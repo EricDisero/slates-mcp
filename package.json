@@ -1,0 +1,19 @@
+{
+  "name": "slates-mcp-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf packages/*/dist"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.7.0"
+  }
+}

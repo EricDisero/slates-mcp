@@ -1,0 +1,5 @@
+export * from './auth.js'
+export { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from './clients/cloud.js'
+export { SlatesDesktopClient } from './clients/desktop.js'
+export * as operations from './operations/index.js'
+export { ALL_OPERATIONS, defaultContext, type Operation, type OperationContext, type OperationResult } from './operations/index.js'
