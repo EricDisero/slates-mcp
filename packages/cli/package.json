@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Slates CLI — drive Slates from your terminal or Claude Code via shell-out.",
   "license": "UNLICENSED",
   "type": "module",
@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slatesvideo/shared": "0.1.0",
+    "@slatesvideo/shared": "0.2.0",
     "commander": "^12.1.0",
     "open": "^10.0.0",
     "zod": "^3.23.0"

@@ -866,6 +866,201 @@ export const generateVideo: Operation<{
   },
 }
 
+// ── Generate lip-sync ───────────────────────────────────────────
+
+export const generateLipSync: Operation<{
+  projectId: string
+  sourceAssetId: string
+  sourceType: 'image' | 'video'
+  audioMethod: 'tts' | 'upload'
+  ttsText?: string
+  ttsVoice?: string
+  ttsLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
+  ttsSpeed?: number
+  audioFilePath?: string
+  avatarModel?: 'avatar-standard' | 'avatar-pro'
+  confirm?: boolean
+}> = {
+  id: 'slates_generate_lip_sync',
+  description:
+    'Lip-sync a still image (avatar) or a video clip to audio via Kling. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED — the source asset must already exist in the project. Two flows: (1) sourceType=video → lip-syncs an existing talking-head clip to new audio (~$0.11 / 5s, no confirm gate); (2) sourceType=image → animates a still portrait into a talking avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s, hits the >$0.50 confirm gate). Audio comes from either TTS (pass ttsText) or an uploaded file (pass audioFilePath). Always 5 seconds — Kling lip-sync does not support other durations.',
+  input: z.object({
+    projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
+    sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
+    sourceType: z.enum(['image', 'video']).describe('"image" = animate a still portrait (avatar). "video" = re-sync an existing talking-head clip. Determines pricing — be deliberate.'),
+    audioMethod: z.enum(['tts', 'upload']).describe('"tts" = generate speech from ttsText. "upload" = use the file at audioFilePath (absolute path on the user\'s machine).'),
+    ttsText: z.string().min(1).max(2000).optional().describe('Required when audioMethod=tts. The exact words the avatar/clip will speak.'),
+    ttsVoice: z.string().optional().describe('Kling voice id (e.g. "oversea_male1"). See slates-prompting-lip-sync skill for the voice catalog.'),
+    ttsLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('TTS language. Default EN.'),
+    ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
+    audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
+    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity. Ignored when sourceType=video.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate. Required for avatar-pro.'),
+  }),
+  async run(input, ctx) {
+    if (input.audioMethod === 'tts' && !input.ttsText) {
+      return ok({
+        requires_clarification: true,
+        missing: ['ttsText'],
+        message: 'audioMethod=tts requires ttsText. Pass the exact words the avatar/clip will speak.',
+      })
+    }
+    if (input.audioMethod === 'upload' && !input.audioFilePath) {
+      return ok({
+        requires_clarification: true,
+        missing: ['audioFilePath'],
+        message: 'audioMethod=upload requires audioFilePath. Pass an absolute path to the audio file on the user\'s machine.',
+      })
+    }
+
+    let costKey: string
+    if (input.sourceType === 'video') {
+      costKey = 'kling-lip-sync-video-5s'
+    } else {
+      costKey = input.avatarModel === 'avatar-pro'
+        ? 'kling-lip-sync-avatar-pro-5s'
+        : 'kling-lip-sync-avatar-5s'
+    }
+
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
+    const totalCents = entry.cost_cents
+    if (totalCents > 50 && !input.confirm) {
+      return ok({
+        requires_confirm: true,
+        variant: costKey,
+        estimated_cents: totalCents,
+        estimated_dollars: (totalCents / 100).toFixed(2),
+        message:
+          `Cost: $${(totalCents / 100).toFixed(2)} for 5s of ${costKey}. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend.`,
+      })
+    }
+
+    const desktop = ctx.desktop()
+    const result = await desktop.post<{
+      success: boolean
+      asset?: Record<string, unknown>
+      generationId?: string
+      error?: string
+    }>('/agent/generation/lip-sync', {
+      projectId: input.projectId,
+      sourceAssetId: input.sourceAssetId,
+      audioMethod: input.audioMethod,
+      ttsText: input.ttsText,
+      ttsVoice: input.ttsVoice,
+      ttsLanguage: input.ttsLanguage,
+      ttsSpeed: input.ttsSpeed,
+      audioFilePath: input.audioFilePath,
+      avatarModel: input.avatarModel,
+      estimatedCost: totalCents,
+    })
+    if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
+
+    return {
+      text:
+        `Generated 5s lip-sync (${costKey}) into project ${input.projectId} ` +
+        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+        (input.audioMethod === 'tts'
+          ? `Spoken: "${(input.ttsText ?? '').slice(0, 60)}${(input.ttsText ?? '').length > 60 ? '...' : ''}"`
+          : `Audio: ${input.audioFilePath}`),
+      data: {
+        variant: costKey,
+        projectId: input.projectId,
+        sourceType: input.sourceType,
+        sourceAssetId: input.sourceAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+        asset: result.asset,
+        generationId: result.generationId,
+      },
+    }
+  },
+}
+
+// ── Generate motion transfer ────────────────────────────────────
+
+export const generateMotionTransfer: Operation<{
+  projectId: string
+  sourceVideoAssetId: string
+  targetImageAssetId: string
+  motionModel?: 'kling-mc-std' | 'kling-mc-pro'
+  characterOrientation?: 'video' | 'image'
+  prompt?: string
+  confirm?: boolean
+}> = {
+  id: 'slates_generate_motion_transfer',
+  description:
+    'Transfer the motion from a reference video onto a target image character via Kling Motion Control. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both source video and target image must already exist as assets in the project. Two tiers: kling-mc-std ($0.95 / 5s) and kling-mc-pro ($1.26 / 5s) — both hit the >$0.50 confirm gate. Always 5 seconds.',
+  input: z.object({
+    projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
+    sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project.'),
+    targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project.'),
+    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('std ($0.95) for general motion. pro ($1.26) for cleaner anatomy + identity preservation. Default pro — pick std deliberately for cost savings.'),
+    characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
+    prompt: z.string().optional().describe('Optional refinement prompt. Read slates-prompting-motion-transfer for guidance.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 confirm gate. Required — both tiers exceed.'),
+  }),
+  async run(input, ctx) {
+    const motionModel = input.motionModel ?? 'kling-mc-pro'
+    const costKey = motionModel === 'kling-mc-std' ? 'kling-mc-std-5s' : 'kling-mc-pro-5s'
+
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
+    const totalCents = entry.cost_cents
+    if (totalCents > 50 && !input.confirm) {
+      return ok({
+        requires_confirm: true,
+        variant: costKey,
+        estimated_cents: totalCents,
+        estimated_dollars: (totalCents / 100).toFixed(2),
+        message:
+          `Cost: $${(totalCents / 100).toFixed(2)} for 5s of ${motionModel}. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend, or pick kling-mc-std to save $0.31.`,
+      })
+    }
+
+    const desktop = ctx.desktop()
+    const result = await desktop.post<{
+      success: boolean
+      asset?: Record<string, unknown>
+      generationId?: string
+      error?: string
+    }>('/agent/generation/motion-transfer', {
+      projectId: input.projectId,
+      sourceVideoAssetId: input.sourceVideoAssetId,
+      targetImageAssetId: input.targetImageAssetId,
+      motionModel,
+      characterOrientation: input.characterOrientation ?? 'video',
+      prompt: input.prompt,
+      estimatedCost: totalCents,
+    })
+    if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
+
+    return {
+      text:
+        `Generated 5s motion transfer (${motionModel}) into project ${input.projectId} ` +
+        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+        (input.prompt ? ` Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` : ''),
+      data: {
+        variant: costKey,
+        motionModel,
+        projectId: input.projectId,
+        sourceVideoAssetId: input.sourceVideoAssetId,
+        targetImageAssetId: input.targetImageAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+        asset: result.asset,
+        generationId: result.generationId,
+      },
+    }
+  },
+}
+
 // ── Aggregation ─────────────────────────────────────────────────
 
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
@@ -896,4 +1091,6 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addFrame as unknown as Operation<unknown>,
   generateImage as unknown as Operation<unknown>,
   generateVideo as unknown as Operation<unknown>,
+  generateLipSync as unknown as Operation<unknown>,
+  generateMotionTransfer as unknown as Operation<unknown>,
 ]
