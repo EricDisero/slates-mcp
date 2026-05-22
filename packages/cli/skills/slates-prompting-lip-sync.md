@@ -153,6 +153,15 @@ Don't default to pro. The $0.44 delta per take adds up across iteration.
 - TTS for final ads (production should use real voice or cloned voice — the upload flow)
 - Uploading raw recordings — clean noise + level the file first, lip detection is sensitive
 
+## Confirm gate: cost + codes, no inline preview
+
+Lip-sync is mechanical — the model re-syncs the chosen source to the chosen audio. The confirm response carries the source asset's code so you can announce it in chat.
+
+- ✅ "Lip-syncing **IMG-A12 — Founder Portrait** to the new line. $0.86 on avatar-pro. Confirm?"
+- ❌ "Using the founder image..." (which? Three exist.)
+
+Don't second-guess the source. If the output is wrong, iterate on source choice or audio, not on a refinement prompt (there isn't one).
+
 ## Sources
 
 - [fal.ai — Kling LipSync API](https://fal.ai/models/fal-ai/kling-video/lipsync/text-to-video/api)

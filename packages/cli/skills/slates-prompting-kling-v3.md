@@ -143,6 +143,15 @@ Cinematic example (paraphrasing fal blog patterns):
 > Shot 2: Medium shot of a detective in a trench coat ducking under an awning, water dripping from his hat brim. [Detective: weary, raspy]: 'I knew she'd come back.' Ambient noise: distant traffic, rain on metal.
 > Shot 3: Close-up on his eyes, narrowing as headlights flash across his face."
 
+## Pre-flight: references arrive inline, refer by code
+
+When you call `slates_generate_video` with `firstFrameAssetId` or `ingredientAssetIds`, the first call returns those references **inline as image content blocks** alongside cost + `requires_confirm: true`. Look at them, revise prompt if needed, then re-call with `confirm=true`. Kling Omni multi-character with several ingredient images especially benefits — confirm each character image lands cleanly before spending $0.16/s.
+
+When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Detective Closeup`. The user sees that code as a gallery badge.
+
+- ✅ "I'm anchoring on **IMG-A12** as the detective and **IMG-A18** as the alleyway environment — Omni will handle the line delivery in EN."
+- ❌ "I'm using the detective image and the alley one..." (which alley? Three exist.)
+
 ## Sources
 
 - [fal.ai — Kling 3.0 Prompting Guide](https://blog.fal.ai/kling-3-0-prompting-guide/)

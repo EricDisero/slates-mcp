@@ -177,7 +177,7 @@ export const listAssets: Operation<{ projectId: string }> = {
 export const getAssetImage: Operation<{ id: string; fullRes?: boolean }> = {
   id: 'slates_get_asset_image',
   description:
-    'Read an asset image off disk and return it inline as base64. Used for vision: the calling LLM sees the actual pixels. Default JPEG 85% ≤1024px long-edge for token economy. Pass fullRes=true for the original PNG.',
+    'Read an asset image off disk and return it inline as base64 so the calling LLM sees the actual pixels. The response also carries the asset\'s short code (e.g. IMG-A12) and human label — USE these when referring to the asset in chat with the user (e.g. "I\'m using IMG-A12 — Beach Sunset as the first frame") so they can match it to the badged thumbnail in the Slates gallery. Default JPEG 85% ≤1024px long-edge for token economy. Pass fullRes=true for the original PNG.',
   input: z.object({
     id: z.string().uuid(),
     fullRes: z.boolean().optional(),
@@ -185,15 +185,116 @@ export const getAssetImage: Operation<{ id: string; fullRes?: boolean }> = {
   async run(input, ctx) {
     const r = await ctx.desktop().get<{
       asset_id: string
+      code: string | null
+      label: string | null
       file_path: string
       data: string
       mimeType: string
       bytes: number
     }>('/agent/assets/image', { id: input.id, fullRes: input.fullRes ?? false })
+    const refLabel = r.code ? (r.label ? `${r.code} — ${r.label}` : r.code) : r.asset_id
     return {
-      text: `Loaded asset ${r.asset_id} (${r.bytes} bytes, ${r.mimeType}) from ${r.file_path}`,
+      text: `Loaded ${refLabel} (${r.bytes} bytes, ${r.mimeType}). When referring to this asset to the user, use "${refLabel}" — they can find the matching badge in the Slates gallery.`,
       images: [{ data: r.data, mimeType: r.mimeType }],
-      data: { asset_id: r.asset_id, file_path: r.file_path, bytes: r.bytes, mimeType: r.mimeType },
+      data: {
+        asset_id: r.asset_id,
+        code: r.code,
+        label: r.label,
+        file_path: r.file_path,
+        bytes: r.bytes,
+        mimeType: r.mimeType,
+      },
+    }
+  },
+}
+
+export const getAssetsBatch: Operation<{ ids: string[] }> = {
+  id: 'slates_get_assets_batch',
+  description:
+    'Fetch up to 8 image-asset thumbnails inline in a single call. Use this when picking the right reference from a project gallery — one round trip beats N. Each returned image carries its short code (IMG-A12) and label so you can speak about candidates in the user\'s shared vocabulary ("between IMG-A12 and IMG-A14, the second has the right composition"). Video assets are not supported here — call slates_get_asset_video_frames for those.',
+  input: z.object({
+    ids: z.array(z.string().uuid()).min(1).max(8).describe('1-8 image-asset ids. Order is preserved in the response.'),
+  }),
+  async run(input, ctx) {
+    const r = await ctx.desktop().post<{
+      images: Array<{
+        asset_id: string
+        code: string | null
+        label: string | null
+        file_path: string
+        data: string
+        mimeType: string
+        bytes: number
+      }>
+      errors: Array<{ asset_id: string; error: string }>
+    }>('/agent/assets/batch-images', { ids: input.ids })
+    const refs = r.images.map((i) =>
+      i.code ? (i.label ? `${i.code} — ${i.label}` : i.code) : i.asset_id
+    )
+    const errSummary =
+      r.errors.length > 0
+        ? ` Skipped ${r.errors.length}: ${r.errors.map((e) => `${e.asset_id} (${e.error})`).join('; ')}.`
+        : ''
+    return {
+      text:
+        `Loaded ${r.images.length} image(s): ${refs.join(', ')}.` +
+        errSummary +
+        ` When discussing these with the user, reference them by their codes so they can match each one to a gallery badge.`,
+      images: r.images.map((i) => ({ data: i.data, mimeType: i.mimeType })),
+      data: {
+        images: r.images.map((i) => ({
+          asset_id: i.asset_id,
+          code: i.code,
+          label: i.label,
+          file_path: i.file_path,
+          bytes: i.bytes,
+          mimeType: i.mimeType,
+        })),
+        errors: r.errors,
+      },
+    }
+  },
+}
+
+export const getAssetVideoFrames: Operation<{ id: string; count?: number }> = {
+  id: 'slates_get_asset_video_frames',
+  description:
+    'Extract N evenly-spaced keyframes from a video asset and return them inline as base64 JPEGs. This is the "see the video" path — LLMs can\'t consume video natively, so frames are the next best thing. Default 3 frames (start / middle / end). Bump to 5-8 for longer clips or when motion is the whole story. Use this before writing a motion-transfer prompt, a lip-sync refinement, or any iteration on a video clip. Response carries the asset\'s code (e.g. VID-V3) + label — name them when discussing the clip with the user.',
+  input: z.object({
+    id: z.string().uuid(),
+    count: z.number().int().min(1).max(8).optional().describe('Number of frames to extract. Default 3.'),
+  }),
+  async run(input, ctx) {
+    const params: Record<string, string | number> = { id: input.id }
+    if (input.count != null) params.count = input.count
+    const r = await ctx.desktop().get<{
+      asset_id: string
+      code: string | null
+      label: string | null
+      file_path: string
+      duration_seconds: number
+      frames: Array<{ data: string; mimeType: string; timestamp_seconds: number; bytes: number }>
+    }>('/agent/assets/video-frames', params)
+    const refLabel = r.code ? (r.label ? `${r.code} — ${r.label}` : r.code) : r.asset_id
+    const timestamps = r.frames.map((f) => `${f.timestamp_seconds}s`).join(', ')
+    return {
+      text:
+        `Extracted ${r.frames.length} frame(s) from ${refLabel} ` +
+        `(${r.duration_seconds}s clip) at: ${timestamps}. ` +
+        `When referring to this video with the user, call it "${refLabel}".`,
+      images: r.frames.map((f) => ({ data: f.data, mimeType: f.mimeType })),
+      data: {
+        asset_id: r.asset_id,
+        code: r.code,
+        label: r.label,
+        file_path: r.file_path,
+        duration_seconds: r.duration_seconds,
+        frames: r.frames.map((f) => ({
+          timestamp_seconds: f.timestamp_seconds,
+          bytes: f.bytes,
+          mimeType: f.mimeType,
+        })),
+      },
     }
   },
 }
@@ -447,6 +548,136 @@ export const addFrame: Operation<{
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/frames', input))
   },
+}
+
+// ── Reference preview helper ────────────────────────────────────
+// When a generation accepts asset ids as references (first/last frame,
+// ingredients, source video), the confirm gate inlines those assets so the
+// calling LLM literally sees what it's working with before committing
+// spend. Images come back as one base64 each; videos come back as N
+// evenly-spaced keyframes (default 3). Each preview carries the asset's
+// short code + label so the LLM can name them in chat using the same
+// vocabulary the user sees on the gallery badge.
+
+interface ReferencePreview {
+  // Human-readable reference for chat ("IMG-A12 — Beach Sunset").
+  ref: string
+  role: string
+  images: Array<{ data: string; mimeType: string }>
+  meta: {
+    asset_id: string
+    code: string | null
+    label: string | null
+    type: 'image' | 'video'
+    file_path: string
+    frame_count?: number
+  }
+}
+
+function formatRef(asset: { asset_id: string; code: string | null; label: string | null }): string {
+  if (!asset.code) return asset.asset_id
+  return asset.label ? `${asset.code} — ${asset.label}` : asset.code
+}
+
+// Cheap metadata-only lookup used by the mechanical-op confirm gates
+// (motion_transfer, lip_sync). Returns the user-facing reference string
+// without pulling any pixels — purely so the agent can announce the
+// chosen assets to the user in shared vocabulary.
+async function lookupAssetRef(
+  desktop: { get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<T> },
+  id: string
+): Promise<string> {
+  try {
+    const r = await desktop.get<{ code: string | null; label: string | null }>('/agent/assets/path', { id })
+    return formatRef({ asset_id: id, code: r.code ?? null, label: r.label ?? null })
+  } catch {
+    return id
+  }
+}
+
+async function previewAsset(
+  ctx: OperationContext,
+  id: string,
+  type: 'image' | 'video',
+  role: string,
+  videoFrameCount = 3
+): Promise<ReferencePreview> {
+  const desktop = ctx.desktop()
+  if (type === 'image') {
+    const r = await desktop.get<{
+      asset_id: string
+      code: string | null
+      label: string | null
+      file_path: string
+      data: string
+      mimeType: string
+      bytes: number
+    }>('/agent/assets/image', { id })
+    return {
+      ref: formatRef(r),
+      role,
+      images: [{ data: r.data, mimeType: r.mimeType }],
+      meta: {
+        asset_id: r.asset_id,
+        code: r.code,
+        label: r.label,
+        type: 'image',
+        file_path: r.file_path,
+      },
+    }
+  }
+  const r = await desktop.get<{
+    asset_id: string
+    code: string | null
+    label: string | null
+    file_path: string
+    duration_seconds: number
+    frames: Array<{ data: string; mimeType: string; timestamp_seconds: number; bytes: number }>
+  }>('/agent/assets/video-frames', { id, count: videoFrameCount })
+  return {
+    ref: formatRef(r),
+    role,
+    images: r.frames.map((f) => ({ data: f.data, mimeType: f.mimeType })),
+    meta: {
+      asset_id: r.asset_id,
+      code: r.code,
+      label: r.label,
+      type: 'video',
+      file_path: r.file_path,
+      frame_count: r.frames.length,
+    },
+  }
+}
+
+async function previewAssets(
+  ctx: OperationContext,
+  refs: Array<{ id: string; type: 'image' | 'video'; role: string }>
+): Promise<ReferencePreview[]> {
+  // Sequential — desktop is local, parallel buys nothing and the order
+  // matters for the confirm-gate text (first frame, last frame, ingredients...).
+  const out: ReferencePreview[] = []
+  for (const r of refs) {
+    try {
+      out.push(await previewAsset(ctx, r.id, r.type, r.role))
+    } catch (err) {
+      // Best-effort previews — a missing frame shouldn't block the gen,
+      // but flag it so the agent sees the gap.
+      out.push({
+        ref: `[unavailable] ${r.id}`,
+        role: r.role,
+        images: [],
+        meta: {
+          asset_id: r.id,
+          code: null,
+          label: null,
+          type: r.type,
+          file_path: '',
+        },
+      })
+      void err
+    }
+  }
+  return out
 }
 
 // ── Generation (cloud-routed, credits-default) ──────────────────
@@ -808,17 +1039,59 @@ export const generateVideo: Operation<{
       )
     }
     const totalCents = entry.cost_cents
-    if (totalCents > 50 && !input.confirm) {
-      return ok({
-        requires_confirm: true,
-        model: input.model,
-        variant: costKey,
-        estimated_cents: totalCents,
-        estimated_dollars: (totalCents / 100).toFixed(2),
-        message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for ${input.duration}s of ${input.model}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend, or pick a cheaper model / shorter duration.`,
-      })
+
+    // Pre-flight confirm gate. Fires when:
+    //   (a) cost > $0.50 (the cost gate), OR
+    //   (b) any reference assets are involved (the look-first gate)
+    // When references are present, the response inlines them as image
+    // content blocks (and video keyframes for video refs) so the LLM
+    // literally sees what it's about to use before committing spend.
+    // The text steers the LLM to discuss the refs with the user by their
+    // code+label so the conversation maps onto the gallery badges.
+    const referenceRefs: Array<{ id: string; type: 'image' | 'video'; role: string }> = []
+    if (input.firstFrameAssetId) {
+      referenceRefs.push({ id: input.firstFrameAssetId, type: 'image', role: 'first frame' })
+    }
+    if (input.lastFrameAssetId) {
+      referenceRefs.push({ id: input.lastFrameAssetId, type: 'image', role: 'last frame' })
+    }
+    for (const id of input.ingredientAssetIds ?? []) {
+      referenceRefs.push({ id, type: 'image', role: 'ingredient' })
+    }
+    const hasReferences = referenceRefs.length > 0
+
+    if ((totalCents > 50 || hasReferences) && !input.confirm) {
+      const previews = hasReferences ? await previewAssets(ctx, referenceRefs) : []
+      const refLines = previews.map((p) => `  - ${p.role}: ${p.ref}`).join('\n')
+      const refSummary = hasReferences
+        ? `\n\nReferences attached above (in order — first frame, last frame, then ingredients):\n${refLines}\n\nReview them against your prompt. If the references suggest a different motion / framing / ` +
+          `style than the current prompt captures, REVISE the prompt before confirming. When you talk to the user about this gen, refer to each reference by its code (e.g. "${previews[0]?.ref ?? 'IMG-A?'}") — they'll see the matching badge in the Slates gallery.`
+        : ''
+      const refImages = previews.flatMap((p) => p.images)
+      return {
+        text:
+          `Pre-flight for ${input.duration}s ${input.model} (${costKey}): ` +
+          `$${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+          refSummary +
+          `\n\nWhen ready, re-call slates_generate_video with confirm=true and the (possibly revised) prompt.`,
+        images: refImages,
+        data: {
+          requires_confirm: true,
+          model: input.model,
+          variant: costKey,
+          estimated_cents: totalCents,
+          estimated_dollars: (totalCents / 100).toFixed(2),
+          references: previews.map((p) => ({
+            role: p.role,
+            ref: p.ref,
+            asset_id: p.meta.asset_id,
+            code: p.meta.code,
+            label: p.meta.label,
+            type: p.meta.type,
+            frame_count: p.meta.frame_count,
+          })),
+        },
+      }
     }
 
     const desktop = ctx.desktop()
@@ -927,15 +1200,27 @@ export const generateLipSync: Operation<{
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
     const totalCents = entry.cost_cents
+
+    // Cost confirm gate. Lip-sync is mechanical — the model re-syncs the
+    // user-chosen source to the user-chosen audio. The agent doesn't
+    // write a prompt that depends on what the source looks like, so we
+    // skip the inline preview and just announce the source code in text.
     if (totalCents > 50 && !input.confirm) {
+      const sourceRef = await lookupAssetRef(ctx.desktop(), input.sourceAssetId)
+      const audioPreview = input.audioMethod === 'tts'
+        ? `Audio: TTS — "${(input.ttsText ?? '').slice(0, 120)}"`
+        : `Audio: ${input.audioFilePath}`
       return ok({
         requires_confirm: true,
         variant: costKey,
         estimated_cents: totalCents,
         estimated_dollars: (totalCents / 100).toFixed(2),
+        source_ref: sourceRef,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for 5s of ${costKey}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend.`,
+          `Cost: $${(totalCents / 100).toFixed(2)} for 5s ${costKey}. ` +
+          `Source: ${sourceRef}. ${audioPreview}. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend. ` +
+          `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
       })
     }
 
@@ -1012,15 +1297,29 @@ export const generateMotionTransfer: Operation<{
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
     const totalCents = entry.cost_cents
+
+    // Cost confirm gate. Motion transfer is mechanical — the model
+    // applies source motion to target image deterministically. We don't
+    // burn tokens previewing assets the user already chose; codes in the
+    // text are enough to keep the chat unambiguous.
     if (totalCents > 50 && !input.confirm) {
+      const desktop = ctx.desktop()
+      const [source, target] = await Promise.all([
+        lookupAssetRef(desktop, input.sourceVideoAssetId),
+        lookupAssetRef(desktop, input.targetImageAssetId),
+      ])
       return ok({
         requires_confirm: true,
         variant: costKey,
         estimated_cents: totalCents,
         estimated_dollars: (totalCents / 100).toFixed(2),
+        source_ref: source,
+        target_ref: target,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for 5s of ${motionModel}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend, or pick kling-mc-std to save $0.31.`,
+          `Cost: $${(totalCents / 100).toFixed(2)} for 5s ${motionModel}. ` +
+          `Transferring motion from ${source} onto ${target}. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend, or pick kling-mc-std to save $0.31. ` +
+          `When discussing with the user, refer to the assets by those codes — they'll match the gallery badges.`,
       })
     }
 
@@ -1074,6 +1373,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getProject as unknown as Operation<unknown>,
   listAssets as unknown as Operation<unknown>,
   getAssetImage as unknown as Operation<unknown>,
+  getAssetsBatch as unknown as Operation<unknown>,
+  getAssetVideoFrames as unknown as Operation<unknown>,
   uploadReferenceImage as unknown as Operation<unknown>,
   listFolders as unknown as Operation<unknown>,
   createFolder as unknown as Operation<unknown>,

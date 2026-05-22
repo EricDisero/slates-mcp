@@ -133,6 +133,15 @@ Leave it empty if you don't have a specific atmospheric note.
 - Iteration is expensive: 4 takes at pro = $5.04. Lock framing + driving video before tier-up to pro.
 - Always run a single std take first to validate the motion + framing combo before committing to pro
 
+## Confirm gate: cost + codes, no inline preview
+
+Motion transfer is mechanical — the model deterministically applies source motion to target image. Both tiers trip the >$0.50 confirm gate; the response includes the asset codes for source and target so you can announce them in chat.
+
+- ✅ "Transferring motion from **VID-V3** onto **IMG-A12 — Detective Closeup**. $1.26, confirm?"
+- ❌ "Using the walk video and the detective image..." (multiple of each in the project.)
+
+Don't second-guess the assets the user picked — the model executes the transfer. If the output is wrong, iterate on motion source or target choice, not on a refinement prompt.
+
 ## Sources
 
 - [fal.ai — Kling Motion Control v2.6 Standard](https://fal.ai/models/fal-ai/kling-video/v2.6/standard/motion-control/api)

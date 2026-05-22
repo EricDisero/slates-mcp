@@ -128,6 +128,15 @@ Also fine: positive reframing ("empty street" not "no cars").
 **Cinematic anchor (atlabs):**
 > "Modern Rural Aesthetics, Cinematic Commercial quality, shot with Sony A7S3/cinema camera, 4K/8K ultra-clear, Extreme Macro, natural transparent lighting, healing ASMR, no historical costume drama feel."
 
+## Pre-flight: references arrive inline, refer by code
+
+When you call `slates_generate_video` with reference asset IDs (firstFrameAssetId, lastFrameAssetId, ingredientAssetIds), the first call returns those references **inline as image content blocks** alongside a cost estimate and `requires_confirm: true`. **Look at the references** — if they suggest a different framing, lighting, or motion than your current prompt captures, revise the prompt before re-calling with `confirm=true`.
+
+When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Beach Sunset`. The user sees that code as a badge on the gallery thumbnail, so they can match what you're saying to what they're looking at.
+
+- ✅ "I'm using **IMG-A12** as the first frame and **IMG-A15** as the last frame — the camera move is going to be a slow dolly forward through the gap."
+- ❌ "I'm using the first beach image and the last one..." (which? They have four.)
+
 ## Sources
 
 - [fal.ai — How to Use Seedance 2.0](https://fal.ai/learn/tools/how-to-use-seedance-2-0)

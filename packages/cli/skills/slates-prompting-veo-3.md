@@ -131,6 +131,15 @@ Verbatim multi-beat:
 
 > "Camera locked at eye level, medium close-up on a 35mm lens: a startup founder in his late 30s with short black hair and light stubble, wearing a charcoal cotton hoodie, speaking directly to camera, leaning slightly forward as he speaks, lifting one hand to emphasize a point, then relaxing back to neutral, in a quiet office during late afternoon, with blurred monitors glowing faintly in the background, lit by soft daylight from a side window with gentle fill on the opposite side and natural falloff across his face. Style: fine skin pores, visible fabric weave, subtle contrast, no gloss or sharpening. Audio: The founder says, 'This update cuts setup time in half, helping teams get started faster.' (no subtitles). Soft office ambience."
 
+## Pre-flight: references arrive inline, refer by code
+
+When you call `slates_generate_video` with `firstFrameAssetId` / `lastFrameAssetId` / `ingredientAssetIds`, the first call returns those references **inline as image content blocks** alongside a cost estimate and `requires_confirm: true`. Veo's strongest move is first-frame + last-frame; the pre-flight is where you confirm the two frames actually anchor the motion you wrote. Revise the prompt before `confirm=true` if needed.
+
+When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Founder Headshot`. The user sees that code as a badge on the gallery thumbnail, so they can match what you're saying to what they're looking at.
+
+- ✅ "I'm anchoring on **IMG-A12** as the open shot and **IMG-A18** as the close — the 180° arc lands on her looking offscreen left."
+- ❌ "I'm using two of the founder shots..." (which two? They have six.)
+
 ## Sources
 
 - [Google Cloud — Ultimate Prompting Guide for Veo 3.1](https://cloud.google.com/blog/products/ai-machine-learning/ultimate-prompting-guide-for-veo-3-1)

@@ -7,6 +7,26 @@ description: Lower-level utility skill for any Slates workflow that needs to "ge
 
 Slates returns generated images inline as base64. You see the actual pixels. Use that — don't trust prompt-following blindly.
 
+## Asset codes are your shared vocabulary with the user
+
+Every asset in Slates has a short stable code (e.g. `IMG-A12`, `VID-V3`, `AUD-S1`) and a label derived from its prompt (e.g. `Beach Sunset`). These are visible in the gallery as a corner badge on each thumbnail. **Always refer to assets by their code in chat** so the user can match what you're saying to a specific card in their gallery.
+
+- ✅ "I'm using **IMG-A12 — Beach Sunset** as the first frame. The second-frame candidate **IMG-A15** has the right composition but warmer light — want me to use that one instead?"
+- ❌ "I'm using the beach sunset image..." (user has four beach sunset variants — which one?)
+- ❌ "I'm using asset `7a3f9e4b-...`" (UUIDs aren't readable; user can't match to a badge)
+
+The code is the FORMAL reference. The label is human texture. Use both: `IMG-A12 — Beach Sunset`.
+
+## Vision tools at your disposal
+
+- `slates_get_asset_image` — pull one image into context. Returns its code+label.
+- `slates_get_assets_batch` — pull up to 8 images in one call. Use when picking from a candidate set; cheaper than N individual fetches.
+- `slates_get_asset_video_frames` — extract N keyframes (default 3) from a video and inline them as JPEGs. You can't see video natively; this is how you "look at" a clip before refining its motion prompt.
+
+## Pre-flight is automatic on the gen tools
+
+`slates_generate_video`, `slates_generate_motion_transfer`, and `slates_generate_lip_sync` now show you their reference assets **inline** on the confirm response. You don't need to fetch them yourself — but you DO need to look at what comes back, revise the prompt if the references suggest a different motion/framing, and only then re-call with `confirm=true`.
+
 ## The pattern
 
 1. **Generate.** Call `slates_generate_image` with a prompt. The result is in your context as an image content block.
