@@ -682,8 +682,18 @@ async function previewAssets(
 
 // ── Generation (cloud-routed, credits-default) ──────────────────
 
+// Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
+// in slate/src/shared/pricing.ts: NB2 prices per resolution, FLUX.2 Max prices
+// per resolution (1k is the bare key), Seedream is flat (one key).
+function imageCostKey(model: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite', resolution: '1k' | '2k' | '4k'): string {
+  if (model === 'flux-2-max') return resolution === '1k' ? 'flux-2-max' : `flux-2-max-${resolution}`
+  if (model === 'seedream-5-lite') return 'seedream-5-lite'
+  return `nano-banana-2-${resolution}`
+}
+
 export const generateImage: Operation<{
   prompt: string
+  model?: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite'
   projectId?: string
   resolution?: '1k' | '2k' | '4k'
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
@@ -693,14 +703,15 @@ export const generateImage: Operation<{
 }> = {
   id: 'slates_generate_image',
   description:
-    'Generate an image via Slates credits using Nano Banana 2 (Google Gemini 3 Image). Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). REQUIRED before calling: read the slates-cost-discipline and slates-prompting-nano-banana-2 skills. You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits.',
+    'Generate an image via Slates credits. Three models: nano-banana-2 (Google Gemini 3 Image — default, strongest general image model, well-censored), flux-2-max (FLUX.2 Max — photoreal, less censored, up to 4MP), seedream-5-lite (cheapest at ~$0.05 flat, less censored). Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). FLUX.2 Max and Seedream 5 Lite REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and slates-prompting-nano-banana-2 when using nano-banana-2). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live.'),
-    resolution: z.enum(['1k', '2k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. Same fal.ai price band — never default this.'),
+    model: z.enum(['nano-banana-2', 'flux-2-max', 'seedream-5-lite']).optional().describe('Image model. Default nano-banana-2. Use flux-2-max for photoreal / less-censored, seedream-5-lite for cheapest. flux-2-max & seedream-5-lite require projectId.'),
+    projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for flux-2-max / seedream-5-lite.'),
+    resolution: z.enum(['1k', '2k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. (Seedream is flat-priced regardless; FLUX & NB2 price by resolution.) Never default this.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous.'),
     count: z.number().int().min(1).max(4).optional(),
-    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Up to 14 ref URLs (10 object + 4 character split). Always label each image\'s role in the prompt text per slates-prompting-nano-banana-2 skill.'),
+    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
   }),
   async run(input, ctx) {
@@ -723,16 +734,26 @@ export const generateImage: Operation<{
       })
     }
     const resolution = input.resolution
-    const model = `nano-banana-2-${resolution}`
+    const imageModel = input.model ?? 'nano-banana-2'
+    // FLUX.2 Max / Seedream 5 Lite have no headless path — they route through
+    // the desktop generation pipeline, which needs a project.
+    if (imageModel !== 'nano-banana-2' && !input.projectId) {
+      return ok({
+        requires_clarification: true,
+        missing: ['projectId'],
+        message: `${imageModel} requires projectId (no headless path). Use slates_list_projects / slates_create_project, then re-call with projectId.`,
+      })
+    }
+    const costKey = imageCostKey(imageModel, resolution)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === model)
-    if (!entry) throw new Error(`Model not in registry: ${model}`)
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = entry.cost_cents * (input.count ?? 1)
     if (totalCents > 50 && !input.confirm) {
       return ok({
         requires_confirm: true,
-        model,
+        model: costKey,
         estimated_cents: totalCents,
         estimated_dollars: (totalCents / 100).toFixed(2),
         message:
@@ -760,6 +781,7 @@ export const generateImage: Operation<{
       }>('/agent/generation/image', {
         projectId: input.projectId,
         prompt: input.prompt,
+        model: imageModel,
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
@@ -791,7 +813,8 @@ export const generateImage: Operation<{
           `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
         images,
         data: {
-          model,
+          model: imageModel,
+          costKey,
           projectId: input.projectId,
           aspectRatio: input.aspectRatio,
           resolution,
@@ -823,7 +846,7 @@ export const generateImage: Operation<{
     }>('/proxy/generate', {
       provider: 'fal',
       type: 'image',
-      model,
+      model: costKey,
       endpoint,
       params: {
         prompt: input.prompt,
@@ -865,7 +888,8 @@ export const generateImage: Operation<{
       images,
       data: {
         urls,
-        model,
+        model: imageModel,
+        costKey,
         aspectRatio: input.aspectRatio,
         resolution,
         cost_cents: totalCents,
@@ -924,9 +948,11 @@ type VideoModel = (typeof VIDEO_MODELS)[number]
 //   Kling: kling-v3-{standard|pro|omni}-{N}s — note the user-facing
 //     model id `kling-v3.0-std` maps to registry key `kling-v3-standard`.
 //   Veo:   veo-3.1-{fast|standard}[-4k]-{N}s[-audio]
-//   Seedance: seedance-2-{fast|std}-{N}s — no tier suffix in registry.
-//     Economy vs Priority routes through different providers but the
-//     credit-charged price is the same in the current registry.
+//   Seedance: seedance-2-{fast|std}[-priority]-{N}s. Economy (PiAPI) and
+//     Priority (fal.ai) are DIFFERENT registry keys at DIFFERENT prices —
+//     priority is ~2.2x economy. The cost key MUST encode the tier or the
+//     pre-flight quote understates a priority gen (the desktop charges the
+//     priority key regardless of what we quoted).
 const KLING_TIER_MAP: Record<string, string> = {
   'kling-v3.0-std': 'kling-v3-standard',
   'kling-v3.0-pro': 'kling-v3-pro',
@@ -938,9 +964,13 @@ function videoCostKey(input: {
   duration: number
   videoResolution?: '720p' | '1080p' | '4k'
   sound?: boolean
+  seedanceSpeed?: 'economy' | 'priority'
 }): string {
   if (input.model.startsWith('seedance')) {
-    return `${input.model}-${input.duration}s`
+    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts.
+    return input.seedanceSpeed === 'priority'
+      ? `${input.model}-priority-${input.duration}s`
+      : `${input.model}-${input.duration}s`
   }
   if (input.model.startsWith('veo')) {
     const is4k = input.videoResolution === '4k'
@@ -956,6 +986,17 @@ function videoCostKey(input: {
     return `${tier}-${input.duration}s`
   }
   throw new Error(`Unknown video model: ${input.model}`)
+}
+
+// Maps a video model id to its bundled prompting skill (frontmatter `name:`),
+// so guidance text points at a skill that actually exists. Deriving the name
+// via model.split('-')[0] produced 'slates-prompting-kling' / '...-veo', which
+// match no file — only seedance happened to line up.
+function promptingSkillFor(model: string): string {
+  if (model.startsWith('kling')) return 'slates-prompting-kling-v3'
+  if (model.startsWith('veo')) return 'slates-prompting-veo-3'
+  if (model.startsWith('seedance')) return 'slates-prompting-seedance'
+  return 'slates-cost-discipline'
 }
 
 export const generateVideo: Operation<{
@@ -977,13 +1018,13 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3.1) — video models prompt very differently. projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9. Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance).',
+    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance).',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.enum(VIDEO_MODELS).describe('Pick deliberately. Kling V3.0 std = $0.05/s (cheapest, no audio). Pro = $0.08/s. Omni = $0.16/s (multi-char dialogue + audio). Veo 3.1 fast = $0.225/s, standard = higher. Seedance 2 = ByteDance, includes audio, supports first+last frame.'),
+    model: z.enum(VIDEO_MODELS).describe('Pick deliberately by capability AND cost. Kling V3.0 std = cheapest (no audio); pro = mid; omni = multi-char dialogue + audio. Veo 3.1 = top quality, locks 16:9, audio; fast vs standard. Seedance 2 = ByteDance, audio included, supports first+last frame; pick economy vs priority via seedanceSpeed. For exact per-call credit cost, call slates_estimate_generation_cost or slates_list_available_models — never quote prices from memory (they change).'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
-    duration: z.number().int().min(4).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 6/8/10. Seedance: 4-15. Default 5 if omitted but always be explicit (cost scales linearly).'),
+    duration: z.number().int().min(4).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Default 5 if omitted but always be explicit (cost scales linearly).'),
     videoResolution: z.enum(['720p', '1080p', '4k']).optional().describe('Veo only. 720p / 1080p same price. 4k more expensive.'),
     seedanceSpeed: z.enum(['economy', 'priority']).optional().describe('Seedance only. Economy via PiAPI (cheaper, slower). Priority via fal.ai (faster).'),
     firstFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the starting frame for image-to-video. Must already exist in the project.'),
@@ -1017,10 +1058,30 @@ export const generateVideo: Operation<{
         missing,
         message:
           `Missing required field(s): ${missing.join(', ')}. ` +
-          `Read the slates-cost-discipline + slates-prompting-${input.model.split('-')[0]} skills, ` +
+          `Read the slates-cost-discipline + ${promptingSkillFor(input.model)} skills, ` +
           `or ask the user. Veo locks to 16:9. Kling/Seedance support 1:1 16:9 9:16 4:3 3:4 21:9. ` +
-          `Duration: Kling 5-15s, Veo 6/8/10s, Seedance 4-15s. Cost scales linearly with duration.`,
+          `Duration: Kling 5-15s, Veo 4/6/8s (4K only at 8s), Seedance 4-15s. Cost scales linearly with duration.`,
       })
+    }
+
+    // Veo exists only at discrete durations 4/6/8s, and 4K only at 8s.
+    // Validate up front so the agent gets an actionable message instead of
+    // a generic "Model variant not in registry" throw from the cost lookup.
+    if (input.model.startsWith('veo')) {
+      if (![4, 6, 8].includes(input.duration)) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message: `Veo 3.1 supports only 4s, 6s, or 8s (you passed ${input.duration}s). Pick one of those.`,
+        })
+      }
+      if (input.videoResolution === '4k' && input.duration !== 8) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message: `Veo 3.1 4K renders only at 8s (you passed ${input.duration}s at 4k). Use duration=8 for 4K, or drop to 720p/1080p for 4s/6s.`,
+        })
+      }
     }
 
     const cloud = ctx.cloud()
@@ -1030,6 +1091,7 @@ export const generateVideo: Operation<{
       duration: input.duration,
       videoResolution: input.videoResolution,
       sound: input.sound,
+      seedanceSpeed: input.seedanceSpeed,
     })
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) {

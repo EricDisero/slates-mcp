@@ -27,7 +27,7 @@ const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
 const opsById = new Map<string, Operation<unknown>>(ops.map((o) => [o.id, o]))
 
 const server = new Server(
-  { name: 'slates-studio', version: '0.1.0' },
+  { name: 'slates-studio', version: '0.2.0' },
   { capabilities: { tools: {} } }
 )
 

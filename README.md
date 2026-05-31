@@ -2,11 +2,13 @@
 
 MCP server + CLI + skills package for [Slates](https://slates.video) — drive the AI Video Creation Studio from Claude Code, Cursor, Claude Desktop, ChatGPT, or any MCP-capable client.
 
-This monorepo publishes three packages:
+This monorepo publishes two installable packages, plus their shared core:
 
 - **`@slatesvideo/mcp-server`** — stdio MCP server. Run with `npx -y @slatesvideo/mcp-server`.
 - **`@slatesvideo/cli`** — `slates` binary. Run with `npm i -g @slatesvideo/cli`.
-- **`@slatesvideo/skills`** — agent-side recipe markdown files (bundled inside the CLI package; install with `slates install-skills`).
+- **`@slatesvideo/shared`** — the operations layer both surfaces depend on (published as their dependency, not installed directly).
+
+Agent-side recipe markdown ("skills") ships bundled inside the CLI package — install them into your project with `slates install-skills`.
 
 ## What it does
 
@@ -17,13 +19,13 @@ Both surfaces share one operations layer (`@slatesvideo/shared`) and one config 
 ## Setup
 
 1. Install or update Slates desktop. Open it.
-2. **Settings → Agent Control → toggle on.** This starts a local HTTP server on `127.0.0.1:27272` (or the next free port) and writes the connection file.
-3. Inside Settings → Agent Control, click **Send link** to authorize this machine. You'll get an email with a sign-in link. Click it.
-4. The connection file now has both:
+2. **Settings → Agent Control → enter your email → Send link.** This one click starts the local HTTP server on `127.0.0.1:27272` (or the next free port) AND emails you a sign-in link.
+3. Click the link in your email to authorize this machine.
+4. The connection file is now written with both:
    - `desktop` — port + token for the local server
    - `cloud` — `slates_sk_` token for [slates-api](https://slates-api.fly.dev)
 
-That's it. Both the CLI and the MCP auto-discover the connection file. No env vars, no copy-paste.
+That's it. Both the CLI and the MCP auto-discover the connection file. No env vars, no copy-paste. (Need the local server without the cloud token? There's a raw server toggle under **Advanced** — most people don't need it.)
 
 ## Using it
 
@@ -86,9 +88,9 @@ Operations choose their transport internally. `slates_get_credit_balance` hits t
 ## Privacy + security
 
 - The desktop server is bound to `127.0.0.1` only. It rejects any non-loopback connection at the OS level.
-- Every request is checked for an empty `Origin` header (kills browser-fetch attacks) and a loopback `Host` header (kills DNS rebinding) before the bearer token is even read.
-- The `slates_sk_` token is only ever sent to `slates-api.fly.dev`. Override with `SLATES_CLOUD_BASE_URL` only if you know what you're doing.
-- Tokens are revocable from Slates desktop Settings → Agent Control → Disconnect. Once revoked, the previous token's hash never authenticates again.
+- Every request is rejected if it carries a cross-origin `Origin` header (kills browser-fetch attacks) or a non-loopback `Host` header (kills DNS rebinding), before the bearer token is even read.
+- The `slates_sk_` token is sent only to the configured cloud host (`slates-api.fly.dev` by default). `SLATES_CLOUD_BASE_URL` can override the host for dev/staging, but only over `https://` (or `http://localhost`) — an insecure override is ignored so the token can't be exfiltrated or sent in cleartext.
+- Disconnect (Slates desktop → Settings → Agent Control) revokes the `slates_sk_` token server-side and clears it locally. Once revoked, that token's hash never authenticates again — so a leaked copy stops working too.
 
 ## License
 

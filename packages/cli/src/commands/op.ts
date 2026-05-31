@@ -119,6 +119,7 @@ function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<
       shape?: () => Record<string, ZodLike>
       innerType?: ZodLike
       schema?: ZodLike
+      type?: ZodLike // ZodArray element type
     }
     shape?: Record<string, ZodLike>
   }
@@ -133,17 +134,17 @@ function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<
   // Unwrap ZodOptional / ZodDefault / ZodNullable / ZodEffects / ZodReadonly
   // to find the leaf type. `z.number().optional()` reports typeName
   // 'ZodOptional' with `_def.innerType` pointing at the ZodNumber.
+  const wrappers = new Set([
+    'ZodOptional',
+    'ZodDefault',
+    'ZodNullable',
+    'ZodReadonly',
+    'ZodEffects',
+    'ZodCatch',
+    'ZodBranded',
+  ])
   const unwrap = (t: ZodLike | undefined): ZodLike | undefined => {
     let cur = t
-    const wrappers = new Set([
-      'ZodOptional',
-      'ZodDefault',
-      'ZodNullable',
-      'ZodReadonly',
-      'ZodEffects',
-      'ZodCatch',
-      'ZodBranded',
-    ])
     let depth = 0
     while (cur?._def?.typeName && wrappers.has(cur._def.typeName) && depth < 8) {
       cur = cur._def.innerType ?? cur._def.schema
@@ -152,20 +153,63 @@ function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<
     return cur
   }
 
+  // Does the declared type allow null anywhere in its wrapper chain?
+  // (e.g. z.string().uuid().nullable() — so `--folderId null` → null.)
+  const isNullable = (t: ZodLike | undefined): boolean => {
+    let cur = t
+    let depth = 0
+    while (cur?._def?.typeName && depth < 8) {
+      if (cur._def.typeName === 'ZodNullable') return true
+      if (wrappers.has(cur._def.typeName)) {
+        cur = cur._def.innerType ?? cur._def.schema
+        depth++
+        continue
+      }
+      break
+    }
+    return false
+  }
+
+  const coerceScalar = (fieldType: string, value: string): unknown => {
+    if (fieldType === 'ZodNumber') {
+      const n = Number(value)
+      return Number.isFinite(n) ? n : value
+    }
+    if (fieldType === 'ZodBoolean') return value === 'true' || value === '1'
+    return value
+  }
+
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(raw)) {
-    const leaf = unwrap(shape[key])
+    const declared = shape[key]
+    const leaf = unwrap(declared)
     const fieldType = (leaf?._def?.typeName ?? '') as string
+
+    // `--folderId null` (or a bare `--folderId` → true is NOT null) → JS null
+    // for fields that actually allow null. Enables "move to project root",
+    // "clear character turnaround", etc. from the CLI.
+    if (value === 'null' && isNullable(declared)) {
+      out[key] = null
+      continue
+    }
+
+    // Array fields: a single `--ids X` produced a bare string; repeated
+    // `--ids X --ids Y` produced an array. Accept either, plus comma-split
+    // (`--ids a,b,c`). Coerce each element to the array's element type.
+    if (fieldType === 'ZodArray') {
+      const elemType = (leaf?._def?.type?._def?.typeName ?? '') as string
+      const arr = Array.isArray(value)
+        ? value
+        : typeof value === 'string'
+          ? value.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
+          : [value]
+      out[key] = arr.map((v) => (typeof v === 'string' ? coerceScalar(elemType, v) : v))
+      continue
+    }
+
     if (typeof value === 'string') {
-      if (fieldType === 'ZodNumber') {
-        const n = Number(value)
-        out[key] = Number.isFinite(n) ? n : value
-        continue
-      }
-      if (fieldType === 'ZodBoolean') {
-        out[key] = value === 'true' || value === '1'
-        continue
-      }
+      out[key] = coerceScalar(fieldType, value)
+      continue
     }
     out[key] = value
   }

@@ -1,7 +1,32 @@
 import { requireCloudToken } from '../auth.js'
 
-export const DEFAULT_CLOUD_BASE_URL =
-  process.env.SLATES_CLOUD_BASE_URL ?? 'https://slates-api.fly.dev'
+const FALLBACK_CLOUD_BASE_URL = 'https://slates-api.fly.dev'
+
+// The slates_sk_ bearer is attached to every cloud request. SLATES_CLOUD_BASE_URL
+// may override the host for dev/staging, but ONLY over https (or http to
+// localhost) — otherwise the token could be exfiltrated to an arbitrary host
+// or sent in cleartext. An invalid/insecure override is ignored (falls back to
+// production) rather than silently leaking the token.
+function resolveCloudBaseUrl(): string {
+  const override = process.env.SLATES_CLOUD_BASE_URL
+  if (!override) return FALLBACK_CLOUD_BASE_URL
+  try {
+    const u = new URL(override)
+    const isLoopback = u.hostname === 'localhost' || u.hostname === '127.0.0.1'
+    if (u.protocol === 'https:' || (u.protocol === 'http:' && isLoopback)) {
+      return override.replace(/\/+$/, '')
+    }
+    console.error(
+      `[slates] Ignoring SLATES_CLOUD_BASE_URL="${override}": must be https:// (or http://localhost). ` +
+        `Falling back to ${FALLBACK_CLOUD_BASE_URL} so the auth token is not exposed.`
+    )
+  } catch {
+    console.error(`[slates] Ignoring invalid SLATES_CLOUD_BASE_URL="${override}". Falling back to ${FALLBACK_CLOUD_BASE_URL}.`)
+  }
+  return FALLBACK_CLOUD_BASE_URL
+}
+
+export const DEFAULT_CLOUD_BASE_URL = resolveCloudBaseUrl()
 
 // Thin client for slates-api. Used for credit-aware ops that route through
 // the user's account (generation proxy, credits balance, model registry,
