@@ -66,6 +66,15 @@ export class SlatesCloudClient {
       // fall through
     }
     if (!res.ok) {
+      // 401 = the slates_sk_ token is missing, expired, or was revoked
+      // (Disconnect in Slates Settings kills it server-side). Point at the
+      // two recovery paths instead of echoing an opaque auth error.
+      if (res.status === 401) {
+        throw new Error(
+          `slates-api ${path} rejected the auth token (401) — it's expired or was revoked. ` +
+            'To reconnect, run `slates login` (CLI) or reconnect in Slates → Settings → Agent Control'
+        )
+      }
       const detail =
         parsed && typeof parsed === 'object' && 'error' in parsed
           ? (parsed as { error: string }).error

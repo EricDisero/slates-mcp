@@ -13,6 +13,7 @@
 import { z } from 'zod'
 import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from '../clients/cloud.js'
 import { SlatesDesktopClient } from '../clients/desktop.js'
+import { SKILLS } from '../skills/content.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -49,6 +50,29 @@ function ok(data: unknown, text?: string): OperationResult {
   return {
     text: text ?? JSON.stringify(data, null, 2),
     data,
+  }
+}
+
+// Shared describe-text for the background flag on every generate_* op.
+const BACKGROUND_DESCRIBE =
+  'Submit and return immediately with generationId(s) instead of blocking until the file is saved. ' +
+  'Poll with slates_get_generation_status. Recommended for video (1-5 min renders).'
+
+// Early-return shape when a generation route accepted the job in background
+// mode ({ background: true } in the response). No inline-image fetch — the
+// asset doesn't exist yet; the poller delivers it on completion.
+function backgroundSubmitted(
+  kind: string,
+  ids: string[],
+  extra: Record<string, unknown>
+): OperationResult {
+  const idText = ids.length > 0 ? ids.join(', ') : '(no id returned)'
+  return {
+    text:
+      `Submitted ${kind} in the background — generationId(s): ${idText}. ` +
+      `Poll slates_get_generation_status with each id every 5-15s until status is 'completed' ` +
+      `(video generations commonly take 1-5 minutes). Generations survive app restarts.`,
+    data: { generationIds: ids, status: 'processing', ...extra },
   }
 }
 
@@ -699,11 +723,13 @@ export const generateImage: Operation<{
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
   count?: number
   referenceImageUrls?: string[]
+  referenceAssetIds?: string[]
+  background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_image',
   description:
-    'Generate an image via Slates credits. Three models: nano-banana-2 (Google Gemini 3 Image — default, strongest general image model, well-censored), flux-2-max (FLUX.2 Max — photoreal, less censored, up to 4MP), seedream-5-lite (cheapest at ~$0.05 flat, less censored). Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). FLUX.2 Max and Seedream 5 Lite REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and slates-prompting-nano-banana-2 when using nano-banana-2). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits.',
+    'Generate an image via Slates credits. Three models: nano-banana-2 (Google Gemini 3 Image — default, strongest general image model, well-censored), flux-2-max (FLUX.2 Max — photoreal, less censored, up to 4MP), seedream-5-lite (cheapest at ~$0.05 flat, less censored). Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). FLUX.2 Max and Seedream 5 Lite REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and slates-prompting-nano-banana-2 when using nano-banana-2). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
     model: z.enum(['nano-banana-2', 'flux-2-max', 'seedream-5-lite']).optional().describe('Image model. Default nano-banana-2. Use flux-2-max for photoreal / less-censored, seedream-5-lite for cheapest. flux-2-max & seedream-5-lite require projectId.'),
@@ -712,6 +738,8 @@ export const generateImage: Operation<{
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous.'),
     count: z.number().int().min(1).max(4).optional(),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
+    referenceAssetIds: z.array(z.string().uuid()).max(14).optional().describe("Project asset ids to use as reference/ingredient images (resolved on the desktop). Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
   }),
   async run(input, ctx) {
@@ -744,21 +772,85 @@ export const generateImage: Operation<{
         message: `${imageModel} requires projectId (no headless path). Use slates_list_projects / slates_create_project, then re-call with projectId.`,
       })
     }
+    // referenceAssetIds are PROJECT assets — the desktop resolves them off
+    // disk, so a headless run has nowhere to look them up. Same for
+    // background mode: the poller (slates_get_generation_status) reads the
+    // desktop's generation records.
+    const referenceAssetIds = input.referenceAssetIds ?? []
+    if (referenceAssetIds.length > 0 && !input.projectId) {
+      return ok({
+        requires_clarification: true,
+        missing: ['projectId'],
+        message:
+          'referenceAssetIds are project assets resolved on the desktop — pass the projectId they live in (slates_list_projects to find it).',
+      })
+    }
+    if (input.background && !input.projectId) {
+      return ok({
+        requires_clarification: true,
+        missing: ['projectId'],
+        message:
+          'background=true routes through the desktop generation pipeline (so slates_get_generation_status can poll it) — pass a projectId, or drop background for a blocking headless run.',
+      })
+    }
+    if (referenceAssetIds.length > 0) {
+      await ctx.desktop().requireCapability('image-references', 'reference images on image generation')
+    }
+    if (input.background) {
+      await ctx.desktop().requireCapability('background-generation', 'background generation')
+    }
     const costKey = imageCostKey(imageModel, resolution)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = entry.cost_cents * (input.count ?? 1)
-    if (totalCents > 50 && !input.confirm) {
-      return ok({
-        requires_confirm: true,
-        model: costKey,
-        estimated_cents: totalCents,
-        estimated_dollars: (totalCents / 100).toFixed(2),
-        message:
-          'Cost exceeds $0.50. Re-call with confirm=true to proceed, or pick a smaller resolution / count.',
-      })
+    // Confirm gate. Fires on cost > $0.50, AND (look-first, mirroring
+    // slates_generate_video) whenever reference assets are involved
+    // regardless of cost — the LLM must see what it's referencing before
+    // committing spend.
+    if ((totalCents > 50 || referenceAssetIds.length > 0) && !input.confirm) {
+      if (referenceAssetIds.length === 0) {
+        return ok({
+          requires_confirm: true,
+          model: costKey,
+          estimated_cents: totalCents,
+          estimated_dollars: (totalCents / 100).toFixed(2),
+          message:
+            'Cost exceeds $0.50. Re-call with confirm=true to proceed, or pick a smaller resolution / count.',
+        })
+      }
+      const previews = await previewAssets(
+        ctx,
+        referenceAssetIds.map((id) => ({ id, type: 'image' as const, role: 'reference' }))
+      )
+      const refLines = previews.map((p) => `  - ${p.role}: ${p.ref}`).join('\n')
+      return {
+        text:
+          `Pre-flight for ${imageModel} (${costKey}): ` +
+          `$${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+          `\n\nReference images attached above:\n${refLines}\n\n` +
+          `Review them against your prompt — every reference's role must be labeled in the prompt text. ` +
+          `If the references suggest a different composition / style than the current prompt captures, REVISE the prompt before confirming. ` +
+          `When you talk to the user about this gen, refer to each reference by its code (e.g. "${previews[0]?.ref ?? 'IMG-A?'}") — they'll see the matching badge in the Slates gallery.` +
+          `\n\nWhen ready, re-call slates_generate_image with confirm=true and the (possibly revised) prompt.`,
+        images: previews.flatMap((p) => p.images),
+        data: {
+          requires_confirm: true,
+          model: imageModel,
+          variant: costKey,
+          estimated_cents: totalCents,
+          estimated_dollars: (totalCents / 100).toFixed(2),
+          references: previews.map((p) => ({
+            role: p.role,
+            ref: p.ref,
+            asset_id: p.meta.asset_id,
+            code: p.meta.code,
+            label: p.meta.label,
+            type: p.meta.type,
+          })),
+        },
+      }
     }
 
     // Two paths:
@@ -773,6 +865,7 @@ export const generateImage: Operation<{
       const desktop = ctx.desktop()
       const result = await desktop.post<{
         success: boolean
+        background?: boolean
         asset?: Record<string, unknown>
         assets?: Array<Record<string, unknown>>
         generationId?: string
@@ -785,9 +878,27 @@ export const generateImage: Operation<{
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
+        ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
+        background: input.background,
       })
-      if (!result.success) {
+      // Partial multi-image failure: the desktop attaches an error message
+      // but result.assets still holds the images that DID save. Throwing
+      // here would discard real, paid-for assets and invite a full retry
+      // that double-spends — surface what landed instead.
+      const partialFailure =
+        !result.success && Array.isArray(result.assets) && result.assets.length > 0
+      if (!result.success && !partialFailure) {
         throw new Error(result.error ?? 'Generation failed')
+      }
+      if (result.background) {
+        const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
+        return backgroundSubmitted(`${imageModel} image generation`, ids, {
+          model: imageModel,
+          costKey,
+          projectId: input.projectId,
+          cost_cents: totalCents,
+          cost_dollars: (totalCents / 100).toFixed(2),
+        })
       }
       const assetList: Array<Record<string, unknown>> = result.assets
         ?? (result.asset ? [result.asset] : [])
@@ -806,11 +917,16 @@ export const generateImage: Operation<{
           // Vision payload is best-effort; skip if the disk read fails.
         }
       }
+      const requestedCount = input.count ?? 1
       return {
-        text:
-          `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
-          `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
-          `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
+        text: partialFailure
+          ? `Partial result: ${assetList.length} of ${requestedCount} image(s) saved into project ${input.projectId} ` +
+            `(error on the rest: ${result.error ?? 'unknown error'}). ` +
+            `The saved assets are in data.assets — re-generate only the missing count, don't redo the whole batch. ` +
+            `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`
+          : `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
+            `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+            `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
         images,
         data: {
           model: imageModel,
@@ -822,6 +938,9 @@ export const generateImage: Operation<{
           cost_dollars: (totalCents / 100).toFixed(2),
           assets: assetList,
           generationIds: result.generationIds ?? (result.generationId ? [result.generationId] : []),
+          ...(partialFailure
+            ? { partial: true, error: result.error ?? 'unknown error', requested_count: requestedCount }
+            : {}),
         },
       }
     }
@@ -929,6 +1048,134 @@ async function pollProxyJob(
   throw new Error(`Generation timed out after ${Math.round(timeoutMs / 1000)}s.`)
 }
 
+// ── Edit image ──────────────────────────────────────────────────
+
+export const editImage: Operation<{
+  projectId: string
+  sourceAssetId: string
+  prompt: string
+  editModel?: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite'
+  referenceAssetIds?: string[]
+  resolution?: '1k' | '2k' | '4k'
+  aspectRatio?: string
+  confirm?: boolean
+  background?: boolean
+}> = {
+  id: 'slates_edit_image',
+  description:
+    'Surgically edit an existing image asset with a text instruction (e.g. \'remove the lamppost\', \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The edited result is saved as a NEW asset in the project (prompt prefixed \'[Edit]\'); the source is untouched. Default model nano-banana-2 (only model that also accepts referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    sourceAssetId: z.string().uuid().describe('Image asset to edit. Must already exist in the project.'),
+    prompt: z.string().min(1).max(4000).describe('The edit instruction — describe the change, not the whole image.'),
+    editModel: z.enum(['nano-banana-2', 'flux-2-max', 'seedream-5-lite']).optional(),
+    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('nano-banana-2 only: extra reference images.'),
+    resolution: z.enum(['1k', '2k', '4k']).optional(),
+    aspectRatio: z.string().optional(),
+    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('edit-image', 'image editing')
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
+    const editModel = input.editModel ?? 'nano-banana-2'
+    const resolution = input.resolution ?? '2k'
+    // NB2 edits charge the normal per-resolution NB2 key; FLUX / Seedream
+    // route to their dedicated edit endpoints, priced under '-edit' keys.
+    const costKey =
+      editModel === 'nano-banana-2'
+        ? imageCostKey('nano-banana-2', resolution)
+        : `${imageCostKey(editModel, resolution)}-edit`
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) throw new Error(`Model not in registry: ${costKey}`)
+    const totalCents = entry.cost_cents
+
+    if (totalCents > 50 && !input.confirm) {
+      const sourceRef = await lookupAssetRef(desktop, input.sourceAssetId)
+      return ok({
+        requires_confirm: true,
+        variant: costKey,
+        estimated_cents: totalCents,
+        estimated_dollars: (totalCents / 100).toFixed(2),
+        source_ref: sourceRef,
+        message:
+          `Cost: $${(totalCents / 100).toFixed(2)} to edit ${sourceRef} with ${editModel} (${costKey}). ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend. ` +
+          `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
+      })
+    }
+
+    const result = await desktop.post<{
+      success: boolean
+      background?: boolean
+      asset?: Record<string, unknown>
+      generationId?: string
+      generationIds?: string[]
+      error?: string
+    }>('/agent/generation/edit-image', {
+      projectId: input.projectId,
+      sourceAssetId: input.sourceAssetId,
+      prompt: input.prompt,
+      editModel,
+      referenceAssetIds: input.referenceAssetIds,
+      resolution,
+      aspectRatio: input.aspectRatio,
+      background: input.background,
+    })
+    if (!result.success) throw new Error(result.error ?? 'Image edit failed')
+    if (result.background) {
+      const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
+      return backgroundSubmitted(`${editModel} image edit`, ids, {
+        editModel,
+        variant: costKey,
+        projectId: input.projectId,
+        sourceAssetId: input.sourceAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+      })
+    }
+
+    // Inline the edited result so the LLM sees whether the surgery landed —
+    // same best-effort pattern as slates_generate_image.
+    const images: Array<{ data: string; mimeType: string }> = []
+    const newAssetId = (result.asset as { id?: string } | undefined)?.id
+    if (newAssetId) {
+      try {
+        const img = await desktop.get<{ data: string; mimeType: string; bytes: number }>(
+          '/agent/assets/image',
+          { id: newAssetId }
+        )
+        images.push({ data: img.data, mimeType: img.mimeType })
+      } catch {
+        // Vision payload is best-effort; skip if the disk read fails.
+      }
+    }
+    return {
+      text:
+        `Edited image saved as a new asset in project ${input.projectId} ` +
+        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢) via ${editModel}. ` +
+        `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
+      images,
+      data: {
+        editModel,
+        variant: costKey,
+        projectId: input.projectId,
+        sourceAssetId: input.sourceAssetId,
+        resolution,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+        asset: result.asset,
+        generationId: result.generationId,
+      },
+    }
+  },
+}
+
 // ── Generate video ──────────────────────────────────────────────
 
 const VIDEO_MODELS = [
@@ -1014,11 +1261,12 @@ export const generateVideo: Operation<{
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
   negativePrompt?: string
+  background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance).',
+    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance). No skill files installed? Call slates_get_prompting_guide with the per-model guide (\'slates-prompting-veo-3\' / \'slates-prompting-kling-v3\' / \'slates-prompting-seedance\') and \'slates-cost-discipline\' before first use.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
     model: z.enum(VIDEO_MODELS).describe('Pick deliberately by capability AND cost. Kling V3.0 std = cheapest (no audio); pro = mid; omni = multi-char dialogue + audio. Veo 3.1 = top quality, locks 16:9, audio; fast vs standard. Seedance 2 = ByteDance, audio included, supports first+last frame; pick economy vs priority via seedanceSpeed. For exact per-call credit cost, call slates_estimate_generation_cost or slates_list_available_models — never quote prices from memory (they change).'),
@@ -1034,6 +1282,7 @@ export const generateVideo: Operation<{
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
     negativePrompt: z.string().optional(),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the >$0.50 cost confirm gate (which fires for almost every video gen since they\'re expensive).'),
   }),
   async run(input, ctx) {
@@ -1157,10 +1406,15 @@ export const generateVideo: Operation<{
     }
 
     const desktop = ctx.desktop()
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
     const result = await desktop.post<{
       success: boolean
+      background?: boolean
       asset?: Record<string, unknown>
       generationId?: string
+      generationIds?: string[]
       error?: string
     }>('/agent/generation/video', {
       projectId: input.projectId,
@@ -1177,9 +1431,20 @@ export const generateVideo: Operation<{
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
       negativePrompt: input.negativePrompt,
+      background: input.background,
     })
     if (!result.success) {
       throw new Error(result.error ?? 'Generation failed')
+    }
+    if (result.background) {
+      const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
+      return backgroundSubmitted(`${input.duration}s ${input.model} video generation`, ids, {
+        model: input.model,
+        variant: costKey,
+        projectId: input.projectId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+      })
     }
     return {
       text:
@@ -1214,11 +1479,12 @@ export const generateLipSync: Operation<{
   ttsSpeed?: number
   audioFilePath?: string
   avatarModel?: 'avatar-standard' | 'avatar-pro'
+  background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_lip_sync',
   description:
-    'Lip-sync a still image (avatar) or a video clip to audio via Kling. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED — the source asset must already exist in the project. Two flows: (1) sourceType=video → lip-syncs an existing talking-head clip to new audio (~$0.11 / 5s, no confirm gate); (2) sourceType=image → animates a still portrait into a talking avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s, hits the >$0.50 confirm gate). Audio comes from either TTS (pass ttsText) or an uploaded file (pass audioFilePath). Always 5 seconds — Kling lip-sync does not support other durations.',
+    'Lip-sync a still image (avatar) or a video clip to audio via Kling. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED — the source asset must already exist in the project. Two flows: (1) sourceType=video → lip-syncs an existing talking-head clip to new audio (~$0.11 / 5s, no confirm gate); (2) sourceType=image → animates a still portrait into a talking avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s, hits the >$0.50 confirm gate). Audio comes from either TTS (pass ttsText) or an uploaded file (pass audioFilePath). Always 5 seconds — Kling lip-sync does not support other durations. No skill files installed? Call slates_get_prompting_guide with \'slates-prompting-lip-sync\' (and \'slates-cost-discipline\') before first use.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
     sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
@@ -1230,6 +1496,7 @@ export const generateLipSync: Operation<{
     ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
     avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity. Ignored when sourceType=video.'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate. Required for avatar-pro.'),
   }),
   async run(input, ctx) {
@@ -1287,10 +1554,15 @@ export const generateLipSync: Operation<{
     }
 
     const desktop = ctx.desktop()
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
     const result = await desktop.post<{
       success: boolean
+      background?: boolean
       asset?: Record<string, unknown>
       generationId?: string
+      generationIds?: string[]
       error?: string
     }>('/agent/generation/lip-sync', {
       projectId: input.projectId,
@@ -1303,8 +1575,19 @@ export const generateLipSync: Operation<{
       audioFilePath: input.audioFilePath,
       avatarModel: input.avatarModel,
       estimatedCost: totalCents,
+      background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
+    if (result.background) {
+      const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
+      return backgroundSubmitted(`5s lip-sync (${costKey})`, ids, {
+        variant: costKey,
+        projectId: input.projectId,
+        sourceAssetId: input.sourceAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+      })
+    }
 
     return {
       text:
@@ -1336,11 +1619,12 @@ export const generateMotionTransfer: Operation<{
   motionModel?: 'kling-mc-std' | 'kling-mc-pro'
   characterOrientation?: 'video' | 'image'
   prompt?: string
+  background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_motion_transfer',
   description:
-    'Transfer the motion from a reference video onto a target image character via Kling Motion Control. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both source video and target image must already exist as assets in the project. Two tiers: kling-mc-std ($0.95 / 5s) and kling-mc-pro ($1.26 / 5s) — both hit the >$0.50 confirm gate. Always 5 seconds.',
+    'Transfer the motion from a reference video onto a target image character via Kling Motion Control. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both source video and target image must already exist as assets in the project. Two tiers: kling-mc-std ($0.95 / 5s) and kling-mc-pro ($1.26 / 5s) — both hit the >$0.50 confirm gate. Always 5 seconds. No skill files installed? Call slates_get_prompting_guide with \'slates-prompting-motion-transfer\' (and \'slates-cost-discipline\') before first use.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
     sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project.'),
@@ -1348,6 +1632,7 @@ export const generateMotionTransfer: Operation<{
     motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('std ($0.95) for general motion. pro ($1.26) for cleaner anatomy + identity preservation. Default pro — pick std deliberately for cost savings.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Optional refinement prompt. Read slates-prompting-motion-transfer for guidance.'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 confirm gate. Required — both tiers exceed.'),
   }),
   async run(input, ctx) {
@@ -1386,10 +1671,15 @@ export const generateMotionTransfer: Operation<{
     }
 
     const desktop = ctx.desktop()
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
     const result = await desktop.post<{
       success: boolean
+      background?: boolean
       asset?: Record<string, unknown>
       generationId?: string
+      generationIds?: string[]
       error?: string
     }>('/agent/generation/motion-transfer', {
       projectId: input.projectId,
@@ -1399,8 +1689,21 @@ export const generateMotionTransfer: Operation<{
       characterOrientation: input.characterOrientation ?? 'video',
       prompt: input.prompt,
       estimatedCost: totalCents,
+      background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
+    if (result.background) {
+      const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
+      return backgroundSubmitted(`5s motion transfer (${motionModel})`, ids, {
+        variant: costKey,
+        motionModel,
+        projectId: input.projectId,
+        sourceVideoAssetId: input.sourceVideoAssetId,
+        targetImageAssetId: input.targetImageAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+      })
+    }
 
     return {
       text:
@@ -1418,6 +1721,675 @@ export const generateMotionTransfer: Operation<{
         asset: result.asset,
         generationId: result.generationId,
       },
+    }
+  },
+}
+
+// ── Generation status (background mode) ─────────────────────────
+
+export const getGenerationStatus: Operation<{ generationId: string }> = {
+  id: 'slates_get_generation_status',
+  description:
+    'Poll one generation by id. Returns status (pending/processing/completed/failed/cancelled), the error message on failure, and the finished asset record (with id, code, filePath) on completion. Use after submitting any generate_* op with background=true; poll every 5-15s — video generations commonly take 1-5 minutes. Generations survive app restarts (the desktop resumes in-flight provider jobs on boot).',
+  input: z.object({ generationId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('background-generation', 'background generation')
+    return ok(await desktop.get('/agent/generation/status', { id: input.generationId }))
+  },
+}
+
+export const listGenerations: Operation<{
+  projectId?: string
+  status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
+  limit?: number
+}> = {
+  id: 'slates_list_generations',
+  description:
+    "List recent and in-flight generations (newest first), optionally filtered by project and/or status. Use status='processing' to see everything still running, or no filter to review the recent history with costs and errors.",
+  input: z.object({
+    projectId: z.string().uuid().optional(),
+    status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']).optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('background-generation', 'background generation')
+    return ok(
+      await desktop.get('/agent/generation/list', {
+        projectId: input.projectId,
+        status: input.status,
+        limit: input.limit,
+      })
+    )
+  },
+}
+
+// ── Timeline ────────────────────────────────────────────────────
+
+// Loose view over the timeline payload — enough to write the one-line
+// summaries without over-coupling to the desktop's exact shape.
+interface TimelineView {
+  timeline?: {
+    id?: string
+    frameRate?: number
+    width?: number
+    height?: number
+    durationSec?: number
+    tracks?: Array<{ id?: string; clips?: unknown[] }>
+  }
+  clipIndex?: Array<{
+    clipId?: string
+    trackId?: string
+    assetId?: string
+    code?: string | null
+    label?: string | null
+  }>
+  durationSec?: number
+}
+
+export const getTimeline: Operation<{ projectId: string }> = {
+  id: 'slates_get_timeline',
+  description:
+    'Get (or lazily create) the single editing timeline for a Slates project, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame.',
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    const r = await desktop.get<TimelineView & { success: boolean }>('/agent/timeline', {
+      projectId: input.projectId,
+    })
+    const t = r.timeline ?? {}
+    const clipCount =
+      r.clipIndex?.length ??
+      (t.tracks ?? []).reduce((n, tr) => n + (tr.clips?.length ?? 0), 0)
+    const durationSec = t.durationSec ?? r.durationSec
+    const dims = t.width && t.height ? `${t.width}x${t.height}` : '?'
+    return ok(
+      r,
+      `Timeline for project ${input.projectId}: ${clipCount} clip(s) on ${t.tracks?.length ?? '?'} track(s), ` +
+        `${durationSec ?? '?'}s at ${t.frameRate ?? '?'} fps, ${dims}.\n\n` +
+        JSON.stringify(r, null, 2)
+    )
+  },
+}
+
+export const addClipToTimeline: Operation<{
+  projectId: string
+  assetId: string
+  trackId?: string
+  startFrame?: number
+  sourceInFrame?: number
+  sourceOutFrame?: number
+}> = {
+  id: 'slates_add_clip_to_timeline',
+  description:
+    "Append a video asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: clip goes to the end of the first video track, full source duration, and an empty timeline auto-adopts the clip's resolution and frame rate. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions. Only video assets are accepted.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    assetId: z.string().uuid().describe('Video asset already in the project.'),
+    trackId: z.string().uuid().optional().describe('Target track. Default: the first video track.'),
+    startFrame: z.number().int().min(0).optional().describe('Timeline frame to place the clip at. Default: append after the last clip.'),
+    sourceInFrame: z.number().int().min(0).optional(),
+    sourceOutFrame: z.number().int().min(1).optional(),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    const r = await desktop.post<
+      TimelineView & {
+        success: boolean
+        clip?: {
+          id?: string
+          assetId?: string
+          startFrame?: number
+          durationFrames?: number
+          endFrame?: number
+          code?: string | null
+          label?: string | null
+        }
+      }
+    >('/agent/timeline/add-clip', {
+      projectId: input.projectId,
+      assetId: input.assetId,
+      trackId: input.trackId,
+      startFrame: input.startFrame,
+      sourceInFrame: input.sourceInFrame,
+      sourceOutFrame: input.sourceOutFrame,
+    })
+    const clip = r.clip ?? {}
+    // Code + label for the chat reference: prefer fields on the clip, fall
+    // back to the clipIndex entry for this clip / its source asset.
+    const idx = (r.clipIndex ?? []).find(
+      (c) => (clip.id && c.clipId === clip.id) || (!clip.id && clip.assetId && c.assetId === clip.assetId)
+    )
+    const code = clip.code ?? idx?.code ?? null
+    const label = clip.label ?? idx?.label ?? null
+    const ref = code ? (label ? `${code} — ${label}` : code) : input.assetId
+    const frames =
+      clip.durationFrames ??
+      (clip.endFrame != null && clip.startFrame != null ? clip.endFrame - clip.startFrame : '?')
+    return ok(r, `Added ${ref} to timeline at frame ${clip.startFrame ?? '?'} (${frames} frames long).`)
+  },
+}
+
+export const reorderClips: Operation<{ trackId: string; clipIds: string[] }> = {
+  id: 'slates_reorder_clips',
+  description:
+    "Reorder the clips on one timeline track. Pass the COMPLETE list of the track's clip ids in the desired playback order; clips are repacked back-to-back from frame 0 (existing gaps are removed). Get current clip ids from slates_get_timeline.",
+  input: z.object({
+    trackId: z.string().uuid(),
+    clipIds: z.array(z.string().uuid()).min(1),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/reorder-clips', input))
+  },
+}
+
+export const removeClip: Operation<{ clipId: string }> = {
+  id: 'slates_remove_clip',
+  description:
+    "Remove a clip from the timeline (the source asset is untouched). Leaves a gap at the clip's old position — MP4 export renders gaps as black; call slates_reorder_clips afterwards to close gaps.",
+  input: z.object({ clipId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/remove-clip', input))
+  },
+}
+
+// ── Export ──────────────────────────────────────────────────────
+
+const ABSOLUTE_PATH_RE = /^([A-Za-z]:[\\/]|\/)/
+
+export const exportVideo: Operation<{
+  projectId?: string
+  timelineId?: string
+  outputPath: string
+  overwrite?: boolean
+}> = {
+  id: 'slates_export_video',
+  description:
+    "Render the project's timeline to an MP4 file on disk via the desktop app's ffmpeg pipeline (H.264 + AAC, gaps rendered as black). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline.",
+  input: z
+    .object({
+      projectId: z.string().uuid().optional(),
+      timelineId: z.string().uuid().optional(),
+      outputPath: z
+        .string()
+        .min(5)
+        .refine((p) => ABSOLUTE_PATH_RE.test(p), { message: 'outputPath must be absolute' })
+        .describe('Absolute path for the rendered file, ending in .mp4 (e.g. C:\\Users\\you\\Videos\\ad.mp4 or /Users/you/ad.mp4). slates_get_project_directory gives a sensible default folder.'),
+      overwrite: z.boolean().optional(),
+    })
+    .refine((d) => !!d.projectId !== !!d.timelineId, {
+      message: 'Pass exactly one of projectId or timelineId',
+    }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('export', 'video export')
+    const r = await desktop.post<{
+      success: boolean
+      outputPath?: string
+      durationSec?: number
+      fileSizeBytes?: number
+      width?: number
+      height?: number
+      frameRate?: number
+      clipCount?: number
+    }>('/agent/timeline/export-video', {
+      projectId: input.projectId,
+      timelineId: input.timelineId,
+      outputPath: input.outputPath,
+      overwrite: input.overwrite,
+    })
+    const mb = r.fileSizeBytes != null ? (r.fileSizeBytes / (1024 * 1024)).toFixed(1) : '?'
+    return ok(
+      r,
+      `Exported ${r.durationSec ?? '?'}s MP4 (${mb} MB) to ${r.outputPath ?? input.outputPath}.`
+    )
+  },
+}
+
+export const exportTimelineXml: Operation<{
+  projectId?: string
+  timelineId?: string
+  outputPath: string
+  overwrite?: boolean
+}> = {
+  id: 'slates_export_timeline_xml',
+  description:
+    "Export the project's timeline as FCP7/XMEML XML — the file DaVinci Resolve imports directly (File → Import → Timeline) to recreate the edit with references to the original clip media on disk. This is the 'open in DaVinci' handoff path. Pass an absolute outputPath ending in .xml; fails if the file exists unless overwrite=true.",
+  input: z
+    .object({
+      projectId: z.string().uuid().optional(),
+      timelineId: z.string().uuid().optional(),
+      outputPath: z
+        .string()
+        .min(5)
+        .refine((p) => ABSOLUTE_PATH_RE.test(p), { message: 'outputPath must be absolute' })
+        .describe('Absolute path for the XML file, ending in .xml (e.g. C:\\Users\\you\\Videos\\ad.xml or /Users/you/ad.xml).'),
+      overwrite: z.boolean().optional(),
+    })
+    .refine((d) => !!d.projectId !== !!d.timelineId, {
+      message: 'Pass exactly one of projectId or timelineId',
+    }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('export', 'timeline XML export')
+    const r = await desktop.post<{ success: boolean; outputPath?: string }>(
+      '/agent/timeline/export-xml',
+      {
+        projectId: input.projectId,
+        timelineId: input.timelineId,
+        outputPath: input.outputPath,
+        overwrite: input.overwrite,
+      }
+    )
+    return ok(r, `Exported timeline XML to ${r.outputPath ?? input.outputPath}. Import in DaVinci Resolve via File → Import → Timeline.`)
+  },
+}
+
+export const revealFile: Operation<{ path: string }> = {
+  id: 'slates_reveal_file',
+  description:
+    'Open the OS file manager (Explorer/Finder) with the given file selected — use after slates_export_video / slates_export_timeline_xml so the user can see the file you wrote. Absolute path required; the file must exist.',
+  input: z.object({ path: z.string().min(3) }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('export', 'revealing files in the file manager')
+    return ok(await desktop.post('/agent/reveal-file', input))
+  },
+}
+
+// ── CRUD completion (agent API v1 routes — no capability check) ─
+
+export const updateProject: Operation<{ id: string; name?: string; description?: string }> = {
+  id: 'slates_update_project',
+  description: 'Update a Slates project\'s name and/or description.',
+  input: z.object({
+    id: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/projects/update', {
+        id: input.id,
+        data: { name: input.name, description: input.description },
+      })
+    )
+  },
+}
+
+export const deleteProject: Operation<{ id: string; confirm?: boolean }> = {
+  id: 'slates_delete_project',
+  description:
+    'Delete a Slates project. DESTRUCTIVE — permanently removes the project with all its assets, storyboards, and media files. Requires confirm=true after explicit user OK.',
+  input: z.object({
+    id: z.string().uuid(),
+    confirm: z.boolean().optional().describe('Set true only after the user explicitly OKs the deletion.'),
+  }),
+  async run(input, ctx) {
+    if (!input.confirm) {
+      return ok({
+        requires_confirm: true,
+        message:
+          'Deleting a project permanently removes all its assets, storyboards, and media files. Re-call with confirm=true after explicit user OK.',
+      })
+    }
+    return ok(await ctx.desktop().post('/agent/projects/delete', { id: input.id }))
+  },
+}
+
+export const getProjectDirectory: Operation<{ id: string }> = {
+  id: 'slates_get_project_directory',
+  description:
+    'Get the absolute on-disk folder of a Slates project — useful for choosing an export outputPath default (e.g. <dir>/exports/final.mp4).',
+  input: z.object({ id: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/projects/location', { id: input.id }))
+  },
+}
+
+export const deleteAsset: Operation<{ id: string }> = {
+  id: 'slates_delete_asset',
+  description:
+    'Delete an asset from its project. Permanent — also deletes the media file from disk.',
+  input: z.object({ id: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/assets/delete', { id: input.id }))
+  },
+}
+
+export const renameFolder: Operation<{ folderId: string; name: string }> = {
+  id: 'slates_rename_folder',
+  description: 'Rename an asset folder.',
+  input: z.object({
+    folderId: z.string().uuid(),
+    name: z.string().min(1).max(120),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/folders/rename', { id: input.folderId, name: input.name }))
+  },
+}
+
+export const deleteFolder: Operation<{ folderId: string }> = {
+  id: 'slates_delete_folder',
+  description: 'Delete an asset folder.',
+  input: z.object({ folderId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/folders/delete', { id: input.folderId }))
+  },
+}
+
+export const setFolderCover: Operation<{ folderId: string; assetId: string | null }> = {
+  id: 'slates_set_folder_cover',
+  description: 'Set the cover image of an asset folder (or clear it with assetId=null).',
+  input: z.object({
+    folderId: z.string().uuid(),
+    assetId: z.string().uuid().nullable(),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/folders/set-cover', input))
+  },
+}
+
+export const updateCharacter: Operation<{
+  characterId: string
+  name?: string
+  description?: string
+  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+}> = {
+  id: 'slates_update_character',
+  description:
+    'Update a character\'s name, description, or style. (Turnaround / expression image slots have their own dedicated set_character_* ops.)',
+  input: z.object({
+    characterId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/characters/update', {
+        id: input.characterId,
+        data: { name: input.name, description: input.description, style: input.style },
+      })
+    )
+  },
+}
+
+export const deleteCharacter: Operation<{ characterId: string }> = {
+  id: 'slates_delete_character',
+  description: 'Delete a character from its project.',
+  input: z.object({ characterId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/characters/delete', { id: input.characterId }))
+  },
+}
+
+export const updateEnvironment: Operation<{
+  environmentId: string
+  name?: string
+  description?: string
+  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+  gridAssetId?: string | null
+}> = {
+  id: 'slates_update_environment',
+  description:
+    'Update an environment\'s name, description, style, or bound grid asset (gridAssetId=null clears it).',
+  input: z.object({
+    environmentId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+    gridAssetId: z.string().uuid().nullable().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/environments/update', {
+        id: input.environmentId,
+        data: {
+          name: input.name,
+          description: input.description,
+          style: input.style,
+          gridAssetId: input.gridAssetId,
+        },
+      })
+    )
+  },
+}
+
+export const deleteEnvironment: Operation<{ environmentId: string }> = {
+  id: 'slates_delete_environment',
+  description: 'Delete an environment from its project.',
+  input: z.object({ environmentId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/environments/delete', { id: input.environmentId }))
+  },
+}
+
+export const listStyles: Operation<{ projectId: string }> = {
+  id: 'slates_list_styles',
+  description: 'List visual styles in a Slates project.',
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/styles', { projectId: input.projectId }))
+  },
+}
+
+export const createStyle: Operation<{ projectId: string; name: string; description?: string }> = {
+  id: 'slates_create_style',
+  description: 'Create a new visual style in a Slates project.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    name: z.string().min(1).max(120),
+    description: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/styles', input))
+  },
+}
+
+export const updateStyle: Operation<{
+  styleId: string
+  name?: string
+  description?: string
+  imageAssetId?: string | null
+}> = {
+  id: 'slates_update_style',
+  description:
+    'Update a style\'s name, description, or bound reference image (imageAssetId=null clears it).',
+  input: z.object({
+    styleId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+    imageAssetId: z.string().uuid().nullable().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/styles/update', {
+        id: input.styleId,
+        data: { name: input.name, description: input.description, imageAssetId: input.imageAssetId },
+      })
+    )
+  },
+}
+
+export const deleteStyle: Operation<{ styleId: string }> = {
+  id: 'slates_delete_style',
+  description: 'Delete a visual style from its project.',
+  input: z.object({ styleId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/styles/delete', { id: input.styleId }))
+  },
+}
+
+export const updateStoryboard: Operation<{
+  storyboardId: string
+  name?: string
+  description?: string
+}> = {
+  id: 'slates_update_storyboard',
+  description: 'Update a storyboard\'s name and/or description.',
+  input: z.object({
+    storyboardId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/storyboards/update', {
+        id: input.storyboardId,
+        data: { name: input.name, description: input.description },
+      })
+    )
+  },
+}
+
+export const deleteStoryboard: Operation<{ storyboardId: string }> = {
+  id: 'slates_delete_storyboard',
+  description: 'Delete a storyboard with all its scenes and frames (the referenced assets are untouched).',
+  input: z.object({ storyboardId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/storyboards/delete', { id: input.storyboardId }))
+  },
+}
+
+export const updateScene: Operation<{ sceneId: string; name?: string; position?: number }> = {
+  id: 'slates_update_scene',
+  description: 'Update a scene\'s name and/or position within its storyboard.',
+  input: z.object({
+    sceneId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    position: z.number().int().min(0).optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/scenes/update', {
+        id: input.sceneId,
+        data: { name: input.name, position: input.position },
+      })
+    )
+  },
+}
+
+export const deleteScene: Operation<{ sceneId: string }> = {
+  id: 'slates_delete_scene',
+  description: 'Delete a scene (and its frames) from a storyboard.',
+  input: z.object({ sceneId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/scenes/delete', { id: input.sceneId }))
+  },
+}
+
+export const reorderScenes: Operation<{ storyboardId: string; sceneIds: string[] }> = {
+  id: 'slates_reorder_scenes',
+  description:
+    'Reorder the scenes of a storyboard. Pass the COMPLETE list of the storyboard\'s scene ids in the desired order.',
+  input: z.object({
+    storyboardId: z.string().uuid(),
+    sceneIds: z.array(z.string().uuid()).min(1),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/scenes/reorder', input))
+  },
+}
+
+export const updateFrame: Operation<{
+  frameId: string
+  shotLabel?: string
+  notes?: string
+  assetId?: string | null
+  sceneId?: string | null
+  position?: number
+  frameType?: 'first' | 'last' | 'ingredient' | null
+  motionPrompt?: string | null
+}> = {
+  id: 'slates_update_frame',
+  description:
+    'Update a frame: shot label, notes, bound asset (assetId=null unbinds), scene, position, frameType (first/last/ingredient, null clears), or motion prompt (null clears).',
+  input: z.object({
+    frameId: z.string().uuid(),
+    shotLabel: z.string().optional(),
+    notes: z.string().optional(),
+    assetId: z.string().uuid().nullable().optional(),
+    sceneId: z.string().uuid().nullable().optional(),
+    position: z.number().int().min(0).optional(),
+    frameType: z.enum(['first', 'last', 'ingredient']).nullable().optional(),
+    motionPrompt: z.string().nullable().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/frames/update', {
+        id: input.frameId,
+        data: {
+          shotLabel: input.shotLabel,
+          notes: input.notes,
+          assetId: input.assetId,
+          sceneId: input.sceneId,
+          position: input.position,
+          frameType: input.frameType,
+          motionPrompt: input.motionPrompt,
+        },
+      })
+    )
+  },
+}
+
+export const deleteFrame: Operation<{ frameId: string }> = {
+  id: 'slates_delete_frame',
+  description: 'Delete a frame from its scene (the referenced asset is untouched).',
+  input: z.object({ frameId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/frames/delete', { id: input.frameId }))
+  },
+}
+
+// ── Prompting guides (local lookup — no transport) ──────────────
+
+// Model-id → guide-name aliasing. Order matters: kling-mc-* (motion
+// transfer) must match before the generic kling-v3* check.
+function resolveGuideTopic(topic: string): string | null {
+  const t = topic.trim().toLowerCase()
+  if (SKILLS[t]) return t
+  if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
+  if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
+  if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
+  if (t.startsWith('veo')) return 'slates-prompting-veo-3'
+  if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
+  if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
+  if (t.startsWith('seedance')) return 'slates-prompting-seedance'
+  if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'
+  return null
+}
+
+export const getPromptingGuide: Operation<{ topic: string }> = {
+  id: 'slates_get_prompting_guide',
+  description:
+    "Return the full markdown of a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id (e.g. 'veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2-std', 'nano-banana-2') which maps to the right guide. ALWAYS read 'slates-cost-discipline' plus the relevant model guide before your first generation in a session.",
+  input: z.object({
+    topic: z
+      .string()
+      .min(1)
+      .describe(
+        'Guide name or model id. Guides: slates-cost-discipline, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film'
+      ),
+  }),
+  async run(input) {
+    const resolved = resolveGuideTopic(input.topic)
+    const content = resolved ? SKILLS[resolved] : undefined
+    if (!resolved || content === undefined) {
+      throw new Error(
+        `Unknown guide topic: ${input.topic}. Valid topics: ${Object.keys(SKILLS).sort().join(', ')}`
+      )
+    }
+    return {
+      text: content,
+      data: { topic: resolved, bytes: Buffer.byteLength(content, 'utf8') },
     }
   },
 }
@@ -1456,4 +2428,37 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   generateVideo as unknown as Operation<unknown>,
   generateLipSync as unknown as Operation<unknown>,
   generateMotionTransfer as unknown as Operation<unknown>,
+  editImage as unknown as Operation<unknown>,
+  getGenerationStatus as unknown as Operation<unknown>,
+  listGenerations as unknown as Operation<unknown>,
+  getTimeline as unknown as Operation<unknown>,
+  addClipToTimeline as unknown as Operation<unknown>,
+  reorderClips as unknown as Operation<unknown>,
+  removeClip as unknown as Operation<unknown>,
+  exportVideo as unknown as Operation<unknown>,
+  exportTimelineXml as unknown as Operation<unknown>,
+  revealFile as unknown as Operation<unknown>,
+  updateProject as unknown as Operation<unknown>,
+  deleteProject as unknown as Operation<unknown>,
+  getProjectDirectory as unknown as Operation<unknown>,
+  deleteAsset as unknown as Operation<unknown>,
+  renameFolder as unknown as Operation<unknown>,
+  deleteFolder as unknown as Operation<unknown>,
+  setFolderCover as unknown as Operation<unknown>,
+  updateCharacter as unknown as Operation<unknown>,
+  deleteCharacter as unknown as Operation<unknown>,
+  updateEnvironment as unknown as Operation<unknown>,
+  deleteEnvironment as unknown as Operation<unknown>,
+  listStyles as unknown as Operation<unknown>,
+  createStyle as unknown as Operation<unknown>,
+  updateStyle as unknown as Operation<unknown>,
+  deleteStyle as unknown as Operation<unknown>,
+  updateStoryboard as unknown as Operation<unknown>,
+  deleteStoryboard as unknown as Operation<unknown>,
+  updateScene as unknown as Operation<unknown>,
+  deleteScene as unknown as Operation<unknown>,
+  reorderScenes as unknown as Operation<unknown>,
+  updateFrame as unknown as Operation<unknown>,
+  deleteFrame as unknown as Operation<unknown>,
+  getPromptingGuide as unknown as Operation<unknown>,
 ]

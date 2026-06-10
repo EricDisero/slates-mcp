@@ -38,6 +38,18 @@ Format: `Plan: N generations totaling $X.XX. [Brief description of the sequence.
 
 Example: `Plan: 6 frame generations at 1k 16:9 totaling $0.60 — establishing wide, push-in, two-shot, reverse, OTS, insert. Proceed?`
 
+### 3b. Batch authorization — one approval covers the enumerated batch
+
+When the user approves a batch plan with one aggregated cost total up front ("8 scenes, ~$X total — go"), that single approval authorizes `confirm=true` on **each enumerated call in that batch** — and nothing beyond it. You do not need to re-ask per call; that's the point of the upfront announcement. Hands-off multi-scene runs depend on this.
+
+Boundaries that re-trigger confirmation:
+
+- Any call's actual estimate exceeds what the announced plan implied for it by **>25%** → stop, surface the delta, get a fresh OK.
+- New calls are added that weren't in the enumerated plan (extra variants, retries beyond the plan, a new scene) → those are NOT covered. Announce and confirm separately.
+- The batch scope changes (different model, resolution, or duration than announced) → re-announce, re-confirm.
+
+One approval = that plan, as enumerated, at those prices. Nothing else.
+
 ### 4. Track the running total
 
 After each generation completes, the response includes `cost_cents` (when available). Keep a running tally in your context. Surface it every 3 generations or whenever the user asks "how much have we spent?"
@@ -52,7 +64,7 @@ After each generation completes, the response includes `cost_cents` (when availa
 | Print, marketing asset, final delivery | 4k |
 | Iterating to refine | match the previous resolution |
 
-For Nano Banana 2 specifically, all three ship at the same price band on fal.ai — pick by need, not cost.
+Resolution is a price lever, not a free choice: on Nano Banana 2 and FLUX.2 Max, 4k costs roughly 2x 1k (Seedream 5 Lite is flat-priced regardless of resolution). Prices change — call `slates_estimate_generation_cost` or `slates_list_available_models` for current numbers instead of assuming. Pick the cheapest resolution that serves the use case.
 
 ## Aspect ratio decision rules
 

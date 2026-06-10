@@ -5,7 +5,7 @@ description: How to prompt Kling V3.0 (Kuaishou). Read before calling slates_gen
 
 # Kling V3.0 — prompting
 
-Kuaishou's video model. Three tiers: `kling-v3.0-std` ($0.05/s), `kling-v3.0-pro` ($0.08/s), `kling-v3.0-omni` ($0.16/s — multi-char dialogue + audio-visual co-generation).
+Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, no audio), `kling-v3.0-pro` (higher visual quality, no audio), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
 
 Up to 15s. Multi-shot supported (up to 6 cuts in 15s total). Strong on image-to-video — preserves identity, layout, and text from the input image well.
 
@@ -124,11 +124,11 @@ Layer scene-specific suppressions on top.
 
 ## Tier choice
 
-- **Standard** ($0.05/s): general use, no audio
-- **Pro** ($0.08/s): higher quality, no audio
-- **Omni** ($0.16/s): multi-character dialogue, audio-visual co-gen, language codes, `@elementN` references
+- **Standard**: general use, no audio
+- **Pro**: higher visual quality, no audio
+- **Omni**: multi-character dialogue, audio-visual co-gen, language codes, `@elementN` references
 
-If you don't need dialogue, pick standard or pro. Omni is 2-3x the cost.
+Pick by capability: need dialogue/audio → Omni; need maximum visual quality silent → Pro; everything else → Standard. Prices change — call `slates_estimate_generation_cost` or `slates_list_available_models` for current numbers before choosing a tier.
 
 ## Benchmark prompt structure
 
@@ -145,7 +145,7 @@ Cinematic example (paraphrasing fal blog patterns):
 
 ## Pre-flight: references arrive inline, refer by code
 
-When you call `slates_generate_video` with `firstFrameAssetId` or `ingredientAssetIds`, the first call returns those references **inline as image content blocks** alongside cost + `requires_confirm: true`. Look at them, revise prompt if needed, then re-call with `confirm=true`. Kling Omni multi-character with several ingredient images especially benefits — confirm each character image lands cleanly before spending $0.16/s.
+When you call `slates_generate_video` with `firstFrameAssetId` or `ingredientAssetIds`, the first call returns those references **inline as image content blocks** alongside cost + `requires_confirm: true`. Look at them, revise prompt if needed, then re-call with `confirm=true`. Kling Omni multi-character with several ingredient images especially benefits — confirm each character image lands cleanly before spending.
 
 When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Detective Closeup`. The user sees that code as a gallery badge.
 

@@ -48,7 +48,11 @@ For each frame:
   - **In Slates desktop:** click each frame to generate motion (the existing UI handles motion generation).
   - **Continue here:** ask you to keep going.
 
-If they say keep going, generate motion for each frame using the highest-confidence model the budget allows (Veo 3.1 Fast 8s by default). Then call the export op.
+### 5. If they say keep going — motion, assembly, export
+- Generate motion per frame with `slates_generate_video` (`firstFrameAssetId` = the frame's asset, `background: true`), using the highest-confidence model the budget allows (Veo 3.1 Fast 8s by default). Submit all four, then poll `slates_get_generation_status` until each completes (1-5 min).
+- Assemble: `slates_add_clip_to_timeline` for each completed clip in beat order (Hook → Lifestyle → Problem-Solution → CTA). Verify with `slates_get_timeline`; fix order with `slates_reorder_clips`.
+- Export: `slates_export_video` to an absolute `.mp4` path (default `<slates_get_project_directory>/exports/<product>-ad.mp4`), then `slates_reveal_file` so the user sees the file.
+- Full pipeline doctrine (batch cost authorization, model mixing, multi-take selection): `slates-one-prompt-film`.
 
 ## Anti-patterns
 

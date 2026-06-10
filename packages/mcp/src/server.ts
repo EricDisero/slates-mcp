@@ -6,6 +6,9 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { zodToJsonSchema } from 'zod-to-json-schema'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   ALL_OPERATIONS,
   defaultContext,
@@ -26,8 +29,14 @@ import {
 const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
 const opsById = new Map<string, Operation<unknown>>(ops.map((o) => [o.id, o]))
 
+// Version comes from this package's own package.json (dist/server.js →
+// ../package.json) so the reported version never drifts from the publish.
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
+) as { version: string }
+
 const server = new Server(
-  { name: 'slates-studio', version: '0.2.0' },
+  { name: 'slates-studio', version: pkg.version },
   { capabilities: { tools: {} } }
 )
 

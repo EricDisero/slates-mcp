@@ -41,7 +41,7 @@ The code is the FORMAL reference. The label is human texture. Use both: `IMG-A12
 - **One specific delta per regeneration.** Don't change five things at once — you won't know what helped.
 - **Anchor with references.** If the result drifted from the user's intent, attach the *previous best* generation as a reference image alongside the original brief.
 - **Use `slates_get_asset_image`** to pull a previously-generated image back into context if you need to compare against a fresh generation.
-- **Use `slates_edit_image`** (when available) for surgical tweaks instead of full regeneration when 90% of the image is right.
+- **Use `slates_edit_image`** for surgical tweaks instead of full regeneration when ~90% of the image is right — `sourceAssetId` = the asset, `prompt` = the change only. Edits preserve composition and identity; full regen rolls the dice. Recipe: `slates-edit-and-iterate`.
 
 ## Cost discipline
 

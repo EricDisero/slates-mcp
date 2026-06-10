@@ -8,8 +8,9 @@
   ],
   "scripts": {
     "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli",
-    "typecheck": "tsc --noEmit",
-    "clean": "rimraf packages/*/dist"
+    "typecheck": "node packages/shared/scripts/embed-skills.mjs && tsc --noEmit",
+    "clean": "rimraf packages/*/dist",
+    "publish:all": "npm run build && npm publish -w packages/shared --access public && npm publish -w packages/mcp --access public && npm publish -w packages/cli --access public"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -1,0 +1,15 @@
+# Smithery registry config for the Slates MCP server.
+# https://smithery.ai — stdio server launched via npx.
+#
+# No env/config needed here: authentication pairs through the Slates desktop
+# app (Settings → Agent Control → Send link), which writes
+# ~/.slates/agent-connection.json. The server auto-discovers it.
+
+startCommand:
+  type: stdio
+  configSchema:
+    # No configuration required — auth pairing happens via the Slates desktop app.
+    type: object
+    properties: {}
+  commandFunction: |-
+    (config) => ({ command: 'npx', args: ['-y', '@slatesvideo/mcp-server'] })

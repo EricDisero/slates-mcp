@@ -1,0 +1,34 @@
+{
+  "manifest_version": "0.3",
+  "name": "slates",
+  "display_name": "Slates",
+  "version": "0.3.0",
+  "description": "Drive the Slates AI Video Creation Studio: projects, characters, storyboards, image + video generation, timeline assembly, and MP4 export — files land on disk via the Slates desktop app.",
+  "author": {
+    "name": "Blueprint Online Learning Inc.",
+    "url": "https://slates.video"
+  },
+  "homepage": "https://slates.video",
+  "documentation": "https://github.com/EricDisero/slates-mcp#readme",
+  "support": "https://github.com/EricDisero/slates-mcp/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EricDisero/slates-mcp"
+  },
+  "license": "MIT",
+  "keywords": ["slates", "ai-video", "video-generation", "image-generation", "storyboard", "veo", "kling", "seedance"],
+  "tools_generated": true,
+  "server": {
+    "type": "node",
+    "entry_point": "dist/server.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/server.js"]
+    }
+  },
+  "compatibility": {
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

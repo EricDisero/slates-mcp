@@ -1,26 +1,57 @@
 {
   "name": "@slatesvideo/mcp-server",
-  "version": "0.2.0",
-  "description": "MCP server for Slates — drive AI Video Creation Studio from Claude, Cursor, or any MCP client.",
-  "license": "UNLICENSED",
+  "version": "0.3.0",
+  "description": "MCP server for the Slates desktop app. Your AI agent (Claude, Cursor, or any MCP client) drives a local AI video studio: projects, characters, storyboards, image and video generation. Files land on disk.",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "slates-mcp-server": "./dist/server.js"
   },
   "main": "./dist/server.js",
-  "files": ["dist", "README.md"],
+  "files": ["dist", "!dist/**/*.map", "README.md"],
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build",
+    "build:mcpb": "npm run build --prefix ../shared && npm run build && node scripts/stage-mcpb.mjs && mcpb pack dist-mcpb/staging dist-mcpb/slates.mcpb"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EricDisero/slates-mcp.git",
+    "directory": "packages/mcp"
+  },
+  "homepage": "https://slates.video",
+  "bugs": {
+    "url": "https://github.com/EricDisero/slates-mcp/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "claude",
+    "claude-desktop",
+    "cursor",
+    "slates",
+    "veo",
+    "kling",
+    "seedance",
+    "storyboard"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@slatesvideo/shared": "0.2.0",
+    "@slatesvideo/shared": "0.3.0",
     "zod": "^3.23.0",
     "zod-to-json-schema": "^3.23.0"
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
     "@types/node": "^20.0.0",
     "typescript": "^5.7.0"
   }

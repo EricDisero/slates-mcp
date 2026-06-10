@@ -40,7 +40,7 @@ For each frame:
 
 ### 4. Hand back
 - Total frames generated, total credits spent, storyboard id.
-- Suggest next steps: motion generation (in Slates UI), or `slates_get_storyboard_with_frames` to review.
+- Suggest next steps: review via `slates_get_storyboard_with_frames`, or take the frames to motion — `slates_generate_video` per frame (`firstFrameAssetId`, `background: true`, poll `slates_get_generation_status`), then `slates_add_clip_to_timeline` in story order and `slates_export_video`. The full frames-to-film pipeline (batch cost authorization, model mixing) is `slates-one-prompt-film`.
 
 ## Anti-patterns
 

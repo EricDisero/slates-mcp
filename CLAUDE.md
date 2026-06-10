@@ -8,20 +8,25 @@ This is the MCP server + CLI + skills monorepo for Slates. Treat it as a thin tr
 slates-mcp/
 ├── package.json                ← npm workspaces root
 ├── tsconfig.json               ← shared compiler options
+├── smithery.yaml               ← Smithery registry config (stdio via npx)
 └── packages/
     ├── shared/                 ← @slatesvideo/shared
+    │   skills/*.md             ← bundled agent recipes (single source)
+    │   scripts/embed-skills.mjs← prebuild: skills/*.md → src/skills/content.ts (gitignored, generated)
     │   src/
     │     auth.ts               ← read/write ~/.slates/agent-connection.json
     │     clients/cloud.ts      ← slates-api HTTP client
-    │     clients/desktop.ts    ← 127.0.0.1:PORT HTTP client
+    │     clients/desktop.ts    ← 127.0.0.1:PORT HTTP client (+ healthz capability handshake)
     │     operations/index.ts   ← single source of truth for the tool surface
+    │     skills/content.ts     ← GENERATED — embedded SKILLS record, do not edit
     │     index.ts              ← public re-exports
     ├── mcp/                    ← @slatesvideo/mcp-server (stdio MCP, bin: slates-mcp-server)
     │   src/server.ts
+    │   manifest.json           ← Claude Desktop .mcpb manifest
+    │   scripts/stage-mcpb.mjs  ← stages dist-mcpb/ for `npm run build:mcpb`
     └── cli/                    ← @slatesvideo/cli (bin: slates)
         src/index.ts
-        src/commands/{login,logout,status,op,install-skills}.ts
-        skills/*.md             ← bundled agent recipes
+        src/commands/{login,logout,status,op,install-skills,mcp}.ts
 ```
 
 ## Hard rules
@@ -50,9 +55,11 @@ If the op needs new desktop endpoints, add the route in `slate/src/main/agent/ro
 
 ## Adding a new skill
 
-1. Drop a markdown file with frontmatter into `packages/cli/skills/`.
+1. Drop a markdown file with frontmatter into `packages/shared/skills/`.
 2. Frontmatter must include `name:` and `description:` for skill discovery.
-3. Two categories — keep them separate:
-   - **Workflow skills** (`slates-direct-response-ad`, `slates-storyboard-from-script`, etc.) compose multiple ops into a recipe. Cap ~6 — more than that and the LLM can't tell which one fires.
+3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
+4. Three categories — keep them separate:
+   - **Workflow skills** (`slates-one-prompt-film`, `slates-direct-response-ad`, `slates-storyboard-from-script`, etc.) compose multiple ops into a recipe. Cap ~6 — more than that and the LLM can't tell which one fires. Currently AT the cap (6).
    - **Per-model prompting skills** (`slates-prompting-nano-banana-2`, `slates-prompting-veo-3`, etc.) fire when calling the matching `slates_generate_*` op. Naming convention: `slates-prompting-{model}.md`. One per model variant family.
    - **Cross-cutting hygiene skills** (`slates-cost-discipline`) fire on every generation call regardless of model. Should be rare — only add when a discipline applies across many ops.
+5. If the skill maps to a model id, extend the alias table in `resolveGuideTopic()` (operations/index.ts) so `slates_get_prompting_guide` resolves the model id to it.

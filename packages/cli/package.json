@@ -1,21 +1,53 @@
 {
   "name": "@slatesvideo/cli",
-  "version": "0.2.0",
-  "description": "Slates CLI — drive Slates from your terminal or Claude Code via shell-out.",
-  "license": "UNLICENSED",
+  "version": "0.3.0",
+  "description": "Slates CLI: drive the Slates AI video studio from your terminal or let Claude Code shell out to it. Includes the bundled agent skills and an MCP client configurator.",
+  "license": "MIT",
   "type": "module",
   "bin": {
-    "slates": "./dist/index.js"
+    "slates": "dist/index.js"
   },
   "main": "./dist/index.js",
-  "files": ["dist", "skills", "README.md"],
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EricDisero/slates-mcp.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://slates.video",
+  "bugs": {
+    "url": "https://github.com/EricDisero/slates-mcp/issues"
+  },
+  "keywords": [
+    "slates",
+    "cli",
+    "mcp",
+    "model-context-protocol",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "claude",
+    "claude-code",
+    "agent-skills",
+    "veo",
+    "kling",
+    "seedance"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
-    "@slatesvideo/shared": "0.2.0",
+    "@slatesvideo/shared": "0.3.0",
     "commander": "^12.1.0",
     "zod": "^3.23.0"
   },

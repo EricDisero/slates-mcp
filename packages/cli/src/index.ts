@@ -1,38 +1,47 @@
 #!/usr/bin/env node
 import { Command } from 'commander'
+import { readFileSync } from 'node:fs'
+import { join, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { readConnection, setCloudToken, clearCloudToken } from '@slatesvideo/shared'
 import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
 import { runOp } from './commands/op.js'
 import { runInstallSkills } from './commands/install-skills.js'
+import { runMcp } from './commands/mcp.js'
 import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 
 // Slates CLI. The CLI mirrors the MCP tool surface as commands so Claude
-// Code can shell out to them and skip the cost of loading 20+ tool
-// schemas into its context window. Skills (in packages/skills) tell the
-// agent how to compose them.
+// Code can shell out to them instead of loading every tool schema into
+// its context window. Bundled skills (embedded in @slatesvideo/shared,
+// installed via `slates install-skills`) tell the agent how to compose
+// the operations into recipes.
 //
 // First-time use:
-//   1. Open Slates desktop → Settings → Agent Control → toggle on.
-//   2. Run `slates login` — sends a magic link to your account email.
-//   3. Click the link in your email.
-//   4. The CLI auto-detects the connection and writes the cloud token
-//      into ~/.slates/agent-connection.json. The desktop app's local
-//      port + token are already there from step 1.
+//   1. Open Slates desktop → Settings → Agent Control → Send link.
+//   2. Click the link in your email (or run `slates login`).
+//   3. The connection is written to ~/.slates/agent-connection.json —
+//      cloud token + the desktop app's local port + token.
 //
 // Inside Claude Code:
-//   `/slates run slates_create_project --name "neon samurai"`
-//   `/slates run slates_generate_image --prompt "..." --resolution 2k`
+//   slates run slates_create_project --name "neon samurai"
+//   slates run slates_generate_image --prompt "..." --resolution 1k --aspectRatio 16:9
 //
-// Or import @slatesvideo/skills/*.md into .claude/skills/ for higher-
-// level recipes.
+// Run `slates install-skills` to copy the bundled skills into
+// .claude/skills/<name>/SKILL.md for higher-level recipes.
+
+// Version comes from this package's own package.json (dist/index.js → ../package.json)
+// so the CLI never drifts from the published version.
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
+) as { version: string }
 
 const program = new Command()
 program
   .name('slates')
   .description('Slates CLI — drive AI Video Creation Studio from your terminal.')
-  .version('0.2.0')
+  .version(pkg.version)
   .enablePositionalOptions()
 
 program
@@ -54,16 +63,22 @@ program
   .action(() => runStatus())
 
 program
+  .command('mcp')
+  .description('Detect installed MCP clients and print (or write) the Slates MCP config for each.')
+  .option('--write', 'Merge the "slates" entry into detected Claude Desktop / Cursor config files (backs up to .bak first)', false)
+  .action((opts) => runMcp(opts))
+
+program
   .command('install-skills')
-  .description('Copy the bundled skills into your local .claude/skills directory.')
-  .option('--force', 'Overwrite existing skill files', false)
+  .description('Install the bundled skills into .claude/skills/<name>/SKILL.md (Claude Code layout).')
+  .option('--global', 'Install into ~/.claude/skills instead of the current project', false)
   .action((opts) => runInstallSkills(opts))
 
-const runCmd = program
+program
   .command('run')
   .description('Invoke a Slates operation by id (use `slates run --list` to see them).')
   .option('--list', 'List all available operations', false)
-  .option('--json', 'Emit raw JSON response instead of formatted text', false)
+  .option('--json', 'Emit structured JSON ({text, data, images: [{mimeType, bytes}]}). Image binary is omitted — use the MCP server for inline image payloads.', false)
   .allowUnknownOption()
   .passThroughOptions()
   .argument('[opId]', 'Operation id, e.g. slates_create_project')
@@ -109,6 +124,13 @@ program
     clearCloudToken()
     console.log('Cloud token cleared.')
   })
+
+// Bare `slates` with no args: print help and exit 0 (commander's default
+// help-on-missing-command exits 1, which reads as an error to scripts).
+if (process.argv.length <= 2) {
+  program.outputHelp()
+  process.exit(0)
+}
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.message : String(err))

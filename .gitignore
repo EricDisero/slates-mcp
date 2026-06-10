@@ -4,6 +4,10 @@ node_modules/
 # Build output
 packages/*/dist/
 packages/*/tsconfig.tsbuildinfo
+packages/mcp/dist-mcpb/
+
+# Generated (by packages/shared/scripts/embed-skills.mjs on every build)
+packages/shared/src/skills/content.ts
 
 # Local env / secrets
 .env

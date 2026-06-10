@@ -5,7 +5,7 @@ description: How to write prompts that produce cinematic, photorealistic results
 
 # Nano Banana 2 — cinematic & photorealistic prompting
 
-The model behind `slates_generate_image` is **Gemini 3 Image** (Nano Banana 2 / Flash). It's a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
+The **default** model behind `slates_generate_image` is **Gemini 3 Image** (Nano Banana 2 / Flash) — the op also exposes `flux-2-max` and `seedream-5-lite`, each with its own prompting skill. NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
 
 Knowledge cutoff: January 2025. Anything after needs explicit reference images.
 
@@ -127,7 +127,7 @@ Scene prompt: [actual prompt]
 
 ## Resolution tactics
 
-- 1k / 2k / 4k all ship at the same fal.ai price band. Pick by need, not cost.
+- Resolution is priced: NB2 4k costs roughly 2x 1k. Prices change — call `slates_estimate_generation_cost` for current numbers. Pick the cheapest resolution that serves the use case.
 - **At 2K and above, the model allocates more tokens to surface detail** — explicit texture vocabulary (pores, fabric weave, grain) compounds at higher resolution.
 - 1k for fast iteration / drafts; 2k for hero shots; 4k only when you need print-grade detail.
 - 2K generations vary 20-60s+. Don't time-budget tightly.

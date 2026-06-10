@@ -8,13 +8,15 @@ This monorepo publishes two installable packages, plus their shared core:
 - **`@slatesvideo/cli`** — `slates` binary. Run with `npm i -g @slatesvideo/cli`.
 - **`@slatesvideo/shared`** — the operations layer both surfaces depend on (published as their dependency, not installed directly).
 
-Agent-side recipe markdown ("skills") ships bundled inside the CLI package — install them into your project with `slates install-skills`.
+Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is embedded into `@slatesvideo/shared` at build time — install into your project with `slates install-skills`, or (MCP-only clients) read any guide at runtime via the `slates_get_prompting_guide` tool.
 
 ## What it does
 
-The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos, organize assets, and watch the desktop app populate live as the agent works.
+The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. 64 tools total.
 
 Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
+
+> **Desktop version note:** the timeline, export, background-generation, edit-image, and image-reference tools need a Slates desktop on agent API v2. If a tool reports a version error, update Slates (Settings → Check for Updates) and retry. Everything else works on older desktops.
 
 ## Setup
 
@@ -36,7 +38,7 @@ Add to your MCP config:
 ```json
 {
   "mcpServers": {
-    "slates-studio": {
+    "slates": {
       "command": "npx",
       "args": ["-y", "@slatesvideo/mcp-server"]
     }
@@ -51,13 +53,14 @@ Restart your client. Slates tools appear in the tool palette.
 ```bash
 npm i -g @slatesvideo/cli
 slates login                  # only if you haven't connected via Settings
-slates install-skills         # writes recipe files to ./.claude/skills/
+slates install-skills         # installs skills to ./.claude/skills/<name>/SKILL.md
+slates mcp                    # detect MCP clients, print (or --write) their config
 slates status                 # show connection state
 slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
 ```
 
-In Claude Code, the agent shells out to `slates run <op> --key value` instead of loading 25 tool schemas into context. Skills (in `./.claude/skills/`) provide higher-level recipes — direct-response ad, character turnaround, storyboard from script, vision feedback loop, edit-and-iterate.
+In Claude Code, the agent shells out to `slates run <op> --key value` instead of loading 64 tool schemas into context. The 15 bundled skills provide higher-level recipes — workflow skills (one-prompt film, direct-response ad, character turnaround, storyboard from script, vision feedback loop, edit-and-iterate), per-model prompting guides (Kling V3, Veo 3.1, Seedance 2.0, Nano Banana 2, FLUX.2 Max, Seedream 5 Lite, lip sync, motion transfer), and cost discipline.
 
 ## Architecture
 
@@ -72,6 +75,7 @@ In Claude Code, the agent shells out to `slates run <op> --key value` instead of
     clients/cloud.ts                     ← https://slates-api.fly.dev
     clients/desktop.ts                   ← http://127.0.0.1:PORT
     auth.ts                              ← read/write connection file
+    skills/                              ← bundled markdown recipes (embedded at build time)
 
 @slatesvideo/mcp-server
     server.ts                            ← stdio server, registers operations as MCP tools
@@ -80,10 +84,20 @@ In Claude Code, the agent shells out to `slates run <op> --key value` instead of
     src/index.ts                         ← commander entry
     src/commands/login.ts                ← magic-link polling
     src/commands/op.ts                   ← `slates run <op>` dispatcher
-    skills/                              ← bundled markdown recipes
+    src/commands/install-skills.ts       ← writes embedded skills to .claude/skills/
 ```
 
 Operations choose their transport internally. `slates_get_credit_balance` hits the cloud. `slates_create_project` hits the desktop. `slates_generate_image` hits the cloud, then the desktop client writes the resulting asset to the local project folder. The user watches it appear in the Slates UI as it lands.
+
+## Publishing
+
+Publish order matters: `@slatesvideo/shared` must land before `@slatesvideo/mcp-server` and `@slatesvideo/cli` (both depend on it at an exact version). Always publish from the repo root with:
+
+```bash
+npm run publish:all
+```
+
+This builds everything first, then publishes shared → mcp → cli with `--access public`. Each package also has a `prepublishOnly` build hook, so a stray `npm publish` from a fresh clone can't ship an empty `dist`.
 
 ## Privacy + security
 
@@ -94,4 +108,4 @@ Operations choose their transport internally. `slates_get_credit_balance` hits t
 
 ## License
 
-Unlicensed (proprietary). Contact ericdisero@gmail.com for licensing questions.
+MIT — see [LICENSE](LICENSE). Copyright Blueprint Online Learning Inc.

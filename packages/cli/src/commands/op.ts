@@ -103,7 +103,7 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
   console.log(result.text)
   if (result.images && result.images.length > 0) {
     console.log(`\nReturned ${result.images.length} inline image(s).`)
-    console.log('(use --json to get the full payload, or use the MCP server for vision-aware tools)')
+    console.log('(--json reports image metadata only, not the bytes — use the MCP server for vision-aware tools)')
   }
 }
 

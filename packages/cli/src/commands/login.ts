@@ -36,13 +36,24 @@ export async function runLogin(opts: LoginOptions): Promise<void> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: trimmed, client_name: clientName }),
   })
-  const reqBody = (await reqRes.json()) as { success: boolean; challengeId?: string; error?: string }
+  const reqBody = (await reqRes.json()) as {
+    success: boolean
+    challengeId?: string
+    userCode?: string
+    error?: string
+  }
   if (!reqBody.success || !reqBody.challengeId) {
     console.error(`Failed to request sign-in: ${reqBody.error ?? 'unknown error'}`)
     process.exit(1)
   }
 
   console.log(`\nA sign-in link is on its way to ${trimmed}.`)
+  // Newer slates-api versions return a short user code (e.g. XK4-P2N) that
+  // the authorization page asks the user to verify — anti-phishing pairing.
+  // Older servers omit the field; show nothing in that case.
+  if (reqBody.userCode) {
+    console.log(`Confirm this code on the authorization page: ${reqBody.userCode}`)
+  }
   console.log('Click the link, then return here. Waiting (10 min max)...\n')
 
   const start = Date.now()

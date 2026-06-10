@@ -24,9 +24,11 @@ The user's request is one of:
 ### 3. Pick the right tool
 | Delta type | Approach |
 |---|---|
-| Surgical | `slates_edit_image` with a focused edit prompt + the original as the source. |
-| Aesthetic / compositional | `slates_generate_image` with the original as a reference + a refined prompt. Don't re-roll from scratch. |
+| Surgical | `slates_edit_image` — `sourceAssetId` = the original, `prompt` = the change only ("remove the second figure"), not a re-description of the whole image. |
+| Aesthetic / compositional | `slates_generate_image` with the original in `referenceAssetIds` + a refined prompt. Don't re-roll from scratch. |
 | Wholesale | New prompt, no reference, fresh generation. Treat as a new brief. |
+
+**`slates_edit_image` shape:** `projectId` + `sourceAssetId` + `prompt` (the edit instruction). Default model `nano-banana-2` — the only edit model that also takes extra `referenceAssetIds`; `flux-2-max` / `seedream-5-lite` use their own edit endpoints and ignore references. The result lands as a NEW asset (prompt prefixed `[Edit]`); the source is untouched. Cost > $0.50 gates on `confirm=true`.
 
 ### 4. Generate, evaluate, decide
 - Estimate cost first.
@@ -42,5 +44,5 @@ The user's request is one of:
 
 - **Don't** delete the original asset until the user confirms the new one. Slates keeps both; the user picks.
 - **Don't** mix surgical and wholesale changes in one regeneration. The user said "make it warmer" — don't also reframe the shot.
-- **Don't** re-generate when `edit_image` would work. Edits preserve composition and identity; full regen rolls the dice.
+- **Don't** re-generate when `slates_edit_image` would work. Edits preserve composition and identity; full regen rolls the dice.
 - **Don't** chain >3 iterations without checking in. If three tries didn't land, the brief is wrong, not the model.

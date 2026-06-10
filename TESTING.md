@@ -143,7 +143,7 @@ node packages/cli/dist/index.js status
 # Expect: cloud token present, desktop server enabled, license active, balance > 0
 
 node packages/cli/dist/index.js run --list
-# Expect: 31 operations listed (matches ALL_OPERATIONS.length)
+# Expect: 64 operations listed (matches ALL_OPERATIONS.length)
 
 node packages/cli/dist/index.js run slates_list_projects
 # Expect: {"projects":[...]} — should match what Slates UI shows
@@ -179,7 +179,7 @@ Add this to your Claude Desktop MCP config (typically `%APPDATA%\Claude\claude_d
 }
 ```
 
-Restart Claude Desktop. Open a new chat. The hammer icon should show 31 Slates tools (`slates_list_projects`, `slates_create_project`, ..., `slates_generate_image`).
+Restart Claude Desktop. Open a new chat. The hammer icon should show 64 Slates tools (`slates_list_projects`, `slates_create_project`, ..., `slates_generate_image`).
 
 Test in chat:
 > "List my Slates projects."

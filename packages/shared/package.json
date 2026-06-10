@@ -1,6 +1,8 @@
 {
   "name": "@slatesvideo/shared",
-  "version": "0.2.0",
+  "version": "0.3.0",
+  "description": "Shared operations layer for the Slates MCP server and CLI: auth, cloud/desktop clients, and the single tool surface both consume. Most users want @slatesvideo/mcp-server or @slatesvideo/cli instead.",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -14,10 +16,35 @@
     "./clients/desktop": "./dist/clients/desktop.js",
     "./operations": "./dist/operations/index.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "!dist/**/*.map", "skills", "README.md"],
   "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "build": "node scripts/embed-skills.mjs && tsc",
+    "typecheck": "node scripts/embed-skills.mjs && tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EricDisero/slates-mcp.git",
+    "directory": "packages/shared"
+  },
+  "homepage": "https://slates.video",
+  "bugs": {
+    "url": "https://github.com/EricDisero/slates-mcp/issues"
+  },
+  "keywords": [
+    "slates",
+    "mcp",
+    "model-context-protocol",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "claude",
+    "veo",
+    "kling",
+    "seedance"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "zod": "^3.23.0"

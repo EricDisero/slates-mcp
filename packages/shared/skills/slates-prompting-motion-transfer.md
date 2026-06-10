@@ -144,5 +144,5 @@ Don't second-guess the assets the user picked — the model executes the transfe
 
 ## Sources
 
-- [fal.ai — Kling Motion Control v2.6 Standard](https://fal.ai/models/fal-ai/kling-video/v2.6/standard/motion-control/api)
-- [fal.ai — Kling Motion Control v2.6 Pro](https://fal.ai/models/fal-ai/kling-video/v2.6/pro/motion-control/api)
+- [fal.ai — Kling Motion Control V3 Standard](https://fal.ai/models/fal-ai/kling-video/v3/standard/motion-control)
+- [fal.ai — Kling Motion Control V3 Pro](https://fal.ai/models/fal-ai/kling-video/v3/pro/motion-control)
