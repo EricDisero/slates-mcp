@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/mcp-server",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "MCP server for the Slates desktop app. Your AI agent (Claude, Cursor, or any MCP client) drives a local AI video studio: projects, characters, storyboards, image and video generation. Files land on disk.",
   "license": "MIT",
   "type": "module",
@@ -46,7 +46,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@slatesvideo/shared": "0.4.0",
+    "@slatesvideo/shared": "0.4.1",
     "zod": "^3.23.0",
     "zod-to-json-schema": "^3.23.0"
   },

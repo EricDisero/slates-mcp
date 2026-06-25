@@ -412,7 +412,7 @@ export const createCharacter: Operation<{
   projectId: string
   name: string
   description?: string
-  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+  style?: string
 }> = {
   id: 'slates_create_character',
   description: 'Create a new character in a Slates project.',
@@ -420,7 +420,7 @@ export const createCharacter: Operation<{
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/characters', input))
@@ -478,7 +478,7 @@ export const createEnvironment: Operation<{
   projectId: string
   name: string
   description?: string
-  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+  style?: string
 }> = {
   id: 'slates_create_environment',
   description: 'Create a new environment in a Slates project.',
@@ -486,7 +486,7 @@ export const createEnvironment: Operation<{
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/environments', input))
@@ -2101,7 +2101,7 @@ export const updateCharacter: Operation<{
   characterId: string
   name?: string
   description?: string
-  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+  style?: string
 }> = {
   id: 'slates_update_character',
   description:
@@ -2110,7 +2110,7 @@ export const updateCharacter: Operation<{
     characterId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
-    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
   }),
   async run(input, ctx) {
     return ok(
@@ -2135,7 +2135,7 @@ export const updateEnvironment: Operation<{
   environmentId: string
   name?: string
   description?: string
-  style?: 'realistic' | 'anime' | 'pixar' | 'comic-book'
+  style?: string
   gridAssetId?: string | null
 }> = {
   id: 'slates_update_environment',
@@ -2145,7 +2145,7 @@ export const updateEnvironment: Operation<{
     environmentId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
-    style: z.enum(['realistic', 'anime', 'pixar', 'comic-book']).optional(),
+    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
     gridAssetId: z.string().uuid().nullable().optional(),
   }),
   async run(input, ctx) {
