@@ -104,6 +104,13 @@ Upload 2-4 multi-angle reference photos per character/object. Tag inline:
 @element2 is the antagonist.
 ```
 
+## Reference discipline (character / environment refs)
+
+- **2-4 strong refs per role**, labeled (which element is which) and reused across every shot — swapping mid-sequence drifts.
+- **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip. Prep refs flat and plain.
+- **Attach both character sheets, labeled for identity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail). Render the scene's expression (default neutral); the label keeps the varied expressions from averaging the face.
+- **Environment: describe it, don't feed a multi-panel grid.** Reserve an environment ref for a hard exact-match, then use ONE clean establishing image.
+
 ## Negative prompting — has a real field
 
 Kling exposes `negative_prompt` on the fal endpoint (different from Seedance which has none). Default block to start from:

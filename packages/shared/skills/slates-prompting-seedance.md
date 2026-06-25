@@ -83,6 +83,17 @@ Reference-to-video endpoint accepts up to **9 reference images, 3 reference vide
 
 **Mutually exclusive:** First-frame/last-frame mode CANNOT be combined with reference images. The error reads `"first/last frame content cannot be mixed with reference media content."` Pick one or the other.
 
+## Reference rules (the verified ones)
+
+- **2-4 strong refs beat both extremes** — not 1 (warps), not 12 (averages worse). Start focused.
+- **One reference per ROLE, labeled** — `@Image1 is the character`, `@Image2 is the environment`. The model needs to know what each ref is FOR; it doesn't infer roles from order.
+- **Character identity: attach the turnaround AND the close-up expression sheet, labeled for identity** (face/skin/body/outfit), and render the expression the SCENE describes (default neutral). That label is what keeps the varied expressions from averaging the face — don't gate the expression sheet. The trend is MORE references (video/audio into Seedance), so lean into attaching rich refs and labeling every role.
+- **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip ("green-screen pasted in front of mountains"). Prep refs flat and plain.
+- **Environment: describe it, don't feed a grid.** Default to words and let the model build the space to fit; reserve an environment ref for a hard exact-match, and then use ONE clean establishing image — never a multi-panel grid.
+- **Reuse the same refs across every shot** in a sequence — swapping mid-sequence drifts.
+- **Legible on-screen text → bake it into an NB2 start frame** and animate from it; Seedance won't render clean text from scratch.
+- **Grids are for EXPLORING compositions, not for inputting** — pick a cell, don't feed the grid back as a reference.
+
 ## Image-to-video / first-frame guidance
 
 **Describe motion, not image.** The model already sees the visual; tokens spent re-describing appearance are wasted.

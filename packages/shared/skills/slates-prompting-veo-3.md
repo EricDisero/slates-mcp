@@ -96,6 +96,13 @@ Verbatim arc-shot example:
 Verbatim example:
 > "Using the provided images for the detective, the woman, and the office setting, create a medium shot of the detective behind his desk. He looks up at the woman and says in a weary voice, 'Of all the offices in this town, you had to walk into mine.'"
 
+## Reference discipline (character / environment refs)
+
+- **2-4 strong refs per role**, labeled (name what each provided image is for) and reused across every shot.
+- **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip. Prep refs flat and plain.
+- **Attach both character sheets, labeled for identity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail). Render the scene's expression (default neutral); the label keeps the varied expressions from averaging the face.
+- **Environment: describe it, don't feed a multi-panel grid.** Reserve an environment ref for a hard exact-match, then use ONE clean establishing image.
+
 ## Negative prompting — nouns, not instructions
 
 Veo has a `negativePrompt` field. **Verbatim Vertex AI rule:**

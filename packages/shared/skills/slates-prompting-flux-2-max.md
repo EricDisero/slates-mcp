@@ -82,6 +82,12 @@ Use natural language for exploration, JSON when the layout is locked and you're 
 
 In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Label every reference's role in the prompt text ("subject from image 1, style from image 2, background from image 3"); unlabeled references get blended unpredictably. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max` (note: FLUX edits ignore extra referenceAssetIds — that's NB2-only).
 
+Reference discipline (FLUX caps refs lower than NB2's 14, so be deliberate):
+- **2-4 strong refs**, one per role, labeled — not 1 (warps), not many (blends).
+- **Flat-lit identity refs** — a studio-lit / scene-lit character sheet bleeds its lighting into the output.
+- **Attach both character sheets, labeled for identity** — turnaround (body/proportion/outfit) + close-up expression sheet (face detail), rendering the scene's expression (default neutral); the label keeps the expressions from averaging the face.
+- **Environment: describe it, don't feed a multi-panel grid** — reserve a ref for a hard exact-match, then use ONE clean establishing image.
+
 ## Character consistency across a series
 
 Define the character exhaustively once, then repeat those exact descriptors verbatim in every subsequent prompt. FLUX has no memory between generations — the repeated description IS the consistency mechanism.

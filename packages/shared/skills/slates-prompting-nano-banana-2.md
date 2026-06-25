@@ -96,20 +96,27 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 ## Reference images
 
 - **Hard limit: 14 images** (10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
-- **Always label every reference's role** in the prompt. The model does not infer roles from order. Use the existing Slates composition pattern:
+- **Always label every reference's role** in the prompt. The model does not infer roles from order. Use the Slates composition pattern:
 
 ```
 Reference Image Instructions:
-- Image 1: Character reference (@samurai) — use for character appearance, facial features, expressions, and body proportions
+- Image 1: Character reference (@samurai) — use for the character's identity (facial features, skin, bone structure, body, outfit); render the expression the scene describes, default neutral
 - Image 2: Environment reference (@temple) — use for location architecture, spatial layout, environmental lighting, and atmospheric qualities
 - Image 3: Style reference (#kurosawa) — use for visual style, mood, and aesthetic treatment
 
 Scene prompt: [actual prompt]
 ```
 
-- **Practical ceiling:** start with 2-3 focused refs. Each ref adds context AND variables to balance.
-- **Character consistency is officially "not 100% perfect"** per Google. Test before bulk generations.
-- **High-resolution, front-facing reference images** help character consistency most.
+### Reference rules (the verified ones)
+1. **2-4 strong refs beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each adds context AND variables to balance.
+2. **One reference per ROLE, labeled** (identity / style-grade / environment). Same-role competitors drift.
+3. **Identity refs: attach both sheets, labeled — don't gate them.** A character's turnaround (body/proportion/outfit) AND its close-up expression sheet (high-res face: eyes, skin, teeth) both go in. The label ("use for identity; render the scene's expression, default neutral") is what stops the varied expressions from averaging the face. An *unlabeled* expression sheet hurts; labeled, the close-ups are a fidelity win.
+4. **Flat-light identity refs.** Prep them with flat, even, shadowless lighting on a plain neutral background. Studio-lit / scene-lit sheets bleed their lighting into the generation ("green-screen pasted in front of mountains").
+5. **Environment: describe it, don't feed a grid.** Default to describing the location in words. Reserve an environment ref for a mandatory exact-match, and then use ONE clean establishing image — never a multi-panel grid fed whole.
+6. **Grids: explore, don't input.** Use grids to explore compositions, then pick a cell. Never feed a grid back in as a reference — cells share a split detail budget, so flaws propagate.
+7. **Reuse the same refs across all shots.** Swapping mid-sequence causes drift.
+8. **Legible in-shot text → bake it into the NB2 start frame**, then animate from it. Never trust text-to-video to render clean text.
+- **Character consistency is officially "not 100% perfect"** per Google. Test before bulk generations. High-resolution, front-facing reference images help most.
 
 ## Common failure modes + fixes
 
