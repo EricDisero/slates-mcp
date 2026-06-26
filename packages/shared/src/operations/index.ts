@@ -1251,6 +1251,9 @@ export const generateVideo: Operation<{
   firstFrameAssetId?: string
   lastFrameAssetId?: string
   ingredientAssetIds?: string[]
+  characterAssetIds?: string[]
+  environmentAssetIds?: string[]
+  styleAssetIds?: string[]
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
@@ -1271,6 +1274,9 @@ export const generateVideo: Operation<{
     firstFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the starting frame for image-to-video. Must already exist in the project.'),
     lastFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the ending frame. Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
     ingredientAssetIds: z.array(z.string().uuid()).max(9).optional().describe('Asset ids used as visual reference / ingredients for Kling Omni or Seedance. Up to 9 (Seedance) or 4 (Kling).'),
+    characterAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of character sheets — keeps a character consistent across the shot. From a Slates project.'),
+    environmentAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of environment grids — keeps a location/setting consistent across the shot. From a Slates project.'),
+    styleAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of style references — locks the visual style of the shot. From a Slates project.'),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
@@ -1361,6 +1367,15 @@ export const generateVideo: Operation<{
     for (const id of input.ingredientAssetIds ?? []) {
       referenceRefs.push({ id, type: 'image', role: 'ingredient' })
     }
+    for (const id of input.characterAssetIds ?? []) {
+      referenceRefs.push({ id, type: 'image', role: 'character' })
+    }
+    for (const id of input.environmentAssetIds ?? []) {
+      referenceRefs.push({ id, type: 'image', role: 'environment' })
+    }
+    for (const id of input.styleAssetIds ?? []) {
+      referenceRefs.push({ id, type: 'image', role: 'style' })
+    }
     const hasReferences = referenceRefs.length > 0
 
     if ((totalCents > 50 || hasReferences) && !input.confirm) {
@@ -1418,6 +1433,9 @@ export const generateVideo: Operation<{
       firstFrameAssetId: input.firstFrameAssetId,
       lastFrameAssetId: input.lastFrameAssetId,
       ingredientAssetIds: input.ingredientAssetIds ?? [],
+      characterAssetIds: input.characterAssetIds ?? [],
+      environmentAssetIds: input.environmentAssetIds ?? [],
+      styleAssetIds: input.styleAssetIds ?? [],
       sound: input.sound,
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
@@ -1470,6 +1488,7 @@ export const generateLipSync: Operation<{
   ttsSpeed?: number
   audioFilePath?: string
   avatarModel?: 'avatar-standard' | 'avatar-pro'
+  klingProvider?: 'fal' | 'kling'
   background?: boolean
   confirm?: boolean
 }> = {
@@ -1487,6 +1506,7 @@ export const generateLipSync: Operation<{
     ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
     avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity. Ignored when sourceType=video.'),
+    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing for the Kling call. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured — omit unless the user explicitly wants BYOK.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate. Required for avatar-pro.'),
   }),
@@ -1565,6 +1585,7 @@ export const generateLipSync: Operation<{
       ttsSpeed: input.ttsSpeed,
       audioFilePath: input.audioFilePath,
       avatarModel: input.avatarModel,
+      klingProvider: input.klingProvider,
       estimatedCost: totalCents,
       background: input.background,
     })
@@ -1610,6 +1631,7 @@ export const generateMotionTransfer: Operation<{
   motionModel?: 'kling-mc-std' | 'kling-mc-pro'
   characterOrientation?: 'video' | 'image'
   prompt?: string
+  klingProvider?: 'fal' | 'kling'
   background?: boolean
   confirm?: boolean
 }> = {
@@ -1623,6 +1645,7 @@ export const generateMotionTransfer: Operation<{
     motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('std ($0.95) for general motion. pro ($1.26) for cleaner anatomy + identity preservation. Default pro — pick std deliberately for cost savings.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Optional refinement prompt. Read slates-prompting-motion-transfer for guidance.'),
+    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing for the Kling call. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured — omit unless the user explicitly wants BYOK.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 confirm gate. Required — both tiers exceed.'),
   }),
@@ -1679,6 +1702,7 @@ export const generateMotionTransfer: Operation<{
       motionModel,
       characterOrientation: input.characterOrientation ?? 'video',
       prompt: input.prompt,
+      klingProvider: input.klingProvider,
       estimatedCost: totalCents,
       background: input.background,
     })
