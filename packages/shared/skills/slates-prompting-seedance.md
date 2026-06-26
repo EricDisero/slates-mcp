@@ -1,11 +1,11 @@
 ---
 name: slates-prompting-seedance
-description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2-fast or seedance-2-std. Seedance prompts have very specific structure (6-step formula + narrative timing beats) that differs from Kling and Veo — don't cross-pollinate the syntax.
+description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2. Seedance prompts have very specific structure (6-step formula + narrative timing beats) that differs from Kling and Veo — don't cross-pollinate the syntax.
 ---
 
 # Seedance 2.0 — prompting
 
-ByteDance's video model. Routed via PiAPI (Economy) or fal.ai (Priority). Audio always generated alongside video. Models: `seedance-2-fast` (cheaper) and `seedance-2-std` (higher quality). Up to 15s.
+ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K, default 1080p), 4–15s, first+last frame + up to 9 reference images.
 
 ## Official 6-step formula
 

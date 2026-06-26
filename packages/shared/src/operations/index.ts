@@ -1184,8 +1184,7 @@ const VIDEO_MODELS = [
   'kling-v3.0-omni',
   'veo-3.1-fast',
   'veo-3.1-standard',
-  'seedance-2-fast',
-  'seedance-2-std',
+  'seedance-2',
 ] as const
 
 type VideoModel = (typeof VIDEO_MODELS)[number]
@@ -1195,11 +1194,9 @@ type VideoModel = (typeof VIDEO_MODELS)[number]
 //   Kling: kling-v3-{standard|pro|omni}-{N}s — note the user-facing
 //     model id `kling-v3.0-std` maps to registry key `kling-v3-standard`.
 //   Veo:   veo-3.1-{fast|standard}[-4k]-{N}s[-audio]
-//   Seedance: seedance-2-{fast|std}[-priority]-{N}s. Economy (PiAPI) and
-//     Priority (fal.ai) are DIFFERENT registry keys at DIFFERENT prices —
-//     priority is ~2.2x economy. The cost key MUST encode the tier or the
-//     pre-flight quote understates a priority gen (the desktop charges the
-//     priority key regardless of what we quoted).
+//   Seedance: seedance-2-{res}-{N}s (BytePlus ModelArk, sole provider). The
+//     cost key encodes resolution (480p/720p/1080p/4k) — price scales with
+//     resolution, so the key MUST carry it or the pre-flight quote is wrong.
 const KLING_TIER_MAP: Record<string, string> = {
   'kling-v3.0-std': 'kling-v3-standard',
   'kling-v3.0-pro': 'kling-v3-pro',
@@ -1209,15 +1206,13 @@ const KLING_TIER_MAP: Record<string, string> = {
 function videoCostKey(input: {
   model: VideoModel
   duration: number
-  videoResolution?: '720p' | '1080p' | '4k'
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
   sound?: boolean
-  seedanceSpeed?: 'economy' | 'priority'
 }): string {
   if (input.model.startsWith('seedance')) {
-    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts.
-    return input.seedanceSpeed === 'priority'
-      ? `${input.model}-priority-${input.duration}s`
-      : `${input.model}-${input.duration}s`
+    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (res × duration).
+    const res = input.videoResolution ?? '1080p'
+    return `${input.model}-${res}-${input.duration}s`
   }
   if (input.model.startsWith('veo')) {
     const is4k = input.videoResolution === '4k'
@@ -1252,8 +1247,7 @@ export const generateVideo: Operation<{
   projectId?: string
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
   duration?: number
-  videoResolution?: '720p' | '1080p' | '4k'
-  seedanceSpeed?: 'economy' | 'priority'
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
   firstFrameAssetId?: string
   lastFrameAssetId?: string
   ingredientAssetIds?: string[]
@@ -1266,15 +1260,14 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance). No skill files installed? Call slates_get_prompting_guide with the per-model guide (\'slates-prompting-veo-3\' / \'slates-prompting-kling-v3\' / \'slates-prompting-seedance\') and \'slates-cost-discipline\' before first use.',
+    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. Also read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters (build it safe-by-construction so the filter doesn\'t reject or degrade it). projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance). No skill files installed? Call slates_get_prompting_guide with the per-model guide (\'slates-prompting-veo-3\' / \'slates-prompting-kling-v3\' / \'slates-prompting-seedance\') and \'slates-cost-discipline\' before first use.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.enum(VIDEO_MODELS).describe('Pick deliberately by capability AND cost. Kling V3.0 std = cheapest (no audio); pro = mid; omni = multi-char dialogue + audio. Veo 3.1 = top quality, locks 16:9, audio; fast vs standard. Seedance 2 = ByteDance, audio included, supports first+last frame; pick economy vs priority via seedanceSpeed. For exact per-call credit cost, call slates_estimate_generation_cost or slates_list_available_models — never quote prices from memory (they change).'),
+    model: z.enum(VIDEO_MODELS).describe('Pick deliberately by capability AND cost. Kling V3.0 std = cheapest (no audio); pro = mid; omni = multi-char dialogue + audio. Veo 3.1 = top quality, locks 16:9, audio; fast vs standard. Seedance 2 = ByteDance (BytePlus), audio included, first+last frame + up to 9 reference images, full 480p–4K ladder (native 4K) via videoResolution. For exact per-call credit cost, call slates_estimate_generation_cost or slates_list_available_models — never quote prices from memory (they change).'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
     duration: z.number().int().min(4).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Default 5 if omitted but always be explicit (cost scales linearly).'),
-    videoResolution: z.enum(['720p', '1080p', '4k']).optional().describe('Veo only. 720p / 1080p same price. 4k more expensive.'),
-    seedanceSpeed: z.enum(['economy', 'priority']).optional().describe('Seedance only. Economy via PiAPI (cheaper, slower). Priority via fal.ai (faster).'),
+    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive). Veo: 720p/1080p same price, 4K more (8s only).'),
     firstFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the starting frame for image-to-video. Must already exist in the project.'),
     lastFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the ending frame. Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
     ingredientAssetIds: z.array(z.string().uuid()).max(9).optional().describe('Asset ids used as visual reference / ingredients for Kling Omni or Seedance. Up to 9 (Seedance) or 4 (Kling).'),
@@ -1340,7 +1333,6 @@ export const generateVideo: Operation<{
       duration: input.duration,
       videoResolution: input.videoResolution,
       sound: input.sound,
-      seedanceSpeed: input.seedanceSpeed,
     })
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) {
@@ -1423,7 +1415,6 @@ export const generateVideo: Operation<{
       aspectRatio: input.aspectRatio,
       duration: input.duration,
       videoResolution: input.videoResolution,
-      seedanceSpeed: input.seedanceSpeed,
       firstFrameAssetId: input.firstFrameAssetId,
       lastFrameAssetId: input.lastFrameAssetId,
       ingredientAssetIds: input.ingredientAssetIds ?? [],
@@ -2370,13 +2361,13 @@ function resolveGuideTopic(topic: string): string | null {
 export const getPromptingGuide: Operation<{ topic: string }> = {
   id: 'slates_get_prompting_guide',
   description:
-    "Return the full markdown of a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id (e.g. 'veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2-std', 'nano-banana-2') which maps to the right guide. ALWAYS read 'slates-cost-discipline' plus the relevant model guide before your first generation in a session.",
+    "Return the full markdown of a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id (e.g. 'veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2', 'nano-banana-2') which maps to the right guide. ALWAYS read 'slates-cost-discipline' plus the relevant model guide before your first generation in a session.",
   input: z.object({
     topic: z
       .string()
       .min(1)
       .describe(
-        'Guide name or model id. Guides: slates-cost-discipline, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film'
+        'Guide name or model id. Guides: slates-cost-discipline, slates-content-policy, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film'
       ),
   }),
   async run(input) {
