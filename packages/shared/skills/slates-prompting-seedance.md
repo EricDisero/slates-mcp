@@ -83,11 +83,24 @@ Reference-to-video endpoint accepts up to **9 reference images, 3 reference vide
 
 **Mutually exclusive:** First-frame/last-frame mode CANNOT be combined with reference images. The error reads `"first/last frame content cannot be mixed with reference media content."` Pick one or the other.
 
+## Faces — set `seedanceFace` for AI-character faces
+
+Seedance routes through **two providers** depending on whether a reference shows a **face**, and the app exposes this as the "Face in Reference" toggle (param `seedanceFace` on `slates_generate_video`):
+
+- **Faceless / object / environment refs → default route (cheapest).** Leave `seedanceFace` off.
+- **An AI-character's FACE in a reference → `seedanceFace: true`.** The default (BytePlus) route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider (relaxed mode). It costs **~10% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
+
+Rules:
+- **AI-generated characters only.** Real people (yourself, an actor, a photo of a real person) are **walled on every route** — ByteDance's Feb-2026 real-person policy. Never promise "upload a real face and animate it"; it will be rejected. The toggle is for fictional/AI characters.
+- It's about the **reference, not the output.** If your character refs (turnaround, expression sheet, a generated portrait) show a face, turn it on. A product shot with no person stays off.
+- Don't toggle it on "just in case" — a faceless gen on the face route just burns the +10% for nothing.
+
 ## Reference rules (the verified ones)
 
+- **Describe the ACTION, never the reference's content.** With refs attached, prompt only what is *happening* — motion, change, camera. Never re-describe what's in the reference, and never say "still / scene / from a movie / from the image." The model already sees the refs; narrating them wastes tokens and induces drift. Injection is stochastic — if a roll misses, **re-roll, don't re-engineer** (and a slow gen is not a failed one — see slates-cost-discipline).
 - **2-4 strong refs beat both extremes** — not 1 (warps), not 12 (averages worse). Start focused.
-- **One reference per ROLE, labeled** — `@Image1 is the character`, `@Image2 is the environment`. The model needs to know what each ref is FOR; it doesn't infer roles from order.
-- **Character identity: attach the turnaround AND the close-up expression sheet, labeled for identity** (face/skin/body/outfit), and render the expression the SCENE describes (default neutral). That label is what keeps the varied expressions from averaging the face — don't gate the expression sheet. The trend is MORE references (video/audio into Seedance), so lean into attaching rich refs and labeling every role.
+- **One reference per ROLE, named in the prompt.** Seedance's official idiom is **"Reference \<Subject_N\> in \<Image_N\>"** — `Image_N` indexes the order the refs are attached, so the name + index carries the role; the model doesn't infer it from order alone. Slates composes this for you from `@mentions`: it cites each reference inline as "image N" in the exact order it sends them. You don't hand-write role labels.
+- **Character identity: attach the turnaround AND the close-up expression sheet, named as one entity** — cite both under the same name. The shared name — not a role essay — is what keeps the varied expressions from averaging the face; don't gate the expression sheet, and don't tell it to "render neutral / ignore the outfit" (the user's prompt owns expression, wardrobe, and lighting). The trend is MORE references (video/audio into Seedance), all addressed by name — lean into attaching rich refs and let the naming do the work.
 - **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip ("green-screen pasted in front of mountains"). Prep refs flat and plain.
 - **Environment: describe it, don't feed a grid.** Default to words and let the model build the space to fit; reserve an environment ref for a hard exact-match, and then use ONE clean establishing image — never a multi-panel grid.
 - **Reuse the same refs across every shot** in a sequence — swapping mid-sequence drifts.

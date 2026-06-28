@@ -10,6 +10,7 @@ import { runStatus } from './commands/status.js'
 import { runOp } from './commands/op.js'
 import { runInstallSkills } from './commands/install-skills.js'
 import { runMcp } from './commands/mcp.js'
+import { runSetup } from './commands/setup.js'
 import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 
 // Slates CLI. The CLI mirrors the MCP tool surface as commands so Claude
@@ -61,6 +62,13 @@ program
   .command('status')
   .description('Show the current Slates connection status.')
   .action(() => runStatus())
+
+program
+  .command('setup')
+  .description('One-command onboarding: write the MCP config into every detected client, install the skills, and point you at the account-connect step.')
+  .option('--global', 'Install skills into ~/.claude/skills instead of the current project', false)
+  .option('--skip-skills', 'Only write MCP configs; do not install skills', false)
+  .action((opts) => runSetup(opts))
 
 program
   .command('mcp')

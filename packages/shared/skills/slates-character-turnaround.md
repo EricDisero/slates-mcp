@@ -41,10 +41,10 @@ If text only: skip step 2's reference and generate the turnaround from prompt-on
 - On success bind via `slates_set_character_expression_asset`.
 
 ### 5. Hand back
-> "Character {name} ready. Turnaround + expressions bound. Use `@{name}` in any prompt — Slates attaches both sheets and labels them so the face stays consistent."
+> "Character {name} ready. Turnaround + expressions bound. Use `@{name}` in any prompt — Slates attaches both sheets and names them as one person so the face stays consistent."
 
 ## Why both sheets (don't gate them)
-At scene time Slates attaches the turnaround AND the expression sheet, and writes a reference label that says: use these for the character's identity (face, skin, bone structure, body, outfit) and render the expression the SCENE describes, default neutral. That LABEL — not withholding the expression sheet — is what stops the multiple expressions from averaging the face to a midpoint. The close-ups carry far more facial signal (eyes, teeth, skin) than the postage-stamp faces in a full-body turnaround, so attaching both is a fidelity win. The trend is MORE references (video/audio/3D into newer models), so lean into attaching rich refs and labeling every role.
+At scene time Slates attaches the turnaround AND the expression sheet and cites BOTH inline under the same name — `{name} (images N and M)`. That shared NAME — not a withheld expression sheet, and not an injected "use for identity / render neutral" essay — is what tells the model they're ONE person and stops the multiple expressions from averaging the face to a midpoint. (Naming-as-one-entity is each model's own official lever: NB2 "assign a distinct name", Seedance "Reference Subject_N in Image_N".) The close-ups carry far more facial signal (eyes, teeth, skin) than the postage-stamp faces in a full-body turnaround, so attaching both is a fidelity win. Critically, the app injects NO wardrobe/expression/lighting directive — the user's scene prompt owns all of that, so `@{name}` in a movie-still injection keeps the still's own clothing and lighting. The trend is MORE references (video/audio/3D into newer models), all addressed by name — lean into attaching rich refs and let the naming do the work.
 
 ## Anti-patterns
 

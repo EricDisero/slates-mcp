@@ -48,13 +48,23 @@ Add to your MCP config:
 
 Restart your client. Slates tools appear in the tool palette.
 
+**Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → Agent Control → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients and writes their config. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
+
 ### CLI (Claude Code, terminal scripts)
+
+**Fastest path — one command** wires the MCP config into every detected client, installs the skills, and points you at the account-connect step:
+
+```bash
+npx -y @slatesvideo/cli setup
+```
+
+Or step by step:
 
 ```bash
 npm i -g @slatesvideo/cli
 slates login                  # only if you haven't connected via Settings
 slates install-skills         # installs skills to ./.claude/skills/<name>/SKILL.md
-slates mcp                    # detect MCP clients, print (or --write) their config
+slates mcp --write            # detect MCP clients, write their config
 slates status                 # show connection state
 slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"

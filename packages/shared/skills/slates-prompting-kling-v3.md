@@ -106,9 +106,9 @@ Upload 2-4 multi-angle reference photos per character/object. Tag inline:
 
 ## Reference discipline (character / environment refs)
 
-- **2-4 strong refs per role**, labeled (which element is which) and reused across every shot — swapping mid-sequence drifts.
+- **2-4 strong refs per role**, named (the same fixed label reused verbatim) and reused across every shot — swapping mid-sequence drifts. Kling's consistency lever is **"lock the subject with a fixed label reused verbatim"** (pronoun/synonym drift breaks it), so reusing the exact name on every mention is the whole game. Slates composes this for you from `@mentions`.
 - **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip. Prep refs flat and plain.
-- **Attach both character sheets, labeled for identity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail). Render the scene's expression (default neutral); the label keeps the varied expressions from averaging the face.
+- **Attach both character sheets, named as one entity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail), cited under the same name. The shared name keeps the varied expressions from averaging the face; don't write a role essay or tell it to "render neutral" — the user's prompt owns the expression, wardrobe, and lighting.
 - **Environment: describe it, don't feed a multi-panel grid.** Reserve an environment ref for a hard exact-match, then use ONE clean establishing image.
 
 ## Negative prompting — has a real field

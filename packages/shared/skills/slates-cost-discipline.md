@@ -91,6 +91,14 @@ The server returns `requires_clarification` when aspect ratio or resolution is m
 
 Don't bypass the gate by silently filling in defaults. The gates exist because defaults waste money.
 
+## Video is slow + async — a timeout is NOT a failure
+
+Video gens take minutes (Seedance 4K can run far longer). A client/CLI timeout or a slow, empty-looking response is **not** a failed generation — the job is still running on the provider.
+
+- **Never re-submit a video gen because it "timed out."** That double-charges the user for one video. Re-rolling a slow gen is the single most expensive mistake here.
+- **Poll, don't re-roll.** Use `background: true` on `slates_generate_video`, then poll `slates_get_generation_status` (free, read-only) until it reports `completed` or `failed`. In-flight jobs survive app restarts and are recovered.
+- A gen has only failed when the status comes back `failed` — and a provider *rejection* **refunds** the credits, so failed isolation tests are ~free. Until you see a terminal status, the job is in flight. Wait.
+
 ## The 3-strike rule
 
 Stop after 3 iterations on the same prompt. Hand back to the user with what you tried and what's not working. The slot machine doesn't converge — if it's not landing, the prompt structure is wrong, not the seed.

@@ -11,6 +11,7 @@
 // now. SSOT map: second-brain business/projects/slates/product/prompting-ssot.md
 
 export * from './reference-rules.js'
+export * from './reference-composer.js'
 export * from './content-policy.js'
 export * from './style-library.js'
 export * from './model-facts.js'

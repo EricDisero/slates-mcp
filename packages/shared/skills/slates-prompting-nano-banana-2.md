@@ -96,27 +96,19 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 ## Reference images
 
 - **Hard limit: 14 images** (10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
-- **Always label every reference's role** in the prompt. The model does not infer roles from order. Use the Slates composition pattern:
-
-```
-Reference Image Instructions:
-- Image 1: Character reference (@samurai) — use for the character's identity (facial features, skin, bone structure, body, outfit); render the expression the scene describes, default neutral
-- Image 2: Environment reference (@temple) — use for location architecture, spatial layout, environmental lighting, and atmospheric qualities
-- Image 3: Style reference (#kurosawa) — use for visual style, mood, and aesthetic treatment
-
-Scene prompt: [actual prompt]
-```
+- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style (or pass `referenceAssetIds`), Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (images 1 and 2) sits across from the woman (images 3 and 4) in the cafe (image 5)`, with a trailing `Render in the visual style of image 6.` The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**, so citing both of a subject's sheets under the SAME name ("Marcus") is what tells the model they are ONE person and stops the face averaging. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 
 ### Reference rules (the verified ones)
 1. **2-4 strong refs beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each adds context AND variables to balance.
-2. **One reference per ROLE, labeled** (identity / style-grade / environment). Same-role competitors drift.
-3. **Identity refs: attach both sheets, labeled — don't gate them.** A character's turnaround (body/proportion/outfit) AND its close-up expression sheet (high-res face: eyes, skin, teeth) both go in. The label ("use for identity; render the scene's expression, default neutral") is what stops the varied expressions from averaging the face. An *unlabeled* expression sheet hurts; labeled, the close-ups are a fidelity win.
+2. **One reference per ROLE, named** (identity / style-grade / environment). Same-role competitors drift. The model doesn't infer roles from order — the inline name does it.
+3. **Identity refs: attach both sheets, named as one entity — don't gate them.** A character's turnaround (body/proportion/outfit) AND its close-up expression sheet (high-res face: eyes, skin, teeth) both go in, cited under the SAME name ("Marcus (images 1 and 2)"). That shared name — not a role essay — is what stops the varied expressions from averaging the face. An *unnamed* expression sheet hurts; named as one entity, the close-ups are a fidelity win.
 4. **Flat-light identity refs.** Prep them with flat, even, shadowless lighting on a plain neutral background. Studio-lit / scene-lit sheets bleed their lighting into the generation ("green-screen pasted in front of mountains").
 5. **Environment: describe it, don't feed a grid.** Default to describing the location in words. Reserve an environment ref for a mandatory exact-match, and then use ONE clean establishing image — never a multi-panel grid fed whole.
 6. **Grids: explore, don't input.** Use grids to explore compositions, then pick a cell. Never feed a grid back in as a reference — cells share a split detail budget, so flaws propagate.
 7. **Reuse the same refs across all shots.** Swapping mid-sequence causes drift.
 8. **Legible in-shot text → bake it into the NB2 start frame**, then animate from it. Never trust text-to-video to render clean text.
 - **Character consistency is officially "not 100% perfect"** per Google. Test before bulk generations. High-resolution, front-facing reference images help most.
+- **Injection is stochastic — budget 3-5 re-rolls per shot; re-roll, don't re-engineer.** First rolls miss faces/hands; the same prompt lands a clean one within a few tries.
 
 ## Common failure modes + fixes
 

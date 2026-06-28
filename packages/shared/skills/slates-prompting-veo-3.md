@@ -98,9 +98,9 @@ Verbatim example:
 
 ## Reference discipline (character / environment refs)
 
-- **2-4 strong refs per role**, labeled (name what each provided image is for) and reused across every shot.
+- **2-4 strong refs per role**, named inline (Slates cites each as "image N" from your `@mentions`) and reused across every shot. The model doesn't infer a ref's role from order — the name does it.
 - **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip. Prep refs flat and plain.
-- **Attach both character sheets, labeled for identity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail). Render the scene's expression (default neutral); the label keeps the varied expressions from averaging the face.
+- **Attach both character sheets, named as one entity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail), cited under the same name. The shared name keeps the varied expressions from averaging the face; don't write a role essay or "render neutral" instruction — the user's prompt owns the expression, wardrobe, and lighting.
 - **Environment: describe it, don't feed a multi-panel grid.** Reserve an environment ref for a hard exact-match, then use ONE clean establishing image.
 
 ## Negative prompting — nouns, not instructions

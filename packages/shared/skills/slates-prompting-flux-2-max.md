@@ -80,12 +80,12 @@ Use natural language for exploration, JSON when the layout is locked and you're 
 
 ## Reference images (edit path)
 
-In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Label every reference's role in the prompt text ("subject from image 1, style from image 2, background from image 3"); unlabeled references get blended unpredictably. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max` (note: FLUX edits ignore extra referenceAssetIds — that's NB2-only).
+In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Slates names each reference inline in the prompt ("the subject (image 1), the style (image 2)") in the order it sends them, so you don't hand-write role labels; the name carries the role and unnamed-by-position blending is avoided. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max` (note: FLUX edits ignore extra referenceAssetIds — that's NB2-only).
 
 Reference discipline (FLUX caps refs lower than NB2's 14, so be deliberate):
-- **2-4 strong refs**, one per role, labeled — not 1 (warps), not many (blends).
+- **2-4 strong refs**, one per role, named — not 1 (warps), not many (blends).
 - **Flat-lit identity refs** — a studio-lit / scene-lit character sheet bleeds its lighting into the output.
-- **Attach both character sheets, labeled for identity** — turnaround (body/proportion/outfit) + close-up expression sheet (face detail), rendering the scene's expression (default neutral); the label keeps the expressions from averaging the face.
+- **Attach both character sheets, named as one entity** — turnaround (body/proportion/outfit) + close-up expression sheet (face detail), cited under the same name; the shared name keeps the expressions from averaging the face. Don't write a role essay or "render neutral" instruction — the user's prompt owns the expression, wardrobe, and lighting.
 - **Environment: describe it, don't feed a multi-panel grid** — reserve a ref for a hard exact-match, then use ONE clean establishing image.
 
 ## Character consistency across a series
@@ -99,7 +99,7 @@ Define the character exhaustively once, then repeat those exact descriptors verb
 | Generic "AI look" on photoreal | Name a camera body + lens + f-stop instead of "professional photo" |
 | Colors drift from brand spec | Bind each hex code to a named object |
 | Text garbled | Quote the exact string, specify font feel + placement + size |
-| Multi-reference blend chaos | Label each reference's role explicitly in the prompt |
+| Multi-reference blend chaos | Name each reference inline (Slates does this from your @mentions/referenceAssetIds) — the same name for one entity, distinct names per role |
 | Wanted element missing | Move it earlier in the prompt — order is weight |
 
 ## Pre-flight: references arrive inline, refer by code

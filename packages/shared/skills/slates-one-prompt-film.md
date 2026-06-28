@@ -30,7 +30,7 @@ Price the whole batch before the first generation: frame images (count × model 
 Per `slates-cost-discipline` 3b: that single OK authorizes `confirm=true` for **every enumerated call in the batch** — no per-call re-asking. Re-confirm only if a call's price overruns the plan >25% or new calls get added (extra retakes, new shots).
 
 ### 5. Generate frame images
-Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the character turnaround / environment / prior frames for consistency (label each reference's role in the prompt). Evaluate every result inline against the beat. Bind keepers via `slates_add_frame`.
+Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the character turnaround / environment / prior frames for consistency (Slates names each reference inline as "image N" — you don't hand-write role labels; reuse the same subject name across shots). Evaluate every result inline against the beat. Bind keepers via `slates_add_frame`.
 
 **Multi-take where it matters:** for the hook shot and any shot the whole film hangs on, generate 2-4 variants (cheap model or 1k), pull them back with `slates_get_assets_batch`, pick the strongest on composition + identity, discard the rest. Don't multi-take filler shots.
 

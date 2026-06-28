@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/mcp-server",
-  "version": "0.4.2",
+  "version": "0.4.4",
   "description": "MCP server for the Slates desktop app. Your AI agent (Claude, Cursor, or any MCP client) drives a local AI video studio: projects, characters, storyboards, image and video generation. Files land on disk.",
   "license": "MIT",
   "type": "module",
@@ -8,13 +8,17 @@
     "slates-mcp-server": "./dist/server.js"
   },
   "main": "./dist/server.js",
-  "files": ["dist", "!dist/**/*.map", "README.md"],
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build",
-    "build:mcpb": "npm run build --prefix ../shared && npm run build && node scripts/stage-mcpb.mjs && mcpb pack dist-mcpb/staging dist-mcpb/slates.mcpb"
+    "build:mcpb": "npm run build --prefix ../shared && npm run build && node scripts/stage-mcpb.mjs && npx -y @anthropic-ai/mcpb pack dist-mcpb/staging dist-mcpb/slates.mcpb"
   },
   "repository": {
     "type": "git",
@@ -46,7 +50,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "@slatesvideo/shared": "0.4.2",
+    "@slatesvideo/shared": "0.4.4",
     "zod": "^3.23.0",
     "zod-to-json-schema": "^3.23.0"
   },

@@ -493,6 +493,70 @@ export const createEnvironment: Operation<{
   },
 }
 
+export const generateCharacterSheets: Operation<{
+  characterId: string
+  projectId: string
+  baseAssetId: string
+  sheetTypes?: ('turnaround' | 'expression')[]
+  userNotes?: string
+}> = {
+  id: 'slates_generate_character_sheets',
+  description:
+    "Generate a character's turnaround sheet (4 neutral full-body angles — identity: body, proportions, outfit) AND expression sheet (close-up facial detail) from a base portrait asset, on Nano Banana 2 at 2K, and bind both to the character. THE real character-building workflow — call right after slates_create_character. baseAssetId is the source portrait (a project asset). Both sheets generate by default. Afterward, carry the character into a scene by passing its turnaround + expression asset ids as characterAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so identity stays consistent across shots. Cost ~$0.36 for both sheets.",
+  input: z.object({
+    characterId: z.string().uuid(),
+    projectId: z.string().uuid(),
+    baseAssetId: z.string().uuid().describe('The base portrait asset the sheets are generated from.'),
+    sheetTypes: z
+      .array(z.enum(['turnaround', 'expression']))
+      .optional()
+      .describe('Which sheets to generate. Default both.'),
+    userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/characters/generate-sheets', {
+        characterId: input.characterId,
+        projectId: input.projectId,
+        baseAssetIds: [input.baseAssetId],
+        sheetTypes: input.sheetTypes,
+        userNotes: input.userNotes,
+      })
+    )
+  },
+}
+
+export const generateEnvironmentPlate: Operation<{
+  environmentId: string
+  projectId: string
+  baseAssetId?: string
+  userNotes?: string
+}> = {
+  id: 'slates_generate_environment_plate',
+  description:
+    "Generate an environment's single clean establishing plate (Nano Banana 2, 2K) from an optional base image, and bind it as the environment's reference. THE real environment-building workflow — call right after slates_create_environment. Afterward, pass the plate asset id as environmentAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so the location stays consistent across shots. Cost ~$0.18.",
+  input: z.object({
+    environmentId: z.string().uuid(),
+    projectId: z.string().uuid(),
+    baseAssetId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Optional base image to establish from (e.g. a rough location shot).'),
+    userNotes: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    return ok(
+      await ctx.desktop().post('/agent/environments/generate-plate', {
+        environmentId: input.environmentId,
+        projectId: input.projectId,
+        baseAssetIds: input.baseAssetId ? [input.baseAssetId] : [],
+        userNotes: input.userNotes,
+      })
+    )
+  },
+}
+
 // ── Storyboards ─────────────────────────────────────────────────
 
 export const listStoryboards: Operation<{ projectId: string }> = {
@@ -1208,11 +1272,15 @@ function videoCostKey(input: {
   duration: number
   videoResolution?: '480p' | '720p' | '1080p' | '4k'
   sound?: boolean
+  seedanceFace?: boolean
 }): string {
   if (input.model.startsWith('seedance')) {
-    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (res × duration).
+    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (face × res × duration).
+    // Face route (AI-character face ref) bills the EvoLink relaxed rate (+10%) via
+    // the `-face-` key; faceless uses the cheaper BytePlus key.
     const res = input.videoResolution ?? '1080p'
-    return `${input.model}-${res}-${input.duration}s`
+    const face = input.seedanceFace ? '-face' : ''
+    return `${input.model}${face}-${res}-${input.duration}s`
   }
   if (input.model.startsWith('veo')) {
     const is4k = input.videoResolution === '4k'
@@ -1254,9 +1322,11 @@ export const generateVideo: Operation<{
   characterAssetIds?: string[]
   environmentAssetIds?: string[]
   styleAssetIds?: string[]
+  videoReferenceAssetId?: string
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
+  seedanceFace?: boolean
   negativePrompt?: string
   background?: boolean
   confirm?: boolean
@@ -1277,9 +1347,11 @@ export const generateVideo: Operation<{
     characterAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of character sheets — keeps a character consistent across the shot. From a Slates project.'),
     environmentAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of environment grids — keeps a location/setting consistent across the shot. From a Slates project.'),
     styleAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of style references — locks the visual style of the shot. From a Slates project.'),
+    videoReferenceAssetId: z.string().uuid().optional().describe('Seedance ONLY: an existing VIDEO asset to use as a reference (edit / relocate an existing clip — Seedance ref-to-video). 2-15s. If the clip contains a human/AI character, pair with seedanceFace=true so it routes to the face-capable provider (the default Seedance route blocks people). Ignored by Kling/Veo.'),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
+    seedanceFace: z.boolean().optional().describe('Seedance ONLY: set true when a reference/ingredient shows an AI-character\'s FACE. Faces are blocked on the default (cheaper) Seedance route, so this reroutes the gen to a face-capable provider and costs ~10% more (the cost key becomes seedance-2-face-*). Leave false/unset for faceless or object-only references. No effect on Kling/Veo. Real-person faces are not supported on any route.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the >$0.50 cost confirm gate (which fires for almost every video gen since they\'re expensive).'),
@@ -1339,6 +1411,7 @@ export const generateVideo: Operation<{
       duration: input.duration,
       videoResolution: input.videoResolution,
       sound: input.sound,
+      seedanceFace: input.seedanceFace,
     })
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) {
@@ -1436,9 +1509,11 @@ export const generateVideo: Operation<{
       characterAssetIds: input.characterAssetIds ?? [],
       environmentAssetIds: input.environmentAssetIds ?? [],
       styleAssetIds: input.styleAssetIds ?? [],
+      videoReferenceAssetId: input.videoReferenceAssetId,
       sound: input.sound,
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
+      seedanceFace: input.seedanceFace,
       negativePrompt: input.negativePrompt,
       background: input.background,
     })
@@ -2434,6 +2509,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   setCharacterExpression as unknown as Operation<unknown>,
   listEnvironments as unknown as Operation<unknown>,
   createEnvironment as unknown as Operation<unknown>,
+  generateCharacterSheets as unknown as Operation<unknown>,
+  generateEnvironmentPlate as unknown as Operation<unknown>,
   listStoryboards as unknown as Operation<unknown>,
   createStoryboard as unknown as Operation<unknown>,
   getStoryboardWithFrames as unknown as Operation<unknown>,
