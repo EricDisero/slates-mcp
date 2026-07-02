@@ -2481,6 +2481,21 @@ function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
   if (t.startsWith('seedance')) return 'slates-prompting-seedance'
   if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'
+  // Style names → the per-style prompting guide (photoreal/anime/painterly/
+  // 3d-render across Seedance/Kling/NB2). Matches the style-library ids plus
+  // the obvious spellings users type.
+  if (
+    t === 'style' ||
+    t === 'styles' ||
+    t.startsWith('photoreal') ||
+    t.startsWith('anime') ||
+    t.startsWith('painterly') ||
+    t === '3d-render' ||
+    t === '3d render' ||
+    t === 'comic'
+  ) {
+    return 'slates-style-prompting'
+  }
   return null
 }
 
@@ -2493,7 +2508,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
       .string()
       .min(1)
       .describe(
-        'Guide name or model id. Guides: slates-cost-discipline, slates-content-policy, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film'
+        'Guide name, model id, or style name. Guides: slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
       ),
   }),
   async run(input) {
