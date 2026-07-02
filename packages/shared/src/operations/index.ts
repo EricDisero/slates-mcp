@@ -1267,19 +1267,22 @@ const KLING_TIER_MAP: Record<string, string> = {
   'kling-v3.0-omni': 'kling-v3-omni',
 }
 
-function videoCostKey(input: {
+// Exported for scripts/pricing-consistency-check.mjs (slates-api repo), which
+// asserts this builder byte-matches the desktop's klingCreditKey/seedanceCreditKey.
+export function videoCostKey(input: {
   model: VideoModel
   duration: number
   videoResolution?: '480p' | '720p' | '1080p' | '4k'
   sound?: boolean
   seedanceFace?: boolean
+  seedanceRealFace?: boolean
 }): string {
   if (input.model.startsWith('seedance')) {
     // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (face × res × duration).
-    // Face route (AI-character face ref) bills the EvoLink relaxed rate (+10%) via
-    // the `-face-` key; faceless uses the cheaper BytePlus key.
+    // AI-face route bills the `-face-` key (~45% over faceless); consented
+    // real-person route bills the premium `-realface-` key (fal partner endpoint).
     const res = input.videoResolution ?? '1080p'
-    const face = input.seedanceFace ? '-face' : ''
+    const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
     return `${input.model}${face}-${res}-${input.duration}s`
   }
   if (input.model.startsWith('veo')) {
@@ -1292,7 +1295,14 @@ function videoCostKey(input: {
     return parts.join('-')
   }
   if (input.model.startsWith('kling-v3.0')) {
+    // Mirrors klingCreditKey() in slate/src/shared/pricing.ts. Kling native 4K
+    // bills flat-rate keys: std/pro/omni all get a `-4k` tier key, and omni-pro
+    // shares kling-v3-omni-4k (the o3/4k endpoint has one flat rate).
     const tier = KLING_TIER_MAP[input.model] ?? input.model
+    if (input.videoResolution === '4k') {
+      const tier4k = tier === 'kling-v3-omni-pro' ? 'kling-v3-omni' : tier
+      return `${tier4k}-4k-${input.duration}s`
+    }
     return `${tier}-${input.duration}s`
   }
   throw new Error(`Unknown video model: ${input.model}`)
@@ -1327,6 +1337,8 @@ export const generateVideo: Operation<{
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
   seedanceFace?: boolean
+  seedanceRealFace?: boolean
+  realFaceConsent?: boolean
   negativePrompt?: string
   background?: boolean
   confirm?: boolean
@@ -1351,7 +1363,9 @@ export const generateVideo: Operation<{
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
-    seedanceFace: z.boolean().optional().describe('Seedance ONLY: set true when a reference/ingredient shows an AI-character\'s FACE. Faces are blocked on the default (cheaper) Seedance route, so this reroutes the gen to a face-capable provider and costs ~10% more (the cost key becomes seedance-2-face-*). Leave false/unset for faceless or object-only references. No effect on Kling/Veo. Real-person faces are not supported on any route.'),
+    seedanceFace: z.boolean().optional().describe('Seedance ONLY: set true when a reference/ingredient shows an AI-character\'s FACE. Faces are blocked on the default (cheaper) Seedance route, so this reroutes the gen to a face-capable provider at ~45% more (the cost key becomes seedance-2-face-*). Leave false/unset for faceless or object-only references. No effect on Kling/Veo. A REAL person\'s photo is rejected on this route — the failure message contains [REAL_FACE_DETECTED]; see seedanceRealFace.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: the reference shows a REAL person (a photo of an actual human, not an AI character). Routes to the premium real-face provider (cost key seedance-2-realface-*, roughly 2x the AI-face price — quote it via slates_estimate_generation_cost first). REQUIRES realFaceConsent=true. Typical flow: a seedanceFace gen fails with [REAL_FACE_DETECTED] → ask the user to confirm consent + the higher price → retry with seedanceRealFace=true + realFaceConsent=true.'),
+    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: set true ONLY after the user has explicitly confirmed they hold the rights/consent to this person\'s likeness and it doesn\'t impersonate or misrepresent them. The generation is refused without it. Public figures/celebrities fail on every route.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the >$0.50 cost confirm gate (which fires for almost every video gen since they\'re expensive).'),
@@ -1412,7 +1426,18 @@ export const generateVideo: Operation<{
       videoResolution: input.videoResolution,
       sound: input.sound,
       seedanceFace: input.seedanceFace,
+      seedanceRealFace: input.seedanceRealFace,
     })
+    // Hard consent gate, checked before any spend: the real-face route is
+    // consent-attested by design (the desktop enforces it too).
+    if (input.seedanceRealFace && !input.realFaceConsent) {
+      return ok({
+        requires_clarification: true,
+        missing: ['realFaceConsent'],
+        message:
+          'Real-person generation needs consent: confirm with the user that they hold the rights/consent to this likeness, then retry with realFaceConsent=true.',
+      })
+    }
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) {
       throw new Error(
@@ -1514,6 +1539,8 @@ export const generateVideo: Operation<{
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
       seedanceFace: input.seedanceFace,
+      seedanceRealFace: input.seedanceRealFace,
+      realFaceConsent: input.realFaceConsent,
       negativePrompt: input.negativePrompt,
       background: input.background,
     })

@@ -85,15 +85,16 @@ Reference-to-video endpoint accepts up to **9 reference images, 3 reference vide
 
 ## Faces — set `seedanceFace` for AI-character faces
 
-Seedance routes through **two providers** depending on whether a reference shows a **face**, and the app exposes this as the "Face in Reference" toggle (param `seedanceFace` on `slates_generate_video`):
+Seedance routes through **three tiers** depending on the face in the reference, exposed as the "Face in Reference" toggle plus the real-face params on `slates_generate_video`:
 
 - **Faceless / object / environment refs → default route (cheapest).** Leave `seedanceFace` off.
-- **An AI-character's FACE in a reference → `seedanceFace: true`.** The default (BytePlus) route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider (relaxed mode). It costs **~10% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
+- **An AI-character's FACE in a reference → `seedanceFace: true`.** The default route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider. It costs **~45% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
+- **A REAL person's photo (the user themselves, an actor) → the consent-gated premium route.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the provider classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, roughly 2× the AI-face rate — quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
 
 Rules:
-- **AI-generated characters only.** Real people (yourself, an actor, a photo of a real person) are **walled on every route** — ByteDance's Feb-2026 real-person policy. Never promise "upload a real face and animate it"; it will be rejected. The toggle is for fictional/AI characters.
+- **The real-vs-AI call is the PROVIDER'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass the standard face route (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively route to the real-face tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every route.
 - It's about the **reference, not the output.** If your character refs (turnaround, expression sheet, a generated portrait) show a face, turn it on. A product shot with no person stays off.
-- Don't toggle it on "just in case" — a faceless gen on the face route just burns the +10% for nothing.
+- Don't toggle it on "just in case" — a faceless gen on the face route burns ~45% extra for nothing.
 
 ## Reference rules (the verified ones)
 
