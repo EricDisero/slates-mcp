@@ -1,6 +1,6 @@
 ---
 name: slates-project-organization
-description: How to keep a Slates project's assets organized — folders for film STRUCTURE, the typed tabs for reusable references — so the user and the agent can both navigate it and a human can take over the project manually.
+description: How a Slates project's assets are organized AND named — the asset short-code system (IMG-A12 / VID-V3 / AUD-S1 badges on every gallery card), folders for film STRUCTURE, the typed tabs for reusable references. Read when the user refers to an asset by code, asks what a code like IMG-A36 means, or when organizing/navigating a project.
 ---
 
 # Organizing a Slates project
@@ -20,3 +20,18 @@ Rules of thumb:
 - Scene stills, clips, and the final cut → file into the structural folder they belong to, as you make them.
 - One folder per asset (folders are structure). Cross-cutting status (hero take, reject, variant) is a tag concern, not a folder.
 - Keep the gallery legible: work product lives in folders; the reference scaffolding (sheets, plates, style images) stays in its tabs.
+
+## Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1)
+
+Every asset gets a short, stable code the moment it lands in a project, and the user sees it as the badge in the **top-left corner of every image and video card** in the gallery. This is the shared vocabulary between you and the user — it exists so neither of you ever has to quote a UUID.
+
+**The scheme:**
+- `IMG-A{n}` = images · `VID-V{n}` = videos · `AUD-S{n}` = audio.
+- Numbering is **per project, per type**, counts up from 1, and **numbers are never reused** — deleting IMG-A12 doesn't renumber anything, so a code always means the same asset forever.
+- Each asset also carries a **label**: the first ~4 meaningful words of its prompt, title-cased. Chat format is code + label: `IMG-A12 — Beach Sunset`.
+
+**How to use it:**
+- **User names a code** ("use IMG-A36 as the reference", "animate VID-V3's last frame") → resolve it via `slates_list_assets` (match the `code` field) to get the assetId, confirm back in the same vocabulary: "Got it — IMG-A36 — Marcus Rooftop Close-Up as the first frame."
+- **You name assets** → ALWAYS code + label, never UUID, never "the beach one" (which of three?). The user matches your words to the badge by eye.
+- **User seems confused** about what a code is or how to point you at an image → explain it in one line: "Every image and video in your gallery has a code badge in its top-left corner — like IMG-A36. Just say that code and I'll know exactly which one you mean."
+- **Ambiguity** ("the sunset image" when several exist) → pull candidates with `slates_get_assets_batch` and offer the codes: "I see IMG-A12, IMG-A19, and IMG-A24 with sunsets — which one?"

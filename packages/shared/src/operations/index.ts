@@ -48,7 +48,9 @@ export interface Operation<I> {
 
 function ok(data: unknown, text?: string): OperationResult {
   return {
-    text: text ?? JSON.stringify(data, null, 2),
+    // Compact JSON — pretty-printing (indent 2) cost ~10-15% extra tokens
+    // on every tool result the calling LLM reads.
+    text: text ?? JSON.stringify(data),
     data,
   }
 }
@@ -64,14 +66,16 @@ const BACKGROUND_DESCRIBE =
 function backgroundSubmitted(
   kind: string,
   ids: string[],
-  extra: Record<string, unknown>
+  extra: Record<string, unknown>,
+  note?: string
 ): OperationResult {
   const idText = ids.length > 0 ? ids.join(', ') : '(no id returned)'
   return {
     text:
       `Submitted ${kind} in the background — generationId(s): ${idText}. ` +
-      `Poll slates_get_generation_status with each id every 5-15s until status is 'completed' ` +
-      `(video generations commonly take 1-5 minutes). Generations survive app restarts.`,
+      `Call slates_get_generation_status with waitSeconds: 45 (it long-polls and returns on completion — ` +
+      `never a rapid loop; video renders commonly take 1-5 minutes). Generations survive app restarts.` +
+      (note ? ` ${note}` : ''),
     data: { generationIds: ids, status: 'processing', ...extra },
   }
 }
@@ -115,36 +119,109 @@ export const getCreditBalance: Operation<Record<string, never>> = {
   },
 }
 
-export const listAvailableModels: Operation<Record<string, never>> = {
+export const listAvailableModels: Operation<{ filter?: string }> = {
   id: 'slates_list_available_models',
-  description: 'Full registry of generation models with their per-call credit cost. Use this for cost estimation.',
-  input: z.object({}).strict(),
-  async run(_input, ctx) {
+  description: 'Registry of generation model cost keys with per-call credit cost in cents, as a compact "key cents" table. Optional `filter` substring (e.g. "kling" or "nano-banana") keeps the result small — prefer it. For a single known model, slates_estimate_generation_cost is cheaper still.',
+  input: z.object({
+    filter: z.string().optional().describe('Substring match on the model key, e.g. "kling-v3" or "seedance"'),
+  }),
+  async run(input, ctx) {
     const r = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    return ok(r)
+    let models = r.models
+    if (input.filter) {
+      const q = input.filter.toLowerCase()
+      models = models.filter((m) => m.model.toLowerCase().includes(q))
+    }
+    // Compact text table — "key cents" lines are ~5x denser than the raw
+    // JSON registry (the full pretty-printed dump was an ~8k-token leak).
+    const table = models.map((m) => `${m.model} ${m.cost_cents}`).join('\n')
+    return {
+      text:
+        `${models.length} COST keys (cents per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
+        `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on slates_generate_video takes a BASE id ` +
+        `(kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard) with duration/videoResolution as separate params:\n` +
+        table,
+      data: { count: models.length, credit_markup: r.credit_markup },
+    }
   },
 }
 
-export const estimateGenerationCost: Operation<{ model: string; quantity?: number }> = {
+export const estimateGenerationCost: Operation<{
+  model: string
+  quantity?: number
+  duration?: number
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  resolution?: '1k' | '2k' | '4k'
+  sound?: boolean
+  seedanceFace?: boolean
+  seedanceRealFace?: boolean
+}> = {
   id: 'slates_estimate_generation_cost',
   description:
-    'Pre-flight cost estimate. Call before any generate_* op so the user sees "this will cost N credits" up front. Pairs with the >$0.50 confirm gate.',
+    'Pre-flight cost estimate. Call before any generate_* op so the user sees "this will cost N credits" up front. Takes the SAME base model ids as the generate ops (video: "seedance-2" + duration + videoResolution; image: "nano-banana-2" + resolution) — exact registry cost keys also work. Pairs with the >$0.50 confirm gate.',
   input: z.object({
-    model: z.string().describe('Model id, e.g. "nano-banana-2-2k" or "veo-3.1-fast-8s"'),
+    model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
+    duration: z.number().int().min(3).max(15).optional().describe('Video only — seconds. Cost scales linearly; required with a video base id.'),
+    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Video only. Seedance defaults to 1080p.'),
+    resolution: z.enum(['1k', '2k', '4k']).optional().describe('Image only (default 2k).'),
+    sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
+    seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
   }),
   async run(input, ctx) {
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === input.model)
-    if (!entry) {
-      throw new Error(`Unknown model: ${input.model}. Use slates_list_available_models to see options.`)
+    const byKey = new Map(registry.models.map((m) => [m.model, m.cost_cents]))
+
+    // 1) exact registry cost key
+    let key: string | null = byKey.has(input.model) ? input.model : null
+    // 2) image base id + resolution
+    if (!key) {
+      const img = (['nano-banana-2', 'flux-2-max', 'seedream-5-lite'] as const).find(
+        (m) => m === input.model
+      )
+      if (img) key = imageCostKey(img, input.resolution ?? '2k')
+    }
+    // 3) video base id (or cost-key spelling) → the same forgiving resolver
+    //    the generate op uses, so the two can never disagree about a model.
+    if (!key) {
+      const resolved = resolveVideoModel(input.model)
+      if (resolved) {
+        const duration = input.duration ?? resolved.duration
+        if (!duration) {
+          return ok({
+            requires_clarification: true,
+            missing: ['duration'],
+            message: `"${resolved.model}" cost scales with duration — pass duration (seconds) to estimate.`,
+          })
+        }
+        key = videoCostKey({
+          model: resolved.model,
+          duration,
+          videoResolution:
+            input.videoResolution ??
+            resolved.videoResolution ??
+            (resolved.model.startsWith('seedance') ? '1080p' : undefined),
+          sound: input.sound ?? resolved.sound,
+          seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
+          seedanceRealFace: input.seedanceRealFace,
+        })
+      }
+    }
+
+    const cents = key != null ? byKey.get(key) : undefined
+    if (key == null || cents == null) {
+      throw new Error(
+        `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | nano-banana-2 | flux-2-max | seedream-5-lite) plus duration/resolution params, or use slates_list_available_models with a filter.`
+      )
     }
     const qty = input.quantity ?? 1
-    const totalCents = entry.cost_cents * qty
+    const totalCents = cents * qty
     return ok({
       model: input.model,
+      cost_key: key,
       quantity: qty,
-      cost_per_cents: entry.cost_cents,
+      cost_per_cents: cents,
       total_cents: totalCents,
       total_dollars: (totalCents / 100).toFixed(2),
       requires_confirm: totalCents > 50,
@@ -186,15 +263,144 @@ export const getProject: Operation<{ id: string }> = {
 
 // ── Assets ──────────────────────────────────────────────────────
 
-export const listAssets: Operation<{ projectId: string }> = {
+/** Compact projection of a raw asset row — the full row (prompt, settings,
+ * paths, thumbnails) is 20-50x heavier and was the single biggest context
+ * leak in early agent sessions (494 assets ≈ 130KB ≈ 33k tokens in ONE
+ * tool result). Every op that embeds asset lists uses this. */
+function compactAsset(a: unknown): Record<string, unknown> {
+  const r = a as Record<string, unknown>
+  const prompt = typeof r.prompt === 'string' ? r.prompt : ''
+  return {
+    id: r.id,
+    code: r.code ?? null,
+    label: r.label ?? (prompt ? prompt.slice(0, 40) : null),
+    type: r.type,
+    created_at: r.createdAt ?? r.created_at ?? undefined,
+  }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+interface ResolvedAssetRef {
+  id: string
+  code: string | null
+  label: string | null
+}
+
+/**
+ * Resolve asset references that may be UUIDs OR badge codes ("IMG-A8",
+ * "vid-v3", bare "A8"). Codes resolve against the project's asset list AT
+ * CALL TIME — never a stale mapping from earlier in a conversation. The
+ * user creates assets in the Slates UI mid-chat; an agent that guesses or
+ * reuses a nearby UUID for a code it never looked up burns real dollars on
+ * the wrong start frame (observed live: "use A8" generated from A5).
+ * Unknown codes throw a teaching error; unknown UUIDs pass through for the
+ * desktop route to validate.
+ */
+async function resolveAssetRefs(
+  ctx: OperationContext,
+  projectId: string,
+  refs: string[]
+): Promise<Map<string, ResolvedAssetRef>> {
+  const out = new Map<string, ResolvedAssetRef>()
+  const pending = [...new Set(refs.filter((r) => typeof r === 'string' && r.trim().length > 0))]
+  if (pending.length === 0) return out
+  const { assets } = await ctx.desktop().get<{ assets: unknown[] }>('/agent/assets', { projectId })
+  const rows = (assets ?? []).map(compactAsset)
+  const byId = new Map(rows.map((a) => [String(a.id).toLowerCase(), a]))
+  const byCode = new Map(
+    rows.filter((a) => a.code).map((a) => [String(a.code).toUpperCase(), a])
+  )
+  for (const ref of pending) {
+    const raw = ref.trim()
+    if (UUID_RE.test(raw)) {
+      const row = byId.get(raw.toLowerCase())
+      out.set(ref, {
+        id: raw,
+        code: row ? ((row.code as string | null) ?? null) : null,
+        label: row ? ((row.label as string | null) ?? null) : null,
+      })
+      continue
+    }
+    let row = byCode.get(raw.toUpperCase())
+    if (!row && /^[AVS]\d+$/i.test(raw)) {
+      // Bare "A8" / "V3" / "S1" — expand to the full badge family.
+      const norm = raw.toUpperCase()
+      const prefixed = norm.startsWith('A') ? `IMG-${norm}` : norm.startsWith('V') ? `VID-${norm}` : `AUD-${norm}`
+      row = byCode.get(prefixed)
+    }
+    if (!row) {
+      throw new Error(
+        `No asset matching "${ref}" in this project. Codes resolve at call time — ` +
+          `call slates_list_assets (search: "${ref}") to see what actually exists, then pass the exact code or id. Never guess.`
+      )
+    }
+    out.set(ref, {
+      id: String(row.id),
+      code: (row.code as string | null) ?? null,
+      label: (row.label as string | null) ?? null,
+    })
+  }
+  return out
+}
+
+/** "first frame: IMG-A8 — Untitled" echo lines for generation results. */
+function describeResolvedRefs(
+  refInputs: Array<{ ref: string; role: string }>,
+  resolved: Map<string, ResolvedAssetRef>
+): string {
+  if (refInputs.length === 0) return ''
+  const lines = refInputs.map(({ ref, role }) => {
+    const r = resolved.get(ref)
+    if (!r) return `${role}: ${ref}`
+    const name = r.code ?? r.id
+    return `${role}: ${name}${r.label ? ` — ${r.label}` : ''}`
+  })
+  return `References used: ${lines.join('; ')}.`
+}
+
+export const listAssets: Operation<{
+  projectId: string
+  type?: 'image' | 'video' | 'audio'
+  search?: string
+  limit?: number
+}> = {
   id: 'slates_list_assets',
-  description: 'List all assets (images + videos) in a Slates project.',
-  input: z.object({ projectId: z.string().uuid() }),
+  description: 'List assets in a Slates project as COMPACT rows (id, code, label, type) — newest first, default limit 50. Each asset carries its short code (IMG-A12 / VID-V3 / AUD-S1 — the badge the user sees on the gallery card) and label. When the user names an asset by code ("use IMG-A36 as the reference"), pass it as `search` to resolve the assetId. Always speak about assets by code + label, never by UUID. NOTE: generate_* results already return the new asset ids — do NOT call this to find an asset you just created.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    type: z.enum(['image', 'video', 'audio']).optional().describe('Only this asset type'),
+    search: z.string().optional().describe('Case-insensitive match on code or label (e.g. "IMG-A36" or "sunset")'),
+    limit: z.number().int().min(1).max(500).optional().describe('Max rows (default 50, newest first)'),
+  }),
   async run(input, ctx) {
     const r = await ctx.desktop().get<{ assets: unknown[] }>('/agent/assets', {
       projectId: input.projectId,
     })
-    return ok(r)
+    const all = (r.assets ?? []).map(compactAsset)
+    let rows = all
+    if (input.type) rows = rows.filter((a) => a.type === input.type)
+    if (input.search) {
+      const q = input.search.toLowerCase()
+      rows = rows.filter(
+        (a) =>
+          String(a.code ?? '').toLowerCase().includes(q) ||
+          String(a.label ?? '').toLowerCase().includes(q)
+      )
+    }
+    // Newest first, then cap. (created_at is ISO — lexicographic sort works.)
+    rows = rows
+      .slice()
+      .sort((a, b) => String(b.created_at ?? '').localeCompare(String(a.created_at ?? '')))
+    const limit = input.limit ?? 50
+    const truncated = rows.length > limit
+    rows = rows.slice(0, limit)
+    return ok({
+      total_matching: truncated ? undefined : rows.length,
+      total_in_project: all.length,
+      truncated,
+      assets: rows.map(({ created_at: _drop, ...rest }) => rest),
+    })
   },
 }
 
@@ -802,7 +1008,7 @@ export const generateImage: Operation<{
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous.'),
     count: z.number().int().min(1).max(4).optional(),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
-    referenceAssetIds: z.array(z.string().uuid()).max(14).optional().describe("Project asset ids to use as reference/ingredient images (resolved on the desktop). Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
+    referenceAssetIds: z.array(z.string()).max(14).optional().describe("Project assets to use as reference/ingredient images — asset UUIDs or badge codes (\"IMG-A8\"); codes resolve against the project at call time. Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
   }),
@@ -840,7 +1046,7 @@ export const generateImage: Operation<{
     // disk, so a headless run has nowhere to look them up. Same for
     // background mode: the poller (slates_get_generation_status) reads the
     // desktop's generation records.
-    const referenceAssetIds = input.referenceAssetIds ?? []
+    let referenceAssetIds = input.referenceAssetIds ?? []
     if (referenceAssetIds.length > 0 && !input.projectId) {
       return ok({
         requires_clarification: true,
@@ -857,8 +1063,15 @@ export const generateImage: Operation<{
           'background=true routes through the desktop generation pipeline (so slates_get_generation_status can poll it) — pass a projectId, or drop background for a blocking headless run.',
       })
     }
+    let refEcho = ''
     if (referenceAssetIds.length > 0) {
       await ctx.desktop().requireCapability('image-references', 'reference images on image generation')
+      // UUIDs or badge codes — resolved against the project at call time
+      // (stale-code guessing is a real, observed failure mode).
+      const resolved = await resolveAssetRefs(ctx, input.projectId as string, referenceAssetIds)
+      const refInputs = referenceAssetIds.map((ref) => ({ ref, role: 'reference' }))
+      referenceAssetIds = referenceAssetIds.map((ref) => resolved.get(ref)?.id ?? ref)
+      refEcho = describeResolvedRefs(refInputs, resolved)
     }
     if (input.background) {
       await ctx.desktop().requireCapability('background-generation', 'background generation')
@@ -956,13 +1169,18 @@ export const generateImage: Operation<{
       }
       if (result.background) {
         const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-        return backgroundSubmitted(`${imageModel} image generation`, ids, {
-          model: imageModel,
-          costKey,
-          projectId: input.projectId,
-          cost_cents: totalCents,
-          cost_dollars: (totalCents / 100).toFixed(2),
-        })
+        return backgroundSubmitted(
+          `${imageModel} image generation`,
+          ids,
+          {
+            model: imageModel,
+            costKey,
+            projectId: input.projectId,
+            cost_cents: totalCents,
+            cost_dollars: (totalCents / 100).toFixed(2),
+          },
+          refEcho
+        )
       }
       const assetList: Array<Record<string, unknown>> = result.assets
         ?? (result.asset ? [result.asset] : [])
@@ -990,7 +1208,8 @@ export const generateImage: Operation<{
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`
           : `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
             `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
-            `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
+            `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
+            (refEcho ? ` ${refEcho}` : ''),
         images,
         data: {
           model: imageModel,
@@ -1000,7 +1219,10 @@ export const generateImage: Operation<{
           resolution,
           cost_cents: totalCents,
           cost_dollars: (totalCents / 100).toFixed(2),
-          assets: assetList,
+          // Compact refs only — the full rows (prompt/settings/paths) were a
+          // multi-KB leak per generation and everything needed downstream is
+          // the id/code/label.
+          assets: assetList.map(compactAsset),
           generationIds: result.generationIds ?? (result.generationId ? [result.generationId] : []),
           ...(partialFailure
             ? { partial: true, error: result.error ?? 'unknown error', requested_count: requestedCount }
@@ -1242,7 +1464,10 @@ export const editImage: Operation<{
 
 // ── Generate video ──────────────────────────────────────────────
 
-const VIDEO_MODELS = [
+// Exported: the exact `model` ids slates_generate_video accepts — consumed
+// by the desktop Studio Agent system prompt (SSOT; never restate these ids
+// in prose that can drift).
+export const VIDEO_MODELS = [
   'kling-v3.0-std',
   'kling-v3.0-pro',
   'kling-v3.0-omni',
@@ -1308,6 +1533,67 @@ export function videoCostKey(input: {
   throw new Error(`Unknown video model: ${input.model}`)
 }
 
+/**
+ * Forgiving model-id resolver. Agents routinely paste registry COST keys
+ * ("kling-v3-standard-8s", "seedance-2-1080p-8s") into the `model` param —
+ * an observed 15-turn error-retry spiral in a live session. Instead of
+ * rejecting, extract the intent: base model + any duration / resolution /
+ * audio the key encodes. Returns null only when nothing matches.
+ */
+function resolveVideoModel(raw: string): {
+  model: VideoModel
+  duration?: number
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  sound?: boolean
+  seedanceFace?: boolean
+} | null {
+  let s = raw.trim().toLowerCase()
+  const out: ReturnType<typeof resolveVideoModel> = { model: 'kling-v3.0-std' }
+  const dur = /-(\d+)s\b/.exec(s)
+  if (dur) {
+    out!.duration = parseInt(dur[1], 10)
+    s = s.replace(/-(\d+)s\b/, '')
+  }
+  const res = /-(480p|720p|1080p|4k)\b/.exec(s)
+  if (res) {
+    out!.videoResolution = res[1] as '480p' | '720p' | '1080p' | '4k'
+    s = s.replace(/-(480p|720p|1080p|4k)\b/, '')
+  }
+  if (/-audio\b/.test(s)) {
+    out!.sound = true
+    s = s.replace(/-audio\b/, '')
+  }
+  if (/-(realface|face)\b/.test(s)) {
+    out!.seedanceFace = true
+    s = s.replace(/-(realface|face)\b/, '')
+  }
+  const direct = (VIDEO_MODELS as readonly string[]).find((m) => m === s)
+  if (direct) {
+    out!.model = direct as VideoModel
+    return out
+  }
+  const aliases: Record<string, VideoModel> = {
+    'kling-v3-standard': 'kling-v3.0-std',
+    'kling-v3-std': 'kling-v3.0-std',
+    'kling-v3.0-standard': 'kling-v3.0-std',
+    'kling-v3': 'kling-v3.0-std',
+    'kling-v3-pro': 'kling-v3.0-pro',
+    'kling-v3-omni': 'kling-v3.0-omni',
+    'kling-v3-omni-pro': 'kling-v3.0-omni',
+    'kling-v3.0-omni-pro': 'kling-v3.0-omni',
+    'seedance-2.0': 'seedance-2',
+    'seedance-2-0': 'seedance-2',
+    seedance: 'seedance-2',
+    'veo-3.1': 'veo-3.1-fast',
+    'veo-3': 'veo-3.1-fast',
+  }
+  if (aliases[s]) {
+    out!.model = aliases[s]
+    return out
+  }
+  return null
+}
+
 // Maps a video model id to its bundled prompting skill (frontmatter `name:`),
 // so guidance text points at a skill that actually exists. Deriving the name
 // via model.split('-')[0] produced 'slates-prompting-kling' / '...-veo', which
@@ -1321,7 +1607,9 @@ function promptingSkillFor(model: string): string {
 
 export const generateVideo: Operation<{
   prompt: string
-  model: VideoModel
+  // Accepts base ids AND registry cost-key spellings — normalized by
+  // resolveVideoModel() at the top of run() before any use.
+  model: string
   projectId?: string
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
   duration?: number
@@ -1345,21 +1633,21 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read the slates-cost-discipline skill plus the per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently. Also read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters (build it safe-by-construction so the filter doesn\'t reject or degrade it). projectId is REQUIRED for UI integration (the user sees a progress card and the asset lands in the project — without it the call fails). aspectRatio + duration are required (server returns requires_clarification when missing). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Veo locks to 16:9 and to 4/6/8s durations (4K only at 8s). Image-to-video via firstFrameAssetId. Frames-to-video via firstFrameAssetId + lastFrameAssetId (Veo / Seedance only). Ingredients via ingredientAssetIds (Kling Omni / Seedance). No skill files installed? Call slates_get_prompting_guide with the per-model guide (\'slates-prompting-veo-3\' / \'slates-prompting-kling-v3\' / \'slates-prompting-seedance\') and \'slates-cost-discipline\' before first use.',
+    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.enum(VIDEO_MODELS).describe('Pick deliberately by capability AND cost. Kling V3.0 std = cheapest (no audio); pro = mid; omni = multi-char dialogue + audio. Veo 3.1 = top quality, locks 16:9, audio; fast vs standard. Seedance 2 = ByteDance (BytePlus), audio included, first+last frame + up to 9 reference images, full 480p–4K ladder (native 4K) via videoResolution. For exact per-call credit cost, call slates_estimate_generation_cost or slates_list_available_models — never quote prices from memory (they change).'),
+    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default. All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
     duration: z.number().int().min(4).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Default 5 if omitted but always be explicit (cost scales linearly).'),
     videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive). Veo: 720p/1080p same price, 4K more (8s only).'),
-    firstFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the starting frame for image-to-video. Must already exist in the project.'),
-    lastFrameAssetId: z.string().uuid().optional().describe('Asset id from the project — used as the ending frame. Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
-    ingredientAssetIds: z.array(z.string().uuid()).max(9).optional().describe('Asset ids used as visual reference / ingredients for Kling Omni or Seedance. Up to 9 (Seedance) or 4 (Kling).'),
-    characterAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of character sheets — keeps a character consistent across the shot. From a Slates project.'),
-    environmentAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of environment grids — keeps a location/setting consistent across the shot. From a Slates project.'),
-    styleAssetIds: z.array(z.string().uuid()).optional().describe('Asset ids of style references — locks the visual style of the shot. From a Slates project.'),
-    videoReferenceAssetId: z.string().uuid().optional().describe('Seedance ONLY: an existing VIDEO asset to use as a reference (edit / relocate an existing clip — Seedance ref-to-video). 2-15s. If the clip contains a human/AI character, pair with seedanceFace=true so it routes to the face-capable provider (the default Seedance route blocks people). Ignored by Kling/Veo.'),
+    firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video: asset UUID or badge code ("IMG-A8") — codes resolve against the project at call time, so a code the user just spoke is always safe to pass.'),
+    lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
+    ingredientAssetIds: z.array(z.string()).max(9).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni or Seedance. Up to 9 (Seedance) or 4 (Kling).'),
+    characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
+    environmentAssetIds: z.array(z.string()).optional().describe('Environment grid assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
+    styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
+    videoReferenceAssetId: z.string().optional().describe('Seedance ONLY: an existing VIDEO asset (UUID or badge code) to use as a reference (edit / relocate an existing clip — Seedance ref-to-video). 2-15s. If the clip contains a human/AI character, pair with seedanceFace=true so it routes to the face-capable provider (the default Seedance route blocks people). Ignored by Kling/Veo.'),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
@@ -1371,6 +1659,25 @@ export const generateVideo: Operation<{
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the >$0.50 cost confirm gate (which fires for almost every video gen since they\'re expensive).'),
   }),
   async run(input, ctx) {
+    // Resolve the model FIRST — forgiving normalization (cost keys, alias
+    // spellings) with a teaching error, so a wrong id never costs the agent
+    // a retry spiral. Anything the key encoded (duration/res/audio) fills
+    // params the caller left blank; explicit params always win.
+    const resolved = resolveVideoModel(input.model)
+    if (!resolved) {
+      throw new Error(
+        `Unknown video model "${input.model}". Valid model ids: ${VIDEO_MODELS.join(' | ')}. ` +
+          `Registry entries like "kling-v3-standard-8s" or "seedance-2-1080p-8s" are COST keys, not model ids — ` +
+          `pass the base id and set duration / videoResolution as separate params.`
+      )
+    }
+    input.model = resolved.model
+    if (input.duration == null && resolved.duration != null) input.duration = resolved.duration
+    if (input.videoResolution == null && resolved.videoResolution != null)
+      input.videoResolution = resolved.videoResolution
+    if (input.sound == null && resolved.sound != null) input.sound = resolved.sound
+    if (input.seedanceFace == null && resolved.seedanceFace != null)
+      input.seedanceFace = resolved.seedanceFace
     // projectId is required for video — without it there's no UI feedback,
     // no asset to reference later, and a failed gen leaves the user with
     // nothing. The MCP-only headless path that exists for image gen is
@@ -1418,10 +1725,42 @@ export const generateVideo: Operation<{
       }
     }
 
+    // Resolve every asset reference (UUID or badge code) against the
+    // project AT CALL TIME. Codes the user just spoke ("a8 is the one")
+    // resolve to whatever exists NOW — including assets created in the UI
+    // after the agent's last list call. Unknown codes throw before any
+    // spend. The resolved code+label is echoed in every result so a wrong
+    // start frame is visible immediately, not after $4 of render.
+    const refInputs: Array<{ ref: string; role: string }> = []
+    if (input.firstFrameAssetId) refInputs.push({ ref: input.firstFrameAssetId, role: 'first frame' })
+    if (input.lastFrameAssetId) refInputs.push({ ref: input.lastFrameAssetId, role: 'last frame' })
+    for (const r of input.ingredientAssetIds ?? []) refInputs.push({ ref: r, role: 'ingredient' })
+    for (const r of input.characterAssetIds ?? []) refInputs.push({ ref: r, role: 'character' })
+    for (const r of input.environmentAssetIds ?? []) refInputs.push({ ref: r, role: 'environment' })
+    for (const r of input.styleAssetIds ?? []) refInputs.push({ ref: r, role: 'style' })
+    if (input.videoReferenceAssetId) refInputs.push({ ref: input.videoReferenceAssetId, role: 'video reference' })
+    const resolvedRefs = await resolveAssetRefs(
+      ctx,
+      input.projectId,
+      refInputs.map((r) => r.ref)
+    )
+    const rid = (v: string | undefined): string | undefined =>
+      v ? (resolvedRefs.get(v)?.id ?? v) : v
+    const rids = (a: string[] | undefined): string[] | undefined =>
+      a?.map((v) => resolvedRefs.get(v)?.id ?? v)
+    input.firstFrameAssetId = rid(input.firstFrameAssetId)
+    input.lastFrameAssetId = rid(input.lastFrameAssetId)
+    input.videoReferenceAssetId = rid(input.videoReferenceAssetId)
+    input.ingredientAssetIds = rids(input.ingredientAssetIds)
+    input.characterAssetIds = rids(input.characterAssetIds)
+    input.environmentAssetIds = rids(input.environmentAssetIds)
+    input.styleAssetIds = rids(input.styleAssetIds)
+    const refEcho = describeResolvedRefs(refInputs, resolvedRefs)
+
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const costKey = videoCostKey({
-      model: input.model,
+      model: input.model as VideoModel,
       duration: input.duration,
       videoResolution: input.videoResolution,
       sound: input.sound,
@@ -1549,19 +1888,29 @@ export const generateVideo: Operation<{
     }
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-      return backgroundSubmitted(`${input.duration}s ${input.model} video generation`, ids, {
-        model: input.model,
-        variant: costKey,
-        projectId: input.projectId,
-        cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
-      })
+      return backgroundSubmitted(
+        `${input.duration}s ${input.model} video generation`,
+        ids,
+        {
+          model: input.model,
+          variant: costKey,
+          projectId: input.projectId,
+          cost_cents: totalCents,
+          cost_dollars: (totalCents / 100).toFixed(2),
+          references: refInputs.map(({ ref, role }) => ({
+            role,
+            ...(resolvedRefs.get(ref) ?? { id: ref, code: null, label: null }),
+          })),
+        },
+        refEcho
+      )
     }
     return {
       text:
         `Generated ${input.duration}s ${input.model} video into project ${input.projectId} ` +
         `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
-        `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
+        `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
+        (refEcho ? ` ${refEcho}` : ''),
       data: {
         model: input.model,
         variant: costKey,
@@ -1844,15 +2193,53 @@ export const generateMotionTransfer: Operation<{
 
 // ── Generation status (background mode) ─────────────────────────
 
-export const getGenerationStatus: Operation<{ generationId: string }> = {
+export const getGenerationStatus: Operation<{ generationId: string; waitSeconds?: number }> = {
   id: 'slates_get_generation_status',
   description:
-    'Poll one generation by id. Returns status (pending/processing/completed/failed/cancelled), the error message on failure, and the finished asset record (with id, code, filePath) on completion. Use after submitting any generate_* op with background=true; poll every 5-15s — video generations commonly take 1-5 minutes. Generations survive app restarts (the desktop resumes in-flight provider jobs on boot).',
-  input: z.object({ generationId: z.string().uuid() }),
+    'Poll one generation by id. Returns status (pending/processing/completed/failed/cancelled), the error message on failure, and the finished asset record (with id, code, filePath) on completion. Use after submitting any generate_* op with background=true. ALWAYS pass waitSeconds (use 45) — the call long-polls internally and returns early the moment the generation reaches a terminal state, so ONE call replaces a dozen rapid polls (each poll turn re-reads your whole context; rapid polling is the #1 orchestration-cost leak). Video generations commonly take 1-5 minutes: expect 1-4 long-poll calls, never a tight loop. Generations survive app restarts (the desktop resumes in-flight provider jobs on boot).',
+  input: z.object({
+    generationId: z.string().uuid(),
+    waitSeconds: z
+      .number()
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .describe('Long-poll: block up to N seconds, returning early on completion/failure. Use 45.'),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('background-generation', 'background generation')
-    return ok(await desktop.get('/agent/generation/status', { id: input.generationId }))
+    const deadline = Date.now() + Math.min(Math.max(input.waitSeconds ?? 0, 0), 50) * 1000
+    for (;;) {
+      const r = await desktop.get<{
+        found?: boolean
+        status?: string
+        note?: string
+        generation?: Record<string, unknown>
+        asset?: Record<string, unknown> | null
+      }>('/agent/generation/status', { id: input.generationId })
+      const g = r.generation
+      const status = (g?.status as string | undefined) ?? r.status
+      const terminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+      if (terminal || Date.now() >= deadline) {
+        if (!g) return ok(r)
+        // Slim the payload: the raw generation row (full prompt/settings)
+        // and full asset row are context bloat — return the fields the
+        // agent acts on, with the EXACT billed cost front and center.
+        return ok({
+          status,
+          cost_cents: g.cost ?? null,
+          error: g.error ?? null,
+          model: g.model,
+          completed_at: g.completedAt ?? null,
+          asset: r.asset
+            ? { ...compactAsset(r.asset), file_path: (r.asset as { filePath?: string }).filePath }
+            : null,
+        })
+      }
+      await new Promise((resolve) => setTimeout(resolve, Math.min(3000, deadline - Date.now())))
+    }
   },
 }
 
@@ -1876,7 +2263,8 @@ export const listGenerations: Operation<{
       await desktop.get('/agent/generation/list', {
         projectId: input.projectId,
         status: input.status,
-        limit: input.limit,
+        // Default cap — an unbounded history dump is a context leak.
+        limit: input.limit ?? 20,
       })
     )
   },
@@ -2473,6 +2861,16 @@ export const deleteFrame: Operation<{ frameId: string }> = {
 function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (SKILLS[t]) return t
+  if (
+    t === 'model-selection' ||
+    t === 'model selection' ||
+    t === 'which-model' ||
+    t === 'which model' ||
+    t === 'routing' ||
+    t === 'model-routing'
+  ) {
+    return 'slates-model-selection'
+  }
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
@@ -2508,7 +2906,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
       .string()
       .min(1)
       .describe(
-        'Guide name, model id, or style name. Guides: slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
+        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
       ),
   }),
   async run(input) {

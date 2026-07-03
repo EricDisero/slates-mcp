@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-veo-3
-description: How to prompt Veo 3.1 (Google). Read before calling slates_generate_video with veo-3.1-fast or veo-3.1-standard. Veo has the strongest first-frame + last-frame workflow of the three video models, native synchronized audio, and a different cinematography formula than Seedance/Kling. (no subtitles) is mandatory after every dialogue line.
+description: How to prompt Veo 3.1 (Google). Read before calling slates_generate_video with veo-3.1-fast or veo-3.1-standard. Veo is a NICHE pick, never the default (route per slates-model-selection — Kling is the general default, Seedance the premium tier) — reach for it only when native synchronized audio must generate WITH the video in one gen. 16:9 only. Different cinematography formula than Seedance/Kling. (no subtitles) is mandatory after every dialogue line.
 ---
 
 # Veo 3.1 — prompting

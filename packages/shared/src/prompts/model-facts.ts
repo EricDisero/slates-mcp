@@ -47,7 +47,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     maxRefImages: null,
     maxIngredients: 9, // ingredient images per video gen
-    notes: 'Hero video model — physics, effects, scale. Up to 9 ingredient images. Strong I2V / own-footage restyle.',
+    notes: 'PREMIUM video tier — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). Up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K.',
   },
   {
     id: 'kling-v3',
@@ -55,7 +55,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     maxRefImages: null,
     maxIngredients: 4,
-    notes: 'Budget-cinematic video — acting, dialogue, lip-sync. Strong start-frame adherence.',
+    notes: 'DEFAULT general-purpose video model — cost-effective, strong start-frame adherence (identity/layout/text), acting, dialogue, lip-sync, any aspect ratio. Escalate to Seedance for physics.',
   },
   {
     id: 'veo-3.1',
@@ -63,7 +63,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     maxRefImages: null,
     maxIngredients: 3,
-    notes: 'Native audio. Default audio-on. Strong prompt adherence; treats the prompt as scene direction.',
+    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one gen. 16:9 only, 4/6/8s only. Otherwise Kling (default) or Seedance (physics/premium) win.',
   },
 ]
 

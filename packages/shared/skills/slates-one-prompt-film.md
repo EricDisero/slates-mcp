@@ -25,7 +25,7 @@ Turn the idea into a beat-level script: 4-10 shots, each with subject, action, s
 ### 4. ONE aggregated cost approval — then hands-off
 Price the whole batch before the first generation: frame images (count × model — `slates_estimate_generation_cost`) + video gens (count × model × duration). Present a single total:
 
-> Plan: 6 frames at 1k 16:9 + 6 × 8s Veo 3.1 Fast ≈ $X.XX total. Proceed with the batch?
+> Plan: 6 frames at 1k 16:9 + 5 × 8s Kling 3.0 std + 1 × 8s Seedance 2 hero shot ≈ $X.XX total. Proceed with the batch?
 
 Per `slates-cost-discipline` 3b: that single OK authorizes `confirm=true` for **every enumerated call in the batch** — no per-call re-asking. Re-confirm only if a call's price overruns the plan >25% or new calls get added (extra retakes, new shots).
 
@@ -37,10 +37,10 @@ Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the chara
 ### 6. Generate video per frame — background mode
 `slates_generate_video` with `firstFrameAssetId` = the bound frame, `background: true`. Submit ALL shots, collect the generationIds, then poll `slates_get_generation_status` every 10-15s (1-5 min per gen; they survive app restarts). This parallelizes a 6-shot film into one wait instead of six.
 
-**Model mixing — pick per shot type** (details in the per-model guides):
-- **Veo 3.1** (`slates-prompting-veo-3`): top fidelity + native audio, 16:9 only, 4/6/8s — hero shots, dialogue, anything widescreen-cinematic.
-- **Kling V3** (`slates-prompting-kling-v3`): any aspect ratio, 5-15s, std tier is the budget workhorse; Omni for multi-character dialogue.
-- **Seedance 2** (`slates-prompting-seedance`): audio included, first+last frame guidance, timed beats — controlled transitions and product moves.
+**Model mixing — route per `slates-model-selection`** (details in the per-model guides):
+- **Kling V3** (`slates-prompting-kling-v3`): the DEFAULT for most shots — any aspect ratio, 5-15s, strong start-frame adherence; std is the workhorse, Omni for multi-character dialogue.
+- **Seedance 2** (`slates-prompting-seedance`): the PREMIUM tier — any shot where physics/effects/scale remotely matter, plus the hero shot; audio included, first+last frame guidance, native 4K.
+- **Veo 3.1** (`slates-prompting-veo-3`): niche, never the default — only when native synced audio must generate WITH the video in one gen; 16:9 only, 4/6/8s.
 
 Failed gen? Check the error via `slates_get_generation_status`, fix the prompt, resubmit that one shot (a retry beyond the plan = announce the delta cost).
 
