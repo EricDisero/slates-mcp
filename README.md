@@ -1,6 +1,6 @@
 # slates-mcp
 
-MCP server + CLI + skills package for [Slates](https://slates.video) — drive the AI Video Creation Studio from Claude Code, Cursor, Claude Desktop, ChatGPT, or any MCP-capable client.
+MCP server + CLI + skills package for [Slates](https://slates.video) — drive the AI Video Creation Studio from Claude Code, Cursor, Claude Desktop, Codex, or any MCP-capable client.
 
 This monorepo publishes two installable packages, plus their shared core:
 
@@ -31,7 +31,7 @@ That's it. Both the CLI and the MCP auto-discover the connection file. No env va
 
 ## Using it
 
-### MCP server (Claude / Cursor / Claude Desktop / ChatGPT)
+### MCP server (Claude / Cursor / Claude Desktop / Codex)
 
 Add to your MCP config:
 

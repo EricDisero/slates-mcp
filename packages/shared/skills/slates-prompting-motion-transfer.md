@@ -1,18 +1,32 @@
 ---
 name: slates-prompting-motion-transfer
-description: How to set up Kling Motion Control (motion transfer). Read before calling slates_generate_motion_transfer. Reference image (character) + driving video (motion source) → new video of the character performing the motion. Asset selection rules, character_orientation choice, std vs pro tier, and prompt usage.
+description: How to set up motion transfer — Kling Motion Control (cheap utility lane) or Seedance 2.0 (premium single-pass lane). Read before calling slates_generate_motion_transfer. Reference image (character) + driving video (motion source) → new video of the character performing the motion. Asset selection rules, engine choice, character_orientation, tiers, and prompt usage.
 ---
 
-# Kling Motion Control — setup guide
+# Motion transfer — setup guide
 
-Take a still **target image** (your character) and a **source video** (the motion you want), produce a new 5s video of your character performing the source video's motion.
+Take a still **target image** (your character) and a **source video** (the motion you want), produce a new video of your character performing the source video's motion. Two engines:
 
-| Tier | Cost (5s) | Use case |
+| Engine | Cost | Use case |
 |------|-----------|----------|
-| std (`kling-mc-std-5s`) | $0.95 | General motion transfer |
-| pro (`kling-mc-pro-5s`) | $1.26 | Cleaner anatomy, better identity preservation |
+| Kling std (`kling-mc-std-5s`) | $0.95 / 5s | General motion transfer, budget lane |
+| Kling pro (`kling-mc-pro-5s`) | $1.26 / 5s | Cleaner anatomy, better identity preservation |
+| **Seedance 2.0** (`motionModel=seedance-2`) | per second of input+output (`seedance-2-face-vref-*`) | **Premium lane** — single-pass generation with the driving clip as a native conditioning signal: better motion fidelity, native audio, prompt-directed |
 
-Both tiers trip the >$0.50 confirm gate. User OK required every time.
+All tiers trip the >$0.50 confirm gate. User OK required every time.
+
+## Seedance engine (premium single-pass)
+
+Kling MC retargets a skeleton onto a finished image; Seedance *generates* the shot with the motion as a conditioning input — the difference shows on fast choreography, physical contact, cloth/hair, and camera motion. Key differences from Kling:
+
+- **Prompt-driven.** The prompt is the primary control, using ordinal references: `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.` Add style/setting/camera direction freely — Seedance re-generates the whole shot.
+- **Driving clip must be 2–15s** (all providers cap reference video at 15s). Longer clips: trim first, or use Kling MC (`character_orientation: 'video'` takes up to 30s).
+- **Billing = combined input+output seconds** (the vref keys). Pass `sourceVideoSeconds`; output `duration` defaults to the clip length (4–15s). The server probes the clip and corrects an understated key — quote via the confirm gate before spending.
+- **Faces route through the face cascade**: `seedanceFace` defaults true (driving clips contain people). A REAL person → `[REAL_FACE_DETECTED]` → confirm consent with the user → retry `seedanceRealFace=true, realFaceConsent=true` (premium realface vref pricing).
+- **Native audio included** — the output can carry sound from the prompt (or the driving clip's vibe); no audio surcharge.
+- `characterOrientation` is Kling-only; Seedance framing follows the prompt + `aspectRatio`.
+
+Everything below applies to the **Kling** engine.
 
 ## Inputs
 

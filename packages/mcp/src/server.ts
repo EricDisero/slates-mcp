@@ -24,7 +24,7 @@ import {
 //
 //   { "command": "npx", "args": ["-y", "@slatesvideo/mcp-server"] }
 //
-// to their Claude / Cursor / Claude Desktop / ChatGPT MCP config.
+// to their Claude / Cursor / Claude Desktop / Codex MCP config.
 
 const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
 const opsById = new Map<string, Operation<unknown>>(ops.map((o) => [o.id, o]))

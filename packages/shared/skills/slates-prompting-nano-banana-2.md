@@ -144,3 +144,12 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 ## The 3-strike rule
 
 If three iterations on the same prompt haven't produced what the user wants, stop. Hand back to the user with what you tried and what isn't working. The slot machine doesn't converge — the prompt structure is wrong, not the seed.
+
+## Family variants — Lite and Pro
+
+Everything in this skill applies to the whole Nano Banana family; two variants trade speed/ceiling around NB2 full:
+
+- **nano-banana-2-lite** — ~half the price, ~2.7× faster, **1K output only**, max 4 refs. The draft/iteration seat: explore compositions here, then re-run the winner on NB2 full at 2K/4K. Same Gemini filter.
+- **nano-banana-pro** — the hero-frame/typography ceiling (~2× NB2, 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs — it takes a full subject library in one call.
+
+Routing between them (and vs GPT Image 2 / FLUX / Seedream): `slates-model-selection`.

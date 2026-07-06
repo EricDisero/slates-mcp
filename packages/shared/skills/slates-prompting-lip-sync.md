@@ -1,19 +1,33 @@
 ---
 name: slates-prompting-lip-sync
-description: How to set up Kling lip-sync. Read before calling slates_generate_lip_sync. Two flows — video→video re-dub and image→video avatar — with different inputs, pricing, and gotchas. Voice catalog, framing rules, audio file constraints, and which tier to pick.
+description: How to set up lip-sync — Kling (cheap utility lane) or Seedance 2.0 (premium single-pass lane). Read before calling slates_generate_lip_sync. Flows — video→video re-dub, image→video avatar, and Seedance native speech — with different inputs, pricing, and gotchas. Voice catalog, framing rules, audio file constraints, and which engine/tier to pick.
 ---
 
-# Kling lip-sync — setup guide
+# Lip-sync — setup guide
 
-Two distinct flows, both 5-second outputs:
+Two engines. Kling is the cheap utility lane (dedicated lip-sync endpoints, 5-second outputs); Seedance is the premium lane (speech generated IN the video itself, single pass):
 
-| Flow | Source | Model | Cost (5s) | Use case |
+| Flow | Source | Engine/Model | Cost | Use case |
 |------|--------|-------|-----------|----------|
-| Re-dub | video clip | kling-lip-sync-video | $0.11 | Replace dialogue on an existing talking head |
-| Avatar standard | still image | ai-avatar/v2/standard | $0.42 | Animate a portrait into a talking avatar |
-| Avatar pro | still image | ai-avatar/v2/pro | $0.86 | Higher facial fidelity for hero shots |
+| Re-dub | video clip | kling-lip-sync-video | $0.11 / 5s | Replace dialogue on an existing talking head |
+| Avatar standard | still image | ai-avatar/v2/standard | $0.42 / 5s | Animate a portrait into a talking avatar |
+| Avatar pro | still image | ai-avatar/v2/pro | $0.86 / 5s | Higher facial fidelity for hero shots |
+| **Seedance native** | image or video | `engine=seedance-2` | per second (`seedance-2-face-*`; video sources bill input+output seconds) | **Premium**: natural delivery, whole-body performance, voice cloned from a video source, audio included |
 
-Pick `sourceType` deliberately — it decides the pricing tier and the underlying endpoint.
+Pick engine + `sourceType` deliberately — they decide the pricing tier and the underlying endpoint.
+
+## Seedance engine (premium single-pass)
+
+Kling lip-sync moves the mouth on finished pixels; Seedance *generates* the performance — head movement, gesture, delivery energy — with the dialogue as a native conditioning signal. Key facts:
+
+- **`ttsText` becomes the spoken line, natively.** No TTS voice/speed params — a VIDEO source keeps its **own voice** (the model clones it from the clip's audio track); for an image source the voice follows the character's look, or describe it in the line's context.
+- **`audioMethod=upload`** drives the speech from a ≤15s audio file instead (a reference-audio input, no billing surcharge).
+- **Sources:** image (any style; same framing rules as the avatar flow below) or a 2–15s video clip. Output duration follows the source/audio/line length (4–15s), not a fixed 5s.
+- **Billing:** image sources bill the normal `seedance-2-face-{res}-{N}s` keys; video sources bill combined input+output seconds (`-vref-` keys) — pass `sourceSeconds` and quote via the confirm gate.
+- **Faces:** `seedanceFace` defaults true. A REAL person → `[REAL_FACE_DETECTED]` → confirm consent → retry with `seedanceRealFace=true, realFaceConsent=true` (premium realface pricing).
+- When to pick it: hero dialogue shots, natural delivery, "make this clip's person say X in their own voice". Stay on Kling for cheap utility re-dubs and long clips.
+
+Everything below applies to the **Kling** engine.
 
 ## Choosing video vs avatar
 

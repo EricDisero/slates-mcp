@@ -246,3 +246,107 @@ export function composeReferences(
     orderedVideoPaths,
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Kling O3 video-to-video EDIT transport adapter
+// ═══════════════════════════════════════════════════════════════
+
+export interface KlingEditElement {
+  /** Frontal image path/URL (element primary view) */
+  frontal: string
+  /** Up to 3 additional angle images */
+  angles: string[]
+  /** Display name (for logging/echo) */
+  name: string
+}
+
+export interface KlingEditComposition {
+  /** Prompt in Kling's edit notation: @Video1 (source), @ElementN, @ImageN */
+  prompt: string
+  /** Subject elements in cited order (@Element1..) */
+  elements: KlingEditElement[]
+  /** Style/appearance reference image paths in cited order (@Image1..) */
+  styleImages: string[]
+}
+
+/** fal cap: max 4 combined element + style-image references per edit request. */
+export const KLING_EDIT_MAX_REFS = 4
+
+/**
+ * Compose references for the Kling O3 edit endpoint. Unlike the "image N"
+ * naming every other model parses, Kling's edit endpoint has its OWN official
+ * notation: `@Video1` (the source clip), `@Element1..` (subjects, frontal +
+ * angle images), `@Image1..` (style/appearance refs). This adapter translates
+ * the one-ordered-list groups into that notation — the same prompt-is-law
+ * principle, different citation tokens.
+ *
+ * - character/environment groups → elements (media[0] = frontal, rest = angles,
+ *   max 3 angles per fal's schema)
+ * - style/pinned image groups → @ImageN style refs
+ * - video groups are ignored here — the source clip is transported separately
+ *   and is always @Video1
+ * - combined element+image count is capped at KLING_EDIT_MAX_REFS (style refs
+ *   trimmed first — subjects are the feature)
+ */
+export function composeKlingEdit(rawPrompt: string, groups: ReferenceGroup[]): KlingEditComposition {
+  const elements: KlingEditElement[] = []
+  const styleImages: string[] = []
+  const styleNums: number[] = []
+  let body = rawPrompt
+
+  // Subjects first — they own the @ElementN numbering.
+  const subjectGroups = groups.filter(
+    (g) => (g.kind === 'character' || g.kind === 'environment') && g.media.some((m) => m.mediaKind === 'image')
+  )
+  for (const g of subjectGroups) {
+    if (elements.length >= KLING_EDIT_MAX_REFS) break
+    const imgs = g.media.filter((m) => m.mediaKind === 'image').map((m) => m.path)
+    if (imgs.length === 0) continue
+    const n = elements.length + 1
+    elements.push({ frontal: imgs[0], angles: imgs.slice(1, 4), name: g.name })
+    if (g.token) {
+      // Replace every @token occurrence with the element citation.
+      const escaped = g.token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(`${escaped}\\b`, 'gi')
+      if (re.test(body)) {
+        body = body.replace(re, `@Element${n}`)
+      } else {
+        body = `${body}\n@Element${n} is ${g.name}.`
+      }
+    } else {
+      body = `${body}\n@Element${n} is ${g.name}.`
+    }
+  }
+
+  // Style / pinned refs take the remaining slots as @ImageN.
+  for (const g of groups) {
+    if (g.kind !== 'style' && g.kind !== 'pinned') continue
+    for (const m of g.media) {
+      if (m.mediaKind !== 'image') continue
+      if (elements.length + styleImages.length >= KLING_EDIT_MAX_REFS) break
+      styleImages.push(m.path)
+      const n = styleImages.length
+      if (g.kind === 'style') styleNums.push(n)
+      if (g.token) {
+        const escaped = g.token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        body = body.replace(new RegExp(`${escaped}\\b`, 'gi'), `@Image${n}`)
+      }
+    }
+  }
+
+  if (styleNums.length > 0) {
+    const cites = styleNums.map((n) => `@Image${n}`).join(' and ')
+    body = `${body}\nApply the visual style of ${cites}.`
+  }
+
+  // The source clip is always @Video1 — anchor the instruction to it.
+  if (!/@Video1\b/i.test(body)) {
+    body = `Edit @Video1: ${body}`
+  }
+
+  return {
+    prompt: body.replace(/[ \t]{2,}/g, ' ').trim(),
+    elements,
+    styleImages,
+  }
+}

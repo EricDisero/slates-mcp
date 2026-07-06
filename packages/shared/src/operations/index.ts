@@ -151,7 +151,8 @@ export const estimateGenerationCost: Operation<{
   quantity?: number
   duration?: number
   videoResolution?: '480p' | '720p' | '1080p' | '4k'
-  resolution?: '1k' | '2k' | '4k'
+  resolution?: '1k' | '2k' | '3k' | '4k'
+  quality?: 'medium' | 'high'
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
@@ -164,7 +165,8 @@ export const estimateGenerationCost: Operation<{
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
     duration: z.number().int().min(3).max(15).optional().describe('Video only — seconds. Cost scales linearly; required with a video base id.'),
     videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Video only. Seedance defaults to 1080p.'),
-    resolution: z.enum(['1k', '2k', '4k']).optional().describe('Image only (default 2k).'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k = gpt-image-2 1440p class).'),
+    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
     seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
@@ -175,12 +177,23 @@ export const estimateGenerationCost: Operation<{
 
     // 1) exact registry cost key
     let key: string | null = byKey.has(input.model) ? input.model : null
-    // 2) image base id + resolution
+    // 2) image base id + resolution (+ quality for gpt-image-2)
     if (!key) {
-      const img = (['nano-banana-2', 'flux-2-max', 'seedream-5-lite'] as const).find(
+      const img = (['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite'] as const).find(
         (m) => m === input.model
       )
-      if (img) key = imageCostKey(img, input.resolution ?? '2k')
+      if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality ?? 'medium')
+    }
+    // 2b) Kling O3 edit base id + duration (ceiled source-clip length)
+    if (!key && (input.model === 'kling-v3.0-omni-edit' || input.model === 'kling-v3.0-omni-pro-edit')) {
+      if (!input.duration) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message: 'Kling O3 edit bills per second of output (≈ the source clip length, rounded up) — pass duration.',
+        })
+      }
+      key = klingEditCostKey(input.model, input.duration)
     }
     // 3) video base id (or cost-key spelling) → the same forgiving resolver
     //    the generate op uses, so the two can never disagree about a model.
@@ -976,21 +989,39 @@ async function previewAssets(
 
 // ── Generation (cloud-routed, credits-default) ──────────────────
 
+export type ImageModelId =
+  | 'nano-banana-2'
+  | 'nano-banana-2-lite'
+  | 'nano-banana-pro'
+  | 'gpt-image-2'
+  | 'flux-2-max'
+  | 'seedream-5-lite'
+
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
-// in slate/src/shared/pricing.ts: NB2 prices per resolution, FLUX.2 Max prices
-// per resolution (1k is the bare key), Seedream is flat (one key).
-function imageCostKey(model: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite', resolution: '1k' | '2k' | '4k'): string {
+// in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
+// videoCostKey): NB2/NB Pro price per resolution, FLUX.2 Max prices per
+// resolution (1k is the bare key), NB2 Lite/Seedream are flat, GPT Image 2 is
+// quality × resolution-class (med|high; low deliberately not exposed).
+function imageCostKey(
+  model: ImageModelId,
+  resolution: '1k' | '2k' | '3k' | '4k',
+  quality: 'medium' | 'high' = 'medium'
+): string {
   if (model === 'flux-2-max') return resolution === '1k' ? 'flux-2-max' : `flux-2-max-${resolution}`
   if (model === 'seedream-5-lite') return 'seedream-5-lite'
+  if (model === 'nano-banana-2-lite') return 'nano-banana-2-lite'
+  if (model === 'nano-banana-pro') return `nano-banana-pro-${resolution}`
+  if (model === 'gpt-image-2') return `gpt-image-2-${quality === 'high' ? 'high' : 'med'}-${resolution}`
   return `nano-banana-2-${resolution}`
 }
 
 export const generateImage: Operation<{
   prompt: string
-  model?: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite'
+  model?: ImageModelId
   projectId?: string
-  resolution?: '1k' | '2k' | '4k'
+  resolution?: '1k' | '2k' | '3k' | '4k'
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
+  quality?: 'medium' | 'high'
   count?: number
   referenceImageUrls?: string[]
   referenceAssetIds?: string[]
@@ -999,12 +1030,13 @@ export const generateImage: Operation<{
 }> = {
   id: 'slates_generate_image',
   description:
-    'Generate an image via Slates credits. Three models: nano-banana-2 (Google Gemini 3 Image — default, strongest general image model, well-censored), flux-2-max (FLUX.2 Max — photoreal, less censored, up to 4MP), seedream-5-lite (cheapest at ~$0.05 flat, less censored). Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). FLUX.2 Max and Seedream 5 Lite REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and slates-prompting-nano-banana-2 when using nano-banana-2). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use.',
+    'Generate an image via Slates credits. Models: nano-banana-2 (default), nano-banana-2-lite (fast/cheap drafts, 1K only), nano-banana-pro (hero-frame/typography premium), gpt-image-2 (sharp text / character sheets / grids; quality medium|high), flux-2-max (photoreal, less censored), seedream-5-lite (cheapest flat, less censored). Which model for which job: read the slates-model-selection skill. Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.enum(['nano-banana-2', 'flux-2-max', 'seedream-5-lite']).optional().describe('Image model. Default nano-banana-2. Use flux-2-max for photoreal / less-censored, seedream-5-lite for cheapest. flux-2-max & seedream-5-lite require projectId.'),
-    projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for flux-2-max / seedream-5-lite.'),
-    resolution: z.enum(['1k', '2k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. (Seedream is flat-priced regardless; FLUX & NB2 price by resolution.) Never default this.'),
+    model: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite']).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
+    projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. nano-banana-2-lite is 1k-only. gpt-image-2 classes: 1k=1024², 2k=1080p, 3k=1440p, 4k=2160p (3k is gpt-image-2 only). Never default this.'),
+    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only. medium (default) = sharp text, fast, the value seat; high = max text precision + reasoning at ~4× the price. Ignored by other models.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous.'),
     count: z.number().int().min(1).max(4).optional(),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
@@ -1033,7 +1065,16 @@ export const generateImage: Operation<{
     }
     const resolution = input.resolution
     const imageModel = input.model ?? 'nano-banana-2'
-    // FLUX.2 Max / Seedream 5 Lite have no headless path — they route through
+    // The '3k' class exists only on gpt-image-2 (2560×1440); other models
+    // would mis-key the registry lookup.
+    if (resolution === '3k' && imageModel !== 'gpt-image-2') {
+      return ok({
+        requires_clarification: true,
+        missing: ['resolution'],
+        message: `3k (1440p) is a gpt-image-2 resolution class — pick 1k/2k/4k for ${imageModel}.`,
+      })
+    }
+    // Only nano-banana-2 has a headless path — everything else routes through
     // the desktop generation pipeline, which needs a project.
     if (imageModel !== 'nano-banana-2' && !input.projectId) {
       return ok({
@@ -1076,7 +1117,16 @@ export const generateImage: Operation<{
     if (input.background) {
       await ctx.desktop().requireCapability('background-generation', 'background generation')
     }
-    const costKey = imageCostKey(imageModel, resolution)
+    // New-roster models need a desktop that knows them — an older desktop's
+    // allowlist would silently fall back to nano-banana-2 while we quote the
+    // new model's price.
+    if (
+      input.projectId &&
+      (imageModel === 'gpt-image-2' || imageModel === 'nano-banana-pro' || imageModel === 'nano-banana-2-lite')
+    ) {
+      await ctx.desktop().requireCapability('image-models-v2', `${imageModel} generation`)
+    }
+    const costKey = imageCostKey(imageModel, resolution, input.quality ?? 'medium')
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
@@ -1155,6 +1205,7 @@ export const generateImage: Operation<{
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
+        ...(imageModel === 'gpt-image-2' ? { gptQuality: input.quality ?? 'medium' } : {}),
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         background: input.background,
       })
@@ -1340,9 +1391,10 @@ export const editImage: Operation<{
   projectId: string
   sourceAssetId: string
   prompt: string
-  editModel?: 'nano-banana-2' | 'flux-2-max' | 'seedream-5-lite'
+  editModel?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2' | 'flux-2-max' | 'seedream-5-lite'
   referenceAssetIds?: string[]
-  resolution?: '1k' | '2k' | '4k'
+  resolution?: '1k' | '2k' | '3k' | '4k'
+  quality?: 'medium' | 'high'
   aspectRatio?: string
   confirm?: boolean
   background?: boolean
@@ -1354,9 +1406,10 @@ export const editImage: Operation<{
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must already exist in the project.'),
     prompt: z.string().min(1).max(4000).describe('The edit instruction — describe the change, not the whole image.'),
-    editModel: z.enum(['nano-banana-2', 'flux-2-max', 'seedream-5-lite']).optional(),
-    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('nano-banana-2 only: extra reference images.'),
-    resolution: z.enum(['1k', '2k', '4k']).optional(),
+    editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite']).optional(),
+    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana family only: extra reference images (NB Pro takes up to 13, NB2 Lite up to 3).'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k (1440p class) is gpt-image-2 only; nano-banana-2-lite is 1k only.'),
+    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
     aspectRatio: z.string().optional(),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -1368,13 +1421,18 @@ export const editImage: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     const editModel = input.editModel ?? 'nano-banana-2'
-    const resolution = input.resolution ?? '2k'
-    // NB2 edits charge the normal per-resolution NB2 key; FLUX / Seedream
-    // route to their dedicated edit endpoints, priced under '-edit' keys.
+    const resolution = input.resolution ?? (editModel === 'nano-banana-2-lite' ? '1k' : '2k')
+    if (
+      (editModel === 'gpt-image-2' || editModel === 'nano-banana-pro' || editModel === 'nano-banana-2-lite')
+    ) {
+      await desktop.requireCapability('image-models-v2', `${editModel} editing`)
+    }
+    // Nano-Banana family + GPT Image 2 edits charge the same key as gen;
+    // FLUX / Seedream route to dedicated edit endpoints priced under '-edit' keys.
     const costKey =
-      editModel === 'nano-banana-2'
-        ? imageCostKey('nano-banana-2', resolution)
-        : `${imageCostKey(editModel, resolution)}-edit`
+      editModel === 'flux-2-max' || editModel === 'seedream-5-lite'
+        ? `${imageCostKey(editModel, resolution)}-edit`
+        : imageCostKey(editModel, resolution, input.quality ?? 'medium')
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
@@ -1410,6 +1468,7 @@ export const editImage: Operation<{
       editModel,
       referenceAssetIds: input.referenceAssetIds,
       resolution,
+      ...(editModel === 'gpt-image-2' ? { gptQuality: input.quality ?? 'medium' } : {}),
       aspectRatio: input.aspectRatio,
       background: input.background,
     })
@@ -1490,6 +1549,10 @@ const KLING_TIER_MAP: Record<string, string> = {
   'kling-v3.0-std': 'kling-v3-standard',
   'kling-v3.0-pro': 'kling-v3-pro',
   'kling-v3.0-omni': 'kling-v3-omni',
+  // Missing until 2026-07-05 — the fallthrough quoted a nonexistent
+  // 'kling-v3.0-omni-pro-…' key for O3 Pro (caught by the consistency check
+  // the day omni-pro was added to its coverage).
+  'kling-v3.0-omni-pro': 'kling-v3-omni-pro',
 }
 
 // Exported for scripts/pricing-consistency-check.mjs (slates-api repo), which
@@ -1501,13 +1564,24 @@ export function videoCostKey(input: {
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
+  /** Seedance only: ceiled combined seconds of reference VIDEO inputs (motion
+   *  transfer / lip-sync on video / relocate). >0 bills the vref key on TOTAL
+   *  (input+output) seconds — the server re-derives this by probing the refs. */
+  videoRefSeconds?: number
 }): string {
   if (input.model.startsWith('seedance')) {
-    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (face × res × duration).
-    // AI-face route bills the `-face-` key (~45% over faceless); consented
-    // real-person route bills the premium `-realface-` key (fal partner endpoint).
+    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (face × vref ×
+    // res × duration). AI-face route bills the `-face-` key (~45% over faceless);
+    // consented real-person route bills the premium `-realface-` key (fal partner
+    // endpoint). A reference video flips to `-vref-{res}-{T}s`, T = in + out (6..30).
     const res = input.videoResolution ?? '1080p'
     const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
+    const vrefSecs = input.videoRefSeconds ?? 0
+    if (vrefSecs > 0) {
+      // ceil(x - 0.05) matches the server's probe rounding — quote = bill.
+      const total = Math.min(30, Math.max(6, Math.ceil(vrefSecs - 0.05) + input.duration))
+      return `${input.model}${face}-vref-${res}-${total}s`
+    }
     return `${input.model}${face}-${res}-${input.duration}s`
   }
   if (input.model.startsWith('veo')) {
@@ -1522,15 +1596,29 @@ export function videoCostKey(input: {
   if (input.model.startsWith('kling-v3.0')) {
     // Mirrors klingCreditKey() in slate/src/shared/pricing.ts. Kling native 4K
     // bills flat-rate keys: std/pro/omni all get a `-4k` tier key, and omni-pro
-    // shares kling-v3-omni-4k (the o3/4k endpoint has one flat rate).
+    // shares kling-v3-omni-4k (the o3/4k endpoint has one flat rate, audio
+    // included). At 1080p AUDIO IS A KEY DIMENSION (credits = COGS × markup,
+    // locked 2026-07-05): sound → `-audio` variant. Kling sound defaults OFF.
     const tier = KLING_TIER_MAP[input.model] ?? input.model
     if (input.videoResolution === '4k') {
       const tier4k = tier === 'kling-v3-omni-pro' ? 'kling-v3-omni' : tier
       return `${tier4k}-4k-${input.duration}s`
     }
-    return `${tier}-${input.duration}s`
+    return `${tier}-${input.duration}s${input.sound === true ? '-audio' : ''}`
   }
   throw new Error(`Unknown video model: ${input.model}`)
+}
+
+// Kling O3 video-to-video edit cost key — mirrors klingEditCreditKey() in
+// slate/src/shared/pricing.ts (must byte-match; checked by the slates-api
+// pricing-consistency script). Duration is the CEILED source-clip length —
+// billing is per second of output ≈ source length, always rounded up.
+export function klingEditCostKey(
+  model: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit',
+  duration: number
+): string {
+  const tier = model === 'kling-v3.0-omni-pro-edit' ? 'kling-v3-omni-pro-edit' : 'kling-v3-omni-edit'
+  return `${tier}-${duration}s`
 }
 
 /**
@@ -1621,6 +1709,8 @@ export const generateVideo: Operation<{
   environmentAssetIds?: string[]
   styleAssetIds?: string[]
   videoReferenceAssetId?: string
+  videoReferenceSeconds?: number
+  audioReferenceAssetId?: string
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
@@ -1647,7 +1737,9 @@ export const generateVideo: Operation<{
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
     environmentAssetIds: z.array(z.string()).optional().describe('Environment grid assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
     styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
-    videoReferenceAssetId: z.string().optional().describe('Seedance ONLY: an existing VIDEO asset (UUID or badge code) to use as a reference (edit / relocate an existing clip — Seedance ref-to-video). 2-15s. If the clip contains a human/AI character, pair with seedanceFace=true so it routes to the face-capable provider (the default Seedance route blocks people). Ignored by Kling/Veo.'),
+    videoReferenceAssetId: z.string().optional().describe('Seedance ONLY: an existing VIDEO asset (UUID or badge code) to use as a reference — edit/relocate a clip, or MOTION TRANSFER (pair with a subject in ingredientAssetIds and a prompt like "the character from image 1 performs the motion from video 1"). 2-15s. Billing switches to input+output seconds (the vref key) — pass videoReferenceSeconds so the quote is right. If the clip contains a human/AI character, pair with seedanceFace=true (the default Seedance route blocks people). Ignored by Kling/Veo.'),
+    videoReferenceSeconds: z.number().optional().describe('REQUIRED with videoReferenceAssetId: the reference clip\'s duration in seconds (from the asset listing). Feeds the vref cost key — a video-reference gen bills combined input+output seconds; the server re-derives this by probing the clip, so an understated value just gets corrected upward.'),
+    audioReferenceAssetId: z.string().optional().describe('Seedance ONLY: an AUDIO asset (UUID or badge code), ≤15s, used as a reference — e.g. lip-sync a character to this audio ("the character in image 1 speaks the dialogue from audio 1"). No billing surcharge (Seedance audio is included). Requires at least one image or video reference alongside.'),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
@@ -1739,6 +1831,7 @@ export const generateVideo: Operation<{
     for (const r of input.environmentAssetIds ?? []) refInputs.push({ ref: r, role: 'environment' })
     for (const r of input.styleAssetIds ?? []) refInputs.push({ ref: r, role: 'style' })
     if (input.videoReferenceAssetId) refInputs.push({ ref: input.videoReferenceAssetId, role: 'video reference' })
+    if (input.audioReferenceAssetId) refInputs.push({ ref: input.audioReferenceAssetId, role: 'audio reference' })
     const resolvedRefs = await resolveAssetRefs(
       ctx,
       input.projectId,
@@ -1751,12 +1844,24 @@ export const generateVideo: Operation<{
     input.firstFrameAssetId = rid(input.firstFrameAssetId)
     input.lastFrameAssetId = rid(input.lastFrameAssetId)
     input.videoReferenceAssetId = rid(input.videoReferenceAssetId)
+    input.audioReferenceAssetId = rid(input.audioReferenceAssetId)
     input.ingredientAssetIds = rids(input.ingredientAssetIds)
     input.characterAssetIds = rids(input.characterAssetIds)
     input.environmentAssetIds = rids(input.environmentAssetIds)
     input.styleAssetIds = rids(input.styleAssetIds)
     const refEcho = describeResolvedRefs(refInputs, resolvedRefs)
 
+    // A video reference bills combined input+output seconds (the vref key) —
+    // the quote needs the clip's length. The server probes the uploaded ref
+    // and corrects the key anyway, so this only gates quote accuracy.
+    if (input.videoReferenceAssetId && input.model.startsWith('seedance') && !input.videoReferenceSeconds) {
+      return ok({
+        requires_clarification: true,
+        missing: ['videoReferenceSeconds'],
+        message:
+          'A Seedance video reference bills on combined input+output seconds. Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+      })
+    }
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const costKey = videoCostKey({
@@ -1766,6 +1871,7 @@ export const generateVideo: Operation<{
       sound: input.sound,
       seedanceFace: input.seedanceFace,
       seedanceRealFace: input.seedanceRealFace,
+      videoRefSeconds: input.videoReferenceAssetId ? input.videoReferenceSeconds : 0,
     })
     // Hard consent gate, checked before any spend: the real-face route is
     // consent-attested by design (the desktop enforces it too).
@@ -1874,6 +1980,7 @@ export const generateVideo: Operation<{
       environmentAssetIds: input.environmentAssetIds ?? [],
       styleAssetIds: input.styleAssetIds ?? [],
       videoReferenceAssetId: input.videoReferenceAssetId,
+      audioReferenceAssetId: input.audioReferenceAssetId,
       sound: input.sound,
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
@@ -1940,24 +2047,40 @@ export const generateLipSync: Operation<{
   audioFilePath?: string
   avatarModel?: 'avatar-standard' | 'avatar-pro'
   klingProvider?: 'fal' | 'kling'
+  engine?: 'kling' | 'seedance-2'
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  aspectRatio?: string
+  seedanceFace?: boolean
+  seedanceRealFace?: boolean
+  realFaceConsent?: boolean
+  sourceSeconds?: number
+  audioSeconds?: number
   background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_lip_sync',
   description:
-    'Lip-sync a still image (avatar) or a video clip to audio via Kling. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED — the source asset must already exist in the project. Two flows: (1) sourceType=video → lip-syncs an existing talking-head clip to new audio (~$0.11 / 5s, no confirm gate); (2) sourceType=image → animates a still portrait into a talking avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s, hits the >$0.50 confirm gate). Audio comes from either TTS (pass ttsText) or an uploaded file (pass audioFilePath). Always 5 seconds — Kling lip-sync does not support other durations. No skill files installed? Call slates_get_prompting_guide with \'slates-prompting-lip-sync\' (and \'slates-cost-discipline\') before first use.',
+    'Lip-sync a still image (avatar) or a video clip to audio. Two engines — route per slates-model-selection: (1) engine=kling (default, cheap utility lane): sourceType=video re-syncs a clip (~$0.11 / 5s); sourceType=image animates a still avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s). Audio from TTS (ttsText + ttsVoice) or an uploaded file. Always 5 seconds. (2) engine=seedance-2 (premium single-pass): the speech is generated IN the video itself — natural delivery, a video source keeps its OWN voice (native voice clone), audio included; ttsText becomes the spoken line (no voice/speed params), or an uploaded ≤15s audio file drives the speech as a reference. Seedance sources must be 2-15s videos or images; bills seedance keys (video sources bill input+output seconds — pass sourceSeconds). Faces route via seedanceFace (default true) / seedanceRealFace+realFaceConsent for real people. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
     sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
     sourceType: z.enum(['image', 'video']).describe('"image" = animate a still portrait (avatar). "video" = re-sync an existing talking-head clip. Determines pricing — be deliberate.'),
-    audioMethod: z.enum(['tts', 'upload']).describe('"tts" = generate speech from ttsText. "upload" = use the file at audioFilePath (absolute path on the user\'s machine).'),
+    audioMethod: z.enum(['tts', 'upload']).describe('"tts" = generate speech from ttsText (on Seedance the line is spoken natively in the generation). "upload" = use the file at audioFilePath (absolute path on the user\'s machine; ≤15s on Seedance).'),
     ttsText: z.string().min(1).max(2000).optional().describe('Required when audioMethod=tts. The exact words the avatar/clip will speak.'),
-    ttsVoice: z.string().optional().describe('Kling voice id (e.g. "oversea_male1"). See slates-prompting-lip-sync skill for the voice catalog.'),
-    ttsLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('TTS language. Default EN.'),
-    ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
+    ttsVoice: z.string().optional().describe('Kling engine only — voice id (e.g. "oversea_male1"). See slates-prompting-lip-sync skill for the voice catalog. Ignored on Seedance (a video source keeps its own voice; otherwise describe the voice in ttsText context).'),
+    ttsLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling engine only — TTS language. Default EN.'),
+    ttsSpeed: z.number().min(0.5).max(2).optional().describe('Kling engine only — TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
-    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity. Ignored when sourceType=video.'),
-    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing for the Kling call. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured — omit unless the user explicitly wants BYOK.'),
+    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Kling engine, image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity.'),
+    klingProvider: z.enum(['fal', 'kling']).optional().describe('Kling engine only — provider routing. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured.'),
+    engine: z.enum(['kling', 'seedance-2']).optional().describe('Default kling (cheap utility). seedance-2 = premium single-pass: natural speech generated in the video, voice cloned from a video source, audio included. Credits only.'),
+    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Seedance engine only. Default 1080p.'),
+    aspectRatio: z.string().optional().describe('Seedance engine only. Default 16:9.'),
+    seedanceFace: z.boolean().optional().describe('Seedance engine only — a character\'s face is in the source (default TRUE for lip-sync; the faceless route would reject it). Bills the -face key.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance engine only — the source shows a REAL person. Premium -realface key; REQUIRES realFaceConsent=true.'),
+    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace — set true only after the user explicitly confirms they hold rights/consent to the likeness.'),
+    sourceSeconds: z.number().optional().describe('Seedance engine + sourceType=video: the source clip\'s duration in seconds (from the asset listing). Feeds the vref cost key (input+output billing).'),
+    audioSeconds: z.number().optional().describe('Seedance engine + audioMethod=upload: the audio file\'s duration in seconds — sets the output length (4-15s).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate. Required for avatar-pro.'),
   }),
@@ -1977,8 +2100,44 @@ export const generateLipSync: Operation<{
       })
     }
 
+    const isSeedance = input.engine === 'seedance-2'
     let costKey: string
-    if (input.sourceType === 'video') {
+    let seedanceDuration = 0
+    if (isSeedance) {
+      // Consent gate before any spend, mirroring slates_generate_video.
+      if (input.seedanceRealFace && !input.realFaceConsent) {
+        return ok({
+          requires_clarification: true,
+          missing: ['realFaceConsent'],
+          message:
+            'Real-person lip-sync needs consent: confirm with the user that they hold the rights/consent to this likeness, then retry with realFaceConsent=true.',
+        })
+      }
+      if (input.sourceType === 'video' && !input.sourceSeconds) {
+        return ok({
+          requires_clarification: true,
+          missing: ['sourceSeconds'],
+          message:
+            'Seedance lip-sync on a video source bills combined input+output seconds. Pass sourceSeconds (the clip\'s duration from slates_list_assets, must be 2-15s).',
+        })
+      }
+      const clamp = (n: number): number => Math.min(15, Math.max(4, Math.ceil(n)))
+      seedanceDuration = clamp(
+        input.sourceType === 'video' && input.sourceSeconds
+          ? input.sourceSeconds
+          : input.audioSeconds ?? (input.ttsText ? input.ttsText.length / 13 : 5)
+      )
+      costKey = videoCostKey({
+        model: 'seedance-2',
+        duration: seedanceDuration,
+        videoResolution: input.videoResolution ?? '1080p',
+        // Lip-sync sources are faces by definition — face route unless
+        // explicitly disabled or escalated to realface.
+        seedanceFace: input.seedanceFace !== false && input.seedanceRealFace !== true,
+        seedanceRealFace: input.seedanceRealFace === true,
+        videoRefSeconds: input.sourceType === 'video' ? input.sourceSeconds ?? 0 : 0,
+      })
+    } else if (input.sourceType === 'video') {
       costKey = 'kling-lip-sync-video-5s'
     } else {
       costKey = input.avatarModel === 'avatar-pro'
@@ -2008,7 +2167,7 @@ export const generateLipSync: Operation<{
         estimated_dollars: (totalCents / 100).toFixed(2),
         source_ref: sourceRef,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for 5s ${costKey}. ` +
+          `Cost: $${(totalCents / 100).toFixed(2)} for ${isSeedance ? `${seedanceDuration}s Seedance` : '5s'} lip-sync (${costKey}). ` +
           `Source: ${sourceRef}. ${audioPreview}. ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
@@ -2039,11 +2198,27 @@ export const generateLipSync: Operation<{
       klingProvider: input.klingProvider,
       estimatedCost: totalCents,
       background: input.background,
+      // Seedance engine passthrough — the desktop delegates to the seedance
+      // ref-to-video path (vref billing, face cascade, consent gate). The
+      // durations ride along so the desktop bills exactly what was quoted.
+      ...(isSeedance
+        ? {
+            lipSyncEngine: 'seedance-2',
+            duration: seedanceDuration,
+            videoResolution: input.videoResolution,
+            aspectRatio: input.aspectRatio,
+            seedanceFace: input.seedanceFace !== false && input.seedanceRealFace !== true,
+            seedanceRealFace: input.seedanceRealFace === true,
+            realFaceConsent: input.realFaceConsent === true,
+            sourceDurationSeconds: input.sourceSeconds,
+            audioDurationSeconds: input.audioSeconds,
+          }
+        : {}),
     })
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-      return backgroundSubmitted(`5s lip-sync (${costKey})`, ids, {
+      return backgroundSubmitted(`${isSeedance ? `${seedanceDuration}s` : '5s'} lip-sync (${costKey})`, ids, {
         variant: costKey,
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
@@ -2054,7 +2229,7 @@ export const generateLipSync: Operation<{
 
     return {
       text:
-        `Generated 5s lip-sync (${costKey}) into project ${input.projectId} ` +
+        `Generated ${isSeedance ? `${seedanceDuration}s` : '5s'} lip-sync (${costKey}) into project ${input.projectId} ` +
         `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
         (input.audioMethod === 'tts'
           ? `Spoken: "${(input.ttsText ?? '').slice(0, 60)}${(input.ttsText ?? '').length > 60 ? '...' : ''}"`
@@ -2079,30 +2254,75 @@ export const generateMotionTransfer: Operation<{
   projectId: string
   sourceVideoAssetId: string
   targetImageAssetId: string
-  motionModel?: 'kling-mc-std' | 'kling-mc-pro'
+  motionModel?: 'kling-mc-std' | 'kling-mc-pro' | 'seedance-2'
   characterOrientation?: 'video' | 'image'
   prompt?: string
   klingProvider?: 'fal' | 'kling'
+  duration?: number
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  aspectRatio?: string
+  seedanceFace?: boolean
+  seedanceRealFace?: boolean
+  realFaceConsent?: boolean
+  sourceVideoSeconds?: number
   background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_generate_motion_transfer',
   description:
-    'Transfer the motion from a reference video onto a target image character via Kling Motion Control. REQUIRED before calling: read the slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both source video and target image must already exist as assets in the project. Two tiers: kling-mc-std ($0.95 / 5s) and kling-mc-pro ($1.26 / 5s) — both hit the >$0.50 confirm gate. Always 5 seconds. No skill files installed? Call slates_get_prompting_guide with \'slates-prompting-motion-transfer\' (and \'slates-cost-discipline\') before first use.',
+    'Transfer the motion from a reference video onto a target image character. Two engines — route per slates-model-selection: (1) kling-mc-std ($0.95 / 5s) / kling-mc-pro ($1.26 / 5s) — the cheap utility lane, structured skeleton/depth retargeting, always 5s. (2) motionModel=seedance-2 — the PREMIUM lane: single-pass generation with the driving clip as a native conditioning signal (better motion fidelity + native audio), prompt-driven (write what the character does, e.g. "the character from image 1 performs the exact motion from video 1"), bills input+output seconds on seedance vref keys (pass sourceVideoSeconds; driving clip must be 2-15s). Faces: seedanceFace defaults true; a REAL person needs seedanceRealFace+realFaceConsent (premium route). REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. All tiers hit the >$0.50 confirm gate.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
-    sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project.'),
+    sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Seedance engine: 2-15s clips only.'),
     targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project.'),
-    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('std ($0.95) for general motion. pro ($1.26) for cleaner anatomy + identity preservation. Default pro — pick std deliberately for cost savings.'),
-    characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
-    prompt: z.string().optional().describe('Optional refinement prompt. Read slates-prompting-motion-transfer for guidance.'),
-    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing for the Kling call. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured — omit unless the user explicitly wants BYOK.'),
+    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro', 'seedance-2']).optional().describe('kling-mc-std ($0.95) general motion; kling-mc-pro ($1.26) cleaner anatomy — default. seedance-2 = premium single-pass lane (prompt-driven, native audio, input+output-second billing) — pick when motion fidelity or audio matters.'),
+    characterOrientation: z.enum(['video', 'image']).optional().describe('Kling only. "video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
+    prompt: z.string().optional().describe('Kling: optional refinement. Seedance: THE driver — describe what the character does with the motion from the clip (ordinal references: "the character from image 1 performs the motion from video 1"). A sensible default recipe is used if omitted. Read slates-prompting-motion-transfer.'),
+    klingProvider: z.enum(['fal', 'kling']).optional().describe('Kling engine only — provider routing. "fal" (default) uses Slates credits.'),
+    duration: z.number().int().min(4).max(15).optional().describe('Seedance engine only — output duration in seconds (4-15). Defaults to the driving clip\'s length.'),
+    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Seedance engine only. Default 1080p.'),
+    aspectRatio: z.string().optional().describe('Seedance engine only. Default 16:9.'),
+    seedanceFace: z.boolean().optional().describe('Seedance engine only — a character\'s face is in the clip/image (default TRUE for motion transfer). Bills the -face key.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance engine only — the driving clip/subject shows a REAL person. Premium -realface key; REQUIRES realFaceConsent=true.'),
+    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace — set true only after the user explicitly confirms they hold rights/consent to the likeness.'),
+    sourceVideoSeconds: z.number().optional().describe('Seedance engine: the driving clip\'s duration in seconds (from the asset listing, 2-15s). Feeds the vref cost key (input+output billing).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 confirm gate. Required — both tiers exceed.'),
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
-    const costKey = motionModel === 'kling-mc-std' ? 'kling-mc-std-5s' : 'kling-mc-pro-5s'
+    const isSeedance = motionModel === 'seedance-2'
+    let costKey: string
+    let seedanceDuration = 0
+    if (isSeedance) {
+      if (input.seedanceRealFace && !input.realFaceConsent) {
+        return ok({
+          requires_clarification: true,
+          missing: ['realFaceConsent'],
+          message:
+            'Real-person motion transfer needs consent: confirm with the user that they hold the rights/consent to this likeness, then retry with realFaceConsent=true.',
+        })
+      }
+      if (!input.sourceVideoSeconds) {
+        return ok({
+          requires_clarification: true,
+          missing: ['sourceVideoSeconds'],
+          message:
+            'Seedance motion transfer bills combined input+output seconds. Pass sourceVideoSeconds (the driving clip\'s duration from slates_list_assets, must be 2-15s).',
+        })
+      }
+      seedanceDuration = input.duration ?? Math.min(15, Math.max(4, Math.ceil(input.sourceVideoSeconds)))
+      costKey = videoCostKey({
+        model: 'seedance-2',
+        duration: seedanceDuration,
+        videoResolution: input.videoResolution ?? '1080p',
+        seedanceFace: input.seedanceFace !== false && input.seedanceRealFace !== true,
+        seedanceRealFace: input.seedanceRealFace === true,
+        videoRefSeconds: input.sourceVideoSeconds,
+      })
+    } else {
+      costKey = motionModel === 'kling-mc-std' ? 'kling-mc-std-5s' : 'kling-mc-pro-5s'
+    }
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
@@ -2128,9 +2348,9 @@ export const generateMotionTransfer: Operation<{
         source_ref: source,
         target_ref: target,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for 5s ${motionModel}. ` +
+          `Cost: $${(totalCents / 100).toFixed(2)} for ${isSeedance ? `${seedanceDuration}s Seedance motion transfer` : `5s ${motionModel}`} (${costKey}). ` +
           `Transferring motion from ${source} onto ${target}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend, or pick kling-mc-std to save $0.31. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend${isSeedance ? '' : ', or pick kling-mc-std to save $0.31'}. ` +
           `When discussing with the user, refer to the assets by those codes — they'll match the gallery badges.`,
       })
     }
@@ -2156,11 +2376,26 @@ export const generateMotionTransfer: Operation<{
       klingProvider: input.klingProvider,
       estimatedCost: totalCents,
       background: input.background,
+      // Seedance engine passthrough — the desktop delegates to the seedance
+      // ref-to-video path (vref billing, face cascade, consent gate).
+      ...(isSeedance
+        ? {
+            duration: seedanceDuration,
+            videoResolution: input.videoResolution,
+            aspectRatio: input.aspectRatio,
+            seedanceFace: input.seedanceFace !== false && input.seedanceRealFace !== true,
+            seedanceRealFace: input.seedanceRealFace === true,
+            realFaceConsent: input.realFaceConsent === true,
+            // Ride the caller-supplied clip duration through — the asset row's
+            // duration can be null for imported clips.
+            sourceVideoDurationSeconds: input.sourceVideoSeconds,
+          }
+        : {}),
     })
     if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-      return backgroundSubmitted(`5s motion transfer (${motionModel})`, ids, {
+      return backgroundSubmitted(`${isSeedance ? `${seedanceDuration}s` : '5s'} motion transfer (${motionModel})`, ids, {
         variant: costKey,
         motionModel,
         projectId: input.projectId,
@@ -2173,7 +2408,7 @@ export const generateMotionTransfer: Operation<{
 
     return {
       text:
-        `Generated 5s motion transfer (${motionModel}) into project ${input.projectId} ` +
+        `Generated ${isSeedance ? `${seedanceDuration}s` : '5s'} motion transfer (${motionModel}) into project ${input.projectId} ` +
         `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
         (input.prompt ? ` Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` : ''),
       data: {
@@ -2182,6 +2417,161 @@ export const generateMotionTransfer: Operation<{
         projectId: input.projectId,
         sourceVideoAssetId: input.sourceVideoAssetId,
         targetImageAssetId: input.targetImageAssetId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+        asset: result.asset,
+        generationId: result.generationId,
+      },
+    }
+  },
+}
+
+// ── Edit video (Kling O3 video-to-video) ────────────────────────
+
+export const editVideo: Operation<{
+  projectId: string
+  sourceVideoAssetId: string
+  prompt: string
+  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit'
+  characterAssetIds?: string[]
+  styleAssetIds?: string[]
+  keepAudio?: boolean
+  background?: boolean
+  confirm?: boolean
+}> = {
+  id: 'slates_edit_video',
+  description:
+    'Edit an EXISTING video clip with one instruction via Kling O3 video-to-video edit — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Source clip constraints: 3–15s, 720–3840px, MP4/MOV. Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit.',
+  input: z.object({
+    projectId: z.string().uuid().describe('Project the source clip lives in.'),
+    sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. 3–15s clips only.'),
+    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation.'),
+    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters.'),
+    characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN).'),
+    styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds.'),
+    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true).'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
+    confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('edit-video', 'video editing (Kling O3 edit)')
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
+    const model = input.model ?? 'kling-v3.0-omni-edit'
+
+    // Resolve refs (UUIDs or badge codes) against the project AT CALL TIME.
+    const refInputs = [
+      { ref: input.sourceVideoAssetId, role: 'source clip' },
+      ...(input.characterAssetIds ?? []).map((ref) => ({ ref, role: 'subject element' })),
+      ...(input.styleAssetIds ?? []).map((ref) => ({ ref, role: 'style' })),
+    ]
+    const resolved = await resolveAssetRefs(ctx, input.projectId, refInputs.map((r) => r.ref))
+    const rid = (ref: string): string => resolved.get(ref)?.id ?? ref
+    const sourceId = rid(input.sourceVideoAssetId)
+    const characterAssetIds = (input.characterAssetIds ?? []).map(rid)
+    const styleAssetIds = (input.styleAssetIds ?? []).map(rid)
+    const refEcho = describeResolvedRefs(refInputs, resolved)
+
+    if (characterAssetIds.length + styleAssetIds.length > 4) {
+      throw new Error('Kling O3 edit takes max 4 combined subject + style references.')
+    }
+
+    // The billed key needs the clip's duration (ceiled). Read it from the
+    // project's asset records — the desktop route independently re-validates.
+    const { assets } = await desktop.get<{ assets: Array<{ id?: string; type?: string; duration?: number }> }>(
+      '/agent/assets',
+      { projectId: input.projectId }
+    )
+    const sourceRow = (assets ?? []).find((a) => String(a.id).toLowerCase() === sourceId.toLowerCase())
+    if (!sourceRow) throw new Error(`Source asset not found in project: ${input.sourceVideoAssetId}`)
+    if (sourceRow.type !== 'video') throw new Error('sourceVideoAssetId must reference a VIDEO asset.')
+    const clipSeconds = Number(sourceRow.duration)
+    if (!Number.isFinite(clipSeconds) || clipSeconds <= 0) {
+      throw new Error('Source clip has no recorded duration — cannot quote the edit. Re-import the clip or pick another.')
+    }
+    if (clipSeconds > 15.05 || clipSeconds < 2.95) {
+      throw new Error(
+        `Source clip is ${clipSeconds.toFixed(1)}s — Kling O3 edit accepts 3–15s. Trim it first (agents can pre-trim on the timeline).`
+      )
+    }
+    const billedSeconds = Math.min(15, Math.max(3, Math.ceil(clipSeconds - 0.05)))
+    const costKey = klingEditCostKey(model, billedSeconds)
+
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
+    const totalCents = entry.cost_cents
+
+    // Confirm gate — look-first: preview the source clip + refs so the LLM
+    // sees what it's editing before committing spend (mirrors generateVideo).
+    if ((totalCents > 50 || refInputs.length > 1) && !input.confirm) {
+      const previews = await previewAssets(ctx, [
+        { id: sourceId, type: 'video' as const, role: 'source clip' },
+        ...characterAssetIds.map((id) => ({ id, type: 'image' as const, role: 'subject element' })),
+        ...styleAssetIds.map((id) => ({ id, type: 'image' as const, role: 'style' })),
+      ])
+      return {
+        text:
+          `Cost: $${(totalCents / 100).toFixed(2)} (${totalCents}¢) to edit a ${billedSeconds}s clip with ${model} (${costKey}). ` +
+          `${refEcho} Re-call with confirm=true after the user explicitly OKs the spend.`,
+        images: previews.flatMap((p) => p.images),
+        data: {
+          requires_confirm: true,
+          model,
+          variant: costKey,
+          billed_seconds: billedSeconds,
+          clip_seconds: clipSeconds,
+          estimated_cents: totalCents,
+          estimated_dollars: (totalCents / 100).toFixed(2),
+          references: previews.map((p) => ({ ref: p.ref, role: p.role, ...p.meta })),
+        },
+      }
+    }
+
+    const result = await desktop.post<{
+      success: boolean
+      background?: boolean
+      asset?: Record<string, unknown>
+      generationId?: string
+      error?: string
+    }>('/agent/generation/edit-video', {
+      projectId: input.projectId,
+      model,
+      prompt: input.prompt,
+      sourceVideoAssetId: sourceId,
+      characterAssetIds,
+      styleAssetIds,
+      keepAudio: input.keepAudio !== false,
+      background: input.background,
+    })
+    if (!result.success) throw new Error(result.error ?? 'Video edit failed')
+    if (result.background) {
+      const ids = result.generationId ? [result.generationId] : []
+      return backgroundSubmitted(`${billedSeconds}s video edit (${model})`, ids, {
+        model,
+        variant: costKey,
+        projectId: input.projectId,
+        sourceVideoAssetId: sourceId,
+        cost_cents: totalCents,
+        cost_dollars: (totalCents / 100).toFixed(2),
+      }, refEcho)
+    }
+
+    return {
+      text:
+        `Edited ${billedSeconds}s clip saved as a new asset in project ${input.projectId} ` +
+        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢) via ${model}. ` +
+        `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
+        (refEcho ? ` ${refEcho}` : ''),
+      data: {
+        model,
+        variant: costKey,
+        projectId: input.projectId,
+        sourceVideoAssetId: sourceId,
+        billed_seconds: billedSeconds,
         cost_cents: totalCents,
         cost_dollars: (totalCents / 100).toFixed(2),
         asset: result.asset,
@@ -2872,10 +3262,12 @@ function resolveGuideTopic(topic: string): string | null {
     return 'slates-model-selection'
   }
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
+  if (t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2'
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('veo')) return 'slates-prompting-veo-3'
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
+  if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return 'slates-prompting-kling-v3'
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
   if (t.startsWith('seedance')) return 'slates-prompting-seedance'
   if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'
@@ -2960,6 +3352,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   generateVideo as unknown as Operation<unknown>,
   generateLipSync as unknown as Operation<unknown>,
   generateMotionTransfer as unknown as Operation<unknown>,
+  editVideo as unknown as Operation<unknown>,
   editImage as unknown as Operation<unknown>,
   getGenerationStatus as unknown as Operation<unknown>,
   listGenerations as unknown as Operation<unknown>,

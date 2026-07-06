@@ -159,6 +159,32 @@ When talking to the user about the gen, refer to each reference by its short cod
 - ✅ "I'm anchoring on **IMG-A12** as the detective and **IMG-A18** as the alleyway environment — Omni will handle the line delivery in EN."
 - ❌ "I'm using the detective image and the alley one..." (which alley? Three exist.)
 
+## Video-to-video EDIT (`slates_edit_video`) — @Video1 / @ElementN / @ImageN
+
+Kling O3 edit takes an EXISTING 3-15s clip and changes only what the prompt names — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved by default. Its notation is Kling's own, different from the "image N" naming used everywhere else:
+
+- **`@Video1`** — the source clip (always; the transport anchors the instruction to it).
+- **`@Element1..`** — subjects to swap IN. Each element = one frontal image + up to 3 angle images (pass as `characterAssetIds`; @mention names in the prompt compile to @ElementN automatically).
+- **`@Image1..`** — style/appearance references (pass as `styleAssetIds`).
+- Max **4 combined** element + image refs per edit.
+
+**Prompt shape — the change, not the whole scene:**
+
+```
+Replace the man in @Video1 with @Element1, keeping his walk cycle, the camera move, and the rain unchanged.
+```
+
+```
+Edit @Video1: turn the daytime street into a neon-lit Tokyo alley at night, wet asphalt reflections. Apply the visual style of @Image1. Keep the subject and camera motion exactly as they are.
+```
+
+Rules:
+- Name what CHANGES; explicitly state what stays ("keep the motion / camera / everything else unchanged") — the model preserves better when told to.
+- One edit intent per pass. Chain passes for compound changes (each output is itself an editable clip, linked to its parent).
+- Billing is per second of OUTPUT ≈ the clip length, rounded UP to the next second. A 7.3s clip bills as 8s.
+- Clip constraints: 3-15s, 720-3840px, MP4/MOV. Agents can pre-trim on the timeline when a clip runs long.
+- Routing: Kling edit is the default edit tool (element lock + audio intact); Seedance edit/relocate wins style-transfer-heavy re-imaginings — see `slates-model-selection`.
+
 ## Sources
 
 - [fal.ai — Kling 3.0 Prompting Guide](https://blog.fal.ai/kling-3-0-prompting-guide/)

@@ -83,6 +83,15 @@ Reference-to-video endpoint accepts up to **9 reference images, 3 reference vide
 
 **Mutually exclusive:** First-frame/last-frame mode CANNOT be combined with reference images. The error reads `"first/last frame content cannot be mixed with reference media content."` Pick one or the other.
 
+### Motion transfer & lip-sync recipes (reference video / audio)
+
+These aren't separate Seedance features — they're prompting strategies over reference media, and the Slates tools (`slates_generate_motion_transfer` / `slates_generate_lip_sync` with the seedance engine) compose them for you. When driving them by hand through `slates_generate_video`:
+
+- **Motion transfer:** subject image as a reference + the driving clip via `videoReferenceAssetId` (2–15s) + `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.`
+- **Lip-sync / dialogue:** write the line in the prompt — `The person in video 1 says: "…"` — with `generate_audio` on (always on in Slates). A **video** source's own voice is cloned natively; an **audio** reference (`audioReferenceAssetId`, ≤15s) drives speech from an existing recording: `…speaks the dialogue from audio 1 with accurate lip sync.`
+- **Voice + face from one clip (the talking-head recipe):** ONE unedited 2–15s clip of the person speaking (clear voice, no music, no cuts) as the video reference + prompt with the new script → their likeness AND voice deliver the new line.
+- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = clip seconds + output seconds — quote before confirming. Audio references are free (audio is included on every route).
+
 ## Faces — set `seedanceFace` for AI-character faces
 
 Seedance routes through **three tiers** depending on the face in the reference, exposed as the "Face in Reference" toggle plus the real-face params on `slates_generate_video`:

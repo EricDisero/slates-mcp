@@ -53,3 +53,11 @@ Never write romantic, sexual, or suggestive content involving or directed at min
 - [ ] Anything with children is wholesome and age-appropriate.
 
 If a box fails, apply the substitution table before writing the prompt.
+
+## Editing real footage (Kling O3 edit) — real people in the SOURCE
+
+Video edit takes the user's own footage, which often contains real people. Rules:
+
+- The user must hold rights/consent for any real person's likeness in footage they edit — ask once when it's clearly someone other than the user, then proceed.
+- Kling's video-to-video filter behavior on real faces is **not yet verified** (unlike Seedance, where the consent-gated real-face route is confirmed). If an edit of real-person footage is rejected by the provider, do NOT retry-spam variations — tell the user the filter blocked it and offer a no-face crop/segment or an AI-character swap instead.
+- Never use edit to put a real, named public figure into a scene, or to make someone appear to say/do something they didn't. Faceless b-roll (hands, products, landscapes, crowds-from-behind) edits freely.
