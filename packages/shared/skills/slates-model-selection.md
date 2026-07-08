@@ -35,9 +35,9 @@ Both tools have a cheap Kling utility lane and a premium Seedance lane. The capa
 
 | Job | Engine | Why |
 |---|---|---|
-| Quick motion retarget, budget lane, or driving clip >15s | Kling MC std/pro (`slates_generate_motion_transfer`) | Structured skeleton/depth retarget, $0.95–1.26 / 5s, takes up to 30s driving clips. |
+| Quick motion retarget, budget lane, or driving clip >15s | Kling MC std/pro (`slates_generate_motion_transfer`) | Structured skeleton/depth retarget, ~32–42 credits / 5s, takes up to 30s driving clips. |
 | **Motion transfer where fidelity or audio matters** — dance, choreography, cinematic action | **Seedance 2.0** (`motionModel=seedance-2`) | Single-pass conditioning beats post-hoc retargeting; prompt-driven; native audio. Driving clip 2–15s; bills input+output seconds (vref keys). |
-| Cheap lip-sync utility (re-voice a clip, simple avatar) | Kling lip-sync / avatar (`slates_generate_lip_sync`) | $0.11–0.86 / 5s blocks. |
+| Cheap lip-sync utility (re-voice a clip, simple avatar) | Kling lip-sync / avatar (`slates_generate_lip_sync`) | ~4–29 credits / 5s blocks. |
 | **Natural speech, voice cloned from the source clip, premium delivery** | **Seedance 2.0** (`engine=seedance-2`) | The line is spoken IN the generation (no TTS layer); a video source keeps its own voice; uploaded ≤15s audio can drive it. |
 
 - Faces: Seedance tool gens default `seedanceFace=true` (sources are people). A REAL person triggers the consent cascade (`[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent`, premium realface pricing).

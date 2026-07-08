@@ -17,10 +17,13 @@ export async function runStatus(): Promise<void> {
     try {
       const cloud = new SlatesCloudClient()
       const me = await cloud.get<SlatesUserInfo>('/api/agent/me')
+      // Credits since the 2026-07-07 re-denomination (credit_balance_cents is
+      // a legacy alias carrying the same credit value).
+      const balance = me.user.credit_balance ?? me.user.credit_balance_cents ?? 0
       console.log(`\nLogged in as:      ${me.user.email}`)
       console.log(`License:           ${me.user.license_status}`)
       console.log(`Tier:              ${me.user.tier}`)
-      console.log(`Credit balance:    $${me.user.credit_balance_dollars}`)
+      console.log(`Credit balance:    ${balance.toLocaleString('en-US')} credits`)
       console.log(`Scopes:            ${me.scopes.join(', ')}`)
     } catch (err) {
       console.warn(`\nCloud check failed: ${err instanceof Error ? err.message : String(err)}`)

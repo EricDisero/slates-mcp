@@ -33,7 +33,7 @@ Ask: **"Generate frame images now? (y/N)"**
 
 ### 3. Generate frames if requested
 For each frame:
-- Estimate cost (`slates_estimate_generation_cost`, `count = total frames`). Confirm with user if total > $0.50.
+- Estimate cost (`slates_estimate_generation_cost`, `count = total frames`). Confirm with user if total > ~17 credits.
 - Generate sequentially, with character/environment/style references attached when present in the project (`slates_list_characters`, `slates_list_environments`).
 - Each result returns inline. Evaluate. If wrong, refine prompt + regenerate (charge once, not multiple).
 - Bind to the frame via `slates_add_frame`.

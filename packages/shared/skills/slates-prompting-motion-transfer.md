@@ -9,11 +9,11 @@ Take a still **target image** (your character) and a **source video** (the motio
 
 | Engine | Cost | Use case |
 |------|-----------|----------|
-| Kling std (`kling-mc-std-5s`) | $0.95 / 5s | General motion transfer, budget lane |
-| Kling pro (`kling-mc-pro-5s`) | $1.26 / 5s | Cleaner anatomy, better identity preservation |
+| Kling std (`kling-mc-std-5s`) | ~32 credits / 5s | General motion transfer, budget lane |
+| Kling pro (`kling-mc-pro-5s`) | ~42 credits / 5s | Cleaner anatomy, better identity preservation |
 | **Seedance 2.0** (`motionModel=seedance-2`) | per second of input+output (`seedance-2-face-vref-*`) | **Premium lane** — single-pass generation with the driving clip as a native conditioning signal: better motion fidelity, native audio, prompt-directed |
 
-All tiers trip the >$0.50 confirm gate. User OK required every time.
+All tiers trip the confirm gate. User OK required every time. (Prices are approximate — `slates_estimate_generation_cost` returns the exact credit total.)
 
 ## Seedance engine (premium single-pass)
 
@@ -80,18 +80,18 @@ Switch to `image` when the target image's composition is the brand asset and the
 
 ## Tier choice — std vs pro
 
-**std ($0.95)** for:
+**std (~32 credits)** for:
 - Drafts, motion exploration, blocking
 - Group scenes where the character isn't a hero shot
 - When the budget is tight and the motion is the focus
 
-**pro ($1.26)** for:
+**pro (~42 credits)** for:
 - Final hero takes
 - Branded characters where identity drift = unacceptable
 - Anatomically complex motion (limbs crossing, fast direction changes)
 - Anime / cartoon target images — pro handles non-realistic styles better
 
-Don't default to pro. The $0.31 delta compounds fast across iteration.
+Don't default to pro. The ~10-credit delta compounds fast across iteration.
 
 ## Prompt usage (optional)
 
@@ -126,7 +126,7 @@ Leave it empty if you don't have a specific atmospheric note.
 2. Find driving footage — a clean reference video of the dance you want
 3. Upload both as project assets
 4. Run motion transfer with `motionModel: 'kling-mc-pro'`, `characterOrientation: 'video'`
-5. Total cost: $1.26 per 5s take
+5. Total cost: ~42 credits per 5s take
 
 **Subtle motion on a hero portrait:**
 1. Use the locked hero portrait as the target image
@@ -143,15 +143,15 @@ Leave it empty if you don't have a specific atmospheric note.
 ## Cost discipline
 
 - 5 seconds, no shorter option
-- Both tiers trip the >$0.50 confirm gate — every call needs explicit user OK
-- Iteration is expensive: 4 takes at pro = $5.04. Lock framing + driving video before tier-up to pro.
+- Both tiers trip the confirm gate — every call needs explicit user OK
+- Iteration is expensive: 4 takes at pro ≈ 168 credits. Lock framing + driving video before tier-up to pro.
 - Always run a single std take first to validate the motion + framing combo before committing to pro
 
 ## Confirm gate: cost + codes, no inline preview
 
-Motion transfer is mechanical — the model deterministically applies source motion to target image. Both tiers trip the >$0.50 confirm gate; the response includes the asset codes for source and target so you can announce them in chat.
+Motion transfer is mechanical — the model deterministically applies source motion to target image. Both tiers trip the confirm gate; the response includes the asset codes for source and target so you can announce them in chat.
 
-- ✅ "Transferring motion from **VID-V3** onto **IMG-A12 — Detective Closeup**. $1.26, confirm?"
+- ✅ "Transferring motion from **VID-V3** onto **IMG-A12 — Detective Closeup**. ~42 credits, confirm?"
 - ❌ "Using the walk video and the detective image..." (multiple of each in the project.)
 
 Don't second-guess the assets the user picked — the model executes the transfer. If the output is wrong, iterate on motion source or target choice, not on a refinement prompt.

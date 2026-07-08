@@ -9,9 +9,9 @@ Two engines. Kling is the cheap utility lane (dedicated lip-sync endpoints, 5-se
 
 | Flow | Source | Engine/Model | Cost | Use case |
 |------|--------|-------|-----------|----------|
-| Re-dub | video clip | kling-lip-sync-video | $0.11 / 5s | Replace dialogue on an existing talking head |
-| Avatar standard | still image | ai-avatar/v2/standard | $0.42 / 5s | Animate a portrait into a talking avatar |
-| Avatar pro | still image | ai-avatar/v2/pro | $0.86 / 5s | Higher facial fidelity for hero shots |
+| Re-dub | video clip | kling-lip-sync-video | ~4 credits / 5s | Replace dialogue on an existing talking head |
+| Avatar standard | still image | ai-avatar/v2/standard | ~14 credits / 5s | Animate a portrait into a talking avatar |
+| Avatar pro | still image | ai-avatar/v2/pro | ~29 credits / 5s | Higher facial fidelity for hero shots |
 | **Seedance native** | image or video | `engine=seedance-2` | per second (`seedance-2-face-*`; video sources bill input+output seconds) | **Premium**: natural delivery, whole-body performance, voice cloned from a video source, audio included |
 
 Pick engine + `sourceType` deliberately — they decide the pricing tier and the underlying endpoint.
@@ -34,7 +34,7 @@ Everything below applies to the **Kling** engine.
 Use **video** (re-dub) when:
 - A talking-head clip already exists (Slates-generated, recorded, or imported)
 - The mouth/face is already moving and only the audio needs to change
-- $0.11 is hard to beat for short dialogue replacement
+- ~4 credits is hard to beat for short dialogue replacement
 
 Use **avatar** when:
 - Only a still portrait exists
@@ -127,9 +127,9 @@ Default `"."` is fine if you have nothing useful to add.
 **Use pro** when:
 - Final ads where the avatar's face fills the screen
 - The character is named / branded — identity drift kills the take
-- You're already paying $1+ for the surrounding video pipeline
+- You're already paying tens of credits for the surrounding video pipeline
 
-Don't default to pro. The $0.44 delta per take adds up across iteration.
+Don't default to pro. The ~15-credit delta per take adds up across iteration.
 
 ## Common failure modes
 
@@ -145,17 +145,17 @@ Don't default to pro. The $0.44 delta per take adds up across iteration.
 
 ## Cost discipline
 
-- Video re-dub at $0.11 is the cheapest dialogue iteration in the entire Slates stack — use it for voice A/B testing
-- Avatar standard at $0.42 is fine for medium use
-- Avatar pro at $0.86 trips the >$0.50 confirm gate — explicit user OK required every time
+- Video re-dub at ~4 credits is the cheapest dialogue iteration in the entire Slates stack — use it for voice A/B testing
+- Avatar standard at ~14 credits is fine for medium use
+- Avatar pro at ~29 credits trips the confirm gate — explicit user OK required every time
 - All 5s. There is no shorter option.
 
 ## Workflow patterns
 
 **Voice A/B test (cheap):**
-1. Generate one base talking-head video clip with Veo or Seedance (~$1.20)
+1. Generate one base talking-head video clip with Veo or Seedance (~40 credits)
 2. Run `slates_generate_lip_sync` with `sourceType: 'video'` against 3–5 different `ttsVoice` values
-3. Total cost: $1.20 + (5 × $0.11) = $1.75 to compare voices
+3. Total cost: ~40 + (5 × ~4) ≈ 60 credits to compare voices
 
 **Brand avatar from a single portrait:**
 1. Generate or upload the hero portrait (face fills frame, eyes open, neutral mouth)
@@ -171,7 +171,7 @@ Don't default to pro. The $0.44 delta per take adds up across iteration.
 
 Lip-sync is mechanical — the model re-syncs the chosen source to the chosen audio. The confirm response carries the source asset's code so you can announce it in chat.
 
-- ✅ "Lip-syncing **IMG-A12 — Founder Portrait** to the new line. $0.86 on avatar-pro. Confirm?"
+- ✅ "Lip-syncing **IMG-A12 — Founder Portrait** to the new line. ~29 credits on avatar-pro. Confirm?"
 - ❌ "Using the founder image..." (which? Three exist.)
 
 Don't second-guess the source. If the output is wrong, iterate on source choice or audio, not on a refinement prompt (there isn't one).

@@ -55,6 +55,32 @@ function ok(data: unknown, text?: string): OperationResult {
   }
 }
 
+// ── Credits (2026-07-07 re-denomination) ────────────────────────
+// Costs are ABSTRACT CREDITS now, not dollars. The API's model registry
+// returns `cost_credits` (with `cost_cents` kept as a legacy alias carrying
+// the same credit value); balances the same. Read via creditCost(); display
+// via fmtCredits(). The confirm gate fires above CONFIRM_CREDITS (≈ the old
+// $0.50 gate at the 3¢/credit peg).
+const CONFIRM_CREDITS = 17
+const CENTS_PER_CREDIT = 3 // peg: 1 credit = 3¢ billed = 2¢ COGS (mirror of slates-api)
+
+function creditCost(m: { cost_credits?: number; cost_cents?: number } | undefined): number {
+  if (!m) return 0
+  return m.cost_credits ?? m.cost_cents ?? 0
+}
+
+function fmtCredits(credits: number): string {
+  return `${Math.round(credits).toLocaleString('en-US')} credits`
+}
+
+/** Convert a legacy desktop dollar estimate (COGS × markup) to billed credits,
+ *  mirroring the server's toCredits(round(dollars × 100)). The desktop's
+ *  generations.cost column still stores dollars, so status reads convert. */
+function creditsFromDollars(dollars: number): number {
+  const cents = Math.round(dollars * 100)
+  return cents <= 0 ? 0 : Math.max(1, Math.ceil(cents / CENTS_PER_CREDIT))
+}
+
 // Shared describe-text for the background flag on every generate_* op.
 const BACKGROUND_DESCRIBE =
   'Submit and return immediately with generationId(s) instead of blocking until the file is saved. ' +
@@ -111,17 +137,18 @@ export const getMe: Operation<Record<string, never>> = {
 
 export const getCreditBalance: Operation<Record<string, never>> = {
   id: 'slates_get_credit_balance',
-  description: 'Current Slates credit balance, in cents and dollars. Call before any generation that costs credits.',
+  description: 'Current Slates credit balance (abstract credits — never expire). Call before any generation that costs credits.',
   input: z.object({}).strict(),
   async run(_input, ctx) {
     const r = await ctx.cloud().get<CreditsBalance>('/api/agent/credits/balance')
-    return ok(r)
+    const credits = r.credit_balance ?? r.credit_balance_cents ?? 0
+    return ok({ success: r.success, credit_balance: credits }, `Balance: ${fmtCredits(credits)}.`)
   },
 }
 
 export const listAvailableModels: Operation<{ filter?: string }> = {
   id: 'slates_list_available_models',
-  description: 'Registry of generation model cost keys with per-call credit cost in cents, as a compact "key cents" table. Optional `filter` substring (e.g. "kling" or "nano-banana") keeps the result small — prefer it. For a single known model, slates_estimate_generation_cost is cheaper still.',
+  description: 'Registry of generation model cost keys with per-call credit cost, as a compact "key credits" table. Optional `filter` substring (e.g. "kling" or "nano-banana") keeps the result small — prefer it. For a single known model, slates_estimate_generation_cost is cheaper still.',
   input: z.object({
     filter: z.string().optional().describe('Substring match on the model key, e.g. "kling-v3" or "seedance"'),
   }),
@@ -132,16 +159,16 @@ export const listAvailableModels: Operation<{ filter?: string }> = {
       const q = input.filter.toLowerCase()
       models = models.filter((m) => m.model.toLowerCase().includes(q))
     }
-    // Compact text table — "key cents" lines are ~5x denser than the raw
+    // Compact text table — "key credits" lines are ~5x denser than the raw
     // JSON registry (the full pretty-printed dump was an ~8k-token leak).
-    const table = models.map((m) => `${m.model} ${m.cost_cents}`).join('\n')
+    const table = models.map((m) => `${m.model} ${creditCost(m)}`).join('\n')
     return {
       text:
-        `${models.length} COST keys (cents per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
+        `${models.length} COST keys (credits per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
         `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on slates_generate_video takes a BASE id ` +
         `(kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard) with duration/videoResolution as separate params:\n` +
         table,
-      data: { count: models.length, credit_markup: r.credit_markup },
+      data: { count: models.length },
     }
   },
 }
@@ -159,7 +186,7 @@ export const estimateGenerationCost: Operation<{
 }> = {
   id: 'slates_estimate_generation_cost',
   description:
-    'Pre-flight cost estimate. Call before any generate_* op so the user sees "this will cost N credits" up front. Takes the SAME base model ids as the generate ops (video: "seedance-2" + duration + videoResolution; image: "nano-banana-2" + resolution) — exact registry cost keys also work. Pairs with the >$0.50 confirm gate.',
+    'Pre-flight cost estimate. Call before any generate_* op so the user sees "this will cost N credits" up front. Takes the SAME base model ids as the generate ops (video: "seedance-2" + duration + videoResolution; image: "nano-banana-2" + resolution) — exact registry cost keys also work. Pairs with the confirm gate.',
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
@@ -173,7 +200,7 @@ export const estimateGenerationCost: Operation<{
   }),
   async run(input, ctx) {
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const byKey = new Map(registry.models.map((m) => [m.model, m.cost_cents]))
+    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
 
     // 1) exact registry cost key
     let key: string | null = byKey.has(input.model) ? input.model : null
@@ -222,23 +249,22 @@ export const estimateGenerationCost: Operation<{
       }
     }
 
-    const cents = key != null ? byKey.get(key) : undefined
-    if (key == null || cents == null) {
+    const perCredits = key != null ? byKey.get(key) : undefined
+    if (key == null || perCredits == null) {
       throw new Error(
         `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | nano-banana-2 | flux-2-max | seedream-5-lite) plus duration/resolution params, or use slates_list_available_models with a filter.`
       )
     }
     const qty = input.quantity ?? 1
-    const totalCents = cents * qty
+    const totalCredits = perCredits * qty
     return ok({
       model: input.model,
       cost_key: key,
       quantity: qty,
-      cost_per_cents: cents,
-      total_cents: totalCents,
-      total_dollars: (totalCents / 100).toFixed(2),
-      requires_confirm: totalCents > 50,
-    })
+      cost_per_credits: perCredits,
+      total_credits: totalCredits,
+      requires_confirm: totalCredits > CONFIRM_CREDITS,
+    }, `${input.model}${qty > 1 ? ` ×${qty}` : ''}: ${fmtCredits(totalCredits)} (${key}).`)
   },
 }
 
@@ -753,7 +779,7 @@ export const generateEnvironmentPlate: Operation<{
 }> = {
   id: 'slates_generate_environment_plate',
   description:
-    "Generate an environment's single clean establishing plate (Nano Banana 2, 2K) from an optional base image, and bind it as the environment's reference. THE real environment-building workflow — call right after slates_create_environment. Afterward, pass the plate asset id as environmentAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so the location stays consistent across shots. Cost ~$0.18.",
+    "Generate an environment's single clean establishing plate (Nano Banana 2, 2K) from an optional base image, and bind it as the environment's reference. THE real environment-building workflow — call right after slates_create_environment. Afterward, pass the plate asset id as environmentAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so the location stays consistent across shots. Cost ~6 credits.",
   input: z.object({
     environmentId: z.string().uuid(),
     projectId: z.string().uuid(),
@@ -1042,7 +1068,7 @@ export const generateImage: Operation<{
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
     referenceAssetIds: z.array(z.string()).max(14).optional().describe("Project assets to use as reference/ingredient images — asset UUIDs or badge codes (\"IMG-A8\"); codes resolve against the project at call time. Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
   }),
   async run(input, ctx) {
     // Clarification gate: aspectRatio + resolution must be deliberate.
@@ -1131,20 +1157,20 @@ export const generateImage: Operation<{
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
-    const totalCents = entry.cost_cents * (input.count ?? 1)
+    const totalCents = creditCost(entry) * (input.count ?? 1)
     // Confirm gate. Fires on cost > $0.50, AND (look-first, mirroring
     // slates_generate_video) whenever reference assets are involved
     // regardless of cost — the LLM must see what it's referencing before
     // committing spend.
-    if ((totalCents > 50 || referenceAssetIds.length > 0) && !input.confirm) {
+    if ((totalCents > CONFIRM_CREDITS || referenceAssetIds.length > 0) && !input.confirm) {
       if (referenceAssetIds.length === 0) {
         return ok({
           requires_confirm: true,
           model: costKey,
           estimated_cents: totalCents,
-          estimated_dollars: (totalCents / 100).toFixed(2),
+          estimated_credits: totalCents,
           message:
-            'Cost exceeds $0.50. Re-call with confirm=true to proceed, or pick a smaller resolution / count.',
+            `Cost exceeds ${CONFIRM_CREDITS} credits. Re-call with confirm=true to proceed, or pick a smaller resolution / count.`,
         })
       }
       const previews = await previewAssets(
@@ -1155,7 +1181,7 @@ export const generateImage: Operation<{
       return {
         text:
           `Pre-flight for ${imageModel} (${costKey}): ` +
-          `$${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+          `${fmtCredits(totalCents)}.` +
           `\n\nReference images attached above:\n${refLines}\n\n` +
           `Review them against your prompt — every reference's role must be labeled in the prompt text. ` +
           `If the references suggest a different composition / style than the current prompt captures, REVISE the prompt before confirming. ` +
@@ -1167,7 +1193,7 @@ export const generateImage: Operation<{
           model: imageModel,
           variant: costKey,
           estimated_cents: totalCents,
-          estimated_dollars: (totalCents / 100).toFixed(2),
+          estimated_credits: totalCents,
           references: previews.map((p) => ({
             role: p.role,
             ref: p.ref,
@@ -1228,7 +1254,7 @@ export const generateImage: Operation<{
             costKey,
             projectId: input.projectId,
             cost_cents: totalCents,
-            cost_dollars: (totalCents / 100).toFixed(2),
+            cost_credits: totalCents,
           },
           refEcho
         )
@@ -1258,7 +1284,7 @@ export const generateImage: Operation<{
             `The saved assets are in data.assets — re-generate only the missing count, don't redo the whole batch. ` +
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`
           : `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
-            `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+            `for ${fmtCredits(totalCents)}. ` +
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
             (refEcho ? ` ${refEcho}` : ''),
         images,
@@ -1269,7 +1295,7 @@ export const generateImage: Operation<{
           aspectRatio: input.aspectRatio,
           resolution,
           cost_cents: totalCents,
-          cost_dollars: (totalCents / 100).toFixed(2),
+          cost_credits: totalCents,
           // Compact refs only — the full rows (prompt/settings/paths) were a
           // multi-KB leak per generation and everything needed downstream is
           // the id/code/label.
@@ -1339,7 +1365,7 @@ export const generateImage: Operation<{
     }
     return {
       text:
-        `Generated ${urls.length} image(s) for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+        `Generated ${urls.length} image(s) for ${fmtCredits(totalCents)}. ` +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
       images,
       data: {
@@ -1349,7 +1375,7 @@ export const generateImage: Operation<{
         aspectRatio: input.aspectRatio,
         resolution,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
       },
     }
   },
@@ -1411,7 +1437,7 @@ export const editImage: Operation<{
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k (1440p class) is gpt-image-2 only; nano-banana-2-lite is 1k only.'),
     quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
     aspectRatio: z.string().optional(),
-    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
   async run(input, ctx) {
@@ -1437,18 +1463,18 @@ export const editImage: Operation<{
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
-    const totalCents = entry.cost_cents
+    const totalCents = creditCost(entry)
 
-    if (totalCents > 50 && !input.confirm) {
+    if (totalCents > CONFIRM_CREDITS && !input.confirm) {
       const sourceRef = await lookupAssetRef(desktop, input.sourceAssetId)
       return ok({
         requires_confirm: true,
         variant: costKey,
         estimated_cents: totalCents,
-        estimated_dollars: (totalCents / 100).toFixed(2),
+        estimated_credits: totalCents,
         source_ref: sourceRef,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} to edit ${sourceRef} with ${editModel} (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)} to edit ${sourceRef} with ${editModel} (${costKey}). ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
       })
@@ -1481,7 +1507,7 @@ export const editImage: Operation<{
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
       })
     }
 
@@ -1503,7 +1529,7 @@ export const editImage: Operation<{
     return {
       text:
         `Edited image saved as a new asset in project ${input.projectId} ` +
-        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢) via ${editModel}. ` +
+        `for ${fmtCredits(totalCents)} via ${editModel}. ` +
         `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
       images,
       data: {
@@ -1513,7 +1539,7 @@ export const editImage: Operation<{
         sourceAssetId: input.sourceAssetId,
         resolution,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -1748,7 +1774,7 @@ export const generateVideo: Operation<{
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: set true ONLY after the user has explicitly confirmed they hold the rights/consent to this person\'s likeness and it doesn\'t impersonate or misrepresent them. The generation is refused without it. Public figures/celebrities fail on every route.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the >$0.50 cost confirm gate (which fires for almost every video gen since they\'re expensive).'),
+    confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the confirm gate (which fires for almost every video gen since they\'re expensive).'),
   }),
   async run(input, ctx) {
     // Resolve the model FIRST — forgiving normalization (cost keys, alias
@@ -1779,7 +1805,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['projectId'],
         message:
-          'projectId is required for video generation. Use slates_list_projects to find one or slates_create_project to make a new one. Video gens cost $0.50-$2.00+ per call — they need to land in a project so the user sees the progress card and the result.',
+          'projectId is required for video generation. Use slates_list_projects to find one or slates_create_project to make a new one. Video gens cost tens to a few hundred credits per call — they need to land in a project so the user sees the progress card and the result.',
       })
     }
     if (!input.aspectRatio || !input.duration) {
@@ -1890,7 +1916,7 @@ export const generateVideo: Operation<{
           `Available video models: ${registry.models.filter((m) => m.model.startsWith('kling') || m.model.startsWith('veo') || m.model.startsWith('seedance')).map((m) => m.model).slice(0, 20).join(', ')}`
       )
     }
-    const totalCents = entry.cost_cents
+    const totalCents = creditCost(entry)
 
     // Pre-flight confirm gate. Fires when:
     //   (a) cost > $0.50 (the cost gate), OR
@@ -1921,7 +1947,7 @@ export const generateVideo: Operation<{
     }
     const hasReferences = referenceRefs.length > 0
 
-    if ((totalCents > 50 || hasReferences) && !input.confirm) {
+    if ((totalCents > CONFIRM_CREDITS || hasReferences) && !input.confirm) {
       const previews = hasReferences ? await previewAssets(ctx, referenceRefs) : []
       const refLines = previews.map((p) => `  - ${p.role}: ${p.ref}`).join('\n')
       const refSummary = hasReferences
@@ -1932,7 +1958,7 @@ export const generateVideo: Operation<{
       return {
         text:
           `Pre-flight for ${input.duration}s ${input.model} (${costKey}): ` +
-          `$${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+          `${fmtCredits(totalCents)}.` +
           refSummary +
           `\n\nWhen ready, re-call slates_generate_video with confirm=true and the (possibly revised) prompt.`,
         images: refImages,
@@ -1941,7 +1967,7 @@ export const generateVideo: Operation<{
           model: input.model,
           variant: costKey,
           estimated_cents: totalCents,
-          estimated_dollars: (totalCents / 100).toFixed(2),
+          estimated_credits: totalCents,
           references: previews.map((p) => ({
             role: p.role,
             ref: p.ref,
@@ -2003,7 +2029,7 @@ export const generateVideo: Operation<{
           variant: costKey,
           projectId: input.projectId,
           cost_cents: totalCents,
-          cost_dollars: (totalCents / 100).toFixed(2),
+          cost_credits: totalCents,
           references: refInputs.map(({ ref, role }) => ({
             role,
             ...(resolvedRefs.get(ref) ?? { id: ref, code: null, label: null }),
@@ -2015,7 +2041,7 @@ export const generateVideo: Operation<{
     return {
       text:
         `Generated ${input.duration}s ${input.model} video into project ${input.projectId} ` +
-        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+        `for ${fmtCredits(totalCents)}. ` +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
         (refEcho ? ` ${refEcho}` : ''),
       data: {
@@ -2025,7 +2051,7 @@ export const generateVideo: Operation<{
         aspectRatio: input.aspectRatio,
         duration: input.duration,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -2071,8 +2097,8 @@ export const generateLipSync: Operation<{
     ttsLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling engine only — TTS language. Default EN.'),
     ttsSpeed: z.number().min(0.5).max(2).optional().describe('Kling engine only — TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
-    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Kling engine, image-source only. avatar-standard ($0.42/5s) for general use. avatar-pro ($0.86/5s) for sharper face fidelity.'),
-    klingProvider: z.enum(['fal', 'kling']).optional().describe('Kling engine only — provider routing. "fal" (default) uses Slates credits. "kling" uses the user\'s own BYOK Kling key if configured.'),
+    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Kling engine, image-source only. avatar-standard (~14 credits/5s) for general use. avatar-pro (~29 credits/5s) for sharper face fidelity.'),
+    klingProvider: z.enum(['fal', 'kling']).optional().describe('Kling engine only — provider routing. Leave unset: all agent generations bill Slates credits (BYOK is retired).'),
     engine: z.enum(['kling', 'seedance-2']).optional().describe('Default kling (cheap utility). seedance-2 = premium single-pass: natural speech generated in the video, voice cloned from a video source, audio included. Credits only.'),
     videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Seedance engine only. Default 1080p.'),
     aspectRatio: z.string().optional().describe('Seedance engine only. Default 16:9.'),
@@ -2082,7 +2108,7 @@ export const generateLipSync: Operation<{
     sourceSeconds: z.number().optional().describe('Seedance engine + sourceType=video: the source clip\'s duration in seconds (from the asset listing). Feeds the vref cost key (input+output billing).'),
     audioSeconds: z.number().optional().describe('Seedance engine + audioMethod=upload: the audio file\'s duration in seconds — sets the output length (4-15s).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 cost confirm gate. Required for avatar-pro.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required for avatar-pro.'),
   }),
   async run(input, ctx) {
     if (input.audioMethod === 'tts' && !input.ttsText) {
@@ -2149,13 +2175,13 @@ export const generateLipSync: Operation<{
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
-    const totalCents = entry.cost_cents
+    const totalCents = creditCost(entry)
 
     // Cost confirm gate. Lip-sync is mechanical — the model re-syncs the
     // user-chosen source to the user-chosen audio. The agent doesn't
     // write a prompt that depends on what the source looks like, so we
     // skip the inline preview and just announce the source code in text.
-    if (totalCents > 50 && !input.confirm) {
+    if (totalCents > CONFIRM_CREDITS && !input.confirm) {
       const sourceRef = await lookupAssetRef(ctx.desktop(), input.sourceAssetId)
       const audioPreview = input.audioMethod === 'tts'
         ? `Audio: TTS — "${(input.ttsText ?? '').slice(0, 120)}"`
@@ -2164,10 +2190,10 @@ export const generateLipSync: Operation<{
         requires_confirm: true,
         variant: costKey,
         estimated_cents: totalCents,
-        estimated_dollars: (totalCents / 100).toFixed(2),
+        estimated_credits: totalCents,
         source_ref: sourceRef,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for ${isSeedance ? `${seedanceDuration}s Seedance` : '5s'} lip-sync (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)} for ${isSeedance ? `${seedanceDuration}s Seedance` : '5s'} lip-sync (${costKey}). ` +
           `Source: ${sourceRef}. ${audioPreview}. ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
@@ -2223,14 +2249,14 @@ export const generateLipSync: Operation<{
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
       })
     }
 
     return {
       text:
         `Generated ${isSeedance ? `${seedanceDuration}s` : '5s'} lip-sync (${costKey}) into project ${input.projectId} ` +
-        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢). ` +
+        `for ${fmtCredits(totalCents)}. ` +
         (input.audioMethod === 'tts'
           ? `Spoken: "${(input.ttsText ?? '').slice(0, 60)}${(input.ttsText ?? '').length > 60 ? '...' : ''}"`
           : `Audio: ${input.audioFilePath}`),
@@ -2240,7 +2266,7 @@ export const generateLipSync: Operation<{
         sourceType: input.sourceType,
         sourceAssetId: input.sourceAssetId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -2275,7 +2301,7 @@ export const generateMotionTransfer: Operation<{
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
     sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Seedance engine: 2-15s clips only.'),
     targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project.'),
-    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro', 'seedance-2']).optional().describe('kling-mc-std ($0.95) general motion; kling-mc-pro ($1.26) cleaner anatomy — default. seedance-2 = premium single-pass lane (prompt-driven, native audio, input+output-second billing) — pick when motion fidelity or audio matters.'),
+    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro', 'seedance-2']).optional().describe('kling-mc-std (~32 credits) general motion; kling-mc-pro (~42 credits) cleaner anatomy — default. seedance-2 = premium single-pass lane (prompt-driven, native audio, input+output-second billing) — pick when motion fidelity or audio matters.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('Kling only. "video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Kling: optional refinement. Seedance: THE driver — describe what the character does with the motion from the clip (ordinal references: "the character from image 1 performs the motion from video 1"). A sensible default recipe is used if omitted. Read slates-prompting-motion-transfer.'),
     klingProvider: z.enum(['fal', 'kling']).optional().describe('Kling engine only — provider routing. "fal" (default) uses Slates credits.'),
@@ -2287,7 +2313,7 @@ export const generateMotionTransfer: Operation<{
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace — set true only after the user explicitly confirms they hold rights/consent to the likeness.'),
     sourceVideoSeconds: z.number().optional().describe('Seedance engine: the driving clip\'s duration in seconds (from the asset listing, 2-15s). Feeds the vref cost key (input+output billing).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the >$0.50 confirm gate. Required — both tiers exceed.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required — both tiers exceed.'),
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
@@ -2328,13 +2354,13 @@ export const generateMotionTransfer: Operation<{
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
-    const totalCents = entry.cost_cents
+    const totalCents = creditCost(entry)
 
     // Cost confirm gate. Motion transfer is mechanical — the model
     // applies source motion to target image deterministically. We don't
     // burn tokens previewing assets the user already chose; codes in the
     // text are enough to keep the chat unambiguous.
-    if (totalCents > 50 && !input.confirm) {
+    if (totalCents > CONFIRM_CREDITS && !input.confirm) {
       const desktop = ctx.desktop()
       const [source, target] = await Promise.all([
         lookupAssetRef(desktop, input.sourceVideoAssetId),
@@ -2344,13 +2370,13 @@ export const generateMotionTransfer: Operation<{
         requires_confirm: true,
         variant: costKey,
         estimated_cents: totalCents,
-        estimated_dollars: (totalCents / 100).toFixed(2),
+        estimated_credits: totalCents,
         source_ref: source,
         target_ref: target,
         message:
-          `Cost: $${(totalCents / 100).toFixed(2)} for ${isSeedance ? `${seedanceDuration}s Seedance motion transfer` : `5s ${motionModel}`} (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)} for ${isSeedance ? `${seedanceDuration}s Seedance motion transfer` : `5s ${motionModel}`} (${costKey}). ` +
           `Transferring motion from ${source} onto ${target}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend${isSeedance ? '' : ', or pick kling-mc-std to save $0.31'}. ` +
+          `Re-call with confirm=true after the user explicitly OKs the spend${isSeedance ? '' : ', or pick kling-mc-std to save ~10 credits'}. ` +
           `When discussing with the user, refer to the assets by those codes — they'll match the gallery badges.`,
       })
     }
@@ -2402,14 +2428,14 @@ export const generateMotionTransfer: Operation<{
         sourceVideoAssetId: input.sourceVideoAssetId,
         targetImageAssetId: input.targetImageAssetId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
       })
     }
 
     return {
       text:
         `Generated ${isSeedance ? `${seedanceDuration}s` : '5s'} motion transfer (${motionModel}) into project ${input.projectId} ` +
-        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢).` +
+        `for ${fmtCredits(totalCents)}.` +
         (input.prompt ? ` Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` : ''),
       data: {
         variant: costKey,
@@ -2418,7 +2444,7 @@ export const generateMotionTransfer: Operation<{
         sourceVideoAssetId: input.sourceVideoAssetId,
         targetImageAssetId: input.targetImageAssetId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -2503,11 +2529,11 @@ export const editVideo: Operation<{
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
-    const totalCents = entry.cost_cents
+    const totalCents = creditCost(entry)
 
     // Confirm gate — look-first: preview the source clip + refs so the LLM
     // sees what it's editing before committing spend (mirrors generateVideo).
-    if ((totalCents > 50 || refInputs.length > 1) && !input.confirm) {
+    if ((totalCents > CONFIRM_CREDITS || refInputs.length > 1) && !input.confirm) {
       const previews = await previewAssets(ctx, [
         { id: sourceId, type: 'video' as const, role: 'source clip' },
         ...characterAssetIds.map((id) => ({ id, type: 'image' as const, role: 'subject element' })),
@@ -2515,7 +2541,7 @@ export const editVideo: Operation<{
       ])
       return {
         text:
-          `Cost: $${(totalCents / 100).toFixed(2)} (${totalCents}¢) to edit a ${billedSeconds}s clip with ${model} (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)} to edit a ${billedSeconds}s clip with ${model} (${costKey}). ` +
           `${refEcho} Re-call with confirm=true after the user explicitly OKs the spend.`,
         images: previews.flatMap((p) => p.images),
         data: {
@@ -2525,7 +2551,7 @@ export const editVideo: Operation<{
           billed_seconds: billedSeconds,
           clip_seconds: clipSeconds,
           estimated_cents: totalCents,
-          estimated_dollars: (totalCents / 100).toFixed(2),
+          estimated_credits: totalCents,
           references: previews.map((p) => ({ ref: p.ref, role: p.role, ...p.meta })),
         },
       }
@@ -2556,14 +2582,14 @@ export const editVideo: Operation<{
         projectId: input.projectId,
         sourceVideoAssetId: sourceId,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
       }, refEcho)
     }
 
     return {
       text:
         `Edited ${billedSeconds}s clip saved as a new asset in project ${input.projectId} ` +
-        `for $${(totalCents / 100).toFixed(2)} (${totalCents}¢) via ${model}. ` +
+        `for ${fmtCredits(totalCents)} via ${model}. ` +
         `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
         (refEcho ? ` ${refEcho}` : ''),
       data: {
@@ -2573,7 +2599,7 @@ export const editVideo: Operation<{
         sourceVideoAssetId: sourceId,
         billed_seconds: billedSeconds,
         cost_cents: totalCents,
-        cost_dollars: (totalCents / 100).toFixed(2),
+        cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -2619,7 +2645,7 @@ export const getGenerationStatus: Operation<{ generationId: string; waitSeconds?
         // agent acts on, with the EXACT billed cost front and center.
         return ok({
           status,
-          cost_cents: g.cost ?? null,
+          cost_credits: g.cost != null ? creditsFromDollars(g.cost as number) : null,
           error: g.error ?? null,
           model: g.model,
           completed_at: g.completedAt ?? null,

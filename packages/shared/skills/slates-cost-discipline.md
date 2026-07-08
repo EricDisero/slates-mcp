@@ -1,6 +1,6 @@
 ---
 name: slates-cost-discipline
-description: Mandatory pre-flight discipline before ANY generation call (image or video) — estimate cost, announce in dollars, get confirmation, aggregate batches. Read this every time before calling slates_generate_image or any future slates_generate_* op. Skipping this risks burning the user's credits on guesses.
+description: Mandatory pre-flight discipline before ANY generation call (image or video) — estimate cost, announce in credits, get confirmation, aggregate batches. Read this every time before calling slates_generate_image or any future slates_generate_* op. Skipping this risks burning the user's credits on guesses.
 ---
 
 # Slates cost discipline — read before every generation
@@ -20,23 +20,25 @@ Before ANY `slates_generate_*` call, run `slates_estimate_generation_cost` first
 
 If aspect ratio or resolution isn't obvious from the user's request, **ask before estimating**. Don't guess.
 
-### 2. Announce in dollars, plainly, before spending
+### 2. Announce in credits, plainly, before spending
 
-Format: `About to spend $X.XX on N image(s) at [resolution] [aspect ratio]. Proceed?`
+Slates bills abstract **credits** (they never expire). Announce the credit total the estimate returns — never dollars.
+
+Format: `About to spend N credits on M image(s) at [resolution] [aspect ratio]. Proceed?`
 
 Examples:
-- `About to spend $0.10 on 1 image at 1k 16:9. Proceed?`
-- `About to spend $0.40 on 4 images at 2k 9:16 (variants). Proceed?`
+- `About to spend 4 credits on 1 image at 1k 16:9. Proceed?`
+- `About to spend 24 credits on 4 images at 2k 9:16 (variants). Proceed?`
 
-Below ~$0.20 you can proceed silently after announcing once. Above $0.20 wait for explicit confirmation. Above $0.50 the server itself will gate with `requires_confirm` — pass `confirm: true` only after the user explicitly OKs.
+Below ~7 credits you can proceed silently after announcing once. Above ~7 credits wait for explicit confirmation. Above ~17 credits the server itself will gate with `requires_confirm` — pass `confirm: true` only after the user explicitly OKs.
 
 ### 3. Aggregate batches into ONE upfront announcement
 
-If you're planning a multi-call workflow (5 storyboard frames, 3 character variants, a grid of options), **announce the total before the first call**, not five $0.10 announcements after the fact.
+If you're planning a multi-call workflow (5 storyboard frames, 3 character variants, a grid of options), **announce the total before the first call**, not five small announcements after the fact.
 
-Format: `Plan: N generations totaling $X.XX. [Brief description of the sequence.] Proceed with the batch?`
+Format: `Plan: N generations totaling C credits. [Brief description of the sequence.] Proceed with the batch?`
 
-Example: `Plan: 6 frame generations at 1k 16:9 totaling $0.60 — establishing wide, push-in, two-shot, reverse, OTS, insert. Proceed?`
+Example: `Plan: 6 frame generations at 1k 16:9 totaling 24 credits — establishing wide, push-in, two-shot, reverse, OTS, insert. Proceed?`
 
 ### 3b. Batch authorization — one approval covers the enumerated batch
 
@@ -52,7 +54,7 @@ One approval = that plan, as enumerated, at those prices. Nothing else.
 
 ### 4. Track the running total
 
-After each generation completes, the response includes `cost_cents` (when available). Keep a running tally in your context. Surface it every 3 generations or whenever the user asks "how much have we spent?"
+After each generation completes, the response includes `cost_credits` (when available). Keep a running tally in your context. Surface it every 3 generations or whenever the user asks "how much have we spent?"
 
 ## Resolution decision rules
 
@@ -83,7 +85,7 @@ If the user prompt mixes signals (e.g. "cinematic Instagram post"), ask. Don't g
 
 ## When the gate fires
 
-The server returns `requires_clarification` when aspect ratio or resolution is missing. The server returns `requires_confirm` when total spend exceeds $0.50. In both cases:
+The server returns `requires_clarification` when aspect ratio or resolution is missing. The server returns `requires_confirm` when total spend exceeds ~17 credits. In both cases:
 
 1. Surface the gate response to the user
 2. Get a clean answer

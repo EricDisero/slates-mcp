@@ -85,6 +85,11 @@ export class SlatesCloudClient {
   }
 }
 
+// UNITS (2026-07-07 re-denomination): every credit_balance* / cost_* field is
+// CREDITS now. The `_cents` field names are legacy aliases the API keeps for
+// wire compatibility with shipped clients — they carry the same credit value,
+// NOT cents. `_dollars` / `credit_markup` were dropped from the API response;
+// kept optional here only so an old deployment still type-checks.
 export interface SlatesUserInfo {
   success: boolean
   user: {
@@ -93,24 +98,24 @@ export interface SlatesUserInfo {
     name: string
     license_status: string
     tier: string
-    credit_balance_cents: number
-    credit_balance_dollars: string
+    credit_balance?: number       // CREDITS
+    credit_balance_cents?: number // legacy alias = CREDITS
   }
   scopes: string[]
 }
 
 export interface CreditsBalance {
   success: boolean
-  credit_balance_cents: number
-  credit_balance_dollars: string
+  credit_balance?: number         // CREDITS
+  credit_balance_cents?: number   // legacy alias = CREDITS
 }
 
 export interface ModelRegistryResponse {
   success: boolean
-  credit_markup: number
+  credit_markup?: number          // dropped post-cutover (optional for back-compat)
   models: Array<{
     model: string
-    cost_cents: number
-    cost_dollars: string
+    cost_credits?: number         // CREDITS
+    cost_cents?: number           // legacy alias = CREDITS
   }>
 }

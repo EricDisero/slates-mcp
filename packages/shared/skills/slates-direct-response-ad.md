@@ -10,7 +10,7 @@ You are building a 30-second hyper-motion direct-response ad. The user has hande
 **Hard rules**
 
 - Always estimate cost before generating. Use `slates_estimate_generation_cost` and surface the total.
-- All MCP/CLI generation routes through Slates Credits, period. BYOK is desktop-UI only by design — don't suggest "use your own keys" workarounds.
+- All Slates generation routes through Slates Credits, period (BYOK is retired) — don't suggest "use your own keys" workarounds.
 - Default model: `nano-banana-2-2k`. For close-up product hero frames step up to `4k` only if the user asks.
 - Hyper-motion = punchy cuts, 4 frames in 30 seconds, ~7s each. Don't over-storyboard.
 
@@ -58,7 +58,7 @@ For each frame:
 
 - **Don't** generate text overlays in the image. Slates renders captions/CTAs at the editor stage.
 - **Don't** burn credits on slot-machine prompting. If the first generation is off, refine the prompt; don't just regenerate.
-- **Don't** skip the cost estimate. Confirm with the user above $0.50.
+- **Don't** skip the cost estimate. Confirm with the user above ~17 credits.
 - **Don't** invent visual specifics about the product (colors, textures, angles) that aren't in the reference image. Reference-anchored prompts only.
 
 ## Voice
