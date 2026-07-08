@@ -74,7 +74,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     maxRefImages: null,
     maxIngredients: 9, // ingredient images per video gen
-    notes: 'PREMIUM video tier — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). Up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K. Also the PREMIUM engine inside the Motion Transfer and Lip Sync tools (single-pass: driving video / dialogue are native conditioning signals — better motion fidelity, natural speech, voice cloned from a video source; video references bill input+output seconds).',
+    notes: 'PREMIUM video tier — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). Up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K, but 4K VIDEO is a Pro-only tier gate (base maxes at 1080p; server returns PRO_REQUIRED) — default 1080p unless the user is on Pro. Also the PREMIUM engine inside the Motion Transfer and Lip Sync tools (single-pass: driving video / dialogue are native conditioning signals — better motion fidelity, natural speech, voice cloned from a video source; video references bill input+output seconds).',
   },
   {
     id: 'kling-v3',

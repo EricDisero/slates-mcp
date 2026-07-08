@@ -5,7 +5,7 @@ description: How to prompt Seedance 2.0 (ByteDance video model). Read before cal
 
 # Seedance 2.0 — prompting
 
-ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K, default 1080p), 4–15s, first+last frame + up to 9 reference images.
+ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame + up to 9 reference images.
 
 ## Official 6-step formula
 

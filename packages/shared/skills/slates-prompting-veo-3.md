@@ -5,7 +5,7 @@ description: How to prompt Veo 3.1 (Google). Read before calling slates_generate
 
 # Veo 3.1 — prompting
 
-Google DeepMind's video model. Two tiers: `veo-3.1-fast` (cheaper, quick) and `veo-3.1-standard` (higher quality). 4k variants exist for both.
+Google DeepMind's video model. Two tiers: `veo-3.1-fast` (cheaper, quick) and `veo-3.1-standard` (higher quality). 4k variants exist for both (4K video requires Slates Pro).
 
 **Native single-shot duration: 4, 6, or 8 seconds.** Longer durations require chaining clips via Extend / last-frame reuse — quality degrades if naively requested past 8s in a single generation. Aspect ratio: **16:9 only** — `slates_generate_video` locks Veo to 16:9; anything else is ignored or fails. For 9:16 vertical, use Kling or Seedance instead.
 

@@ -68,6 +68,8 @@ After each generation completes, the response includes `cost_credits` (when avai
 
 Resolution is a price lever, not a free choice: on Nano Banana 2 and FLUX.2 Max, 4k costs roughly 2x 1k (Seedream 5 Lite is flat-priced regardless of resolution). Prices change — call `slates_estimate_generation_cost` or `slates_list_available_models` for current numbers instead of assuming. Pick the cheapest resolution that serves the use case.
 
+**4K VIDEO is Pro-only (2026-07-07).** The ladder above is for IMAGES (open at every tier). For VIDEO — Kling, Seedance, Veo — 4K requires a Slates Pro account; a base-tier 4K video gen is rejected server-side with `PRO_REQUIRED`. Default video to 1080p or lower and only reach for 4K when the user is on Pro and explicitly asks. 4K *images* are never gated.
+
 ## Aspect ratio decision rules
 
 Ask the user when ambiguous. Otherwise:
