@@ -54,10 +54,23 @@ Never write romantic, sexual, or suggestive content involving or directed at min
 
 If a box fails, apply the substitution table before writing the prompt.
 
-## Editing real footage (Kling O3 edit) — real people in the SOURCE
+## Editing real footage (Kling O3 edit / Omni Flash edit) — real people in the SOURCE
 
 Video edit takes the user's own footage, which often contains real people. Rules:
 
 - The user must hold rights/consent for any real person's likeness in footage they edit — ask once when it's clearly someone other than the user, then proceed.
 - Kling's video-to-video filter behavior on real faces is **not yet verified** (unlike Seedance, where the consent-gated real-face route is confirmed). If an edit of real-person footage is rejected by the provider, do NOT retry-spam variations — tell the user the filter blocked it and offer a no-face crop/segment or an AI-character swap instead.
+- **Omni Flash: own-footage editing of the uploader's own face PASSED live 2026-07-09** (real talking-head clip, edited on our fal route) despite Google's documented "recognizable people" restriction — treat that restriction as aimed at third-party/public figures, but expect probabilistic refusals and never promise passage.
 - Never use edit to put a real, named public figure into a scene, or to make someone appear to say/do something they didn't. Faceless b-roll (hands, products, landscapes, crowds-from-behind) edits freely.
+
+## Gemini / Omni Flash filter regime (video gen + edit) — receipts 2026-07-09
+
+Google's filter is its own regime (stricter than fal-hosted Kling about harm-to-a-person, looser than BytePlus about faces). Live receipts:
+
+| Blocked (`content_policy_violation`) | Passed |
+|---|---|
+| "his fingertips **ignite** with a small real flame" (fire ON a body part = harm) | "small **magical** flames appear on his fingertips … vanish when he blows on them" |
+
+- **Harm-to-person framing is the tripwire**, not the effect itself. Reframe body-contact effects as magical / supernatural / harmless VFX: "magical flames", "a glowing aura", "sparks of light dance on". Avoid ignite / burn / on fire / catch fire applied to a person.
+- **Never use a real object as a metaphor** — "candle-like flame" rendered a literal candle in the subject's hand. Describe the effect, not an object that resembles it.
+- The block is a 422 refund (no credits lost) and arrives mid-generation — one reframe per the substitution mindset above, don't retry-spam.

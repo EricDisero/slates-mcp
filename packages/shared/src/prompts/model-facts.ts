@@ -91,7 +91,7 @@ export const MODEL_FACTS: ModelFact[] = [
     maxRefImages: null,
     maxIngredients: 4, // combined subject elements + style refs per edit
     notes:
-      'VIDEO-TO-VIDEO EDIT (default edit tool) — takes an EXISTING 3–15s clip and changes only what the prompt names: character swap, environment change, style transfer. Original motion/camera/audio preserved. One pass, no masking. Use to FIX a 90%-right clip instead of re-rolling it, or to AI-edit the user\'s own footage. Elements (@ElementN = frontal + angles) lock subject identity; max 4 combined refs. Billed per second of output (≈ clip length, rounded up). Seedance edit/relocate is the alternative for style-transfer-heavy jobs.',
+      'VIDEO-TO-VIDEO EDIT — the REF-DRIVEN edit tool: takes an EXISTING 3–15s clip and changes what the prompt names, with element/style reference images (@ElementN = frontal + angles) locking subject identity; max 4 combined refs. keep_audio preserves the ORIGINAL audio verbatim (spoken words cannot drift) — but video lips can drift slightly against it, and multi-beat instructions get under-executed (7/09 receipt: missed a second action beat Omni Flash edit landed) — ONE beat per pass. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the 7/09 fidelity head-to-head. Billed per second of output (≈ clip length, rounded up). Seedance edit/relocate is the alternative for style-transfer-heavy jobs.',
   },
   {
     id: 'veo-3.1',
@@ -100,6 +100,24 @@ export const MODEL_FACTS: ModelFact[] = [
     maxRefImages: null,
     maxIngredients: 3,
     notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one gen. 16:9 only, 4/6/8s only. Otherwise Kling (default) or Seedance (physics/premium) win.',
+  },
+  {
+    id: 'omni-flash',
+    label: 'Gemini Omni Flash',
+    kind: 'video',
+    maxRefImages: null,
+    maxIngredients: 7, // ref2v image_urls; 7 mirrors Google's own reference limit
+    notes:
+      'CHEAP 720p tier with native synced audio included — t2v, single-start-frame i2v, or reference-to-video with up to 7 reference images. 3-10s, 16:9/9:16 only. No last frame, no video/audio references. VIDEO-ONLY. New seat: quality vs Kling/Seedance unproven pending comparison gens — do not route hero shots here; use it for cheap drafts, audio-in-one-gen at low cost, ref2v character consistency trials, and its edit variant.',
+  },
+  {
+    id: 'omni-flash-edit',
+    label: 'Omni Flash Edit',
+    kind: 'video',
+    maxRefImages: null,
+    maxIngredients: 0, // prompt + source clip ONLY — no element/style refs on this endpoint
+    notes:
+      'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (7/09 head-to-head vs Kling edit on real talking footage: lips held perfectly, audio near-identical, both action beats landed). Takes an EXISTING 3-10s clip and changes what the prompt names, footage-synced (prop/effect/environment/lighting swaps). Fidelity is EARNED by prompt discipline: ONE short instruction + "Keep everything else the same." — long descriptive prompts DESTROY it (Google-documented + 7/09 receipt). Never name objects as metaphors ("candle-like" → literal candle). Quirk: occasional tail jitter/doubled last speech beat — trim the tail. NO reference images (identity swaps needing refs → Kling edit); bit-exact audio needs → Kling keep_audio or segment-splice. 720p output, cheapest edit seat (~2/3 of Kling edit Std).',
   },
 ]
 

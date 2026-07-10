@@ -572,15 +572,20 @@ export const uploadReferenceImage: Operation<{
   projectId: string
   filePath?: string
   dataUrl?: string
+  type?: 'image' | 'video'
 }> = {
   id: 'slates_upload_reference_image',
   description:
-    'Add a reference image to a Slates project. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one.',
+    'Add a reference image OR video clip to a Slates project. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" on a filePath import to bring in a clip (the user\'s own footage to edit/relocate/trim); imported videos are probed on ingest, so duration + dimensions are available immediately. Default type is "image". dataUrl is image-only.',
   input: z
     .object({
       projectId: z.string().uuid(),
       filePath: z.string().optional(),
       dataUrl: z.string().optional(),
+      type: z
+        .enum(['image', 'video'])
+        .optional()
+        .describe('Asset kind for a filePath import — "image" (default) or "video". A dataUrl is always an image.'),
     })
     .refine((d) => !!d.filePath !== !!d.dataUrl, {
       message: 'Pass exactly one of filePath or dataUrl',
@@ -591,9 +596,12 @@ export const uploadReferenceImage: Operation<{
       const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload', {
         projectId: input.projectId,
         filePath: input.filePath,
-        type: 'image',
+        type: input.type ?? 'image',
       })
       return ok(r)
+    }
+    if (input.type === 'video') {
+      throw new Error('dataUrl uploads are image-only — pass a filePath to import a video clip.')
     }
     const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload-base64', {
       projectId: input.projectId,
@@ -1559,6 +1567,7 @@ export const VIDEO_MODELS = [
   'veo-3.1-fast',
   'veo-3.1-standard',
   'seedance-2',
+  'omni-flash',
 ] as const
 
 type VideoModel = (typeof VIDEO_MODELS)[number]
@@ -1632,6 +1641,11 @@ export function videoCostKey(input: {
     }
     return `${tier}-${input.duration}s${input.sound === true ? '-audio' : ''}`
   }
+  if (input.model === 'omni-flash') {
+    // Mirrors omniFlashCreditKey() in slate/src/shared/pricing.ts — flat 720p
+    // rate, audio native + included, no resolution/audio key dimension.
+    return `omni-flash-${input.duration}s`
+  }
   throw new Error(`Unknown video model: ${input.model}`)
 }
 
@@ -1645,6 +1659,13 @@ export function klingEditCostKey(
 ): string {
   const tier = model === 'kling-v3.0-omni-pro-edit' ? 'kling-v3-omni-pro-edit' : 'kling-v3-omni-edit'
   return `${tier}-${duration}s`
+}
+
+// Omni Flash video-edit cost key — mirrors omniFlashCreditKey() in
+// slate/src/shared/pricing.ts (must byte-match; checked by the slates-api
+// pricing-consistency script). Duration is the CEILED source-clip length.
+export function omniFlashEditCostKey(duration: number): string {
+  return `omni-flash-edit-${duration}s`
 }
 
 /**
@@ -1700,6 +1721,9 @@ function resolveVideoModel(raw: string): {
     seedance: 'seedance-2',
     'veo-3.1': 'veo-3.1-fast',
     'veo-3': 'veo-3.1-fast',
+    'gemini-omni-flash': 'omni-flash',
+    'gemini-omni-flash-preview': 'omni-flash',
+    'omni-flash-preview': 'omni-flash',
   }
   if (aliases[s]) {
     out!.model = aliases[s]
@@ -1716,6 +1740,7 @@ function promptingSkillFor(model: string): string {
   if (model.startsWith('kling')) return 'slates-prompting-kling-v3'
   if (model.startsWith('veo')) return 'slates-prompting-veo-3'
   if (model.startsWith('seedance')) return 'slates-prompting-seedance'
+  if (model.startsWith('omni-flash')) return 'slates-prompting-omni-flash'
   return 'slates-cost-discipline'
 }
 
@@ -1752,14 +1777,14 @@ export const generateVideo: Operation<{
     'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default. All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
+    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard | omni-flash. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default, omni-flash = cheap 720p tier with audio included (3-10s, 16:9/9:16; t2v, single-start-frame i2v, or up to 7 reference images; no last frame / video / audio refs). All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
-    duration: z.number().int().min(4).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Default 5 if omitted but always be explicit (cost scales linearly).'),
+    duration: z.number().int().min(3).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Omni Flash: 3-10. Default 5 if omitted but always be explicit (cost scales linearly).'),
     videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive). Veo: 720p/1080p same price, 4K more (8s only).'),
     firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video: asset UUID or badge code ("IMG-A8") — codes resolve against the project at call time, so a code the user just spoke is always safe to pass.'),
     lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
-    ingredientAssetIds: z.array(z.string()).max(9).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni or Seedance. Up to 9 (Seedance) or 4 (Kling).'),
+    ingredientAssetIds: z.array(z.string()).max(9).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni, Seedance, or Omni Flash. Up to 9 (Seedance), 4 (Kling), or 7 (Omni Flash, combined across all ref params).'),
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
     environmentAssetIds: z.array(z.string()).optional().describe('Environment grid assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
     styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
@@ -1818,9 +1843,43 @@ export const generateVideo: Operation<{
         message:
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-cost-discipline + ${promptingSkillFor(input.model)} skills, ` +
-          `or ask the user. Veo locks to 16:9. Kling/Seedance support 1:1 16:9 9:16 4:3 3:4 21:9. ` +
-          `Duration: Kling 5-15s, Veo 4/6/8s (4K only at 8s), Seedance 4-15s. Cost scales linearly with duration.`,
+          `or ask the user. Veo locks to 16:9. Kling/Seedance support 1:1 16:9 9:16 4:3 3:4 21:9. Omni Flash: 16:9/9:16 only. ` +
+          `Duration: Kling 5-15s, Veo 4/6/8s (4K only at 8s), Seedance 4-15s, Omni Flash 3-10s. Cost scales linearly with duration.`,
       })
+    }
+
+    // Omni Flash: 3-10s, 720p only — t2v, single-start-frame i2v, or ref2v
+    // with up to 7 reference IMAGES. No last frame, no video/audio refs.
+    // Validate up front so the agent gets an actionable message instead of
+    // a registry throw.
+    if (input.model === 'omni-flash') {
+      if (input.duration < 3 || input.duration > 10) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message: `Omni Flash supports 3-10 seconds (you passed ${input.duration}s). Pick a duration in that range.`,
+        })
+      }
+      if (input.lastFrameAssetId || input.videoReferenceAssetId || input.audioReferenceAssetId) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message:
+            'Omni Flash takes a prompt, an optional start frame, and up to 7 reference IMAGES — last frames and video/audio references are not supported. Drop those, or switch to seedance-2 (video/audio refs, last frame) or veo (last frame).',
+        })
+      }
+      const refCount =
+        (input.ingredientAssetIds?.length ?? 0) +
+        (input.characterAssetIds?.length ?? 0) +
+        (input.environmentAssetIds?.length ?? 0) +
+        (input.styleAssetIds?.length ?? 0)
+      if (refCount > 7) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `Omni Flash takes at most 7 reference images combined (you passed ${refCount}). Trim the list.`,
+        })
+      }
     }
 
     // Veo exists only at discrete durations 4/6/8s, and 4K only at 8s.
@@ -1913,7 +1972,7 @@ export const generateVideo: Operation<{
     if (!entry) {
       throw new Error(
         `Model variant not in registry: ${costKey}. ` +
-          `Available video models: ${registry.models.filter((m) => m.model.startsWith('kling') || m.model.startsWith('veo') || m.model.startsWith('seedance')).map((m) => m.model).slice(0, 20).join(', ')}`
+          `Available video models: ${registry.models.filter((m) => m.model.startsWith('kling') || m.model.startsWith('veo') || m.model.startsWith('seedance') || m.model.startsWith('omni-flash')).map((m) => m.model).slice(0, 20).join(', ')}`
       )
     }
     const totalCents = creditCost(entry)
@@ -2458,7 +2517,7 @@ export const editVideo: Operation<{
   projectId: string
   sourceVideoAssetId: string
   prompt: string
-  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit'
+  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit' | 'omni-flash-edit'
   characterAssetIds?: string[]
   styleAssetIds?: string[]
   keepAudio?: boolean
@@ -2467,15 +2526,15 @@ export const editVideo: Operation<{
 }> = {
   id: 'slates_edit_video',
   description:
-    'Edit an EXISTING video clip with one instruction via Kling O3 video-to-video edit — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Source clip constraints: 3–15s, 720–3840px, MP4/MOV. Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit.',
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements) or omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
-    sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. 3–15s clips only.'),
-    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation.'),
-    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters.'),
-    characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN).'),
-    styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds.'),
-    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true).'),
+    sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
+    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
+    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit', 'omni-flash-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s, 720p, 3–10s) for prompt-only edits — it takes NO character/style refs.'),
+    characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN). KLING MODELS ONLY — rejected on omni-flash-edit.'),
+    styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
+    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit output carries its own audio).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
   }),
@@ -2486,6 +2545,15 @@ export const editVideo: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     const model = input.model ?? 'kling-v3.0-omni-edit'
+    const isOmniFlashEdit = model === 'omni-flash-edit'
+    // Kling edit: 3–15s source clips; Omni Flash edit: 3–10s.
+    const maxClipSeconds = isOmniFlashEdit ? 10 : 15
+
+    if (isOmniFlashEdit && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
+      throw new Error(
+        'omni-flash-edit is prompt-only — it takes no character/style reference images. Drop the refs, or switch to kling-v3.0-omni-edit which supports elements.'
+      )
+    }
 
     // Resolve refs (UUIDs or badge codes) against the project AT CALL TIME.
     const refInputs = [
@@ -2517,13 +2585,14 @@ export const editVideo: Operation<{
     if (!Number.isFinite(clipSeconds) || clipSeconds <= 0) {
       throw new Error('Source clip has no recorded duration — cannot quote the edit. Re-import the clip or pick another.')
     }
-    if (clipSeconds > 15.05 || clipSeconds < 2.95) {
+    if (clipSeconds > maxClipSeconds + 0.05 || clipSeconds < 2.95) {
       throw new Error(
-        `Source clip is ${clipSeconds.toFixed(1)}s — Kling O3 edit accepts 3–15s. Trim it first (agents can pre-trim on the timeline).`
+        `Source clip is ${clipSeconds.toFixed(1)}s — ${model} accepts 3–${maxClipSeconds}s. ` +
+          `Trim it first with slates_trim_video (e.g. inSec 0, outSec ${maxClipSeconds}), then edit the trimmed clip.`
       )
     }
-    const billedSeconds = Math.min(15, Math.max(3, Math.ceil(clipSeconds - 0.05)))
-    const costKey = klingEditCostKey(model, billedSeconds)
+    const billedSeconds = Math.min(maxClipSeconds, Math.max(3, Math.ceil(clipSeconds - 0.05)))
+    const costKey = isOmniFlashEdit ? omniFlashEditCostKey(billedSeconds) : klingEditCostKey(model, billedSeconds)
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
@@ -2603,6 +2672,50 @@ export const editVideo: Operation<{
         asset: result.asset,
         generationId: result.generationId,
       },
+    }
+  },
+}
+
+// ── Trim a video to an exact window (fit-to-model primitive) ────
+
+export const trimVideo: Operation<{
+  projectId: string
+  assetId: string
+  inSec?: number
+  outSec: number
+}> = {
+  id: 'slates_trim_video',
+  description:
+    'Trim a video asset to an exact [inSec, outSec] window and save the result as a NEW clip linked to the original (the original is untouched). This is the fit-to-model primitive: an 11s clip will not run on omni-flash-edit (3–10s) or Kling edit (3–15s), and a Seedance video reference must be 2–15s — trim it first, then edit/relocate the trimmed clip. EXACT re-encode (not a keyframe-snapped cut) so the result honors hard duration caps to the frame; any phone rotation flag is baked into the pixels in the same pass. The new clip lands with correct duration/width/height immediately. inSec defaults to 0.',
+  input: z.object({
+    projectId: z.string().uuid().describe('Project the clip lives in.'),
+    assetId: z
+      .string()
+      .describe('The VIDEO asset to trim — UUID or badge code ("VID-V3", bare "V3"); resolves against the project at call time.'),
+    inSec: z.number().min(0).optional().describe('Trim start in seconds (default 0).'),
+    outSec: z.number().positive().describe('Trim end in seconds. Must be greater than inSec.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    const resolved = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    const assetId = resolved.get(input.assetId)?.id ?? input.assetId
+    const inSec = input.inSec ?? 0
+    if (input.outSec - inSec < 0.05) {
+      throw new Error('outSec must be at least ~0.1s after inSec.')
+    }
+    const r = await desktop.post<{ asset?: Record<string, unknown> }>('/agent/assets/trim-video', {
+      assetId,
+      inSec,
+      outSec: input.outSec,
+    })
+    const a = r.asset as { id?: string; code?: string | null; label?: string | null } | undefined
+    const name = a?.code ?? a?.id ?? 'new clip'
+    return {
+      text:
+        `Trimmed clip saved as ${name}${a?.label ? ` — ${a.label}` : ''} ` +
+        `(${(input.outSec - inSec).toFixed(1)}s, ${inSec.toFixed(1)}–${input.outSec.toFixed(1)}s). ` +
+        `Edit or generate from it by its new id/code.`,
+      data: { asset: r.asset },
     }
   },
 }
@@ -3292,6 +3405,7 @@ function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('veo')) return 'slates-prompting-veo-3'
+  if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return 'slates-prompting-kling-v3'
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
@@ -3379,6 +3493,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   generateLipSync as unknown as Operation<unknown>,
   generateMotionTransfer as unknown as Operation<unknown>,
   editVideo as unknown as Operation<unknown>,
+  trimVideo as unknown as Operation<unknown>,
   editImage as unknown as Operation<unknown>,
   getGenerationStatus as unknown as Operation<unknown>,
   listGenerations as unknown as Operation<unknown>,

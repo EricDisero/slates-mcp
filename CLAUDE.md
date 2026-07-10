@@ -59,6 +59,8 @@ If the op needs new desktop endpoints, add the route in `slate/src/main/agent/ro
 
 ## Adding a new skill
 
+**⚠️ The bundled skills here are FREE product quality — they are NOT the paid "Agentic Skills Pack" ($29 funnel order bump).** The free/paid line is locked (Eric, 2026-07-09): *capability free, outcomes paid.* Everything in `packages/shared/skills/` ships free to every user (CLI `install-skills`, MCP prompting-guide op, desktop Studio Agent) — never gate any of it behind the bump. The paid pack's content is **campaign blueprints harvested from our real ads** (exact prompt stacks, shot lists, workflow runs per ad, replayable as "make this for my product") plus any pack-exclusive skills built specifically for the bump — those live in the pack zip only, never in this folder. Doctrine: `second-brain/business/projects/slates/strategy/funnel-architecture.md` → "Pack content doctrine". The currently-shipped pack zip is a placeholder built from these free skills until blueprints exist.
+
 1. Drop a markdown file with frontmatter into `packages/shared/skills/`.
 2. Frontmatter must include `name:` and `description:` for skill discovery.
 3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
