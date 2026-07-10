@@ -8,3 +8,6 @@ export { ALL_OPERATIONS, VIDEO_MODELS, defaultContext, type Operation, type Oper
 // prompt derives its MODEL ROUTING doctrine from (kind: image vs video,
 // default/premium/niche notes). Edit model-facts.ts, never prose copies.
 export { MODEL_FACTS, getModelFact, type ModelFact } from './prompts/model-facts.js'
+// Per-model prompting tips — the SSOT for the desktop "See prompting tips"
+// modals. The desktop renders these; it never hand-writes tips content.
+export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'

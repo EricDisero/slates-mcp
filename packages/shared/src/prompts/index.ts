@@ -17,3 +17,7 @@ export * from './style-library.js'
 export * from './model-facts.js'
 export * from './character-sheet.js'
 export * from './environment-sheet.js'
+// Exported from the `./prompts` subpath (not just the root barrel) because the
+// desktop RENDERER imports the tips — the root barrel re-exports auth.js
+// (node:fs/os/path), which breaks browser bundling. `./prompts` stays Node-free.
+export * from './prompting-tips.js'
