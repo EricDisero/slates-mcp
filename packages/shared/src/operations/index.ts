@@ -2949,7 +2949,7 @@ export const addTimelineTrack: Operation<{
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('timeline', 'timeline editing')
+    await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     return ok(await desktop.post('/agent/timeline/add-track', input))
   },
 }
@@ -2975,7 +2975,7 @@ export const updateTimelineTrack: Operation<{
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('timeline', 'timeline editing')
+    await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     return ok(await desktop.post('/agent/timeline/update-track', input))
   },
 }
@@ -2990,7 +2990,7 @@ export const removeTimelineTrack: Operation<{ projectId: string; trackId: string
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('timeline', 'timeline editing')
+    await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     return ok(await desktop.post('/agent/timeline/remove-track', input))
   },
 }
@@ -3014,7 +3014,7 @@ export const updateTimelineSettings: Operation<{
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('timeline', 'timeline editing')
+    await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     return ok(await desktop.post('/agent/timeline/update-settings', input))
   },
 }
