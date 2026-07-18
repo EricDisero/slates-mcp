@@ -2858,11 +2858,11 @@ export const addClipToTimeline: Operation<{
 }> = {
   id: 'slates_add_clip_to_timeline',
   description:
-    "Append a video asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: clip goes to the end of the first video track, full source duration, and an empty timeline auto-adopts the clip's resolution and frame rate. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions. Only video assets are accepted.",
+    "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions.",
   input: z.object({
     projectId: z.string().uuid(),
-    assetId: z.string().uuid().describe('Video asset already in the project.'),
-    trackId: z.string().uuid().optional().describe('Target track. Default: the first video track.'),
+    assetId: z.string().uuid().describe('Video or audio asset already in the project.'),
+    trackId: z.string().uuid().optional().describe('Target track (type must match the asset: video asset → video track, audio asset → audio track). Default: the first track of the matching type.'),
     startFrame: z.number().int().min(0).optional().describe('Timeline frame to place the clip at. Default: append after the last clip.'),
     sourceInFrame: z.number().int().min(0).optional(),
     sourceOutFrame: z.number().int().min(1).optional(),
@@ -2931,6 +2931,91 @@ export const removeClip: Operation<{ clipId: string }> = {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
     return ok(await desktop.post('/agent/timeline/remove-clip', input))
+  },
+}
+
+export const addTimelineTrack: Operation<{
+  projectId: string
+  type?: 'video' | 'audio'
+  name?: string
+}> = {
+  id: 'slates_add_timeline_track',
+  description:
+    "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). The new track is appended below existing tracks. Returns the new track and the full timeline.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    type: z.enum(['video', 'audio']).optional().describe('Default: audio.'),
+    name: z.string().optional().describe("Default: 'Audio N' / 'Video N'."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/add-track', input))
+  },
+}
+
+export const updateTimelineTrack: Operation<{
+  projectId: string
+  trackId: string
+  name?: string
+  muted?: boolean
+  locked?: boolean
+  volume?: number
+}> = {
+  id: 'slates_update_timeline_track',
+  description:
+    'Update a timeline track: rename, mute/unmute, lock/unlock, or set its volume fader (linear gain, -∞ to +12 dB). Track volume applies to both preview and MP4 export — audio-track clips are mixed at this gain; a muted video track still shows video but its embedded audio is silenced.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    trackId: z.string().uuid(),
+    name: z.string().optional(),
+    muted: z.boolean().optional(),
+    locked: z.boolean().optional(),
+    volume: z.number().min(0).max(4).optional().describe('Track fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/update-track', input))
+  },
+}
+
+export const removeTimelineTrack: Operation<{ projectId: string; trackId: string }> = {
+  id: 'slates_remove_timeline_track',
+  description:
+    'Remove an EMPTY timeline track (fails if it still has clips, or if it is the last track of its type).',
+  input: z.object({
+    projectId: z.string().uuid(),
+    trackId: z.string().uuid(),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/remove-track', input))
+  },
+}
+
+export const updateTimelineSettings: Operation<{
+  projectId: string
+  width?: number
+  height?: number
+  frameRate?: 24 | 30 | 60
+  masterVolume?: number
+}> = {
+  id: 'slates_update_timeline_settings',
+  description:
+    "Update the project timeline's output settings: resolution, frame rate (24/30/60 — all clips are conformed to it on export), and masterVolume, the output fader (linear gain, -∞ to +12 dB) applied to the final mix in both preview and MP4 export (use it to prevent clipping when stacking loud tracks). Note these are normally auto-managed: the first video clip sets fps + resolution, and higher-res clips raise the canvas. Changing frameRate after clips are placed retimes them — avoid unless the timeline is empty.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    width: z.number().int().min(16).optional(),
+    height: z.number().int().min(16).optional(),
+    frameRate: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
+    masterVolume: z.number().min(0).max(4).optional().describe('Output fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline', 'timeline editing')
+    return ok(await desktop.post('/agent/timeline/update-settings', input))
   },
 }
 
@@ -3501,6 +3586,10 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,
   removeClip as unknown as Operation<unknown>,
+  addTimelineTrack as unknown as Operation<unknown>,
+  updateTimelineTrack as unknown as Operation<unknown>,
+  removeTimelineTrack as unknown as Operation<unknown>,
+  updateTimelineSettings as unknown as Operation<unknown>,
   exportVideo as unknown as Operation<unknown>,
   exportTimelineXml as unknown as Operation<unknown>,
   revealFile as unknown as Operation<unknown>,
