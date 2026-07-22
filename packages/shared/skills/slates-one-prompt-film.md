@@ -12,6 +12,25 @@ The user gives an idea. You hand back an MP4 on disk. Everything in between is y
 ### 1. Script the beats
 Turn the idea into a beat-level script: 4-10 shots, each with subject, action, setting, camera, and duration (4-8s per shot). Surface it as a tight table. Get the user's nod on the plan, format (aspect ratio — 16:9 vs 9:16 decides everything downstream), and rough budget appetite before touching any op.
 
+**Surface a decision log with the plan.**
+
+<!-- @inject:decision-log -->
+When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify:
+
+```
+source phrase or declared default → what you wrote → what it resolves
+"in a diner"        → chrome-and-vinyl booth, 3/4 on the counter   → fixes the anchor so blocking is repeatable
+(no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
+(no camera)         → slow push-in, single move                    → one move per shot; stacking increases instability
+```
+
+**Hard rule: never silently add weather, props, style, or camera movement.** If it wasn't in the brief and you added it, it goes in the log. This is the "why did you add that?" affordance — for an agent that writes prompts on the user's behalf and spends their credits, it is what keeps the model in assembly and the user in the director's chair.
+
+> ❌ **Do NOT turn this into a question gate.** Clarifying questions before optimizing directly fight the locked fast-path rule: *if intent is clear, generate immediately with sane defaults, don't ask questions; only ask for production intent, and batch every question into one message.* Log the decisions, then go. The log is an **output**, not an interrogation — surfaced alongside the plan, never as a separate ceremony, and never as a reason to wait.
+<!-- @end:decision-log -->
+
+A 4-10 shot script is where you invent the most on the user's behalf — time of day, wardrobe, weather, lens feel, camera moves the brief never mentioned. The log is what makes those visible while they are still free to change.
+
 ### 2. Set up the project
 - `slates_create_project` named for the piece.
 - Recurring character? Build it properly — `slates_create_character` + the `slates-character-turnaround` recipe — so every frame references the same turnaround.

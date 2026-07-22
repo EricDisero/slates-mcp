@@ -7,6 +7,18 @@ description: Which model to pick for a given job — the routing doctrine. Read 
 
 Pick the model FIRST, deliberately, before writing a prompt or quoting a plan. Model routing is a core part of the intelligence users are paying for: the agent knows what each model is good at and which ones underperform for a job — defaulting to the wrong model burns the user's credits on a weaker result.
 
+## 🔑 The meta-rule — above the table
+
+The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni Flash, Seedream 5 Lite, GPT Image 2 all landed recently) — **a table rots; a rule doesn't.** When the tables and this rule disagree, or when a model appears that the tables don't cover, run the rule:
+
+> **Name ONE must-preserve requirement for the shot.** Not a vibe — the single thing that, if it breaks, makes the shot unusable: this face stays this face · the fluid behaves like fluid · the text stays legible · the take stays one unbroken move.
+>
+> **Inspect the output at its intended crop.** A frame that holds up as a thumbnail can fall apart at the size it will actually be watched. For a location, look at atmosphere, material texture, and anchor objects; for a character, identity, skin, pose, and gradients.
+>
+> **Choose the model that PROVES that requirement** and leaves only failures you can afford to rerun or mask.
+>
+> **When the roster changes, repeat the evidence test.** Do not carry today's ranking forward on reputation.
+
 ## Video routing
 
 | Job | Model | Why |
@@ -16,6 +28,17 @@ Pick the model FIRST, deliberately, before writing a prompt or quoting a plan. M
 | Multi-character dialogue / audio co-generation | Kling 3.0 omni | Dialogue syntax, voice direction, language codes, `@element` refs. |
 | **Anything with remotely important physics** — effects, destruction, water/fire/smoke/cloth, creature motion, scale, complex simultaneous action | **Seedance 2.0** | The premium tier. Physics and effects are its whole edge; up to 9 ingredient refs, first+last frame, native 4K (4K video is Pro-only). |
 | The premium hero shot a piece hangs on | Seedance 2.0 | Spend where it shows. |
+
+### Named Seedance escalation triggers
+
+"Physics matter" is an abstract category and it under-fires. These are the beats Seedance is **observably** good at — if the shot contains one, escalate without deliberating:
+
+- **Real-time → slow-motion contrast.** The signature beat; nearly every strong clip rides it.
+- **The camera moving while debris, meteors, sparks or particles crash around the subject.** Distinctly a feature of this model, not just a thing it survives.
+- **Massive scale that has to read as genuinely huge** — not "a big thing", a thing whose size is the point of the shot.
+- **One continuous unbroken take.**
+
+Concrete beats route better than an abstract category. Cost stays a tiebreaker, never the router (see below).
 | Native synchronized audio (dialogue + SFX generated WITH the video in one gen), 16:9, ≤8s | Veo 3.1 | The only job Veo wins. |
 
 ## Video EDIT routing (changing an existing clip)
@@ -29,7 +52,7 @@ Pick the model FIRST, deliberately, before writing a prompt or quoting a plan. M
 | AI-edit the user's OWN footage | Omni Flash Edit (3–10s) or Kling O3 Edit (3–15s, 720–3840px) | Both take any MP4/MOV — not just Slates gens. Phone footage MUST be rotation-normalized first (players honor the rotation flag; models don't — raw portrait phone clips come back SIDEWAYS). |
 
 - **Edit before re-roll.** A re-roll gambles away the parts the user already likes; an edit changes only what the prompt names. Quote the edit first when a clip is mostly right.
-- **Ship via segment-splice.** Every edit model re-synthesizes the whole clip, so fidelity risk scales with clip length. For real deliverables: trim out ONLY the seconds where the change happens, edit that segment, splice it back over the original on the timeline with the ORIGINAL audio underneath. Most of the final video stays the untouched original — that's how the pro demos (e.g. Higgsfield's split-screen short) actually work, plus gesture-only beats with voiceover laid over in post.
+- **Ship via segment-splice.** Every edit model re-synthesizes the whole clip, so fidelity risk scales with clip length. For real deliverables: trim out ONLY the seconds where the change happens, edit that segment, splice it back over the original on the timeline with the ORIGINAL audio underneath. Most of the final video stays the untouched original — that's how the polished split-screen demos going around actually work, plus gesture-only beats with voiceover laid over in post.
 - **One change per pass, short prompts.** On Omni Flash this is documented law ("overly descriptive prompts can lead to unintended changes" — long identity-lock preambles make drift WORSE, receipt 7/09); on Kling multi-beat instructions get dropped. Chain passes instead.
 - Edited clips are themselves editable clips — chain passes; lineage links each output to its parent.
 

@@ -27,8 +27,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "node scripts/embed-skills.mjs && tsc",
-    "typecheck": "node scripts/embed-skills.mjs && tsc --noEmit",
+    "sync-partials": "node scripts/sync-partials.mjs",
+    "build": "node scripts/sync-partials.mjs --check && node scripts/embed-skills.mjs && tsc",
+    "typecheck": "node scripts/sync-partials.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "repository": {

@@ -103,6 +103,16 @@ Video gens take minutes (Seedance 4K can run far longer). A client/CLI timeout o
 - **Poll, don't re-roll.** Use `background: true` on `slates_generate_video`, then poll `slates_get_generation_status` (free, read-only) until it reports `completed` or `failed`. In-flight jobs survive app restarts and are recovered.
 - A gen has only failed when the status comes back `failed` — and a provider *rejection* **refunds** the credits, so failed isolation tests are ~free. Until you see a terminal status, the job is in flight. Wait.
 
+## 🔴 The still-gate — the most expensive mistake in the pipeline
+
+<!-- @inject:still-gate -->
+**A visible defect in the still is already a STOP.** Do not animate it. Fix the frame first, then move to motion — and go to motion only when the crop passes the still scan and you genuinely need movement to confirm an uncertain edge, reflection, or object.
+
+This is a **cost** rule as much as a craft rule: a 1080p/10s premium video generation costs many multiples of an image re-roll, and video is where a defect stops being fixable. Anything wrong in the still gets worse in motion — soft geometry mushes, broken-but-plausible objects fall apart, oily textures start crawling. **Animating a known-bad frame is the single most expensive mistake in the pipeline.** Re-rolling the image is the cheap move; re-rolling the video is not.
+<!-- @end:still-gate -->
+
+The check itself lives in `slates-vision-feedback-loop` (the four slop tells and the per-model accents). The **stop** is a cost rule and belongs here: before every image→video call, confirm the source frame passed the still scan. If it didn't, spending video credits on it is not iteration — it is buying a more expensive copy of a defect you already found.
+
 ## The 3-strike rule
 
 Stop after 3 iterations on the same prompt. Hand back to the user with what you tried and what's not working. The slot machine doesn't converge — if it's not landing, the prompt structure is wrong, not the seed.

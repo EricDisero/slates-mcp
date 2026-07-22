@@ -98,10 +98,39 @@ Verbatim example:
 
 ## Reference discipline (character / environment refs)
 
-- **2-4 strong refs per role**, named inline (Slates cites each as "image N" from your `@mentions`) and reused across every shot. The model doesn't infer a ref's role from order — the name does it.
-- **Flat-lit identity refs.** A studio-lit / scene-lit character sheet bleeds its lighting into the clip. Prep refs flat and plain.
-- **Attach both character sheets, named as one entity** — the turnaround (body/proportion/outfit) and the close-up expression sheet (face detail), cited under the same name. The shared name keeps the varied expressions from averaging the face; don't write a role essay or "render neutral" instruction — the user's prompt owns the expression, wardrobe, and lighting.
-- **Environment: describe it, don't feed a multi-panel grid.** Reserve an environment ref for a hard exact-match, then use ONE clean establishing image.
+<!-- @inject:references-read-literally -->
+> **The general law: the model reads a reference literally.**
+> A reference image is not a suggestion. Whatever is baked into it — lighting, medium, texture, symmetry, competing identities — is read as a **property of the subject** and reproduced downstream. A baked rim light tints every shot made from that sheet. A sheet that looks like a 3D game render gets animated like game footage. Two competing renderings of one face get averaged into a third face.
+
+Every reference rule below is a corollary of that one sentence, which is why "prep the reference" beats "prompt around the reference" every time:
+
+- **Flat, plain identity refs** — because scene lighting in the sheet becomes scene lighting in the output (Slates' own receipt: a studio-lit sheet produced a subject that looked green-screen-pasted in front of mountains).
+- **One authoritative rendering per subject** — because the model cannot tell which panel is the real one. ByteDance documents this failure directly: multi-view character assets "confuse the model's character recognition, causing it to generate duplicate characters of the same appearance."
+- **No 3D-game-render look in a reference** — the model recognizes the render mood and inherits its motion character, so the *animation* comes out looking like game footage. This is not a taste rule; it is the same literal-reading mechanism applied to the temporal layer.
+- **Break perfect symmetry** — mirrored faces and dead-square framing read as synthetic, and the model preserves that reading rather than correcting it.
+
+**What this means in practice:** when output is wrong in a way that tracks the *subject* rather than the *scene* — the lighting is wrong the same way in every shot, the face drifts, the material looks synthetic everywhere — fix the reference, not the prompt. Prompting around a baked-in property is the expensive way to lose.
+<!-- @end:references-read-literally -->
+
+<!-- @inject:reference-rules-core -->
+Identity = a few flat-lit neutral angles; one reference per role, named inline; 2-4 refs not 12; describe environments instead of feeding a grid.
+
+1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each one adds context AND another variable to balance.
+2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates composes the naming for you from your `@mentions` / `#tags` — you never hand-write role labels.
+3. **One identity sheet per character — and whatever you do attach for a subject, NAME it as one entity.** A character's identity sheet is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is always better, because the model cannot tell which one is authoritative and averages them.** Where a character carries a second bound sheet — an explicit expression range, or a legacy turnaround+expression pair — cite BOTH under the SAME name, `Marcus (images 1 and 2)`. That shared name, not a role essay, is what tells the model they are ONE person and stops the varied expressions from averaging the face. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
+4. **Flat-light identity refs.** Prep identity references with flat, even, shadowless lighting on a plain neutral background. A studio-lit or scene-lit character sheet bleeds its lighting into every generation — the failure looks like the subject was green-screen-pasted in front of the location. Reference prep beats prompting here.
+5. **Environment: describe it, don't feed a grid.** Default to describing the location in words and let the model build a space that fits the shot. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with natural ambient light that reads as the location's real light — never a multi-panel grid fed whole.
+6. **Grids: explore, don't input.** Use grids to explore compositions cheaply, then pick a cell. Never feed a grid back in as a reference — the cells share a split detail budget and were generated jointly, so their flaws propagate.
+7. **Reuse the same refs across every shot** in a sequence. Lock a set and keep it; swapping references mid-sequence causes drift, because the model adapts each reference to the current prompt rather than copying it.
+8. **Legible in-shot text → bake it into a still start frame, never trust text-to-video.** Have an image model render the text, then animate from that locked frame. Video models smear type.
+9. **Working from existing media — describe ONLY what changes.** The source already carries its composition, motion, timing, and performance; re-describing them fights the model. Narrate the delta. (Video lane: restyle your own clip while keeping the performance; delayed-VFX on "video one"; marker-object insertion; video-as-reference for a series.)
+10. **Style transforms happen in natural language.** By default the source's artistic medium and visual style are inherited. To change it, add a plain-text instruction ("anime → real person"). There are no preset pickers, and there is no style slider.
+<!-- @end:reference-rules-core -->
+
+### For Veo specifically
+
+- **Veo's idiom for rule 2 is plain-English role naming in the sentence itself** — *"Using the provided images for the detective, the woman, and the office setting, create a medium shot of…"* (see Ingredients-to-Video above). The role rides in the noun phrase, not in a separate label block.
+- **Rule 8 has a second reason to matter here:** Veo bakes subtitle text into the frame unless every dialogue line carries `(no subtitles)`. Text you did not ask for is the failure mode, not just text you did.
 
 ## Negative prompting — nouns, not instructions
 

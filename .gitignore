@@ -9,6 +9,13 @@ packages/mcp/dist-mcpb/
 # Generated (by packages/shared/scripts/embed-skills.mjs on every build)
 packages/shared/src/skills/content.ts
 
+# Generated (by packages/shared/scripts/sync-partials.mjs on every build).
+# NOTE: the RESOLVED text inside the @inject markers in skills/*.md IS
+# committed on purpose — skills/ is a published artifact that install-skills
+# writes verbatim to users' disks, and committing it makes every de-fork
+# visible in review. Only this TS mirror is generated.
+packages/shared/src/prompts/partials.generated.ts
+
 # Local env / secrets
 .env
 .env.*

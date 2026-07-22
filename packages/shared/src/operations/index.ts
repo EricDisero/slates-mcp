@@ -752,10 +752,11 @@ export const generateCharacterSheets: Operation<{
   baseAssetId: string
   sheetTypes?: ('turnaround' | 'expression')[]
   userNotes?: string
+  model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2'
 }> = {
   id: 'slates_generate_character_sheets',
   description:
-    "Generate a character's turnaround sheet (4 neutral full-body angles — identity: body, proportions, outfit) AND expression sheet (close-up facial detail) from a base portrait asset, on Nano Banana 2 at 2K, and bind both to the character. THE real character-building workflow — call right after slates_create_character. baseAssetId is the source portrait (a project asset). Both sheets generate by default. Afterward, carry the character into a scene by passing its turnaround + expression asset ids as characterAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so identity stays consistent across shots. Cost ~$0.36 for both sheets.",
+    "Generate a character's identity reference sheet from a base portrait asset and bind it to the character. THE real character-building workflow — call right after slates_create_character. ONE sheet per character by default: a dominant three-quarter chest-up portrait (the sole face authority) plus full-body front and back panels on a deep neutral-grey plate — it binds to the turnaround slot and the expression slot stays null. That is deliberate: every bound sheet costs a reference slot on EVERY downstream shot, so one sheet per character doubles the cast you can stage against real caps (Kling 3.0 takes 4 ingredients, NB2 4 character slots, Seedance 9). Pass sheetTypes:['expression'] only when a character genuinely needs a separate expression range. baseAssetId is the source portrait (a project asset). Afterward, carry the character into a scene by passing its bound sheet asset id as characterAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image). Read slates-character-turnaround before calling. Default nano-banana-2 @ 2K — quote the price from slates_estimate_generation_cost, never from memory.",
   input: z.object({
     characterId: z.string().uuid(),
     projectId: z.string().uuid(),
@@ -763,8 +764,12 @@ export const generateCharacterSheets: Operation<{
     sheetTypes: z
       .array(z.enum(['turnaround', 'expression']))
       .optional()
-      .describe('Which sheets to generate. Default both.'),
+      .describe("Which sheets to generate. Default ['turnaround'] — the single identity sheet. Add 'expression' only when the character needs a dedicated expression range; it costs a second reference slot on every downstream generation."),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
+    model: z
+      .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2'])
+      .optional()
+      .describe('Image model for the sheet. Omit for the default (nano-banana-2). Exists so the layout-vs-face tradeoff can be tested with comparison gens — do not switch without a receipt.'),
   }),
   async run(input, ctx) {
     return ok(
@@ -774,6 +779,7 @@ export const generateCharacterSheets: Operation<{
         baseAssetIds: [input.baseAssetId],
         sheetTypes: input.sheetTypes,
         userNotes: input.userNotes,
+        model: input.model,
       })
     )
   },

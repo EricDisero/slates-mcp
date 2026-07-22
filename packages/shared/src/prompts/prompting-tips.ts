@@ -9,6 +9,15 @@
 // matching entry here in the same pass. Keys are model FAMILIES — the
 // desktop maps concrete model ids to a family key with its MODEL_REGISTRY
 // helpers (the runtime truth for ids lives in slate/src/shared/pricing.ts).
+//
+// Cards whose content is ALSO doctrine (not just model trivia) compose their
+// copy from skills/_partials/*.md via PARTIALS rather than restating it. The
+// NANO_BANANA reference card is why: it shipped "label every role" — retired
+// doctrine — for thirteen months after the reversal, in the same package as
+// the rule forbidding it. Hand-sync didn't merely drift, it survived a
+// reversal. Add a short partial; don't hand-copy a rule into a card.
+
+import { PARTIALS } from './partials.generated.js'
 
 export interface PromptingTipCard {
   heading: string
@@ -43,8 +52,8 @@ export type PromptingTipsKey =
 const SEEDANCE: PromptingTipsEntry = {
   label: 'Seedance 2.0',
   intro: [
-    'Seedance 2.0 wants natural prose with narrative timing beats. Not shot brackets, not bullet points. Audio is always generated alongside video at no extra cost.',
-    "Follow ByteDance's official 6-step formula: Subject, Action, Environment, Camera, Style, Constraints. Sweet spot 60-150 words for single shots, longer for multi-shot.",
+    'Seedance 2.0 is a multimodal director: it reads your text, images, video and audio at once and splits them into a "spatial layer" (what is in frame) and a "temporal layer" (how it changes). So a good prompt is an engineering-style instruction, not a piece of copywriting. Audio is always generated alongside video at no extra cost.',
+    "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
     [
@@ -54,37 +63,55 @@ const SEEDANCE: PromptingTipsEntry = {
         note: "The first 20-30 words are the identity anchor. If the subject isn't locked in immediately, Seedance will hallucinate new subjects mid-generation.",
       },
       {
-        heading: 'Narrative timing beats',
-        example: 'At 2 seconds, the camera begins a slow dolly forward. At 4 seconds, the lid opens in slow-motion...',
-        note: 'Use "At N seconds" — not SHOT brackets. 2 beats for a 5s clip, 3 for 10s, 4-5 for 15s.',
+        heading: 'Shot 1 / Shot 2 / Shot 3 — never time stamps',
+        example: 'Shot 1: Side shot of the alley; the man slowly starts running.\nShot 2: He knocks over a fruit stand; the camera shakes and cuts to his face.\nShot 3: He climbs a low wall; the camera pulls back onto the empty street.',
+        note: 'ByteDance: write a "Shot 1 / Shot 2 / Shot 3" storyboard in the order events occur, then merge it into one prompt. Do NOT write "At 4 seconds" or "0:00–0:03" and do not set per-shot durations — official docs say precise timing is unstable and forcing it "may lead to abnormal generation results." Let the plot set the pacing.',
+        critical: true,
       },
       {
-        heading: 'Lighting is the #1 quality lever',
+        heading: 'Order inside each shot',
+        example: 'camera move → action + expression → position change → audio',
+        note: "ByteDance's recommended per-shot order. Lead with the camera (\"slowly push in from a wide shot\", \"fixed camera position\", \"cut to...\"), then what the subject does, then where they end up, then the sound.",
+      },
+      {
+        heading: 'Lighting is a top quality lever',
         example: 'A cool-white diagonal beam from upper left, dust particles drifting through...',
-        note: 'ByteDance says lighting has the biggest impact on quality of any prompt element. Describe it before or alongside the subject.',
+        note: 'Lighting & color tone has its own slot in the official formula. Describe it before or alongside the subject.',
       },
     ],
     [
       {
-        heading: '8 supported camera moves',
-        example: 'push-in · pull-out · pan · tracking · orbit · aerial · handheld · fixed',
-        note: 'Use these exact terms. "Dolly in" not "zoom in." "Orbit" not "circle." One primary camera move per beat — never stack them.',
+        heading: 'Standard camera terms — including shot size',
+        example: 'medium shot · close-up · wide shot · slow push-in · smooth lateral tracking · fixed shot',
+        note: 'ByteDance: the model has a strong understanding of camera terminology, so use it directly — this is an open vocabulary, not a fixed list, and shot size counts as camera direction. Only ONE camera movement per shot: asking for push, pull, pan and move at once increases image instability.',
       },
       {
-        heading: 'Slow-motion works ("fast" doesn\'t)',
-        example: 'the lid opens in slow-motion · the blade whips through the air',
-        note: 'Speed ramps and slow-motion are supported in natural language. Avoid the word "fast" — it\'s ByteDance\'s #1 quality-degrading keyword.',
+        heading: 'Slow, gentle, continuous movement',
+        example: 'slowly raise a hand · quickly turn the head · walk slowly · sit down naturally with the motion',
+        note: 'Official rule: name the body part and quantify range, speed and force — and prefer small continuous movement over sprints, big jumps and violent rolls. Slow-motion is supported in natural language; "fast" is a known quality-degrading word.',
+      },
+      {
+        heading: 'Externalize emotion',
+        example: '❌ she looks very sad\n✅ head lowering, shoulders trembling slightly, eyes reddening, fingers clutching the corner of her clothing',
+        note: 'Replace abstract emotion words with the physical detail that shows them. This is the single highest-leverage habit in ByteDance\'s guide — the model renders bodies, not adjectives.',
       },
       {
         heading: 'Separate camera from subject motion',
         example: 'The earbud rises smoothly. The camera tracks upward.',
-        note: 'Two different sentences. Mixing them ("the camera speed ramps as the earbud rises") is the #1 cause of shaky, glitchy output.',
+        note: 'Two different sentences. Mixing them ("the camera speed ramps as the earbud rises") is a common cause of shaky, glitchy output.',
+      },
+      {
+        heading: 'Multi-character shots — forbid twins',
+        example: 'Throughout the video, characters with completely identical appearance, clothing, and accessories are prohibited. Do not generate duplicate avatars or a twin effect.',
+        note: 'With several characters in frame, Seedance can render the same person twice. ByteDance\'s fix: bind each character to its image ("Marcus (image 1)"), append that constraint verbatim at the end, and prefer single-person reference photos. Past 4 reference people, stability drops — compose a group still first.',
       },
     ],
   ],
   footer: [
+    'Quality and constraint slots have their own official vocabulary: ask for "HD, rich details, cinematic texture, natural colors, soft lighting" — not "8K / masterpiece / trending on artstation." Seedance has no negative-prompt field, so constraints go inline: "keep it subtitle-free", "do not generate a logo", "do not generate a watermark".',
     'Style block at the end: one primary anchor plus 2-3 supporting details. End with "Single continuous take" if you want one shot with no cuts. Never write "no cut" or "seamless transition" — those aren\'t in the training vocabulary.',
-    'Multi-modal: up to 9 images + 1 video + audio refs. Reference in prompt with @character, @environment, @audio1. Max length: 4,000 characters.',
+    'Multi-modal: up to 9 images, 3 videos and 3 audio references. Cite them by type and index — "Zhang San@Image 1", or the "Marcus (image 1)" form Slates composes from your @mentions. Never cite an asset ID instead of the image number; the model can\'t associate the two. Max length: 4,000 characters.',
+    'Don\'t cross-pollinate image-model syntax: named lenses, apertures and film stocks ("85mm f/1.4", "Kodak Portra 400") are a Nano Banana lever and a Seedance anti-pattern. Translate them into shot size, depth of field and colour tone instead.',
   ],
 }
 
@@ -307,6 +334,11 @@ const NANO_BANANA: PromptingTipsEntry = {
         note: 'Portra = natural skin warmth. Velvia = saturated landscape. HP5 = gritty B&W grain. CineStill 800T = tungsten night with halation. Never mix stocks.',
       },
       {
+        heading: "Don't carry lens + stock into a video prompt",
+        example: '85mm f/1.4, Portra 400\n→ close-up, shallow depth of field, warm natural colors, cinematic texture',
+        note: 'Lenses, apertures, film stocks and camera bodies are an image-model lever and a video-model anti-pattern — ByteDance\'s Seedance guide never mentions f-stops, lens millimetres, fps or shutter angle. When you animate a frame you made here, translate the look into shot size, depth of field and colour tone instead of pasting the gear list across.',
+      },
+      {
         heading: 'Physics-based lighting',
         example: 'Single key light at 45 degrees from upper left. Color temperature 4500K. Crisp catchlights in the eyes.',
         note: 'Direction + Kelvin temp + named source. "Single key light at 10 o\'clock" beats "soft lighting" every time.',
@@ -330,9 +362,9 @@ const NANO_BANANA: PromptingTipsEntry = {
         note: 'Reframe positively first. Use inline "without" / "free of" only when positive framing can\'t suppress the unwanted element.',
       },
       {
-        heading: 'Reference images — label every role',
-        example: 'Image 1: Character ref — facial features, body proportions\nImage 2: Environment ref — architecture, lighting\nImage 3: Style ref — mood, aesthetic',
-        note: "Up to 14 refs (10 object + 4 character — caps don't trade). The @ and # mention system labels these automatically. Start with 2-3 focused refs.",
+        heading: 'Reference images — name them, never label roles',
+        example: 'Marcus (images 1 and 2) sits across from the woman (image 3) in the cafe (image 4).',
+        note: `Up to 14 refs (10 object + 4 character — caps don't trade). ${PARTIALS['reference-tips-short']}`,
       },
       {
         heading: 'Common fixes',

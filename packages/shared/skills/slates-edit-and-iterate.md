@@ -7,6 +7,20 @@ description: Iterate on an existing Slates asset — re-evaluate, refine prompt,
 
 The user already has a generated image in Slates and wants to refine it. The vision-feedback-loop skill defines the general pattern; this skill is the specific recipe for "I have asset X, here's what's wrong with it."
 
+## 🔴 The master rule — an edit is a LEAF, not a node
+
+**Never re-edit an edit. Always go back and re-edit the master.**
+
+Every edit model silently re-renders the **whole frame**, not just the region you named. So the parts you didn't ask to change come back slightly different every pass — softer texture, drifted colour, mushier fine detail. It is barely visible after one edit and obvious by the second. Chaining edits compounds the damage and there is no way to undo it, because each generation *is* the new source.
+
+The fix is structural, not a matter of care:
+
+- **Want two changes?** Make them in ONE edit off the master, or make them as two separate edits **both taken from the master**, then keep whichever you prefer.
+- **An edit came back wrong?** Do NOT edit the result to fix it. Discard it and re-edit the master with a better instruction.
+- **Only the changed region is worth keeping?** That is a compositing job — the edit supplies the new region, the untouched master supplies everything else.
+
+Slates records this: an edit result carries `sourceAssetIds` pointing at the asset it was made from, so **you can tell whether the thing you are about to edit is itself an edit.** Check before you edit — `[Edit]`-prefixed prompts and a populated source lineage both say "this is a leaf; go back to its parent."
+
 ## Workflow
 
 ### 1. Pull the current asset back into context
@@ -45,4 +59,5 @@ The user's request is one of:
 - **Don't** delete the original asset until the user confirms the new one. Slates keeps both; the user picks.
 - **Don't** mix surgical and wholesale changes in one regeneration. The user said "make it warmer" — don't also reframe the shot.
 - **Don't** re-generate when `slates_edit_image` would work. Edits preserve composition and identity; full regen rolls the dice.
-- **Don't** chain >3 iterations without checking in. If three tries didn't land, the brief is wrong, not the model.
+- **Don't** edit an edit — ever. Not once, not "just a small one." Go back to the master (see the master rule above). Every attempt re-renders the full frame and the degradation is cumulative and permanent.
+- **Don't** keep re-rolling the same failed edit. If three tries off the master didn't land, the brief is wrong, not the model — check in with the user.

@@ -6,6 +6,11 @@
 // [community] = multi-guide consensus; [code-verified] = verified against
 // the slate codebase; [creator-demo] = single creator demonstration.
 
+// The generated partial store — one entry per skills/_partials/*.md file.
+// Re-exported so consumers can reach any partial, not just the rules block.
+export { PARTIALS } from './partials.generated.js'
+import { PARTIALS } from './partials.generated.js'
+
 export type SourceGrade = 'Eric-test' | 'community' | 'code-verified' | 'creator-demo'
 
 export interface ReferenceRule {
@@ -37,8 +42,8 @@ export const REFERENCE_RULES: ReferenceRule[] = [
   },
   {
     id: 'identity-name-as-one-entity',
-    title: 'Attach both sheets — NAME them as one entity, don\'t gate them',
-    rule: 'Attach BOTH the full-body turnaround (body/proportion/outfit) AND the close-up expression sheet (high-res facial detail). NAME both inline as the SAME subject ("Marcus (images 1 and 2)") — that shared name is what tells the model they are ONE person and stops the varied expressions from averaging the face. Do NOT inject a role essay ("use for identity, ignore the outfit/lighting, render neutral"): the user\'s prompt owns wardrobe, expression, and lighting.',
+    title: 'One identity sheet per character — NAME whatever you attach as one entity',
+    rule: 'Attach the character\'s single identity sheet (dominant portrait + body panels) rather than a pile of views — fewer competing renderings of a face is always better, because the model cannot tell which is authoritative and averages them. When a character DOES carry a second bound sheet (an explicit expression range, or a legacy turnaround+expression pair), NAME both inline as the SAME subject ("Marcus (images 1 and 2)") — that shared name is what tells the model they are ONE person. Do NOT inject a role essay ("use for identity, ignore the outfit/lighting, render neutral"): the user\'s prompt owns wardrobe, expression, and lighting.',
     why: 'Naming both images as one entity IS each model\'s OWN official consistency lever — NB2 "assign a distinct name to each character/object"; Seedance "Reference <Subject_N> in <Image_N>"; Kling "reuse a fixed label verbatim". The old heavy role-essay was the OFF-doctrine part: telling the model to "use for identity" while injecting "ignore the outfit" dragged the studio-lit sheet\'s wardrobe + lighting into scenes that explicitly wanted otherwise (the movie-still injection failure). The close-ups still carry far more facial signal (eyes, skin, teeth, bone structure) than a turnaround\'s postage-stamp faces, so attach both — the NAME, not an instruction, is what makes many refs work. The trend is MORE references (video/audio/3D into Seedance-class models), all addressed by name.',
     grade: 'Eric-test',
   },
@@ -97,11 +102,31 @@ export const REFERENCE_RULES: ReferenceRule[] = [
 // These are the exact strings the desktop prompt templates, MCP skills,
 // and lead-magnet compose. Change a rule HERE and every consumer follows.
 
-/** Flat, even, shadowless identity lighting on a plain neutral background. */
+/** Flat, even, shadowless identity lighting on a deep neutral-grey plate. */
 export const IDENTITY_LIGHTING = 'flat, even, shadowless lighting'
-export const IDENTITY_BACKGROUND = 'a plain neutral-grey background'
+/**
+ * The plate value is deliberate, not decorative: **white bleeds into the
+ * generated video and washes out the location; black eats edge detail and
+ * crushes hair and wardrobe silhouettes.** A deep neutral grey holds both.
+ */
+export const IDENTITY_PLATE_HEX = '#3a3a3c'
+export const IDENTITY_BACKGROUND = `a plain, deep neutral-grey background (${IDENTITY_PLATE_HEX})`
 export const IDENTITY_LIGHTING_CLAUSE =
   `Render on ${IDENTITY_BACKGROUND} with ${IDENTITY_LIGHTING} so the sheet captures the character's identity, not scene lighting.`
+
+/**
+ * Craft clauses every identity reference wants — the eye and skin detail that
+ * survives downstream, plus the two "reads literally" guards. Crushed-black
+ * irises carry no light information, so eye tone drifts between generations;
+ * no catchlight reads as dead eyes; perfect mirroring reads as synthetic and
+ * the model PRESERVES that reading; a game-render look gets ANIMATED like game
+ * footage. See skills/_partials/references-read-literally.md.
+ */
+export const IDENTITY_CRAFT_CLAUSE =
+  'Crisp catchlights in the eyes and open, readable irises — never crushed to black. ' +
+  "Render surface texture at the medium's own natural level of detail — skin, hair and fabric should read as material, not airbrushed or plastic. " +
+  'Break perfect symmetry — avoid a mirrored face or dead-square framing. ' +
+  'Whatever the medium, avoid the over-clean 3D-game-model look.'
 
 /** Inherit the source's artistic medium unless told otherwise. */
 export const INHERIT_SOURCE_STYLE =
@@ -109,32 +134,33 @@ export const INHERIT_SOURCE_STYLE =
 
 /** Environment plate guidance: one clean, naturally-lit establishing image. */
 export const ENVIRONMENT_NATURAL_LIGHT =
-  'natural, even ambient lighting that reads as the location\'s real light, not a studio setup'
-
-/** One-line summary used as a header in skills + the lead magnet. */
-export const REFERENCE_RULES_HEADLINE =
-  'Identity = a few flat-lit neutral angles; one reference per role, labeled; 2-4 refs not 12; describe environments instead of feeding a grid.'
+  'natural ambient lighting that reads as the location\'s real light, not a studio setup'
 
 /**
- * Canonical markdown block — the SOURCE OF TRUTH the skill markdown and the
- * lead-magnet are reconciled AGAINST. NOTE: nothing imports this yet — the
- * skills hand-author their own reference-rule prose and embed-skills.mjs ships
- * the raw .md as-is, so a change here must be propagated to the per-model skill
- * blocks + lead-magnet by hand until the skill-embed wiring lands (see
- * plans/2026-06-25-slates-prompting-system-overhaul.md). The TARGET is to
- * inject this text so it can't drift; today it's reconciled manually.
+ * One-line summary used as a header in skills + the lead magnet. DERIVED from
+ * the partial's opening line — a hand-authored copy here would be a ninth
+ * wording of the same rule, which is the thing this whole mechanism exists to
+ * stop. Edit `skills/_partials/reference-rules-core.md`.
+ */
+export const REFERENCE_RULES_HEADLINE = PARTIALS['reference-rules-core'].split('\n')[0]
+
+/**
+ * Canonical markdown block — the SOURCE OF TRUTH for reference-image doctrine
+ * across every Slates surface.
+ *
+ * ✅ WIRED 2026-07-21. This is no longer hand-reconciled prose. The text lives
+ * in `skills/_partials/reference-rules-core.md`; `scripts/sync-partials.mjs`
+ * injects it between the `@inject:reference-rules-core` markers in the
+ * per-model skills AND emits it here via `partials.generated.ts`. One edit to
+ * the partial now moves the markdown skills, this export, the MCP
+ * prompting-guide op, the CLI-installed skills, and the Studio Agent together.
+ *
+ * The build runs `sync-partials.mjs --check`, so a hand-edit inside a marker
+ * block fails the build with a diff instead of silently forking.
+ *
+ * To change reference doctrine: edit `skills/_partials/reference-rules-core.md`.
+ * Do NOT edit this file, and do NOT edit between markers in a skill.
  */
 export const REFERENCE_RULES_TEXT = `## Reference rules (how to use reference images)
 
-${REFERENCE_RULES_HEADLINE}
-
-1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs.
-2. **One reference per ROLE, labeled in the prompt.** Identity / style-grade / environment. The model does not infer roles from order — name each role in the prompt text. Same-role competitors drift.
-3. **Attach both sheets — NAME them as one entity, don't gate them.** Attach the full-body turnaround (body/proportion/outfit) AND the close-up expression sheet (high-res facial detail: eyes, skin, teeth, bone structure). NAME both inline as the same subject ("Marcus (images 1 and 2)") — the shared name tells the model they are ONE person, which is what stops the varied expressions from averaging the face. Do **not** inject a role essay ("use for identity, ignore the outfit/lighting, render neutral") — that drags the studio-lit sheet's wardrobe + lighting into the scene; the user's prompt owns wardrobe, expression, and lighting. Naming-as-one-entity IS each model's official lever (NB2 "assign a distinct name"; Seedance "Reference Subject_N in Image_N"; Kling "reuse a fixed label verbatim"). The trend is MORE references — addressing each by name is what makes many refs work.
-4. **Flat-light identity refs.** Prep identity refs with ${IDENTITY_LIGHTING} on a plain neutral background. Studio-lit / scene-lit sheets bleed their lighting into every generation (the studio-lit sheet → "green-screen-pasted in front of mountains" failure). Reference prep beats prompting here.
-5. **Environment: describe it, don't feed a grid.** Default to describing the location in words. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with ${ENVIRONMENT_NATURAL_LIGHT} — never a multi-panel grid fed whole.
-6. **Grids: explore, don't input.** Use grids to explore compositions cheaply, then pick a cell. Never feed a grid back in as a reference — cells share a split detail budget and generate jointly, so flaws propagate.
-7. **Reuse the same refs across all shots.** Lock a set and reuse it; swapping refs mid-sequence causes drift.
-8. **Legible in-shot text → bake it into an image start frame, never trust text-to-video.** Animate from the locked frame.
-9. **I2V / own-footage superpower.** Restyle your own clip keeping the performance; delayed-VFX on "video one"; marker-object insertion; video-as-ref for a series. Describe ONLY what changes.
-10. **Style transform by natural language.** Default keeps the source's art style; an optional plain-text instruction transforms it ("anime → real person"). No preset pickers.`
+${PARTIALS['reference-rules-core']}`

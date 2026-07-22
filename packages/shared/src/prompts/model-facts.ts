@@ -18,7 +18,10 @@ export interface ModelFact {
 export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2',
-    label: 'Nano Banana 2 (Gemini 3 Image)',
+    // Gemini 3.1 FLASH Image — verified against the runtime slug map in
+    // slate/src/main/api/google.ts. Nano Banana PRO is a different model
+    // (gemini-3-pro-image-preview); do not conflate them.
+    label: 'Nano Banana 2 (Gemini 3.1 Flash Image)',
     kind: 'image',
     maxRefImages: 14, // 10 object-fidelity + 4 character-consistency; categories don't trade.
     maxIngredients: null,
