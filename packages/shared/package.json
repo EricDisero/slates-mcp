@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/shared",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Shared operations layer for the Slates MCP server and CLI: auth, cloud/desktop clients, and the single tool surface both consume. Most users want @slatesvideo/mcp-server or @slatesvideo/cli instead.",
   "license": "MIT",
   "type": "module",
