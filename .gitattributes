@@ -1,0 +1,32 @@
+# Deterministic line endings across platforms.
+# The repo stores LF and the working tree checks out LF, regardless of a
+# machine's core.autocrlf setting or which tool wrote the file. This kills the
+# Windows CRLF/LF "modified / unmodified" flicker in git status that happens
+# when there is no explicit attributes file.
+* text=auto eol=lf
+
+# Windows-only scripts must keep CRLF or they break.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries — never apply line-ending conversion.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.icns binary
+*.webp binary
+*.mp4  binary
+*.mov  binary
+*.webm binary
+*.mp3  binary
+*.wav  binary
+*.woff  binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.db   binary
+*.zip  binary
+*.node binary

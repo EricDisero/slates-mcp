@@ -10,8 +10,8 @@
     "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli",
     "sync-partials": "npm run sync-partials -w packages/shared",
     "sync-prompt-builder": "npm run build-prompt-builder -w packages/shared",
-    "typecheck": "node packages/shared/scripts/sync-partials.mjs --check && node packages/shared/scripts/build-prompt-builder.mjs --check && node packages/shared/scripts/embed-skills.mjs && tsc --noEmit",
-    "clean": "rimraf packages/*/dist",
+    "typecheck": "npm run build -w packages/shared && tsc --noEmit",
+    "clean": "rimraf --glob \"packages/*/dist\" \"packages/*/tsconfig.tsbuildinfo\"",
     "publish:all": "npm run build && npm publish -w packages/shared --access public && npm publish -w packages/mcp --access public && npm publish -w packages/cli --access public"
   },
   "devDependencies": {
