@@ -248,7 +248,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
     [
       {
         heading: 'Name references inline',
-        example: 'Marcus (images 1 and 2) walks into the cafe...',
+        example: 'Marcus (image 1) walks into the cafe...',
         note: 'Up to 7 reference images merge into one list — refer to them by number in the prompt.',
       },
       {
@@ -363,7 +363,7 @@ const NANO_BANANA: PromptingTipsEntry = {
       },
       {
         heading: 'Reference images — name them, never label roles',
-        example: 'Marcus (images 1 and 2) sits across from the woman (image 3) in the cafe (image 4).',
+        example: 'Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3).',
         note: `Up to 14 refs (10 object + 4 character — caps don't trade). ${PARTIALS['reference-tips-short']}`,
       },
       {

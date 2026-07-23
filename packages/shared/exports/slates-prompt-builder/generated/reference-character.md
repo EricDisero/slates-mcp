@@ -22,7 +22,7 @@ Every reference rule below is a corollary of that one sentence, which is why "pr
 
 ## The shape: ONE sheet, three panels
 
-Slates generates **one identity sheet per character**, bound to the character's turnaround slot:
+Slates generates **one identity sheet per character**, bound as the character's canonical reference:
 
 | Panel | What it carries |
 |---|---|
@@ -36,9 +36,7 @@ On a deep neutral-grey plate (`#3a3a3c`), flat and shadowless, with catchlights 
 
 **The sheet inherits the source's medium** — photo, anime, illustration, painterly, 3D render — unless the user explicitly asks for a transform. None of the craft clauses above override that: they ask for *readable* eyes and *material-looking* surfaces within whatever medium the character is in, not for photorealism.
 
-**Why one sheet and not two.** Every `@character` mention pushes *all* of that character's bound sheets into one reference group, so a two-sheet character costs **two reference slots on every generation**. Against real caps that is brutal — Kling 3.0 takes 4 ingredients (2 characters, zero room for an environment), NB2 has 4 character slots, Seedance 9. One sheet each **doubles the cast you can stage on every model.** It also takes competing facial renderings from six down to **one** — with the front panel headless and the back panel turned away, the portrait is the only face on the sheet, so there is nothing left to average (see the general law above). And it halves the per-character sheet spend.
-
-**The expression slot still exists** and is still read — characters built before this change have one bound and keep working. Generate one only when a character genuinely needs a dedicated expression range, and tell the user it costs a reference slot on every shot from then on.
+**Why one sheet.** Every `@character` mention attaches that character's canonical identity image, so each character costs one reference slot. It also reduces competing facial renderings to **one** — with the front panel headless and the back panel turned away, the portrait is the only face on the sheet, so there is nothing left to average.
 
 ## Workflow
 
@@ -64,7 +62,7 @@ If text only: generate from prompt-only — less consistent, so warn the user.
 
 ## How the reference gets used at scene time
 
-Slates cites the sheet inline under the character's name — `{name} (image N)` — in the exact order it sends references. That **name** is the anti-averaging lever, and it is each model's own official mechanism (NB2: "assign a distinct name"; Seedance: `Reference <Subject_N> in <Image_N>`; Kling: reuse a fixed label verbatim). If a character has both slots bound, both are cited under the *same* name so the model reads them as one person.
+Slates cites the sheet inline under the character's name — `{name} (image N)` — in the exact order it sends references. That **name** is the anti-averaging lever, and it is each model's own official mechanism (NB2: "assign a distinct name"; Seedance: `Reference <Subject_N> in <Image_N>`; Kling: reuse a fixed label verbatim).
 
 Critically, the app injects **no** wardrobe, expression, or lighting directive. The user's scene prompt owns all of that — which is why `@{name}` dropped into a movie-still injection keeps the still's own clothing and lighting instead of dragging the sheet's.
 
@@ -72,8 +70,8 @@ Critically, the app injects **no** wardrobe, expression, or lighting directive. 
 
 - **Don't** studio-light, white-background, or black-background the sheet. White bleeds into the video and washes out the location; black eats edge detail. Flat, even, shadowless light on a deep neutral grey.
 - **Don't** hand-write the sheet prompt when the op will build it — that is how the template and the shipped prompt fork.
-- **Don't** generate an expression sheet by reflex. It is opt-in now, and it costs a reference slot on every downstream shot.
-- **Don't** skip binding. The slots are what the storyboard pipeline reads — an unbound asset doesn't help downstream.
+- **Don't** create a second character image. One canonical identity is what the storyboard pipeline reads.
+- **Don't** skip binding. An unbound asset doesn't help downstream.
 - **Don't** invent character details. Stick to what's in the reference image and the user's description.
 - **Don't** describe the headless front panel as removal or decapitation — in `userNotes` or any hand-written variant. The template asks for it as *framing* — "cropped at the collarbone, head not shown, invisible-mannequin presentation" — which is a standard e-commerce genre with deep training data. Removal phrasing is untested and invites a refusal.
 - **Don't** use 4K — wastes credits, no quality gain at sheet scale.

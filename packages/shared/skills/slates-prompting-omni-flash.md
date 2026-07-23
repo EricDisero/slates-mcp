@@ -30,7 +30,7 @@ Google's fast video generation + editing model ("Nano Banana Pro for video" in c
 
 - **Inputs:** prompt only (t2v), prompt + ONE start frame (`firstFrameAssetId`, i2v), or prompt + up to **7 reference images** (ingredient/character/environment/style asset params — they merge into one reference list). No last frame, no video/audio references — the op rejects them.
 - Descriptive prompts are fine for GENERATION (the short-prompt law above is edit-specific). Structure like a shot brief: subject + action + setting + camera + lighting + tone.
-- **Name references inline** the standard Slates way ("Marcus (images 1 and 2) walks…"). The endpoint also accepts explicit `<IMAGE_REF_0>`-style binding tags (zero-indexed) — useful when a specific image must bind to a specific role.
+- **Name references inline** the standard Slates way ("Marcus (image 1) walks…"). The endpoint also accepts explicit `<IMAGE_REF_0>`-style binding tags (zero-indexed) — useful when a specific image must bind to a specific role.
 - **Audio is prompt-driven** — no audio parameters. Dialogue in quotes; direct sound in plain language ("rain patters on the tin roof"). Negative direction as plain instructions ("Do not show text").
 - Duration is an explicit 3–10s integer param; cost scales linearly per second.
 

@@ -67,7 +67,7 @@ const specs = [
   },
   {
     output: 'reference-character.md',
-    source: join(pkgRoot, 'skills', 'slates-character-turnaround.md'),
+    source: join(pkgRoot, 'skills', 'slates-character-identity.md'),
     kind: 'production-skill',
   },
   {
@@ -112,7 +112,7 @@ function sha256(value) {
 const crossRefs = [
   ['slates-prompting-nano-banana-2', 'reference-nano-banana.md'],
   ['slates-prompting-kling-v3', 'reference-kling.md'],
-  ['slates-character-turnaround', 'reference-character.md'],
+  ['slates-character-identity', 'reference-character.md'],
   ['slates-prompting-seedance', 'reference-seedance.md'],
   ['slates-content-policy', 'reference-content-policy.md'],
 ]

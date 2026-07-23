@@ -29,7 +29,7 @@ Never rely on the provider default (it's high — the priciest tier). The Slates
 
 - State the grid explicitly and number the cells: "a 2×3 grid of panels, numbered 1–6, reading left-to-right, top-to-bottom".
 - Give each cell ONE content clause: "Panel 3: the character mid-jump, side view".
-- Character sheets: "character turnaround sheet: front, 3/4 left, profile, back — same character, same outfit, flat even lighting, plain background". GPT Image 2 holds the layout; the Banana line holds the *face* better — for identity-critical turnarounds prefer NB2/NB Pro and use GPT Image 2 when labels/annotations matter.
+- Character identity sheets: GPT Image 2 holds structured panel layouts; the Banana line holds the *face* better. Prefer NB2/NB Pro for identity-critical sheets and GPT Image 2 when labels or annotations are the main requirement.
 
 ## References & editing
 

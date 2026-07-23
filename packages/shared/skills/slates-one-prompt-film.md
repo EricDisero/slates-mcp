@@ -33,7 +33,7 @@ A 4-10 shot script is where you invent the most on the user's behalf — time of
 
 ### 2. Set up the project
 - `slates_create_project` named for the piece.
-- Recurring character? Build it properly — `slates_create_character` + the `slates-character-turnaround` recipe — so every frame references the same turnaround.
+- Recurring character? Build it properly — `slates_create_character` + the `slates-character-identity` recipe — so every frame references the same identity.
 - Recurring location? `slates_create_environment`.
 - One-off shots don't need character/environment records; skip the ceremony.
 
@@ -49,7 +49,7 @@ Price the whole batch before the first generation: frame images (count × model 
 Per `slates-cost-discipline` 3b: that single OK authorizes `confirm=true` for **every enumerated call in the batch** — no per-call re-asking. Re-confirm only if a call's price overruns the plan >25% or new calls get added (extra retakes, new shots).
 
 ### 5. Generate frame images
-Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the character turnaround / environment / prior frames for consistency (Slates names each reference inline as "image N" — you don't hand-write role labels; reuse the same subject name across shots). Evaluate every result inline against the beat. Bind keepers via `slates_add_frame`.
+Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the character identity / environment / prior frames for consistency (Slates names each reference inline as "image N" — you don't hand-write role labels; reuse the same subject name across shots). Evaluate every result inline against the beat. Bind keepers via `slates_add_frame`.
 
 **Multi-take where it matters:** for the hook shot and any shot the whole film hangs on, generate 2-4 variants (cheap model or 1k), pull them back with `slates_get_assets_batch`, pick the strongest on composition + identity, discard the rest. Don't multi-take filler shots.
 
@@ -83,4 +83,4 @@ Shots delivered, total spent vs. approved plan, the export path, and the single 
 - **Skeleton before spend.** Project + storyboard structure are free; generation isn't.
 - **Look at everything.** Every image inline, every video via `slates_get_asset_video_frames` if a clip seems off. Never assemble a timeline from clips you haven't evaluated.
 - **3-strike rule per shot.** Three failed takes on one shot = stop, show the user what you tried, ask.
-- **Consistency comes from references, not luck.** Same turnaround asset on every character frame; same environment refs across a location's shots.
+- **Consistency comes from references, not luck.** Same identity asset on every character frame; same environment refs across a location's shots.

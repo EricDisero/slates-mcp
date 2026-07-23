@@ -680,10 +680,10 @@ export const createCharacter: Operation<{
   },
 }
 
-export const setCharacterTurnaround: Operation<{ characterId: string; assetId: string | null }> = {
-  id: 'slates_set_character_turnaround_asset',
+export const setCharacterIdentity: Operation<{ characterId: string; assetId: string | null }> = {
+  id: 'slates_set_character_identity_asset',
   description:
-    'Bind an image asset to the character\'s turnaround slot (or clear with assetId=null). The user sees the character card update live.',
+    'Bind one image asset as the character identity (or clear with assetId=null). The user sees the character card update live.',
   input: z.object({
     characterId: z.string().uuid(),
     assetId: z.string().uuid().nullable(),
@@ -692,25 +692,7 @@ export const setCharacterTurnaround: Operation<{ characterId: string; assetId: s
     return ok(
       await ctx.desktop().post('/agent/characters/update', {
         id: input.characterId,
-        data: { turnaroundAssetId: input.assetId },
-      })
-    )
-  },
-}
-
-export const setCharacterExpression: Operation<{ characterId: string; assetId: string | null }> = {
-  id: 'slates_set_character_expression_asset',
-  description:
-    'Bind an image asset to the character\'s expression-sheet slot (or clear with assetId=null).',
-  input: z.object({
-    characterId: z.string().uuid(),
-    assetId: z.string().uuid().nullable(),
-  }),
-  async run(input, ctx) {
-    return ok(
-      await ctx.desktop().post('/agent/characters/update', {
-        id: input.characterId,
-        data: { expressionAssetId: input.assetId },
+        data: { identityAssetId: input.assetId, expressionAssetId: null },
       })
     )
   },
@@ -746,25 +728,20 @@ export const createEnvironment: Operation<{
   },
 }
 
-export const generateCharacterSheets: Operation<{
+export const generateCharacterIdentity: Operation<{
   characterId: string
   projectId: string
   baseAssetId: string
-  sheetTypes?: ('turnaround' | 'expression')[]
   userNotes?: string
   model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2'
 }> = {
-  id: 'slates_generate_character_sheets',
+  id: 'slates_generate_character_identity',
   description:
-    "Generate a character's identity reference sheet from a base portrait asset and bind it to the character. THE real character-building workflow — call right after slates_create_character. ONE sheet per character by default: a dominant three-quarter chest-up portrait (the sole face authority) plus full-body front and back panels on a deep neutral-grey plate — it binds to the turnaround slot and the expression slot stays null. That is deliberate: every bound sheet costs a reference slot on EVERY downstream shot, so one sheet per character doubles the cast you can stage against real caps (Kling 3.0 takes 4 ingredients, NB2 4 character slots, Seedance 9). Pass sheetTypes:['expression'] only when a character genuinely needs a separate expression range. baseAssetId is the source portrait (a project asset). Afterward, carry the character into a scene by passing its bound sheet asset id as characterAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image). Read slates-character-turnaround before calling. Default nano-banana-2 @ 2K — quote the price from slates_estimate_generation_cost, never from memory.",
+    "Generate one character identity sheet from a base portrait asset and bind it as the character's canonical reference. Call after slates_create_character. Read slates-character-identity before calling and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
     characterId: z.string().uuid(),
     projectId: z.string().uuid(),
-    baseAssetId: z.string().uuid().describe('The base portrait asset the sheets are generated from.'),
-    sheetTypes: z
-      .array(z.enum(['turnaround', 'expression']))
-      .optional()
-      .describe("Which sheets to generate. Default ['turnaround'] — the single identity sheet. Add 'expression' only when the character needs a dedicated expression range; it costs a second reference slot on every downstream generation."),
+    baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from.'),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
       .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2'])
@@ -773,11 +750,10 @@ export const generateCharacterSheets: Operation<{
   }),
   async run(input, ctx) {
     return ok(
-      await ctx.desktop().post('/agent/characters/generate-sheets', {
+      await ctx.desktop().post('/agent/characters/generate-identity', {
         characterId: input.characterId,
         projectId: input.projectId,
         baseAssetIds: [input.baseAssetId],
-        sheetTypes: input.sheetTypes,
         userNotes: input.userNotes,
         model: input.model,
       })
@@ -793,7 +769,7 @@ export const generateEnvironmentPlate: Operation<{
 }> = {
   id: 'slates_generate_environment_plate',
   description:
-    "Generate an environment's single clean establishing plate (Nano Banana 2, 2K) from an optional base image, and bind it as the environment's reference. THE real environment-building workflow — call right after slates_create_environment. Afterward, pass the plate asset id as environmentAssetIds to slates_generate_video (or referenceAssetIds to slates_generate_image) so the location stays consistent across shots. Cost ~6 credits.",
+    "Generate one clean establishing image from an optional base image and bind it as the environment's canonical reference. Call after slates_create_environment and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
     environmentId: z.string().uuid(),
     projectId: z.string().uuid(),
@@ -1792,7 +1768,7 @@ export const generateVideo: Operation<{
     lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
     ingredientAssetIds: z.array(z.string()).max(9).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni, Seedance, or Omni Flash. Up to 9 (Seedance), 4 (Kling), or 7 (Omni Flash, combined across all ref params).'),
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
-    environmentAssetIds: z.array(z.string()).optional().describe('Environment grid assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
+    environmentAssetIds: z.array(z.string()).optional().describe('Environment reference assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
     styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
     videoReferenceAssetId: z.string().optional().describe('Seedance ONLY: an existing VIDEO asset (UUID or badge code) to use as a reference — edit/relocate a clip, or MOTION TRANSFER (pair with a subject in ingredientAssetIds and a prompt like "the character from image 1 performs the motion from video 1"). 2-15s. Billing switches to input+output seconds (the vref key) — pass videoReferenceSeconds so the quote is right. If the clip contains a human/AI character, pair with seedanceFace=true (the default Seedance route blocks people). Ignored by Kling/Veo.'),
     videoReferenceSeconds: z.number().optional().describe('REQUIRED with videoReferenceAssetId: the reference clip\'s duration in seconds (from the asset listing). Feeds the vref cost key — a video-reference gen bills combined input+output seconds; the server re-derives this by probing the clip, so an understated value just gets corrected upward.'),
@@ -3230,7 +3206,7 @@ export const updateCharacter: Operation<{
 }> = {
   id: 'slates_update_character',
   description:
-    'Update a character\'s name, description, or style. (Turnaround / expression image slots have their own dedicated set_character_* ops.)',
+    'Update a character\'s name, description, or style. Use slates_set_character_identity_asset for its canonical image.',
   input: z.object({
     characterId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
@@ -3261,17 +3237,17 @@ export const updateEnvironment: Operation<{
   name?: string
   description?: string
   style?: string
-  gridAssetId?: string | null
+  referenceAssetId?: string | null
 }> = {
   id: 'slates_update_environment',
   description:
-    'Update an environment\'s name, description, style, or bound grid asset (gridAssetId=null clears it).',
+    'Update an environment\'s name, description, style, or bound reference image (referenceAssetId=null clears it).',
   input: z.object({
     environmentId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
     style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
-    gridAssetId: z.string().uuid().nullable().optional(),
+    referenceAssetId: z.string().uuid().nullable().optional(),
   }),
   async run(input, ctx) {
     return ok(
@@ -3281,7 +3257,7 @@ export const updateEnvironment: Operation<{
           name: input.name,
           description: input.description,
           style: input.style,
-          gridAssetId: input.gridAssetId,
+          referenceAssetId: input.referenceAssetId,
         },
       })
     )
@@ -3481,6 +3457,9 @@ export const deleteFrame: Operation<{ frameId: string }> = {
 function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (SKILLS[t]) return t
+  if (t === 'slates-character-turnaround' || t === 'character-turnaround') {
+    return 'slates-character-identity'
+  }
   if (
     t === 'model-selection' ||
     t === 'model selection' ||
@@ -3529,7 +3508,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
       .string()
       .min(1)
       .describe(
-        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-turnaround, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
+        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
       ),
   }),
   async run(input) {
@@ -3568,11 +3547,10 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   moveAssetsToFolder as unknown as Operation<unknown>,
   listCharacters as unknown as Operation<unknown>,
   createCharacter as unknown as Operation<unknown>,
-  setCharacterTurnaround as unknown as Operation<unknown>,
-  setCharacterExpression as unknown as Operation<unknown>,
+  setCharacterIdentity as unknown as Operation<unknown>,
   listEnvironments as unknown as Operation<unknown>,
   createEnvironment as unknown as Operation<unknown>,
-  generateCharacterSheets as unknown as Operation<unknown>,
+  generateCharacterIdentity as unknown as Operation<unknown>,
   generateEnvironmentPlate as unknown as Operation<unknown>,
   listStoryboards as unknown as Operation<unknown>,
   createStoryboard as unknown as Operation<unknown>,

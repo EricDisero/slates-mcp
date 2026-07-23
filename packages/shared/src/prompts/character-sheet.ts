@@ -2,25 +2,14 @@
 //
 // ARCHITECTURE (locked by Eric 2026-07-21): ONE identity sheet per character.
 // A dominant off-frontal chest-up portrait carries the face; two full-body
-// panels (front + back) carry build, wardrobe and hair. The sheet binds to the
-// character's TURNAROUND slot and the expression slot is left null.
+// panels (front + back) carry build, wardrobe and hair. The result is the
+// character's one canonical identity reference.
 //
 // Why one sheet and not two — three arguments, none of which depend on a
 // comparison generation:
-//   1. Reference-cap economics. Every `@character` mention pushes BOTH bound
-//      sheets into one reference group, so a two-sheet character costs TWO
-//      reference slots on every generation. Against real caps that is brutal:
-//      Kling 3.0 takes 4 ingredients (2 characters, zero room for an
-//      environment), NB2 has 4 character slots, Seedance 9. One sheet each
-//      DOUBLES the cast you can stage on every model we route to.
-//   2. Competing face renderings drop 6 → 2. The old pair sent three large
-//      portraits plus three postage-stamp faces (turnaround front + both
-//      profiles). The model cannot tell which rendering is authoritative and
-//      averages them; ByteDance documents the same root cause for its
-//      duplicate-character failure (ModelArk :1959) and prescribes fewer
-//      competing views. Both profile panels disappear with the shape change.
-//   3. One generation instead of two per character — half the sheet spend, one
-//      asset to inspect and bind.
+//   1. Reference-cap economics. Every character uses one reference slot.
+//   2. One authoritative face avoids averaging competing renderings.
+//   3. One generation means one asset to inspect and bind.
 //
 // KNOWN COST, accepted for v1: a neutral chest-up portrait carries no dental
 // information, so a character who smiles in a shot gets invented teeth. The
@@ -59,11 +48,6 @@
 // holds identity better. Reverting is a one-line change here — no migration,
 // no data touched. Quadrupeds are carved out below (a horse has no collarbone).
 //
-// BACK-COMPAT IS MANDATORY: ~20 live users have characters bound to BOTH
-// slots. `buildExpressionSheetPrompt` stays exported and the expression slot
-// stays readable; `mentions.ts` only pushes non-null paths, so old two-sheet
-// characters and new one-sheet characters both work unchanged.
-//
 // SOURCE OF TRUTH. The desktop imports these builders through
 // `slate/src/shared/prompts/character-sheet.ts` (a thin re-export since 1.2.1)
 // — there is no desktop prompt mirror to update. Map:
@@ -98,17 +82,6 @@ export const CHARACTER_SHEET_PANELS_DESC =
 /** Panel identifiers, in sheet order. */
 export const BODY_POSE_LABELS = ['portrait', 'front', 'back'] as const
 
-/**
- * Expression-sheet close-ups — LEGACY. Kept so characters built before the
- * 2026-07-21 single-sheet architecture keep regenerating correctly, and so the
- * expression slot remains usable for a character that genuinely needs a
- * dedicated expression range.
- */
-export const CHARACTER_EXPRESSIONS_DESC =
-  'neutral expression on left, genuine smile showing teeth in center, serious frown on right'
-
-export const EXPRESSION_LABELS = ['neutral', 'smile', 'serious'] as const
-
 // The sheet's style directive: a user transform REPLACES the inherit-source
 // instruction (so the model isn't told to both preserve the medium AND change
 // it); otherwise inherit the source medium.
@@ -117,13 +90,11 @@ function styleDirective(userStyle?: string | null): string {
 }
 
 /**
- * The character identity sheet — one asset, three panels, bound to the
- * turnaround slot. Named `buildCharacterTurnaroundPrompt` for continuity with
- * every existing caller and with the slot it binds to.
+ * The character identity sheet — one asset, three panels.
  *
  * @param userStyle optional natural-language style transform (e.g. "make her a real person")
  */
-export function buildCharacterTurnaroundPrompt(userStyle?: string | null): string {
+export function buildCharacterIdentityPrompt(userStyle?: string | null): string {
   return (
     `A single character identity reference sheet of one character, three panels side by side on one plate: ` +
     `${CHARACTER_SHEET_PANELS_DESC}. ` +
@@ -136,17 +107,5 @@ export function buildCharacterTurnaroundPrompt(userStyle?: string | null): strin
   )
 }
 
-/**
- * Expression sheet — LEGACY close-up face reference. Since 2026-07-21 the
- * identity sheet above is the default and this slot is normally left null.
- * Generate one only when a character needs an explicit expression range;
- * attaching it costs a second reference slot on every generation.
- */
-export function buildExpressionSheetPrompt(userStyle?: string | null): string {
-  return (
-    `Character expression reference sheet with 3 head and shoulder portraits arranged side by side horizontally: ${CHARACTER_EXPRESSIONS_DESC}. ` +
-    `Consistent character appearance across all three. ` +
-    `${styleDirective(userStyle)} ${IDENTITY_LIGHTING_CLAUSE} ${IDENTITY_CRAFT_CLAUSE} Same framing for each. ` +
-    `No text, no labels, no captions.`
-  )
-}
+/** @deprecated Use buildCharacterIdentityPrompt. */
+export const buildCharacterTurnaroundPrompt = buildCharacterIdentityPrompt

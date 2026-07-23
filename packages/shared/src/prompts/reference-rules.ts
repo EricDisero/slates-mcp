@@ -42,9 +42,9 @@ export const REFERENCE_RULES: ReferenceRule[] = [
   },
   {
     id: 'identity-name-as-one-entity',
-    title: 'One identity sheet per character — NAME whatever you attach as one entity',
-    rule: 'Attach the character\'s single identity sheet (dominant portrait + body panels) rather than a pile of views — fewer competing renderings of a face is always better, because the model cannot tell which is authoritative and averages them. When a character DOES carry a second bound sheet (an explicit expression range, or a legacy turnaround+expression pair), NAME both inline as the SAME subject ("Marcus (images 1 and 2)") — that shared name is what tells the model they are ONE person. Do NOT inject a role essay ("use for identity, ignore the outfit/lighting, render neutral"): the user\'s prompt owns wardrobe, expression, and lighting.',
-    why: 'Naming both images as one entity IS each model\'s OWN official consistency lever — NB2 "assign a distinct name to each character/object"; Seedance "Reference <Subject_N> in <Image_N>"; Kling "reuse a fixed label verbatim". The old heavy role-essay was the OFF-doctrine part: telling the model to "use for identity" while injecting "ignore the outfit" dragged the studio-lit sheet\'s wardrobe + lighting into scenes that explicitly wanted otherwise (the movie-still injection failure). The close-ups still carry far more facial signal (eyes, skin, teeth, bone structure) than a turnaround\'s postage-stamp faces, so attach both — the NAME, not an instruction, is what makes many refs work. The trend is MORE references (video/audio/3D into Seedance-class models), all addressed by name.',
+    title: 'One identity sheet per character, named inline',
+    rule: 'Attach the character\'s single identity sheet (dominant portrait + body panels) rather than a pile of views — fewer competing renderings of a face is better, because the model cannot tell which is authoritative and averages them. Cite it inline as the subject ("Marcus (image 1)"). Do not inject a role essay ("use for identity, ignore the outfit/lighting, render neutral"): the user\'s prompt owns wardrobe, expression, and lighting.',
+    why: 'Distinct inline naming is each model\'s own consistency lever — NB2 "assign a distinct name to each character/object"; Seedance "Reference <Subject_N> in <Image_N>"; Kling "reuse a fixed label verbatim". One canonical identity image removes same-role competition before it starts.',
     grade: 'Eric-test',
   },
   {

@@ -47,7 +47,7 @@ The user's request is one of:
 ### 4. Generate, evaluate, decide
 - Estimate cost first.
 - After generation, the result is inline. Compare side-by-side with the original (`slates_get_asset_image` again).
-- If the delta is correct: bind to the same slot (frame, character turnaround, etc.) the original was bound to.
+- If the delta is correct: bind to the same role (frame, character identity, etc.) the original was bound to.
 - If the delta missed: one focused refinement, then regenerate. Cap at 3 tries.
 
 ### 5. Hand back

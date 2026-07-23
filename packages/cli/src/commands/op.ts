@@ -187,7 +187,7 @@ function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<
 
     // `--folderId null` (or a bare `--folderId` → true is NOT null) → JS null
     // for fields that actually allow null. Enables "move to project root",
-    // "clear character turnaround", etc. from the CLI.
+    // "clear character identity", etc. from the CLI.
     if (value === 'null' && isNullable(declared)) {
       out[key] = null
       continue

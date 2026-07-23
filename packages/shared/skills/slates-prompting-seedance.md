@@ -91,7 +91,7 @@ Every time a subject appears, it must be **explicitly referred to**. Two support
 
 Also official: keep descriptions concise, avoid redundancy, avoid semantic conflicts (contradictory traits for one subject), and prefer expressing spatial relationships through reference images rather than dense text. `[:1550-1556]`
 
-**`[slates]`** — the app composes this for you. `composeReferences()` cites each reference inline as `Name (image N)` / `Name (images 1 and 2)` in the exact order it sends them, which is ByteDance's own duplicate-character format (*"Zhang San (corresponding to image 1)"* `[:1976]`). You never hand-write role labels or index numbers.
+**`[slates]`** — the app composes this for you. `composeReferences()` cites each canonical character or environment reference inline as `Name (image N)` in the exact order it sends them, which is ByteDance's own duplicate-character format (*"Zhang San (corresponding to image 1)"* `[:1976]`). You never hand-write role labels or index numbers.
 
 ## Action description `[official :1602-1621]`
 
@@ -153,7 +153,7 @@ Seedance has **no `negativePrompt` field** — constraints go inline in this slo
 3. **Optimize reference assets** `[:1988]` — *"For character reference images, prioritize independent single-person photos. Three-view or multi-view assets are not recommended."*
 4. **Simplify the prompt** — do not paste a whole script; redundant copy confuses the model.
 
-**Scope this honestly.** This is troubleshooting for the twin problem in **multi-character frames**, not a blanket verdict on turnaround sheets. Practical rule for Slates:
+**Scope this honestly.** This is troubleshooting for the twin problem in **multi-character frames**, not a blanket verdict on identity sheets. Practical rule for Slates:
 
 - **Multi-character Seedance shot** → bind every character to its image, append the anti-twin constraint, and prefer single-person / dominant-portrait references over multi-view sheets.
 - **Single-character shot** → the standard character-sheet flow is fine.
@@ -226,7 +226,7 @@ Seedance routes through **three tiers** depending on the face in the reference, 
 
 Rules:
 - **The real-vs-AI call is the PROVIDER'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass the standard face route (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively route to the real-face tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every route.
-- It's about the **reference, not the output.** If your character refs (turnaround, expression sheet, a generated portrait) show a face, turn it on. A product shot with no person stays off.
+- It's about the **reference, not the output.** If your character identity or generated portrait shows a face, turn it on. A product shot with no person stays off.
 - Don't toggle it on "just in case" — a faceless gen on the face route burns ~45% extra for nothing.
 <!-- /slates-only -->
 
@@ -251,7 +251,7 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each one adds context AND another variable to balance.
 2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates composes the naming for you from your `@mentions` / `#tags` — you never hand-write role labels.
-3. **One identity sheet per character — and whatever you do attach for a subject, NAME it as one entity.** A character's identity sheet is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is always better, because the model cannot tell which one is authoritative and averages them.** Where a character carries a second bound sheet — an explicit expression range, or a legacy turnaround+expression pair — cite BOTH under the SAME name, `Marcus (images 1 and 2)`. That shared name, not a role essay, is what tells the model they are ONE person and stops the varied expressions from averaging the face. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
+3. **One identity sheet per character, named inline.** A character's identity is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is better, because the model cannot tell which one is authoritative and averages them.** Slates cites it as `Marcus (image 1)`. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 4. **Flat-light identity refs.** Prep identity references with flat, even, shadowless lighting on a plain neutral background. A studio-lit or scene-lit character sheet bleeds its lighting into every generation — the failure looks like the subject was green-screen-pasted in front of the location. Reference prep beats prompting here.
 5. **Environment: describe it, don't feed a grid.** Default to describing the location in words and let the model build a space that fits the shot. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with natural ambient light that reads as the location's real light — never a multi-panel grid fed whole.
 6. **Grids: explore, don't input.** Use grids to explore compositions cheaply, then pick a cell. Never feed a grid back in as a reference — the cells share a split detail budget and were generated jointly, so their flaws propagate.

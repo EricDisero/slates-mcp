@@ -14,10 +14,9 @@
 // the desktop generation + rail read from this one function, so the rail's badge
 // numbers and the prompt's "image N" citations can never desync.
 //
-// Naming is the ONLY identity signal. Citing both of a subject's images as the
-// SAME name ("Marcus (images 1 and 2)") tells the model they are ONE entity —
-// which is what prevents a multi-image bucket from averaging into a blended
-// face. This IS each model's own official consistency lever (NB2 "assign a
+// Naming is the identity signal. Citing the canonical subject image inline
+// ("Marcus (image 1)") tells the model which reference owns that entity. This
+// is each model's own official consistency lever (NB2 "assign a
 // distinct name", Seedance "Reference Subject_N in Image_N", Kling "reuse a fixed
 // label verbatim"); the heavy role-essay block was the off-doctrine part.
 
@@ -46,7 +45,7 @@ export interface ReferenceGroup {
   /** Display + citation name: 'Marcus' | 'the cafe' | 'noir'. Used verbatim. */
   name: string
   kind: ReferenceKind
-  /** A group can carry several images (e.g. turnaround + expression). */
+  /** A group can carry several images for workflows that genuinely need them. */
   media: ReferenceMedia[]
 }
 
