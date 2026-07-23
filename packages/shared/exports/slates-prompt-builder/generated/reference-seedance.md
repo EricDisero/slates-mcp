@@ -1,7 +1,6 @@
----
-name: slates-prompting-seedance
-description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2. Seedance structures multi-beat prompts as a "Shot 1 / Shot 2 / Shot 3" storyboard against an 8-slot advanced formula — never per-second time stamps. Its syntax differs from Kling, Veo and the image models; don't cross-pollinate (in particular, no lens / aperture / film-stock vocabulary).
----
+<!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
+
+> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
 
 # Seedance 2.0 — prompting
 
@@ -55,7 +54,7 @@ Seedance classifies your request from the phrasing. Use the pattern that matches
 
 > *"For edit / extend video tasks, directly use `<Video_N>` to refer to the video. **Do not use "reference `<Video_N>`"**, to avoid being incorrectly identified as a reference task."*
 
-This is easy to trip: Slates has an edit lane<!-- slates-only --> (`slates_generate_video` with `videoReferenceAssetId`, plus the Seedance edit/relocate routes)<!-- /slates-only -->. Writing *"reference video 1 and change the jacket to red"* gets classified as a **reference** task — the model generates a brand-new clip inspired by the source instead of editing it. Write *"Strictly edit video 1, and modify the blue jacket to red."*
+This is easy to trip: Slates has an edit lane. Writing *"reference video 1 and change the jacket to red"* gets classified as a **reference** task — the model generates a brand-new clip inspired by the source instead of editing it. Write *"Strictly edit video 1, and modify the blue jacket to red."*
 
 ## Shot structure — "Shot 1 / Shot 2 / Shot 3" `[official :1563-1598]`
 
@@ -206,29 +205,11 @@ Reference-to-video accepts up to **9 reference images, 3 reference videos, 3 aud
 
 ### Motion transfer & lip-sync recipes (reference video / audio)
 
-These aren't separate Seedance features — they're prompting strategies over reference media.<!-- slates-only --> The Slates tools (`slates_generate_motion_transfer` / `slates_generate_lip_sync` with the seedance engine) compose them for you. When driving them by hand through `slates_generate_video`:<!-- /slates-only -->
+These aren't separate Seedance features — they're prompting strategies over reference media.
 
-- **Motion transfer:** subject image as a reference + the driving clip<!-- slates-only --> via `videoReferenceAssetId`<!-- /slates-only --> (2–15s) + `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.`
+- **Motion transfer:** subject image as a reference + the driving clip (2–15s) + `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.`
 - **Lip-sync / dialogue:** write the line in the prompt — `The person in video 1 says: "…"` — with audio generation on (always on in Slates). A **video** source's own voice is cloned natively; an **audio** reference (≤15s) drives speech from an existing recording: `…speaks the dialogue from audio 1 with accurate lip sync.`
 - **Voice + face from one clip (the talking-head recipe):** ONE unedited 2–15s clip of the person speaking (clear voice, no music, no cuts) as the video reference + prompt with the new script → their likeness AND voice deliver the new line.
-<!-- slates-only -->
-- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = clip seconds + output seconds — quote before confirming. Audio references are free (audio is included on every route).
-<!-- /slates-only -->
-
-<!-- slates-only -->
-## Faces — set `seedanceFace` for AI-character faces
-
-Seedance routes through **three tiers** depending on the face in the reference, exposed as the "Face in Reference" toggle plus the real-face params on `slates_generate_video`:
-
-- **Faceless / object / environment refs → default route (cheapest).** Leave `seedanceFace` off.
-- **An AI-character's FACE in a reference → `seedanceFace: true`.** The default route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider. It costs **~45% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
-- **A REAL person's photo (the user themselves, an actor) → the consent-gated premium route.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the provider classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, roughly 2× the AI-face rate — quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
-
-Rules:
-- **The real-vs-AI call is the PROVIDER'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass the standard face route (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively route to the real-face tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every route.
-- It's about the **reference, not the output.** If your character refs (turnaround, expression sheet, a generated portrait) show a face, turn it on. A product shot with no person stays off.
-- Don't toggle it on "just in case" — a faceless gen on the face route burns ~45% extra for nothing.
-<!-- /slates-only -->
 
 ## Reference rules (the verified ones)
 
@@ -263,22 +244,11 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 ### For Seedance specifically
 
-- **Describe the ACTION, never the reference's content.** With refs attached, prompt only what is *happening* — motion, change, camera. Never re-describe what's in the reference, and never say "still / scene / from a movie / from the image." The model already sees the refs; narrating them wastes tokens and induces drift. Injection is stochastic — if a roll misses, **re-roll, don't re-engineer** (and a slow gen is not a failed one<!-- slates-only --> — see slates-cost-discipline<!-- /slates-only -->).
+- **Describe the ACTION, never the reference's content.** With refs attached, prompt only what is *happening* — motion, change, camera. Never re-describe what's in the reference, and never say "still / scene / from a movie / from the image." The model already sees the refs; narrating them wastes tokens and induces drift. Injection is stochastic — if a roll misses, **re-roll, don't re-engineer** (and a slow gen is not a failed one).
 - **Seedance's own idiom for rule 2 is `Reference <Subject_N> in <Image_N>`** `[official :1389]` — `Image_N` indexes the order the refs are attached, so the name plus the index carries the role. The full binding grammar is in Part 1 (Subject binding).
 - **Rule 3 has an official ceiling here.** The trend is MORE references (video and audio into Seedance), all addressed by name — but for **multi-character frames** see the twin-problem section above: bind every character to its image, append the anti-twin constraint, and prefer single-person references. Past 4 reference people, stability drops `[official :2048-2052]`.
 - **Rule 8 holds even though Seedance can render common text natively** `[official :1758]`. A baked NB2 start frame is still the reliable route for text that must be legible.
 - **Rule 5 pairs with the first/last-frame exclusion** — frames and reference images are mutually exclusive on this model (see Reference media above), so an environment you must match exactly costs you the frame lane.
-
-<!-- slates-only -->
-## Pre-flight: references arrive inline, refer by code
-
-When you call `slates_generate_video` with reference asset IDs (firstFrameAssetId, lastFrameAssetId, ingredientAssetIds), the first call returns those references **inline as image content blocks** alongside a cost estimate and `requires_confirm: true`. **Look at the references** — if they suggest a different framing, lighting, or motion than your current prompt captures, revise the prompt before re-calling with `confirm=true`.
-
-When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Beach Sunset`. The user sees that code as a badge on the gallery thumbnail, so they can match what you're saying to what they're looking at.
-
-- ✅ "I'm using **IMG-A12** as the first frame and **IMG-A15** as the last frame — the camera move is going to be a slow dolly forward through the gap."
-- ❌ "I'm using the first beach image and the last one..." (which? They have four.)
-<!-- /slates-only -->
 
 ---
 
@@ -331,7 +301,7 @@ One primary anchor + 2-3 supporting details, as the trailing paragraph (both off
 
 ## ⚠️ Don't cross-pollinate image-model syntax
 
-Named **lenses, apertures, film stocks, and camera bodies** — `85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`, `shot on Sony A7S3` — are an **image-model lever** (correct and encouraged in `slates-prompting-nano-banana-2`) and a **Seedance anti-pattern**. ByteDance's guide uses shot sizes, camera moves, pacing words, and the image-quality/style vocabulary throughout, and never once mentions fps, shutter angle, f-stop, or lens millimetres.
+Named **lenses, apertures, film stocks, and camera bodies** — `85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`, `shot on Sony A7S3` — are an **image-model lever** (correct and encouraged in `reference-nano-banana.md`) and a **Seedance anti-pattern**. ByteDance's guide uses shot sizes, camera moves, pacing words, and the image-quality/style vocabulary throughout, and never once mentions fps, shutter angle, f-stop, or lens millimetres.
 
 If you are carrying a look over from an NB2 start frame, translate it: `85mm f/1.4, Portra 400` → `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`.
 

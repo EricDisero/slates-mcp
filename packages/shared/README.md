@@ -21,3 +21,16 @@ Prompting doctrine that applies to more than one model lives **once**, in `skill
 `npm run build` runs `sync-partials.mjs --check`, which fails with a diff if anything inside a marker block was hand-edited, if a skill references a partial that doesn't exist, if markers are unbalanced, or if a partial is referenced by nothing. Run `npm run sync-partials` to apply changes after editing a partial.
 
 **To change shared prompting doctrine: edit the partial.** Never edit between markers, never edit `partials.generated.ts`, and never hand-copy a shared rule into a new skill — a copy is a fork with a delay fuse. Per-model levers (a vendor's own official consistency mechanism, its caps and transport quirks) stay hand-authored, below the injected block, under a `### For <model> specifically` heading.
+
+## Portable Prompt Builder export
+
+The downloadable Claude `.skill` is generated at `exports/slates-prompt-builder/generated/`. Its model, character, and content-policy references come directly from the resolved production files in `skills/`; its routing table derives from `MODEL_FACTS`; the portable wrapper owns only export-specific scope and output behavior.
+
+```bash
+npm run sync-prompt-builder   # regenerate markdown, manifest, and deterministic .skill
+npm run typecheck             # fails if the committed export is stale
+```
+
+`scripts/build-prompt-builder.mjs --check` validates generated text content (normalizing LF/CRLF), keeps the archive byte-exact, opens it to verify its exact entry set, and enforces the runtime character contract (one sheet, the canonical `IDENTITY_PLATE_HEX`, flat/shadowless light, and the three-panel builder). Never edit `exports/slates-prompt-builder/generated/` directly.
+
+The repository verification workflow runs both typecheck and build on every pull request and push to `main`, so stale exports cannot merge through the normal GitHub path.

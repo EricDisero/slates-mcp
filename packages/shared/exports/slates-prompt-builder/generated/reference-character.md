@@ -1,7 +1,6 @@
----
-name: slates-character-turnaround
-description: Build a Slates character from a reference image — generate its identity reference sheet and bind it to the character so the card updates live. Use when the user wants to "create a character", "build a character from this image", "generate a turnaround for X", or starts any storyboard flow that needs consistent character references.
----
+<!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
+
+> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
 
 # Character identity sheet — Slates workflow
 
@@ -48,25 +47,10 @@ The user has either:
 - Pasted/uploaded an image of the character (real person, drawing, AI render).
 - Described the character in text only.
 
-If image: upload it as a reference<!-- slates-only --> (`slates_upload_reference_image`)<!-- /slates-only -->.
+If image: upload it as a reference.
 If text only: generate from prompt-only — less consistent, so warn the user.
 
-<!-- slates-only -->
-### Create the character record
-`slates_create_character` with:
-- `name` (ask if not given)
-- `description` — 1-2 sentences, *visual* only ("tall, dark hair, scar over left eye"), not personality.
-- `style` — leave as the source's own medium by default. Only name a transform if the user wants one (e.g. anime → realistic).
-<!-- /slates-only -->
-
 ### Generate the sheet
-<!-- slates-only -->
-`slates_generate_character_sheets` with `characterId`, `projectId`, and `baseAssetId` (the source portrait).
-
-**Do not hand-write the sheet prompt.** Slates builds it from the canonical template in `@slatesvideo/shared/prompts` (`buildCharacterTurnaroundPrompt`) — panels, plate, lighting and craft clauses included — and appends your `userNotes`. Use `userNotes` for what the template can't know: *"use the woman on the left"*, *"keep the scar on the right cheek"*. A hand-written prompt is a fork of the template and will drift from it.
-
-- Estimate cost first with `slates_estimate_generation_cost` and announce in **credits** — never quote a price from memory.
-<!-- /slates-only -->
 
 - Default to Nano Banana 2 at 2K. **Never 4K** — no identity gain at sheet scale, wasted spend.
 - When the result returns inline, **evaluate it before binding**:
@@ -77,12 +61,6 @@ If text only: generate from prompt-only — less consistent, so warn the user.
   - Is it in the source's medium, and does it read as *that* medium done well — or has it drifted toward the over-clean game-model look?
   - Plate a flat deep grey, not white and not black?
 - If off: one focused refinement, then regenerate. The sheet is upstream of everything — it is worth a re-roll that a scene frame is not.
-<!-- slates-only -->
-- The op binds the result to the turnaround slot automatically.
-
-### Hand back
-> "Character {name} ready — identity sheet bound. Use `@{name}` in any prompt and Slates attaches it and names it inline, so the face stays consistent."
-<!-- /slates-only -->
 
 ## How the reference gets used at scene time
 
@@ -99,4 +77,4 @@ Critically, the app injects **no** wardrobe, expression, or lighting directive. 
 - **Don't** invent character details. Stick to what's in the reference image and the user's description.
 - **Don't** describe the headless front panel as removal or decapitation — in `userNotes` or any hand-written variant. The template asks for it as *framing* — "cropped at the collarbone, head not shown, invisible-mannequin presentation" — which is a standard e-commerce genre with deep training data. Removal phrasing is untested and invites a refusal.
 - **Don't** use 4K — wastes credits, no quality gain at sheet scale.
-- **Don't** feed a multi-view sheet into a Seedance shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint — ByteDance documents multi-view assets as a cause of duplicate characters. See `slates-prompting-seedance`.
+- **Don't** feed a multi-view sheet into a Seedance shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint — ByteDance documents multi-view assets as a cause of duplicate characters. See `reference-seedance.md`.

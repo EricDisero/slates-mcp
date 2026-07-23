@@ -1,7 +1,6 @@
----
-name: slates-prompting-kling-v3
-description: How to prompt Kling V3.0 (Kuaishou). Read before calling slates_generate_video with kling-v3.0-std, kling-v3.0-pro, or kling-v3.0-omni. Kling has dialogue + SFX + ambient native syntax (Omni adds multi-character dialogue and language codes). Multi-shot rules differ from Seedance/Veo — don't cross syntaxes.
----
+<!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
+
+> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
 
 # Kling V3.0 — prompting
 
@@ -164,7 +163,7 @@ Layer scene-specific suppressions on top.
 - **Pro**: higher visual quality, no audio
 - **Omni**: multi-character dialogue, audio-visual co-gen, language codes, `@elementN` references
 
-Pick by capability: need dialogue/audio → Omni; need maximum visual quality silent → Pro; everything else → Standard. Prices change — check current numbers before choosing a tier<!-- slates-only -->; call `slates_estimate_generation_cost` or `slates_list_available_models`<!-- /slates-only -->.
+Pick by capability: need dialogue/audio → Omni; need maximum visual quality silent → Pro; everything else → Standard. Prices change — check current numbers before choosing a tier.
 
 ## Benchmark prompt structure
 
@@ -179,24 +178,13 @@ Cinematic example (paraphrasing fal blog patterns):
 > Shot 2: Medium shot of a detective in a trench coat ducking under an awning, water dripping from his hat brim. [Detective: weary, raspy]: 'I knew she'd come back.' Ambient noise: distant traffic, rain on metal.
 > Shot 3: Close-up on his eyes, narrowing as headlights flash across his face."
 
-<!-- slates-only -->
-## Pre-flight: references arrive inline, refer by code
-
-When you call `slates_generate_video` with `firstFrameAssetId` or `ingredientAssetIds`, the first call returns those references **inline as image content blocks** alongside cost + `requires_confirm: true`. Look at them, revise prompt if needed, then re-call with `confirm=true`. Kling Omni multi-character with several ingredient images especially benefits — confirm each character image lands cleanly before spending.
-
-When talking to the user about the gen, refer to each reference by its short code: `IMG-A12 — Detective Closeup`. The user sees that code as a gallery badge.
-
-- ✅ "I'm anchoring on **IMG-A12** as the detective and **IMG-A18** as the alleyway environment — Omni will handle the line delivery in EN."
-- ❌ "I'm using the detective image and the alley one..." (which alley? Three exist.)
-<!-- /slates-only -->
-
-## Video-to-video EDIT<!-- slates-only --> (`slates_edit_video`)<!-- /slates-only --> — @Video1 / @ElementN / @ImageN
+## Video-to-video EDIT — @Video1 / @ElementN / @ImageN
 
 Kling O3 edit takes an EXISTING 3-15s clip and changes only what the prompt names — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved by default. Its notation is Kling's own, different from the "image N" naming used everywhere else:
 
 - **`@Video1`** — the source clip (always; the transport anchors the instruction to it).
-- **`@Element1..`** — subjects to swap IN. Each element = one frontal image + up to 3 angle images<!-- slates-only --> (pass as `characterAssetIds`; @mention names in the prompt compile to @ElementN automatically)<!-- /slates-only -->.
-- **`@Image1..`** — style/appearance references<!-- slates-only --> (pass as `styleAssetIds`)<!-- /slates-only -->.
+- **`@Element1..`** — subjects to swap IN. Each element = one frontal image + up to 3 angle images.
+- **`@Image1..`** — style/appearance references.
 - Max **4 combined** element + image refs per edit.
 
 **Prompt shape — the change, not the whole scene:**
@@ -214,7 +202,7 @@ Rules:
 - One edit intent per pass. Chain passes for compound changes (each output is itself an editable clip, linked to its parent).
 - Billing is per second of OUTPUT ≈ the clip length, rounded UP to the next second. A 7.3s clip bills as 8s.
 - Clip constraints: 3-15s, 720-3840px, MP4/MOV. Agents can pre-trim on the timeline when a clip runs long.
-- Routing: Kling edit is the default edit tool (element lock + audio intact); Seedance edit/relocate wins style-transfer-heavy re-imaginings<!-- slates-only --> — see `slates-model-selection`<!-- /slates-only -->.
+- Routing: Kling edit is the default edit tool (element lock + audio intact); Seedance edit/relocate wins style-transfer-heavy re-imaginings.
 
 ## Sources
 

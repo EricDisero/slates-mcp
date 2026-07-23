@@ -1,11 +1,10 @@
----
-name: slates-prompting-nano-banana-2
-description: How to write prompts that produce cinematic, photorealistic results from Nano Banana 2 (Google Gemini 3.1 Flash Image, accessed via fal-ai/nano-banana-2). Read this before calling slates_generate_image when the user wants film-quality, real-world, or cinematic output. Skip for stylized / illustrated / cartoon work — the rules differ.
----
+<!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
+
+> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
 
 # Nano Banana 2 — cinematic & photorealistic prompting
 
-Nano Banana 2 is **Gemini 3.1 Flash Image**.<!-- slates-only --> It is the default model behind `slates_generate_image` — the op also exposes `flux-2-max` and `seedream-5-lite`, each with its own prompting skill.<!-- /slates-only --> It is **not** Gemini 3 Pro Image; that is Nano Banana **Pro** (`nano-banana-pro`), a separate model with its own seat.<!-- slates-only --> Verified against the runtime slug map in `slate/src/main/api/google.ts`.<!-- /slates-only --> NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
+Nano Banana 2 is **Gemini 3.1 Flash Image**. It is **not** Gemini 3 Pro Image; that is Nano Banana **Pro** (`nano-banana-pro`), a separate model with its own seat. NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
 
 Knowledge cutoff: January 2025. Anything after needs explicit reference images.
 
@@ -32,7 +31,7 @@ Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and a
 
 > ⚠️ **This vocabulary is an IMAGE-model lever and a video-model anti-pattern — do not carry it across.**
 > Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`) are correct and encouraged **here**. They are a **Seedance anti-pattern**: ByteDance's own guide uses shot sizes, camera moves, pacing words and its image-quality vocabulary throughout, and never once mentions fps, shutter angle, f-stop, or lens millimetres.
-> The leak happens in one specific way — you write an NB2 start frame, then write the video prompt to animate it and carry the look description straight across. **Translate instead of copying:** `85mm f/1.4, Portra 400` → `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. Full rule and the receipts: `slates-prompting-seedance` (Part 3, "Don't cross-pollinate image-model syntax").
+> The leak happens in one specific way — you write an NB2 start frame, then write the video prompt to animate it and carry the look description straight across. **Translate instead of copying:** `85mm f/1.4, Portra 400` → `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. Full rule and the receipts: `reference-seedance.md` (Part 3, "Don't cross-pollinate image-model syntax").
 
 **Named lenses + apertures** beat generic "shallow depth of field":
 - `85mm f/1.4`, `135mm f/2.8` (the cheat code for skin texture), `50mm f/1.2`, `35mm f/2`
@@ -100,7 +99,7 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 ## Reference images
 
 - **Hard limit: 14 images** (10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
-- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style<!-- slates-only --> (or pass `referenceAssetIds`)<!-- /slates-only -->, Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (images 1 and 2) sits across from the woman (images 3 and 4) in the cafe (image 5)`, with a trailing `Render in the visual style of image 6.` The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**, so citing both of a subject's sheets under the SAME name ("Marcus") is what tells the model they are ONE person and stops the face averaging. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
+- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style, Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (images 1 and 2) sits across from the woman (images 3 and 4) in the cafe (image 5)`, with a trailing `Render in the visual style of image 6.` The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**, so citing both of a subject's sheets under the SAME name ("Marcus") is what tells the model they are ONE person and stops the face averaging. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 
 ### Reference rules (the verified ones)
 
@@ -156,7 +155,7 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 ## Resolution tactics
 
-- Resolution is priced: NB2 4k costs roughly 2x 1k. Prices change — check current numbers<!-- slates-only --> by calling `slates_estimate_generation_cost`<!-- /slates-only -->. Pick the cheapest resolution that serves the use case.
+- Resolution is priced: NB2 4k costs roughly 2x 1k. Prices change — check current numbers. Pick the cheapest resolution that serves the use case.
 - **At 2K and above, the model allocates more tokens to surface detail** — explicit texture vocabulary (pores, fabric weave, grain) compounds at higher resolution.
 - 1k for fast iteration / drafts; 2k for hero shots; 4k only when you need print-grade detail.
 - 2K generations vary 20-60s+. Don't time-budget tightly.
@@ -181,7 +180,3 @@ Everything in this skill applies to the whole Nano Banana family; two variants t
 
 - **nano-banana-2-lite** — ~half the price, ~2.7× faster, **1K output only**, max 4 refs. The draft/iteration seat: explore compositions here, then re-run the winner on NB2 full at 2K/4K. Same Gemini filter.
 - **nano-banana-pro** — the hero-frame/typography ceiling (~2× NB2, 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs — it takes a full subject library in one call.
-
-<!-- slates-only -->
-Routing between them (and vs GPT Image 2 / FLUX / Seedream): `slates-model-selection`.
-<!-- /slates-only -->

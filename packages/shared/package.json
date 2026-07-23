@@ -24,12 +24,15 @@
     "dist",
     "!dist/**/*.map",
     "skills",
+    "exports/slates-prompt-builder/generated",
     "README.md"
   ],
   "scripts": {
     "sync-partials": "node scripts/sync-partials.mjs",
-    "build": "node scripts/sync-partials.mjs --check && node scripts/embed-skills.mjs && tsc",
-    "typecheck": "node scripts/sync-partials.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
+    "build-prompt-builder": "node scripts/build-prompt-builder.mjs",
+    "check-prompt-builder": "node scripts/build-prompt-builder.mjs --check",
+    "build": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc",
+    "typecheck": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
     "prepublishOnly": "npm run build"
   },
   "repository": {
@@ -60,6 +63,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "fflate": "^0.8.3",
     "typescript": "^5.7.0"
   }
 }

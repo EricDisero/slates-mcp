@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "source": "@slatesvideo/shared",
+  "sourceFiles": [
+    {
+      "path": "exports/slates-prompt-builder/prompt-builder.md",
+      "sha256": "d7510c28be9453ab1bb1be062ff04a79a75ede5150ac4564a978d4a80d6315c5"
+    },
+    {
+      "path": "skills/slates-character-turnaround.md",
+      "sha256": "a9fc9f00dec0028c3be5af5ff79f8a0e8266cf621938306ee92574f492d0d098"
+    },
+    {
+      "path": "skills/slates-prompting-seedance.md",
+      "sha256": "fc1e2cacbf31f095e66b8c188126b953a42d8ea900d024d1eed2508449be7673"
+    },
+    {
+      "path": "skills/slates-prompting-kling-v3.md",
+      "sha256": "ca9f67c45f2cf0e0e1deb991646b849ce5df5a8845de5e97dffe83be541dfef8"
+    },
+    {
+      "path": "skills/slates-prompting-nano-banana-2.md",
+      "sha256": "59a978b408d690c9c2b0594b3a05529b6b8a4b343694f87e006e22fbc0a7bceb"
+    },
+    {
+      "path": "skills/slates-content-policy.md",
+      "sha256": "ee5afd3e0d276d75c08b1747f551878be28d22151a369c969c55e58fda3f5710"
+    },
+    {
+      "path": "src/prompts/model-facts.ts",
+      "sha256": "3bdc599838204334e0dcbdb076c1d866b5eba2eed17c5de8f5077cfaa5f6fe0b"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "SKILL.md",
+      "bytes": 4969,
+      "sha256": "51bb840b158c84e5d9060af9849ec23b94031d0ff0413f13da9a97358b40ec66"
+    },
+    {
+      "path": "reference-character.md",
+      "bytes": 8780,
+      "sha256": "899a7808ff1da1d44c2274fc9abb80d1b971872a1ae5917236301fe7213f635d"
+    },
+    {
+      "path": "reference-seedance.md",
+      "bytes": 32008,
+      "sha256": "9d247746652acb6aa2eff90c418a9b7b34f972371d8d466129420f9b753ef38a"
+    },
+    {
+      "path": "reference-kling.md",
+      "bytes": 13940,
+      "sha256": "80d3aa9845f2772df7be242e840d9470c2f95eff2ef2bbf30878e559f989aba7"
+    },
+    {
+      "path": "reference-nano-banana.md",
+      "bytes": 17008,
+      "sha256": "f2acaa362c53d4abc20ac59f6b276939b139666133bbc3298826c8c6f8f69ba9"
+    },
+    {
+      "path": "reference-content-policy.md",
+      "bytes": 6785,
+      "sha256": "4c0fe7cd7d3d6b854af6702133fd81a3338a5cb01f48e4a626165c4eb9667b06"
+    }
+  ],
+  "archive": {
+    "path": "slates-prompt-builder.skill",
+    "bytes": 37874,
+    "sha256": "cc76ab8011d81ba0092c12104922c182ca9ffad75c17599a322fd7414f7fb30a",
+    "entries": [
+      "SKILL.md",
+      "reference-character.md",
+      "reference-content-policy.md",
+      "reference-kling.md",
+      "reference-nano-banana.md",
+      "reference-seedance.md"
+    ]
+  }
+}
