@@ -8,7 +8,7 @@
     },
     {
       "path": "skills/slates-character-identity.md",
-      "sha256": "cc0387b21c83bbf0840524e5b124db889d5ee584cbacd19ffaf5fd2ec132bd20"
+      "sha256": "52191db058ada8096297e97958268548b352a5f81739d1bfd01da340867f2d35"
     },
     {
       "path": "skills/slates-prompting-seedance.md",
@@ -39,8 +39,8 @@
     },
     {
       "path": "reference-character.md",
-      "bytes": 7950,
-      "sha256": "3f9af66752811a355225db039aeda9c724b685ede071900c51e61624c9e05622"
+      "bytes": 10081,
+      "sha256": "7dd5b693f3095b6678106c1a41c1303d57b3d7a30da0eeffc867fc5000fd6c74"
     },
     {
       "path": "reference-seedance.md",
@@ -65,8 +65,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 37054,
-    "sha256": "823cbb640eb6f64afceec8665f20685cf851527d2b886e1443bccca0ead4afeb",
+    "bytes": 37938,
+    "sha256": "48331704f54f422542f7a1a164915f3739b925e3f225a3710dbd8ecb2963ce68",
     "entries": [
       "SKILL.md",
       "reference-character.md",

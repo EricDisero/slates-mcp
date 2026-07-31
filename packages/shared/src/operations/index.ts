@@ -650,6 +650,40 @@ export const moveAssetsToFolder: Operation<{ assetIds: string[]; folderId: strin
   },
 }
 
+export const moveAssetsToProject: Operation<{
+  sourceProjectId: string
+  assetIds: string[]
+  targetProjectId: string
+}> = {
+  id: 'slates_move_assets_to_project',
+  description:
+    'Move assets (images, videos, audio) out of one project into another. The media files move on disk into the destination project folder — this is a real re-home, not a copy. Moved assets leave whatever gallery folder they were in and are issued fresh badge codes in the destination.',
+  input: z.object({
+    sourceProjectId: z.string().uuid(),
+    // Badge codes ("IMG-A8") resolve against sourceProjectId at call time.
+    assetIds: z.array(z.string().min(1)).min(1),
+    targetProjectId: z.string().uuid(),
+  }),
+  async run(input, ctx) {
+    if (input.sourceProjectId === input.targetProjectId) {
+      throw new Error('sourceProjectId and targetProjectId are the same — nothing to move.')
+    }
+    const resolved = await resolveAssetRefs(ctx, input.sourceProjectId, input.assetIds)
+    const assetIds = input.assetIds.map((ref) => resolved.get(ref)?.id ?? ref)
+    return ok(
+      await ctx.desktop().post('/agent/assets/move-to-project', {
+        assetIds,
+        targetProjectId: input.targetProjectId,
+        // Sent so the route can ENFORCE it. resolveAssetRefs only validates
+        // badge codes against the source project — a raw UUID passes straight
+        // through, so without this a caller could move an asset out of a
+        // project it never named.
+        sourceProjectId: input.sourceProjectId,
+      })
+    )
+  },
+}
+
 // ── Characters ──────────────────────────────────────────────────
 
 export const listCharacters: Operation<{ projectId: string }> = {
@@ -3545,6 +3579,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   listFolders as unknown as Operation<unknown>,
   createFolder as unknown as Operation<unknown>,
   moveAssetsToFolder as unknown as Operation<unknown>,
+  moveAssetsToProject as unknown as Operation<unknown>,
   listCharacters as unknown as Operation<unknown>,
   createCharacter as unknown as Operation<unknown>,
   setCharacterIdentity as unknown as Operation<unknown>,

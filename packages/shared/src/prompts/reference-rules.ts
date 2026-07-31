@@ -110,7 +110,24 @@ export const IDENTITY_LIGHTING = 'flat, even, shadowless lighting'
  * crushes hair and wardrobe silhouettes.** A deep neutral grey holds both.
  */
 export const IDENTITY_PLATE_HEX = '#3a3a3c'
-export const IDENTITY_BACKGROUND = `a plain, deep neutral-grey background (${IDENTITY_PLATE_HEX})`
+/**
+ * 🚨 THE HEX IS EMITTED WITHOUT ITS `#` AND THAT IS LOAD-BEARING (2026-07-30).
+ *
+ * `#` is a REFERENCE-TOKEN SIGIL in the desktop's prompt composer
+ * (`slate/src/shared/promptComposition.ts` — `/([@#])([\w-]+)/g`), and an
+ * unresolved `#token` is SILENTLY DELETED. So `#3a3a3c` never survived to any
+ * model: fal echoed back `deep neutral-grey background ()` on a real 2026-07-30
+ * request. The plate value has been doing nothing since the composer shipped.
+ *
+ * Writing it bare keeps the value in the prompt. `IDENTITY_PLATE_HEX` keeps its
+ * `#` because it is a colour constant and may have non-prompt consumers.
+ *
+ * GENERAL RULE FOR THIS FILE: never emit `#` or `@` into prompt text. Both are
+ * sigils downstream and both mangle silently — no error, no log, just missing
+ * words. HOW YOU'D KNOW THIS IS BEATEN: the composer stops treating bare
+ * `#hex` as a token, or starts leaving unresolved tokens intact.
+ */
+export const IDENTITY_BACKGROUND = `a plain, deep neutral-grey background (hex ${IDENTITY_PLATE_HEX.replace('#', '')})`
 export const IDENTITY_LIGHTING_CLAUSE =
   `Render on ${IDENTITY_BACKGROUND} with ${IDENTITY_LIGHTING} so the sheet captures the character's identity, not scene lighting.`
 
