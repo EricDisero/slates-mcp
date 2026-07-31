@@ -684,6 +684,57 @@ export const moveAssetsToProject: Operation<{
   },
 }
 
+export const copyAssetsToProject: Operation<{
+  sourceProjectId: string
+  assetIds: string[]
+  targetProjectId: string
+}> = {
+  id: 'slates_copy_assets_to_project',
+  description:
+    'Copy assets (images, videos, audio) from one project into another. The originals stay exactly where they are — new files, new rows, new badge codes in the destination. Use this instead of slates_move_assets_to_project when the asset is already in use where it lives: an image that is a character/environment/style identity or sits in a storyboard frame CANNOT be moved out (that would leave the other project pointing at a file it no longer owns), but it can always be copied. Lineage is not copied; the copy starts clean.',
+  input: z.object({
+    sourceProjectId: z.string().uuid(),
+    // Badge codes ("IMG-A8") resolve against sourceProjectId at call time.
+    assetIds: z.array(z.string().min(1)).min(1),
+    targetProjectId: z.string().uuid(),
+  }),
+  async run(input, ctx) {
+    if (input.sourceProjectId === input.targetProjectId) {
+      throw new Error('sourceProjectId and targetProjectId are the same — nothing to copy.')
+    }
+    const resolved = await resolveAssetRefs(ctx, input.sourceProjectId, input.assetIds)
+    const assetIds = input.assetIds.map((ref) => resolved.get(ref)?.id ?? ref)
+    return ok(
+      await ctx.desktop().post('/agent/assets/copy-to-project', {
+        assetIds,
+        targetProjectId: input.targetProjectId,
+        // Enforced route-side for the same reason as the move op: resolveAssetRefs
+        // only validates badge codes, so a raw UUID would otherwise let a caller
+        // copy out of a project it never named.
+        sourceProjectId: input.sourceProjectId,
+      })
+    )
+  },
+}
+
+export const moveEntityToProject: Operation<{
+  kind: 'character' | 'environment' | 'style'
+  entityId: string
+  targetProjectId: string
+}> = {
+  id: 'slates_move_entity_to_project',
+  description:
+    "Move a character, environment, or style into another project, taking every image it references with it. This is the fix when slates_move_assets_to_project refuses an asset because an entity still uses it: the identity image can't leave on its own, but the whole entity can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. Storyboard frames are not movable this way; moving a frame's image out would empty the shot.",
+  input: z.object({
+    kind: z.enum(['character', 'environment', 'style']),
+    entityId: z.string().uuid(),
+    targetProjectId: z.string().uuid(),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/entities/move-to-project', input))
+  },
+}
+
 // ── Characters ──────────────────────────────────────────────────
 
 export const listCharacters: Operation<{ projectId: string }> = {
@@ -3580,6 +3631,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   createFolder as unknown as Operation<unknown>,
   moveAssetsToFolder as unknown as Operation<unknown>,
   moveAssetsToProject as unknown as Operation<unknown>,
+  copyAssetsToProject as unknown as Operation<unknown>,
+  moveEntityToProject as unknown as Operation<unknown>,
   listCharacters as unknown as Operation<unknown>,
   createCharacter as unknown as Operation<unknown>,
   setCharacterIdentity as unknown as Operation<unknown>,
