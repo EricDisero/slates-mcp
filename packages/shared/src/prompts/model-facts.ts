@@ -7,7 +7,7 @@
 export interface ModelFact {
   id: string
   label: string
-  kind: 'image' | 'video'
+  kind: 'image' | 'video' | 'audio'
   /** Max reference images (image models) — null if not applicable. */
   maxRefImages: number | null
   /** Max ingredient images (video models) — null if not applicable. */
@@ -121,6 +121,42 @@ export const MODEL_FACTS: ModelFact[] = [
     maxIngredients: 0, // prompt + source clip ONLY — no element/style refs on this endpoint
     notes:
       'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (7/09 head-to-head vs Kling edit on real talking footage: lips held perfectly, audio near-identical, both action beats landed). Takes an EXISTING 3-10s clip and changes what the prompt names, footage-synced (prop/effect/environment/lighting swaps). Fidelity is EARNED by prompt discipline: ONE short instruction + "Keep everything else the same." — long descriptive prompts DESTROY it (Google-documented + 7/09 receipt). Never name objects as metaphors ("candle-like" → literal candle). Quirk: occasional tail jitter/doubled last speech beat — trim the tail. NO reference images (identity swaps needing refs → Kling edit); bit-exact audio needs → Kling keep_audio or segment-splice. 720p output, cheapest edit seat (~2/3 of Kling edit Std).',
+  },
+  {
+    id: 'seed-audio',
+    label: 'Seed Audio 1.0',
+    kind: 'audio',
+    maxRefImages: 1, // ONE image XOR up to 3 audio clips — the two inputs are mutually exclusive.
+    maxIngredients: null,
+    notes:
+      'DEFAULT audio model — the one-pass SCENE workhorse: dialogue, SFX, and ambience together from ONE plain sentence. Route here for continuity beds, room tone, crowd/nature soundscapes, and quick scratch VO. AUDIO-ONLY: cannot generate images or video. 🚨 THERE IS NO DURATION PARAMETER — length comes from the words, so you MUST NAME THE LENGTH IN THE PROMPT TEXT ("... 15 seconds"). Slates appends the requested length automatically and BILLS the requested seconds, so a prompt that fights the number wastes credits. Prompts are ONE plain sentence, no production jargon and no SFX:/Ambient: prefixes (those are Kling syntax and hurt here). Say the crowd size out loud — "applause" returns a full room when the joke was three people. 1-120s. Inputs: ONE image (describe-what-you-see scoring) XOR up to 3 audio clips referenced in the prompt as @Audio1-@Audio3, never both. 20 preset voices, or leave voice unset and let the scene cast itself.',
+  },
+  {
+    id: 'eleven-v3',
+    label: 'ElevenLabs Eleven v3 (TTS)',
+    kind: 'audio',
+    maxRefImages: null,
+    maxIngredients: null,
+    notes:
+      'CONTROLLED, REPEATABLE named-voice VOICEOVER — route here whenever the exact words matter and must be re-renderable in the same voice (ad reads, narration, character lines to lip-sync against). AUDIO-ONLY. The text field IS the script: it is spoken verbatim, so never put stage directions in it. 1-5000 characters, billed per 100-character bucket, so trimming a sentence genuinely saves credits. 20 preset voices (Rachel default) — pick one and keep it for the whole piece. stability 0-1 trades consistency against expressiveness (low = more emotive and more variable). No voice cloning on this route. Word-level timestamps come back free and are what a future caption pass consumes. For scene ambience or SFX rather than speech, use seed-audio / eleven-sfx.',
+  },
+  {
+    id: 'eleven-sfx',
+    label: 'ElevenLabs Sound Effects v2',
+    kind: 'audio',
+    maxRefImages: null,
+    maxIngredients: null,
+    notes:
+      'ONE-SHOT SOUND EFFECT with an EXACT duration — route here for a single hit that must land on a frame (door slam, whoosh, impact, UI blip) or for a seamless loop. AUDIO-ONLY. 0.5-22s, and Slates always sends the duration explicitly (a null duration means a non-deterministic charge, so it is never left to the model). Describe the physical CAUSE, not the label: "heavy oak door slams shut in a stone hallway" beats "door sound". Text caps at 450 characters. loop=true produces a seamless bed. prompt_influence 0-1: higher hugs the prompt with less variation, lower explores. For layered scenes with dialogue or room tone, seed-audio does it in one pass instead.',
+  },
+  {
+    id: 'suno',
+    label: 'Suno',
+    kind: 'audio',
+    maxRefImages: null,
+    maxIngredients: null,
+    notes:
+      'FULL MUSIC TRACKS with structure — route here for anything a listener would call a song or a score. AUDIO-ONLY. EVERY call returns TWO variations for one flat price, and duration is FREE up to 360s (measured 2026-07-31: a 240s track costs the same as a default one), which makes it the cheapest way to get a bed that outlasts a cut. Two modes: DESCRIPTION mode (customMode=false, prompt is a <=500-char description and the lyrics get written for you) and CUSTOM mode (customMode=true, needs style + title; prompt then holds the EXACT LYRICS, sung as written — never put a description there). instrumental=true scores a scene with no vocals. Steer with style/negativeTags rather than piling adjectives into the prompt. duration 10-360s is V5_5 + custom mode only. Unofficial API wrapper, so treat availability as best-effort.',
   },
 ]
 

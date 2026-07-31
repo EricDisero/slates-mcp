@@ -91,6 +91,32 @@ Both tools have a cheap Kling utility lane and a premium Seedance lane. The capa
 
 **Split rule of thumb:** readable text / panels / UI → GPT Image 2; photoreal, character-locked, widescreen, or edit-heavy → the Banana line; drafts → NB2 Lite; uncensored or odd resolutions → Seedream/FLUX.
 
+## Audio routing
+
+**Image and video models cannot generate standalone audio, and none of the four audio models can generate images or video.** A shot that needs synced audio generated WITH the picture is still a video job (Kling omni / Veo / Omni Flash / Seedance all carry native audio); the models below produce audio *as its own asset*, to lay on the timeline.
+
+| Job | Model | Why |
+|---|---|---|
+| **Default — a whole audio scene in one pass**: room tone, ambience beds, crowds, nature, layered dialogue + effects | **Seed Audio 1.0** (`seed-audio`) | One plain sentence in, a complete scene out. 1–120s. The continuity-bed workhorse. |
+| **The exact words, in a repeatable named voice** — ad reads, narration, character lines to lip-sync against | **Eleven v3** (`eleven-v3`) | Verbatim text, 20 preset voices, re-renderable after a copy tweak without the performance drifting. Billed per 100 characters. |
+| **One effect that lands on a known frame**, or a seamless loop | **Sound Effects v2** (`eleven-sfx`) | The only surface with an exact duration control (0.5–22s) and a real loop mode. |
+| **A song or a score** | **Suno** (`suno`) | Full music with structure. Two variations per call for one flat price, and duration is free to 360s. |
+
+### Named audio escalation triggers
+
+- **"It needs to sound like a place"** → Seed Audio. Three separate SFX generations layered on the timeline is the wrong shape and costs more.
+- **"Read this line"** with copy that a client can still change → Eleven v3. Scratch dialogue while the script is moving can stay on Seed Audio.
+- **"That needs a thump right there"** → Sound Effects, with the duration set to roughly the length of the event.
+- **"Give it a track"** → Suno, `instrumental: true` unless a vocal is genuinely wanted (an unasked-for vocal fights dialogue).
+
+**Rules:**
+
+- **🚨 Seed Audio has NO duration parameter.** Length comes from the prompt text, so Slates writes the requested duration into the prompt and **bills what you asked for**. Choose the duration deliberately and never write a second, different length into the sentence. Full doctrine: `slates-prompting-seed-audio`.
+- **Kling's audio syntax does not transfer.** `SFX:` / `Ambient noise:` / `Background music:` prefixes are Kling 3.0 *video* prompt syntax. Seed Audio reads them as literal words and the result degrades.
+- **Beds outlast the cut.** Always ask for more seconds than the clip needs so the edit has fade handles — on Suno the extra seconds are literally free.
+- **Audio inside the video vs audio as an asset.** If the sound must be locked to what happens on screen, generate it with the video (Kling omni / Seedance / Omni Flash / Veo). If it needs to be moved, trimmed, re-used, or layered, generate it here and drop it on an audio track.
+- Per-model prompting: `slates-prompting-seed-audio`, `slates-prompting-elevenlabs`, `slates-prompting-suno`.
+
 ## Cost is a tiebreaker, not the router
 
 Route by capability first, then pick the cheapest tier that serves the job (per `slates-cost-discipline`). Never pick a model because its per-second price looked lowest — a cheap clip that has to be regenerated on the right model costs more than routing correctly once.

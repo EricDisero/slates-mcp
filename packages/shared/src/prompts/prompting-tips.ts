@@ -48,6 +48,10 @@ export type PromptingTipsKey =
   | 'omni-flash-edit'
   | 'nano-banana'
   | 'nano-banana-lite'
+  | 'seed-audio'
+  | 'eleven-v3'
+  | 'eleven-sfx'
+  | 'suno'
 
 const SEEDANCE: PromptingTipsEntry = {
   label: 'Seedance 2.0',
@@ -401,6 +405,201 @@ const NANO_BANANA_LITE: PromptingTipsEntry = {
   ],
 }
 
+// ── Audio lane ──────────────────────────────────────────────────
+// The four audio surfaces prompt NOTHING like the video models. The single
+// most expensive mistake is bringing Kling's "SFX:" / "Ambient noise:" syntax
+// to Seed Audio, which reads it as literal text. Every entry below leads with
+// what the surface actually wants.
+
+const SEED_AUDIO: PromptingTipsEntry = {
+  label: 'Seed Audio 1.0',
+  intro: [
+    'Seed Audio builds a whole audio scene — dialogue, effects and ambience together — from one plain sentence. Write it the way you would describe the moment to a person standing next to you, not the way you would write a video prompt.',
+    'It has no duration setting. Length comes from the words, so Slates appends your chosen duration to the prompt ("… 15 seconds") and bills exactly that. Set the duration control to what you actually want and let the sentence stay clean.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'One plain sentence',
+        example: 'nature soundscape, wide open field cicadas and birds and a loon.',
+        note: 'No shot language, no production jargon, no formatting. Plain description outperforms anything that reads like a spec sheet.',
+      },
+      {
+        heading: 'Duration lives in the prompt',
+        example: 'tiny applause of 2 or 3 people at an open mic. 15 seconds',
+        note: 'The duration control writes this for you. Do not also type a different length into your sentence — the two will fight and you pay for the one you selected.',
+        critical: true,
+      },
+      {
+        heading: 'Say the crowd size',
+        example: 'tiny applause of 2 or 3 people  ·  a packed arena roaring',
+        note: '"Applause" alone returns a full room. Scale words are the single highest-leverage edit on any crowd, traffic or nature bed.',
+      },
+      {
+        heading: 'Cut beds longer than the shot',
+        note: 'Ask for a few seconds more than the clip needs so the edit has handles to fade in and out of. Beds that end exactly on the cut always sound clipped.',
+      },
+    ],
+    [
+      {
+        heading: 'No Kling syntax here',
+        example: '✗ SFX: heavy boots\n✓ heavy boots on wet pavement, a siren far off',
+        note: 'The "SFX:" and "Ambient noise:" prefixes belong to Kling video prompts. Seed Audio treats them as words in the scene and the result gets worse.',
+        critical: true,
+      },
+      {
+        heading: 'Dialogue in quotes',
+        example: 'a tired bartender says, "we closed twenty minutes ago", glasses clinking behind him',
+        note: 'Speech goes in quotes inside the same sentence as the room. Pick a preset voice for a specific speaker, or leave it unset and let the scene cast itself.',
+      },
+      {
+        heading: 'References',
+        example: 'match the room tone of @Audio1',
+        note: 'Up to 3 audio clips (max 30s each), referenced as @Audio1–@Audio3 — OR one image to score what is in frame. Never both in the same generation.',
+      },
+      {
+        heading: 'Know its seat',
+        note: 'Scenes, beds and room tone in one pass. For an exact script in a repeatable voice use Eleven v3; for a single effect on a specific frame use Sound Effects; for a song use Suno.',
+      },
+    ],
+  ],
+}
+
+const ELEVEN_V3: PromptingTipsEntry = {
+  label: 'ElevenLabs Eleven v3',
+  intro: [
+    'Eleven v3 speaks your text verbatim in a named voice. It is the controlled, repeatable lane: the same text and the same voice give you a read you can regenerate after a script tweak without the performance drifting.',
+    'Billing is per 100 characters of text, rounded up — so tightening a sentence genuinely costs less, and a stray pasted paragraph genuinely costs more.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'The text field is the script',
+        example: '✗ (excited) Say this fast: Grab yours today!\n✓ Grab yours today!',
+        note: 'Everything you type gets spoken. Stage directions, character names and bracketed notes will be read out loud.',
+        critical: true,
+      },
+      {
+        heading: 'Punctuate for pace',
+        example: 'It works. Every time.  ·  It works — every time…',
+        note: 'Full stops, commas, dashes and ellipses are your only timing controls. Rewrite the punctuation before you touch the settings.',
+      },
+      {
+        heading: 'Pick a voice and stay',
+        note: '20 preset voices. Choosing one per character or per piece is what makes a series sound deliberate; swapping voices mid-piece reads as a mistake.',
+      },
+    ],
+    [
+      {
+        heading: 'Stability',
+        example: '0.3 emotive · 0.5 default · 0.8 steady',
+        note: 'Lower is more expressive and more variable take-to-take. Higher is flatter and more repeatable. Raise it for long narration, lower it for a single dramatic line.',
+      },
+      {
+        heading: 'Spell out the tricky bits',
+        example: 'SKU → "ess kay you"  ·  2026 → "twenty twenty six"',
+        note: 'Acronyms, product names, prices and years are where TTS embarrasses itself. Write the pronunciation you want.',
+      },
+      {
+        heading: 'Know its seat',
+        note: 'Exact words, repeatable voice, lines you will lip-sync against. Ambience, crowds and rooms belong to Seed Audio; one-shot effects to Sound Effects.',
+      },
+    ],
+  ],
+  footer: [
+    'Word-level timestamps come back with every generation at no extra cost — that is what a future caption pass will read, so there is no reason to turn them off.',
+  ],
+}
+
+const ELEVEN_SFX: PromptingTipsEntry = {
+  label: 'ElevenLabs Sound Effects',
+  intro: [
+    'Sound Effects makes one short sound with an exact length — the lane for a hit that has to land on a specific frame, or a seamless loop you can lay under a whole scene.',
+    'Duration is always sent explicitly (0.5–22s). Billing is per second, so the length you pick is the price you pay.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Describe the cause, not the label',
+        example: '✗ door sound\n✓ heavy oak door slams shut in a stone hallway',
+        note: 'Material, weight and room are what separate a usable effect from a stock-library shrug. Name all three.',
+        critical: true,
+      },
+      {
+        heading: 'One sound per generation',
+        note: 'This surface makes a single event. A door, then footsteps, then a siren is three generations layered on the timeline — or one Seed Audio scene.',
+      },
+      {
+        heading: 'Duration is the edit',
+        example: '0.8s for an impact · 4s for a whoosh · 22s for a bed',
+        note: 'Ask for roughly the length you need. A 4-second request for a door slam pads the tail with room tone you then have to trim.',
+      },
+    ],
+    [
+      {
+        heading: 'Loops',
+        example: 'steady rain on a canvas tent  (loop on, 12s)',
+        note: 'Turn loop on for anything continuous — rain, engine hum, crowd murmur — and it will tile without a seam.',
+      },
+      {
+        heading: 'Prompt influence',
+        example: '0.3 default · 0.7 literal',
+        note: 'Higher hugs your wording with less variation between takes; lower explores. Raise it when a re-roll keeps wandering off the brief.',
+      },
+      {
+        heading: 'Know its seat',
+        note: 'One precise effect on a known frame. Full rooms and layered scenes are cheaper and better in one Seed Audio pass.',
+      },
+    ],
+  ],
+}
+
+const SUNO: PromptingTipsEntry = {
+  label: 'Suno',
+  intro: [
+    'Suno writes full music. Every generation returns TWO variations for one flat price, and length is free up to six minutes — so there is never a reason to generate a bed that is shorter than your edit.',
+    'The one thing to get right is which mode you are in, because it changes what the prompt field means.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Description mode',
+        example: 'brooding synthwave for a night drive, analog bass, no vocals',
+        note: 'The prompt is a description (max 500 characters) and the lyrics get written for you. This is the fast path when you just need a mood.',
+      },
+      {
+        heading: 'Custom mode — the prompt IS the lyrics',
+        example: 'Style: dream pop, hazy\nTitle: Blue Hour\nPrompt: [Verse 1] The lights come on…',
+        note: 'In custom mode the prompt is sung exactly as written. Putting a description there gets your description sung back at you.',
+        critical: true,
+      },
+      {
+        heading: 'Instrumental',
+        note: 'Turn instrumental on to score a scene with no vocals — style and title still steer it, and the prompt field is ignored.',
+      },
+    ],
+    [
+      {
+        heading: 'Steer with style, not adjectives',
+        example: 'Style: 90s trip-hop, dusty breakbeat, Rhodes\nAvoid: brass, EDM drops',
+        note: 'Genre, era, instrumentation and tempo belong in the style field. Negative tags remove what keeps creeping in.',
+      },
+      {
+        heading: 'Length is free',
+        example: '10–360 seconds',
+        note: 'A six-minute track costs exactly what a default one does. Ask for longer than the cut needs and trim on the timeline.',
+      },
+      {
+        heading: 'Two songs, both yours',
+        note: 'Both variations land in the gallery. They are genuinely different takes on the same brief — audition both before re-rolling.',
+      },
+    ],
+  ],
+  footer: [
+    'Files are hosted by the provider for a limited window — Slates downloads and stores them on your machine as soon as the track finishes, so nothing expires out from under a project.',
+  ],
+}
+
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   kling: KLING,
@@ -410,6 +609,10 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'omni-flash-edit': OMNI_FLASH_EDIT,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
+  'seed-audio': SEED_AUDIO,
+  'eleven-v3': ELEVEN_V3,
+  'eleven-sfx': ELEVEN_SFX,
+  suno: SUNO,
 }
 
 /** Null when no tips exist for the key — callers render an honest fallback. */

@@ -165,8 +165,11 @@ export const listAvailableModels: Operation<{ filter?: string }> = {
     return {
       text:
         `${models.length} COST keys (credits per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
-        `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on slates_generate_video takes a BASE id ` +
-        `(kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard) with duration/videoResolution as separate params:\n` +
+        `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on the generate ops takes a BASE id. ` +
+        // Derived from the SSOT arrays, not restated: a hand-written list here
+        // drifts the moment a model lands (it already omitted omni-flash).
+        `slates_generate_video: ${VIDEO_MODELS.join(' | ')} (duration/videoResolution as separate params). ` +
+        `slates_generate_audio: ${AUDIO_MODELS.join(' | ')} (durationSeconds as a separate param):\n` +
         table,
       data: { count: models.length },
     }
@@ -177,6 +180,7 @@ export const estimateGenerationCost: Operation<{
   model: string
   quantity?: number
   duration?: number
+  characters?: number
   videoResolution?: '480p' | '720p' | '1080p' | '4k'
   resolution?: '1k' | '2k' | '3k' | '4k'
   quality?: 'medium' | 'high'
@@ -190,7 +194,8 @@ export const estimateGenerationCost: Operation<{
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
-    duration: z.number().int().min(3).max(15).optional().describe('Video only — seconds. Cost scales linearly; required with a video base id.'),
+    duration: z.number().int().min(1).max(360).optional().describe('Seconds. Video 3-15 (cost scales linearly; required with a video base id). Audio: seed-audio 3-120 (⚠️ the requested duration IS the bill), eleven-sfx 1-22. Ignored by eleven-v3 (per-character) and suno (flat).'),
+    characters: z.number().int().min(1).max(5000).optional().describe('eleven-v3 only — script length in characters, billed in 100-char buckets rounded up.'),
     videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Video only. Seedance defaults to 1080p.'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k = gpt-image-2 1440p class).'),
     quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
@@ -210,6 +215,32 @@ export const estimateGenerationCost: Operation<{
         (m) => m === input.model
       )
       if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality ?? 'medium')
+    }
+    // 2a) audio base id → seconds (seed-audio, eleven-sfx), characters
+    //     (eleven-v3), or flat (suno). Runs BEFORE the video resolver: it is
+    //     forgiving by design and "seed-audio" would otherwise be mistaken for
+    //     a seedance spelling.
+    if (!key && (AUDIO_MODELS as readonly string[]).includes(input.model)) {
+      const m = input.model as AudioModel
+      if ((m === 'seed-audio' || m === 'eleven-sfx') && !input.duration) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message:
+            m === 'seed-audio'
+              ? 'Seed Audio cost scales with the REQUESTED duration — and that duration is what the user is billed regardless of what comes back (it has no duration parameter; the number is written into the prompt). Pass duration in seconds (3-120).'
+              : 'Sound Effects bills per second — pass duration in seconds (1-22).',
+        })
+      }
+      if (m === 'eleven-v3' && !input.characters) {
+        return ok({
+          requires_clarification: true,
+          missing: ['characters'],
+          message:
+            'Eleven v3 bills per 100 characters of script, rounded up — pass characters (the length of the text you intend to speak).',
+        })
+      }
+      key = audioCostKey({ model: m, durationSeconds: input.duration, characters: input.characters })
     }
     // 2b) Kling O3 edit base id + duration (ceiled source-clip length)
     if (!key && (input.model === 'kling-v3.0-omni-edit' || input.model === 'kling-v3.0-omni-pro-edit')) {
@@ -252,7 +283,7 @@ export const estimateGenerationCost: Operation<{
     const perCredits = key != null ? byKey.get(key) : undefined
     if (key == null || perCredits == null) {
       throw new Error(
-        `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | nano-banana-2 | flux-2-max | seedream-5-lite) plus duration/resolution params, or use slates_list_available_models with a filter.`
+        `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | ${AUDIO_MODELS.join(' | ')} | nano-banana-2 | flux-2-max | seedream-5-lite) plus duration/characters/resolution params, or use slates_list_available_models with a filter.`
       )
     }
     const qty = input.quantity ?? 1
@@ -1735,6 +1766,62 @@ export function omniFlashEditCostKey(duration: number): string {
   return `omni-flash-edit-${duration}s`
 }
 
+// ── Audio ───────────────────────────────────────────────────────
+
+// Exported: the exact `model` ids slates_generate_audio accepts — consumed
+// by the desktop Studio Agent system prompt (SSOT; never restate these ids
+// in prose that can drift). Mirrors VIDEO_MODELS for the third media type.
+export const AUDIO_MODELS = ['seed-audio', 'eleven-v3', 'eleven-sfx', 'suno'] as const
+
+export type AudioModel = (typeof AUDIO_MODELS)[number]
+
+/** Per-surface hard bounds — mirrored in slate/src/shared/pricing.ts. */
+export const SEED_AUDIO_MAX_SECONDS = 120
+export const ELEVEN_SFX_MAX_SECONDS = 22
+export const ELEVEN_V3_MAX_CHARACTERS = 5000
+export const SUNO_MAX_SECONDS = 360
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.ceil(value)))
+}
+
+// Exported for scripts/pricing-consistency-check.mjs (slates-api repo), which
+// asserts this builder byte-matches the desktop's audioCreditKey().
+//
+// Seed Audio has NO duration parameter — length is driven by the prompt text.
+// We bill the REQUESTED duration (shape B, locked 2026-07-31): the desktop
+// injects "... N seconds" into the prompt and bills seed-audio-{N}s, so
+// display == billing with no amendment to the pricing law. The server probes
+// the returned audio.duration afterwards and logs SEED AUDIO BILLING DRIFT.
+export function audioCostKey(input: {
+  model: AudioModel
+  /** seed-audio + eleven-sfx: the REQUESTED duration in seconds (ceiled). */
+  durationSeconds?: number
+  /** eleven-v3: character count of the text to speak (ceiled to 100-char buckets). */
+  characters?: number
+}): string {
+  if (input.model === 'seed-audio') {
+    const secs = clampInt(input.durationSeconds ?? 0, 1, SEED_AUDIO_MAX_SECONDS)
+    return `seed-audio-${secs}s`
+  }
+  if (input.model === 'eleven-v3') {
+    // 100-character buckets, always rounded UP — never under-bill a read.
+    const buckets = clampInt((input.characters ?? 0) / 100, 1, ELEVEN_V3_MAX_CHARACTERS / 100)
+    return `eleven-v3-tts-${buckets}00c`
+  }
+  if (input.model === 'eleven-sfx') {
+    const secs = clampInt(input.durationSeconds ?? 0, 1, ELEVEN_SFX_MAX_SECONDS)
+    return `eleven-sfx-${secs}s`
+  }
+  if (input.model === 'suno') {
+    // Flat across every Suno model AND every duration up to 360s — measured
+    // against the live sunoapi.org balance 2026-07-31 (12 credits for a
+    // default call and for duration=240 alike). One call returns TWO songs.
+    return 'suno-generate'
+  }
+  throw new Error(`Unknown audio model: ${input.model}`)
+}
+
 /**
  * Forgiving model-id resolver. Agents routinely paste registry COST keys
  * ("kling-v3-standard-8s", "seedance-2-1080p-8s") into the `model` param —
@@ -2179,6 +2266,272 @@ export const generateVideo: Operation<{
         cost_cents: totalCents,
         cost_credits: totalCents,
         asset: result.asset,
+        generationId: result.generationId,
+      },
+    }
+  },
+}
+
+// ── Generate audio ──────────────────────────────────────────────
+
+export const generateAudio: Operation<{
+  projectId: string
+  model: AudioModel
+  prompt: string
+  durationSeconds?: number
+  voice?: string
+  stability?: number
+  languageCode?: string
+  speed?: number
+  pitch?: number
+  multilingual?: boolean
+  loop?: boolean
+  promptInfluence?: number
+  audioReferenceAssetIds?: string[]
+  imageReferenceAssetId?: string
+  sunoModel?: 'V4' | 'V4_5' | 'V4_5PLUS' | 'V4_5ALL' | 'V5' | 'V5_5'
+  customMode?: boolean
+  instrumental?: boolean
+  style?: string
+  title?: string
+  negativeTags?: string
+  vocalGender?: 'm' | 'f'
+  background?: boolean
+  confirm?: boolean
+}> = {
+  id: 'slates_generate_audio',
+  description:
+    'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Four surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s), eleven-v3 (verbatim text-to-speech in a named voice), eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop), suno (full music; every call returns TWO songs for one flat price). Which surface for which job: read the slates-model-selection skill. ' +
+    '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. Choose it deliberately. ' +
+    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-suno). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio and makes results worse. ' +
+    'projectId is REQUIRED (no headless path). Cost > 17 credits returns requires_confirm — pass confirm=true after explicit user OK. No skill files installed? Call slates_get_prompting_guide first.',
+  input: z.object({
+    projectId: z.string().uuid().describe('Slates project the audio asset lands in. Required — the renderer refreshes live.'),
+    model: z
+      .enum(AUDIO_MODELS)
+      .describe(
+        'Audio surface. seed-audio = scene/ambience/beds (default choice), eleven-v3 = exact-script voiceover, eleven-sfx = one precise effect, suno = music. Routing doctrine: slates-model-selection skill.'
+      ),
+    prompt: z
+      .string()
+      .min(1)
+      .max(5000)
+      .describe(
+        'seed-audio: ONE plain sentence describing the scene (no production jargon, no "SFX:" prefixes; name the crowd/room size). eleven-v3: the SCRIPT, spoken verbatim — never put stage directions here. eleven-sfx: the effect described by its physical CAUSE ("heavy oak door slams shut in a stone hallway"), max 450 chars. suno: a description in default mode, or the EXACT LYRICS when customMode=true and instrumental=false.'
+      ),
+    durationSeconds: z
+      .number()
+      .optional()
+      .describe(
+        'seed-audio 3-120 (default 15) — ⚠️ THIS IS THE BILL: it is appended to the prompt and charged regardless of the returned length. eleven-sfx 1-22 (default 4) — always sent explicitly so the per-second charge is deterministic. suno 10-360, FREE (a 6-minute track costs the same as a default one) but only accepted on sunoModel=V5_5 with customMode=true. Ignored by eleven-v3, which bills per 100 characters of text.'
+      ),
+    voice: z
+      .string()
+      .optional()
+      .describe(
+        'seed-audio: a preset voice id (e.g. "cedric_en_zh") — leave unset to let the scene cast itself, which is usually right for background dialogue. eleven-v3: a preset name (Rachel default; Aria, Roger, Sarah, Laura, Charlie, George, Callum, River, Liam, Charlotte, Alice, Matilda, Will, Jessica, Eric, Chris, Brian, Daniel, Lily, Bill). Pick one and keep it for the whole piece. No voice cloning on this route.'
+      ),
+    stability: z.number().min(0).max(1).optional().describe('eleven-v3 only. 0-1, default 0.5. Lower = more expressive and more variable take-to-take; higher = flatter and repeatable. Raise it for long narration.'),
+    languageCode: z.string().optional().describe('eleven-v3 only — ISO 639-1 code to force a language when the text is ambiguous or code-switched.'),
+    speed: z.number().min(0.5).max(2).optional().describe('seed-audio only — 0.5-2.0. Reach for it when dialogue races or drags against picture.'),
+    pitch: z.number().int().min(-12).max(12).optional().describe('seed-audio only — semitones. Small moves; ±3 is already a lot.'),
+    multilingual: z.boolean().optional().describe('seed-audio only — better non-English / mixed-language handling.'),
+    loop: z.boolean().optional().describe('eleven-sfx only — produce a seamless loop (rain, engine hum, crowd murmur).'),
+    promptInfluence: z.number().min(0).max(1).optional().describe('eleven-sfx only — 0-1, default 0.3. Higher hugs your wording with less variation between takes.'),
+    audioReferenceAssetIds: z
+      .array(z.string())
+      .max(3)
+      .optional()
+      .describe(
+        'seed-audio only — up to 3 AUDIO assets (UUIDs or badge codes like "AUD-S1"), each ≤30s, referenced in the prompt as @Audio1-@Audio3 ("match the room tone of @Audio1"). MUTUALLY EXCLUSIVE with imageReferenceAssetId — the API rejects both.'
+      ),
+    imageReferenceAssetId: z
+      .string()
+      .optional()
+      .describe('seed-audio only — ONE image asset to score what is in frame. MUTUALLY EXCLUSIVE with audioReferenceAssetIds.'),
+    sunoModel: z.enum(['V4', 'V4_5', 'V4_5PLUS', 'V4_5ALL', 'V5', 'V5_5']).optional().describe('suno only — wire model id (underscored). Default V5. Cost is FLAT across every version. duration needs V5_5.'),
+    customMode: z
+      .boolean()
+      .optional()
+      .describe(
+        'suno only. false (default) = prompt is a ≤500-char DESCRIPTION and lyrics get written for you. true = style + title required, and prompt becomes the EXACT LYRICS, sung as written. Putting a description in the prompt while customMode=true wastes a full generation.'
+      ),
+    instrumental: z.boolean().optional().describe('suno only — score with no vocals. Usually right for a film bed: an unasked-for vocal fights dialogue.'),
+    style: z.string().optional().describe('suno only — genre + era + instrumentation + tempo ("90s trip-hop, dusty breakbeat, Rhodes, 85 bpm"). Required in customMode. Steer here, not by piling adjectives into the prompt.'),
+    title: z.string().optional().describe('suno only — track title. Required in customMode.'),
+    negativeTags: z.string().optional().describe('suno only — comma-separated things to keep out ("brass, EDM drop, male vocal").'),
+    vocalGender: z.enum(['m', 'f']).optional().describe('suno only — the WIRE values m/f, not "male"/"female".'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE + ' Recommended for suno (2-3 min renders).'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
+  }),
+  run: async (input, ctx) => {
+    // ── Per-surface clarification + constraint gates ──
+    const cfgDefaults: Record<AudioModel, number | undefined> = {
+      'seed-audio': 15,
+      'eleven-sfx': 4,
+      'eleven-v3': undefined,
+      suno: undefined,
+    }
+    const seconds = input.durationSeconds ?? cfgDefaults[input.model]
+
+    if (input.model === 'seed-audio') {
+      if (seconds == null || seconds < 3 || seconds > SEED_AUDIO_MAX_SECONDS) {
+        return ok({
+          requires_clarification: true,
+          missing: ['durationSeconds'],
+          message: `Seed Audio needs a durationSeconds of 3-${SEED_AUDIO_MAX_SECONDS}. It has NO duration parameter — the number is written into the prompt AND is what the user is billed, so it must be a deliberate choice. Ask the user how long the bed should be (a few seconds longer than the clip it sits under, so the edit has handles).`,
+        })
+      }
+      if ((input.audioReferenceAssetIds?.length ?? 0) > 0 && input.imageReferenceAssetId) {
+        throw new Error(
+          'Seed Audio takes audio references OR one image reference, never both — the provider rejects the combination.'
+        )
+      }
+    }
+
+    if (input.model === 'eleven-sfx') {
+      if (seconds == null || seconds < 1 || seconds > ELEVEN_SFX_MAX_SECONDS) {
+        return ok({
+          requires_clarification: true,
+          missing: ['durationSeconds'],
+          message: `Sound Effects needs a durationSeconds of 1-${ELEVEN_SFX_MAX_SECONDS}. It is billed per second and is never left for the model to pick (that would make the charge non-deterministic). Roughly: 0.5-1s for an impact, 2-4s for a whoosh, 8-22s for a loopable bed.`,
+        })
+      }
+      if (input.prompt.length > 450) {
+        throw new Error(`Sound Effects accepts up to 450 characters — this prompt is ${input.prompt.length}.`)
+      }
+    }
+
+    if (input.model === 'eleven-v3' && input.prompt.length > ELEVEN_V3_MAX_CHARACTERS) {
+      throw new Error(
+        `Eleven v3 accepts up to ${ELEVEN_V3_MAX_CHARACTERS} characters — this script is ${input.prompt.length}.`
+      )
+    }
+
+    if (input.model === 'suno' && input.customMode === true) {
+      if (!input.style || !input.title) {
+        return ok({
+          requires_clarification: true,
+          missing: [...(input.style ? [] : ['style']), ...(input.title ? [] : ['title'])],
+          message:
+            'Suno custom mode requires style and title. Remember that in custom mode the prompt field is the EXACT LYRICS (unless instrumental=true, where it is ignored) — if you meant to describe a mood, use customMode=false instead.',
+        })
+      }
+    }
+
+    await ctx.desktop().requireCapability('audio-generation', 'audio generation')
+
+    // ── Resolve asset refs at CALL time (UUIDs or badge codes) ──
+    const refInputs: Array<{ ref: string; role: string }> = []
+    for (const ref of input.audioReferenceAssetIds ?? []) refInputs.push({ ref, role: 'audio reference' })
+    if (input.imageReferenceAssetId) refInputs.push({ ref: input.imageReferenceAssetId, role: 'image reference' })
+    const resolvedRefs =
+      refInputs.length > 0
+        ? await resolveAssetRefs(ctx, input.projectId, refInputs.map((r) => r.ref))
+        : new Map()
+    const rid = (v?: string): string | undefined => (v ? (resolvedRefs.get(v)?.id ?? v) : v)
+    const refEcho = refInputs.length > 0 ? describeResolvedRefs(refInputs, resolvedRefs) : ''
+
+    // ── Cost — from the CLOUD registry, keyed by the SAME builder the desktop
+    //    and the proxy use. Never quote a price from memory. ──
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    const costKey = audioCostKey({
+      model: input.model,
+      durationSeconds: seconds,
+      characters: input.prompt.length,
+    })
+    const entry = registry.models.find((m) => m.model === costKey)
+    if (!entry) {
+      throw new Error(
+        `Audio variant not in registry: ${costKey}. Available audio models: ${AUDIO_MODELS.join(' | ')}.`
+      )
+    }
+    const totalCents = creditCost(entry)
+
+    if (!input.confirm && totalCents > CONFIRM_CREDITS) {
+      return ok({
+        requires_confirm: true,
+        model: input.model,
+        variant: costKey,
+        cost_credits: totalCents,
+        cost_display: fmtCredits(totalCents),
+        message:
+          `${input.model} audio will cost ${fmtCredits(totalCents)}. ` +
+          (input.model === 'seed-audio'
+            ? `You are billed for the ${seconds}s you requested regardless of the returned length. `
+            : '') +
+          (input.model === 'suno' ? 'This returns TWO songs for that one price. ' : '') +
+          'Confirm with the user, then call again with confirm: true.',
+      })
+    }
+
+    // ── Submit through the DESKTOP so the progress card, the project save,
+    //    and recovery all behave exactly like a UI-triggered run. ──
+    const desktop = ctx.desktop()
+    if (input.background) {
+      await desktop.requireCapability('background-generation', 'background generation')
+    }
+
+    const result = await desktop.post<{
+      success: boolean
+      background?: boolean
+      asset?: Record<string, unknown>
+      siblingAssets?: Array<Record<string, unknown>>
+      generationId?: string
+      error?: string
+    }>('/agent/generation/audio', {
+      projectId: input.projectId,
+      model: input.model,
+      prompt: input.prompt,
+      durationSeconds: seconds,
+      voice: input.voice,
+      stability: input.stability,
+      languageCode: input.languageCode,
+      speed: input.speed,
+      pitch: input.pitch,
+      multilingual: input.multilingual,
+      loop: input.loop,
+      promptInfluence: input.promptInfluence,
+      audioReferenceAssetIds: (input.audioReferenceAssetIds ?? []).map((r) => rid(r)),
+      imageReferenceAssetId: rid(input.imageReferenceAssetId),
+      sunoModel: input.sunoModel,
+      customMode: input.customMode,
+      instrumental: input.instrumental,
+      style: input.style,
+      title: input.title,
+      negativeTags: input.negativeTags,
+      vocalGender: input.vocalGender,
+      background: input.background,
+    })
+
+    if (!result.success) throw new Error(result.error ?? 'Audio generation failed')
+
+    if (result.background) {
+      return backgroundSubmitted(
+        `${input.model} audio generation`,
+        [result.generationId as string].filter(Boolean),
+        { model: input.model, variant: costKey, projectId: input.projectId, cost_credits: totalCents },
+        refEcho
+      )
+    }
+
+    const siblings = result.siblingAssets ?? []
+    return {
+      text:
+        `Generated ${input.model} audio into project ${input.projectId} for ${fmtCredits(totalCents)}` +
+        (siblings.length > 0 ? ` (${siblings.length + 1} tracks — Suno returns two variations)` : '') +
+        `. Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
+        (refEcho ? ` ${refEcho}` : ''),
+      data: {
+        model: input.model,
+        variant: costKey,
+        projectId: input.projectId,
+        durationSeconds: seconds,
+        cost_cents: totalCents,
+        cost_credits: totalCents,
+        asset: result.asset,
+        ...(siblings.length > 0 ? { siblingAssets: siblings } : {}),
         generationId: result.generationId,
       },
     }
@@ -3564,6 +3917,14 @@ function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return 'slates-prompting-kling-v3'
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
+  // Audio — seed-audio BEFORE the seedance check: "seed-audio" also starts
+  // with "seed", and falling through would hand the video guide to the audio
+  // model (the exact class of aliasing bug this comment block warns about).
+  if (t.startsWith('seed-audio') || t === 'seed audio' || t === 'audio') return 'slates-prompting-seed-audio'
+  if (t.startsWith('eleven') || t.startsWith('elevenlabs') || t === 'tts' || t === 'sfx' || t === 'sound-effects' || t === 'sound effects' || t === 'voiceover') {
+    return 'slates-prompting-elevenlabs'
+  }
+  if (t.startsWith('suno') || t === 'music') return 'slates-prompting-suno'
   if (t.startsWith('seedance')) return 'slates-prompting-seedance'
   if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'
   // Style names → the per-style prompting guide (photoreal/anime/painterly/
@@ -3593,7 +3954,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
       .string()
       .min(1)
       .describe(
-        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
+        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-seed-audio, slates-prompting-elevenlabs, slates-prompting-suno, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
       ),
   }),
   async run(input) {
@@ -3647,6 +4008,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addFrame as unknown as Operation<unknown>,
   generateImage as unknown as Operation<unknown>,
   generateVideo as unknown as Operation<unknown>,
+  generateAudio as unknown as Operation<unknown>,
   generateLipSync as unknown as Operation<unknown>,
   generateMotionTransfer as unknown as Operation<unknown>,
   editVideo as unknown as Operation<unknown>,
