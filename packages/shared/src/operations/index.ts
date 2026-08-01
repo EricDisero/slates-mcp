@@ -240,6 +240,29 @@ export const estimateGenerationCost: Operation<{
             'Eleven v3 bills per 100 characters of script, rounded up — pass characters (the length of the text you intend to speak).',
         })
       }
+      // REFUSE an out-of-range duration rather than quoting the clamped price.
+      // audioCostKey clamps (it has to — it mirrors the desktop, which clamps),
+      // so without this an agent asking for 2s of Seed Audio would be handed a
+      // real 3s price and no hint that 2s is not a thing it can order. The
+      // generate op gates the same way; the two must agree or the quote is a
+      // promise the generation refuses to keep.
+      const audioBounds: Partial<Record<AudioModel, { min: number; max: number }>> = {
+        'seed-audio': { min: SEED_AUDIO_MIN_SECONDS, max: SEED_AUDIO_MAX_SECONDS },
+        'eleven-sfx': { min: ELEVEN_SFX_MIN_SECONDS, max: ELEVEN_SFX_MAX_SECONDS },
+        suno: { min: SUNO_MIN_SECONDS, max: SUNO_MAX_SECONDS },
+      }
+      const bounds = audioBounds[m]
+      if (bounds && input.duration != null && (input.duration < bounds.min || input.duration > bounds.max)) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message:
+            `${m} accepts ${bounds.min}-${bounds.max} seconds — ${input.duration}s is outside that range and would be refused at generation time. ` +
+            (m === 'suno'
+              ? 'Suno duration is FREE and flat-priced, so any value in range costs the same.'
+              : 'Re-ask with a duration in range.'),
+        })
+      }
       key = audioCostKey({ model: m, durationSeconds: input.duration, characters: input.characters })
     }
     // 2b) Kling O3 edit base id + duration (ceiled source-clip length)
@@ -603,20 +626,20 @@ export const uploadReferenceImage: Operation<{
   projectId: string
   filePath?: string
   dataUrl?: string
-  type?: 'image' | 'video'
+  type?: 'image' | 'video' | 'audio'
 }> = {
   id: 'slates_upload_reference_image',
   description:
-    'Add a reference image OR video clip to a Slates project. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" on a filePath import to bring in a clip (the user\'s own footage to edit/relocate/trim); imported videos are probed on ingest, so duration + dimensions are available immediately. Default type is "image". dataUrl is image-only.',
+    'Add a reference image, video clip, or audio file to a Slates project from disk. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" to bring in a clip (the user\'s own footage to edit/relocate/trim) or type:"audio" for music/VO/SFX they already have; both are probed on ingest, so duration (and for video, dimensions) are available immediately, and audio gets its waveform. Default type is "image". dataUrl is image-only.',
   input: z
     .object({
       projectId: z.string().uuid(),
       filePath: z.string().optional(),
       dataUrl: z.string().optional(),
       type: z
-        .enum(['image', 'video'])
+        .enum(['image', 'video', 'audio'])
         .optional()
-        .describe('Asset kind for a filePath import — "image" (default) or "video". A dataUrl is always an image.'),
+        .describe('Asset kind for a filePath import — "image" (default), "video", or "audio". A dataUrl is always an image.'),
     })
     .refine((d) => !!d.filePath !== !!d.dataUrl, {
       message: 'Pass exactly one of filePath or dataUrl',
@@ -631,8 +654,10 @@ export const uploadReferenceImage: Operation<{
       })
       return ok(r)
     }
-    if (input.type === 'video') {
-      throw new Error('dataUrl uploads are image-only — pass a filePath to import a video clip.')
+    if (input.type === 'video' || input.type === 'audio') {
+      throw new Error(
+        `dataUrl uploads are image-only — pass a filePath to import ${input.type === 'audio' ? 'an audio file' : 'a video clip'}.`
+      )
     }
     const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload-base64', {
       projectId: input.projectId,
@@ -701,17 +726,35 @@ export const moveAssetsToProject: Operation<{
     }
     const resolved = await resolveAssetRefs(ctx, input.sourceProjectId, input.assetIds)
     const assetIds = input.assetIds.map((ref) => resolved.get(ref)?.id ?? ref)
-    return ok(
-      await ctx.desktop().post('/agent/assets/move-to-project', {
-        assetIds,
-        targetProjectId: input.targetProjectId,
-        // Sent so the route can ENFORCE it. resolveAssetRefs only validates
-        // badge codes against the source project — a raw UUID passes straight
-        // through, so without this a caller could move an asset out of a
-        // project it never named.
-        sourceProjectId: input.sourceProjectId,
-      })
-    )
+    const result = await ctx.desktop().post<{
+      moved?: number
+      externalClipRefs?: Array<{ projectId: string; projectName: string; clipCount: number }>
+    }>('/agent/assets/move-to-project', {
+      assetIds,
+      targetProjectId: input.targetProjectId,
+      // Sent so the route can ENFORCE it. resolveAssetRefs only validates
+      // badge codes against the source project — a raw UUID passes straight
+      // through, so without this a caller could move an asset out of a
+      // project it never named.
+      sourceProjectId: input.sourceProjectId,
+    })
+
+    // Timeline clips key media by PATH, so the move repointed edits in OTHER
+    // projects at files that now live inside the destination — and deleting the
+    // destination deletes those files. Say it in the TEXT, not just the data:
+    // an agent summarising this result must be able to pass the warning on.
+    const refs = result.externalClipRefs ?? []
+    if (refs.length > 0) {
+      const clips = refs.reduce((n, r) => n + r.clipCount, 0)
+      const where = refs.map((r) => `"${r.projectName}"`).join(', ')
+      return ok(
+        result,
+        `${JSON.stringify(result)}\n\n⚠️ ${clips} timeline clip(s) in ${where} now reference the moved ` +
+          `file(s) inside the destination project. Deleting the destination project would break those ` +
+          `edits. Tell the user — this is the one cross-project reference Slates allows.`
+      )
+    }
+    return ok(result)
   },
 }
 
@@ -1775,11 +1818,45 @@ export const AUDIO_MODELS = ['seed-audio', 'eleven-v3', 'eleven-sfx', 'suno'] as
 
 export type AudioModel = (typeof AUDIO_MODELS)[number]
 
-/** Per-surface hard bounds — mirrored in slate/src/shared/pricing.ts. */
+/**
+ * Per-surface bounds and defaults.
+ *
+ * 🚨 THESE FOUR NUMBERS PER SURFACE LIVE IN THREE REPOS. A change is a
+ * three-site edit, every time:
+ *   1. HERE (`audioCostKey`, the agent's pre-flight quote)
+ *   2. `slate/src/shared/pricing.ts` → MODEL_REGISTRY `audio.durationSeconds`
+ *      (min/max/default), read by `clampAudioDuration` + `audioCreditKey`
+ *   3. `slates-api/src/lib/audio-keys.ts` → the server's fail-closed bounds
+ * `slates-api/scripts/pricing-consistency-check.mjs` §4 asserts 1 and 2 agree
+ * at EVERY value including out-of-range ones; the gate check covers 3.
+ *
+ * The MINs used to be missing here, and the clamp floor was a hardcoded 1. That
+ * made `slates_estimate_generation_cost({model:'seed-audio', duration:2})`
+ * quote a real `seed-audio-2s` price for a generation the desktop would bill as
+ * 3s and the proxy would REJECT outright. Same for an omitted duration, which
+ * quoted `seed-audio-1s` against the desktop's `seed-audio-15s`.
+ */
+export const SEED_AUDIO_MIN_SECONDS = 3
 export const SEED_AUDIO_MAX_SECONDS = 120
+export const SEED_AUDIO_DEFAULT_SECONDS = 15
+export const ELEVEN_SFX_MIN_SECONDS = 1
 export const ELEVEN_SFX_MAX_SECONDS = 22
+export const ELEVEN_SFX_DEFAULT_SECONDS = 4
 export const ELEVEN_V3_MAX_CHARACTERS = 5000
+export const SUNO_MIN_SECONDS = 10
 export const SUNO_MAX_SECONDS = 360
+
+/**
+ * Byte-for-byte the desktop's `clampAudioDuration` in slate/src/shared/pricing.ts,
+ * INCLUDING the non-finite arm — that one matters: `Math.max(min, NaN)` is NaN,
+ * so without it a NaN duration produces the key `seed-audio-NaNs` here while the
+ * desktop quotes the default. Divergence at a value neither side can bill is
+ * still divergence; the checker sweeps for it.
+ */
+function clampAudioSeconds(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(max, Math.max(min, Math.ceil(value)))
+}
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.ceil(value)))
@@ -1801,16 +1878,33 @@ export function audioCostKey(input: {
   characters?: number
 }): string {
   if (input.model === 'seed-audio') {
-    const secs = clampInt(input.durationSeconds ?? 0, 1, SEED_AUDIO_MAX_SECONDS)
+    // `?? default` before the clamp, not `?? 0` — the desktop resolves a missing
+    // duration to the registry DEFAULT, and a quote that doesn't match what the
+    // desktop would bill is the whole bug class this mirrors away.
+    const secs = clampAudioSeconds(
+      input.durationSeconds ?? SEED_AUDIO_DEFAULT_SECONDS,
+      SEED_AUDIO_MIN_SECONDS,
+      SEED_AUDIO_MAX_SECONDS,
+      SEED_AUDIO_DEFAULT_SECONDS
+    )
     return `seed-audio-${secs}s`
   }
   if (input.model === 'eleven-v3') {
     // 100-character buckets, always rounded UP — never under-bill a read.
-    const buckets = clampInt((input.characters ?? 0) / 100, 1, ELEVEN_V3_MAX_CHARACTERS / 100)
+    // Mirrors ttsBuckets() in slate/src/shared/pricing.ts, non-finite arm included.
+    const chars = input.characters ?? 0
+    const buckets = Number.isFinite(chars)
+      ? Math.min(ELEVEN_V3_MAX_CHARACTERS / 100, Math.max(1, Math.ceil(chars / 100)))
+      : 1
     return `eleven-v3-tts-${buckets}00c`
   }
   if (input.model === 'eleven-sfx') {
-    const secs = clampInt(input.durationSeconds ?? 0, 1, ELEVEN_SFX_MAX_SECONDS)
+    const secs = clampAudioSeconds(
+      input.durationSeconds ?? ELEVEN_SFX_DEFAULT_SECONDS,
+      ELEVEN_SFX_MIN_SECONDS,
+      ELEVEN_SFX_MAX_SECONDS,
+      ELEVEN_SFX_DEFAULT_SECONDS
+    )
     return `eleven-sfx-${secs}s`
   }
   if (input.model === 'suno') {
@@ -2283,6 +2377,7 @@ export const generateAudio: Operation<{
   stability?: number
   languageCode?: string
   speed?: number
+  volume?: number
   pitch?: number
   multilingual?: boolean
   loop?: boolean
@@ -2296,6 +2391,8 @@ export const generateAudio: Operation<{
   title?: string
   negativeTags?: string
   vocalGender?: 'm' | 'f'
+  styleWeight?: number
+  weirdnessConstraint?: number
   background?: boolean
   confirm?: boolean
 }> = {
@@ -2334,6 +2431,7 @@ export const generateAudio: Operation<{
     stability: z.number().min(0).max(1).optional().describe('eleven-v3 only. 0-1, default 0.5. Lower = more expressive and more variable take-to-take; higher = flatter and repeatable. Raise it for long narration.'),
     languageCode: z.string().optional().describe('eleven-v3 only — ISO 639-1 code to force a language when the text is ambiguous or code-switched.'),
     speed: z.number().min(0.5).max(2).optional().describe('seed-audio only — 0.5-2.0. Reach for it when dialogue races or drags against picture.'),
+    volume: z.number().min(0.5).max(2).optional().describe('seed-audio only — output gain, 0.5-2.0 (1 = unchanged). Prefer the timeline track fader for mix decisions; this is for when the model itself renders a scene too hot or too quiet.'),
     pitch: z.number().int().min(-12).max(12).optional().describe('seed-audio only — semitones. Small moves; ±3 is already a lot.'),
     multilingual: z.boolean().optional().describe('seed-audio only — better non-English / mixed-language handling.'),
     loop: z.boolean().optional().describe('eleven-sfx only — produce a seamless loop (rain, engine hum, crowd murmur).'),
@@ -2361,6 +2459,8 @@ export const generateAudio: Operation<{
     title: z.string().optional().describe('suno only — track title. Required in customMode.'),
     negativeTags: z.string().optional().describe('suno only — comma-separated things to keep out ("brass, EDM drop, male vocal").'),
     vocalGender: z.enum(['m', 'f']).optional().describe('suno only — the WIRE values m/f, not "male"/"female".'),
+    styleWeight: z.number().min(0).max(1).optional().describe('suno only — 0-1, how hard the track hugs `style`. Higher = more genre-obedient and more generic; lower = more room to surprise you.'),
+    weirdnessConstraint: z.number().min(0).max(1).optional().describe('suno only — 0-1 experimentation dial. Low is safe and on-brief; high wanders. Leave unset for a film bed.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE + ' Recommended for suno (2-3 min renders).'),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
   }),
@@ -2489,6 +2589,7 @@ export const generateAudio: Operation<{
       stability: input.stability,
       languageCode: input.languageCode,
       speed: input.speed,
+      volume: input.volume,
       pitch: input.pitch,
       multilingual: input.multilingual,
       loop: input.loop,
@@ -2502,6 +2603,8 @@ export const generateAudio: Operation<{
       title: input.title,
       negativeTags: input.negativeTags,
       vocalGender: input.vocalGender,
+      styleWeight: input.styleWeight,
+      weirdnessConstraint: input.weirdnessConstraint,
       background: input.background,
     })
 
