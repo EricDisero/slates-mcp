@@ -1,33 +1,31 @@
 ---
 name: slates-prompting-lip-sync
-description: How to set up lip-sync — Kling (cheap utility lane) or Seedance 2.0 (premium single-pass lane). Read before calling slates_generate_lip_sync. Flows — video→video re-dub, image→video avatar, and Seedance native speech — with different inputs, pricing, and gotchas. Voice catalog, framing rules, audio file constraints, and which engine/tier to pick.
+description: How to set up lip-sync — Kling-only (dedicated lip-sync and avatar endpoints, 5-second outputs). Read before calling slates_generate_lip_sync. Two flows — video→video re-dub and image→video avatar — with different inputs, pricing, and gotchas. Voice catalog, framing rules, audio file constraints, and which tier to pick. Also covers the Seedance alternative, which is a normal video generation rather than a mode of this tool.
 ---
 
 # Lip-sync — setup guide
 
-Two engines. Kling is the cheap utility lane (dedicated lip-sync endpoints, 5-second outputs); Seedance is the premium lane (speech generated IN the video itself, single pass):
+**This tool is Kling-only.** It wraps Kling's dedicated lip-sync and avatar endpoints; every entry is a real endpoint and every output is 5 seconds.
 
-| Flow | Source | Engine/Model | Cost | Use case |
+| Flow | Source | Model | Cost | Use case |
 |------|--------|-------|-----------|----------|
 | Re-dub | video clip | kling-lip-sync-video | ~4 credits / 5s | Replace dialogue on an existing talking head |
 | Avatar standard | still image | ai-avatar/v2/standard | ~14 credits / 5s | Animate a portrait into a talking avatar |
 | Avatar pro | still image | ai-avatar/v2/pro | ~29 credits / 5s | Higher facial fidelity for hero shots |
-| **Seedance native** | image or video | `engine=seedance-2` | per second (`seedance-2-face-*`; video sources bill input+output seconds) | **Premium**: natural delivery, whole-body performance, voice cloned from a video source, audio included |
 
-Pick engine + `sourceType` deliberately — they decide the pricing tier and the underlying endpoint.
+Pick `sourceType` deliberately — it decides the pricing tier and the underlying endpoint.
 
-## Seedance engine (premium single-pass)
+## Want Seedance instead? That is a video generation, not a mode here
 
-Kling lip-sync moves the mouth on finished pixels; Seedance *generates* the performance — head movement, gesture, delivery energy — with the dialogue as a native conditioning signal. Key facts:
+Seedance can generate the performance rather than bolting a mouth onto finished pixels — head movement, gesture, delivery energy, with the dialogue as a native conditioning signal, and a video source keeps its own voice. **It is not an engine switch on this tool.** Run a normal `slates_generate_video` on `seedance-2` with the clip (or portrait) attached as a video/ingredient reference and the dialogue written into the prompt yourself.
 
-- **`ttsText` becomes the spoken line, natively.** No TTS voice/speed params — a VIDEO source keeps its **own voice** (the model clones it from the clip's audio track); for an image source the voice follows the character's look, or describe it in the line's context.
-- **`audioMethod=upload`** drives the speech from a ≤15s audio file instead (a reference-audio input, no billing surcharge).
-- **Sources:** image (any style; same framing rules as the avatar flow below) or a 2–15s video clip. Output duration follows the source/audio/line length (4–15s), not a fixed 5s.
-- **Billing:** image sources bill the normal `seedance-2-face-{res}-{N}s` keys; video sources bill combined input+output seconds (`-vref-` keys) — pass `sourceSeconds` and quote via the confirm gate.
-- **Faces:** `seedanceFace` defaults true. A REAL person → `[REAL_FACE_DETECTED]` → confirm consent → retry with `seedanceRealFace=true, realFaceConsent=true` (premium realface pricing).
-- When to pick it: hero dialogue shots, natural delivery, "make this clip's person say X in their own voice". Stay on Kling for cheap utility re-dubs and long clips.
+That is the same endpoint the old `engine=seedance-2` branch called — it just built the sentence for you, invisibly, and it presupposed a "video 1" that might not exist. Writing the prompt is the whole difference, and it is the part you want control of.
 
-Everything below applies to the **Kling** engine.
+- Driving clips must be 2–15s; output duration is whatever you set (4–15s).
+- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming.
+- Faces go through the normal cascade: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent` for a real person.
+
+Everything below is about the Kling tool.
 
 ## Choosing video vs avatar
 

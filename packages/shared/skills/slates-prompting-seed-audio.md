@@ -10,9 +10,9 @@ ByteDance's one-pass audio scene model, carried on fal (`bytedance/seed-audio-1.
 ## Where it routes
 
 - **Scene audio, room tone, ambience beds, crowd/nature soundscapes** — anything where several sounds share a space. One generation, not three layered ones.
-- **Fast scratch dialogue** when the exact wording is still moving. Once the script locks and the read has to be repeatable, switch to `eleven-v3`.
+- **Dialogue and scratch VO.** This is the only speech surface in Slates: the line is performed inside the scene. Lock the read by re-rolling until a take is right, then lip-sync against it with `slates_generate_lip_sync`.
 - **NOT** a single effect that must land on a known frame — that is `eleven-sfx`, which takes an exact duration.
-- **NOT** music — that is `suno`.
+- **NOT** music. Slates has no music model; import a track and drop it on an audio track.
 - **AUDIO-ONLY.** It cannot produce images or video.
 
 ## THE RULES

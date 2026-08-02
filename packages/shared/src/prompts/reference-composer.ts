@@ -56,6 +56,19 @@ export interface ComposedReferences {
   orderedImagePaths: string[]
   /** Video reference paths in cited order — "video 1..M". */
   orderedVideoPaths: string[]
+  /**
+   * Tokens written in the prompt that matched NO reference group, as authored
+   * (`'#noir'`, `'@bob'`), first-appearance order, deduped case-insensitively.
+   *
+   * 🚨 THIS FIELD EXISTS BECAUSE THE ALTERNATIVE IS A SILENT EDIT. A `#tag` with
+   * no matching style is DELETED from the text — a raw tag confuses every model,
+   * so removing it is right, but removing it without saying so changes what the
+   * user asked for behind their back. Prompt-transparency doctrine (slate
+   * `CLAUDE.md`) requires the surface to be able to say "this went nowhere", and
+   * this is the only record that the token was ever there. Callers that render a
+   * composed-prompt preview MUST surface it.
+   */
+  unresolvedTokens: string[]
 }
 
 // Normalize a name/token for matching: drop the sigil, lowercase, strip
@@ -157,15 +170,32 @@ export function composeReferences(
   const seenFirst = new Set<string>()
   const matchedInPrompt = new Set<string>()
 
+  // Every token that named nothing, recorded as authored and deduped by the
+  // same normalisation used for matching. This is what makes the deletion
+  // below reportable instead of silent — see ComposedReferences.unresolvedTokens.
+  const unresolvedTokens: string[] = []
+  const unresolvedSeen = new Set<string>()
+  const noteUnresolved = (sigil: string, tok: string): void => {
+    const key = normToken(`${sigil}${tok}`)
+    if (unresolvedSeen.has(key)) return
+    unresolvedSeen.add(key)
+    unresolvedTokens.push(`${sigil}${tok}`)
+  }
+
   // First strip "in/with the style of #tag" phrases so the style reads as a
-  // clean trailing clause, not a dangling preposition (legacy cleanPrompt behaviour).
-  let body = rawPrompt.replace(/\s+(with|in)\s+the\s+style\s+of\s+([@#])([\w-]+)/gi, (full, _prep, sigil, tok) => {
+  // clean trailing clause, not a dangling preposition (legacy cleanPrompt
+  // behaviour). An UNRESOLVED token in that phrase is stripped too: leaving the
+  // preposition behind ("…a portrait in the style of") was the worse half of the
+  // silent edit — the tag vanished a step later anyway and the sentence was left
+  // broken. Stripped or not, the token is reported.
+  let body = rawPrompt.replace(/\s+(with|in)\s+the\s+style\s+of\s+([@#])([\w-]+)/gi, (_full, _prep, sigil, tok) => {
     const g = byNorm.get(normToken(`${sigil}${tok}`))
     if (g && g.kind === 'style') {
       matchedInPrompt.add(normToken(`${sigil}${tok}`))
       return ''
     }
-    return full
+    noteUnresolved(sigil, tok)
+    return ''
   })
 
   body = body.replace(/([@#])([\w-]+)/g, (_full, _sigil, tok: string) => {
@@ -173,6 +203,8 @@ export function composeReferences(
     const g = byNorm.get(key)
     if (!g) {
       // Unresolved token. A #unknown vanishes; an @unknown humanizes to words.
+      // Both are edits the user never asked for, so both are reported.
+      noteUnresolved(_sigil, tok)
       return _sigil === '#' ? '' : humanizeToken(tok)
     }
     matchedInPrompt.add(key)
@@ -243,6 +275,7 @@ export function composeReferences(
     prompt: parts.join('\n\n'),
     orderedImagePaths,
     orderedVideoPaths,
+    unresolvedTokens,
   }
 }
 

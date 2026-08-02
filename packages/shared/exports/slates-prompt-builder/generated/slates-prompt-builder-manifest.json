@@ -28,14 +28,14 @@
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "f3ac5db676a96d1dbdbe7aaa364ca5df3c4739637ef7d61840ad10a585931a62"
+      "sha256": "7d4098ca0af31a3c7932e1fede62a365753d936d39754e2ca76007e8e7e695b9"
     }
   ],
   "outputs": [
     {
       "path": "SKILL.md",
-      "bytes": 4969,
-      "sha256": "51bb840b158c84e5d9060af9849ec23b94031d0ff0413f13da9a97358b40ec66"
+      "bytes": 4837,
+      "sha256": "a267cf1dfcdb79f35eb38cc82f04ddf74c8e7241104bbd2108b57cc990f42a50"
     },
     {
       "path": "reference-character.md",
@@ -65,8 +65,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 37938,
-    "sha256": "48331704f54f422542f7a1a164915f3739b925e3f225a3710dbd8ecb2963ce68",
+    "bytes": 37875,
+    "sha256": "c00b6e32711f7f38bb03c95d448990453137e5f1d2c16f0708074a78c9366f83",
     "entries": [
       "SKILL.md",
       "reference-character.md",

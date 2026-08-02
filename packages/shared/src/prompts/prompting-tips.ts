@@ -49,9 +49,7 @@ export type PromptingTipsKey =
   | 'nano-banana'
   | 'nano-banana-lite'
   | 'seed-audio'
-  | 'eleven-v3'
   | 'eleven-sfx'
-  | 'suno'
 
 const SEEDANCE: PromptingTipsEntry = {
   label: 'Seedance 2.0',
@@ -406,7 +404,7 @@ const NANO_BANANA_LITE: PromptingTipsEntry = {
 }
 
 // ── Audio lane ──────────────────────────────────────────────────
-// The four audio surfaces prompt NOTHING like the video models. The single
+// The two audio surfaces prompt NOTHING like the video models. The single
 // most expensive mistake is bringing Kling's "SFX:" / "Ambient noise:" syntax
 // to Seed Audio, which reads it as literal text. Every entry below leads with
 // what the surface actually wants.
@@ -459,55 +457,9 @@ const SEED_AUDIO: PromptingTipsEntry = {
       },
       {
         heading: 'Know its seat',
-        note: 'Scenes, beds and room tone in one pass. For an exact script in a repeatable voice use Eleven v3; for a single effect on a specific frame use Sound Effects; for a song use Suno.',
+        note: 'Scenes, beds, room tone and dialogue in one pass. For a single effect that has to land on a specific frame, use Sound Effects.',
       },
     ],
-  ],
-}
-
-const ELEVEN_V3: PromptingTipsEntry = {
-  label: 'ElevenLabs Eleven v3',
-  intro: [
-    'Eleven v3 speaks your text verbatim in a named voice. It is the controlled, repeatable lane: the same text and the same voice give you a read you can regenerate after a script tweak without the performance drifting.',
-    'Billing is per 100 characters of text, rounded up — so tightening a sentence genuinely costs less, and a stray pasted paragraph genuinely costs more.',
-  ],
-  columns: [
-    [
-      {
-        heading: 'The text field is the script',
-        example: '✗ (excited) Say this fast: Grab yours today!\n✓ Grab yours today!',
-        note: 'Everything you type gets spoken. Stage directions, character names and bracketed notes will be read out loud.',
-        critical: true,
-      },
-      {
-        heading: 'Punctuate for pace',
-        example: 'It works. Every time.  ·  It works — every time…',
-        note: 'Full stops, commas, dashes and ellipses are your only timing controls. Rewrite the punctuation before you touch the settings.',
-      },
-      {
-        heading: 'Pick a voice and stay',
-        note: '20 preset voices. Choosing one per character or per piece is what makes a series sound deliberate; swapping voices mid-piece reads as a mistake.',
-      },
-    ],
-    [
-      {
-        heading: 'Stability',
-        example: '0.3 emotive · 0.5 default · 0.8 steady',
-        note: 'Lower is more expressive and more variable take-to-take. Higher is flatter and more repeatable. Raise it for long narration, lower it for a single dramatic line.',
-      },
-      {
-        heading: 'Spell out the tricky bits',
-        example: 'SKU → "ess kay you"  ·  2026 → "twenty twenty six"',
-        note: 'Acronyms, product names, prices and years are where TTS embarrasses itself. Write the pronunciation you want.',
-      },
-      {
-        heading: 'Know its seat',
-        note: 'Exact words, repeatable voice, lines you will lip-sync against. Ambience, crowds and rooms belong to Seed Audio; one-shot effects to Sound Effects.',
-      },
-    ],
-  ],
-  footer: [
-    'Word-level timestamps come back with every generation at no extra cost — that is what a future caption pass will read, so there is no reason to turn them off.',
   ],
 }
 
@@ -554,52 +506,6 @@ const ELEVEN_SFX: PromptingTipsEntry = {
   ],
 }
 
-const SUNO: PromptingTipsEntry = {
-  label: 'Suno',
-  intro: [
-    'Suno writes full music. Every generation returns TWO variations for one flat price, and length is free up to six minutes — so there is never a reason to generate a bed that is shorter than your edit.',
-    'The one thing to get right is which mode you are in, because it changes what the prompt field means.',
-  ],
-  columns: [
-    [
-      {
-        heading: 'Description mode',
-        example: 'brooding synthwave for a night drive, analog bass, no vocals',
-        note: 'The prompt is a description (max 500 characters) and the lyrics get written for you. This is the fast path when you just need a mood.',
-      },
-      {
-        heading: 'Custom mode — the prompt IS the lyrics',
-        example: 'Style: dream pop, hazy\nTitle: Blue Hour\nPrompt: [Verse 1] The lights come on…',
-        note: 'In custom mode the prompt is sung exactly as written. Putting a description there gets your description sung back at you.',
-        critical: true,
-      },
-      {
-        heading: 'Instrumental',
-        note: 'Turn instrumental on to score a scene with no vocals — style and title still steer it, and the prompt field is ignored.',
-      },
-    ],
-    [
-      {
-        heading: 'Steer with style, not adjectives',
-        example: 'Style: 90s trip-hop, dusty breakbeat, Rhodes\nAvoid: brass, EDM drops',
-        note: 'Genre, era, instrumentation and tempo belong in the style field. Negative tags remove what keeps creeping in.',
-      },
-      {
-        heading: 'Length is free',
-        example: '10–360 seconds',
-        note: 'A six-minute track costs exactly what a default one does. Ask for longer than the cut needs and trim on the timeline.',
-      },
-      {
-        heading: 'Two songs, both yours',
-        note: 'Both variations land in the gallery. They are genuinely different takes on the same brief — audition both before re-rolling.',
-      },
-    ],
-  ],
-  footer: [
-    'Files are hosted by the provider for a limited window — Slates downloads and stores them on your machine as soon as the track finishes, so nothing expires out from under a project.',
-  ],
-}
-
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   kling: KLING,
@@ -610,9 +516,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
   'seed-audio': SEED_AUDIO,
-  'eleven-v3': ELEVEN_V3,
   'eleven-sfx': ELEVEN_SFX,
-  suno: SUNO,
 }
 
 /** Null when no tips exist for the key — callers render an honest fallback. */
