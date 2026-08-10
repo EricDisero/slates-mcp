@@ -14,6 +14,9 @@ import { z } from 'zod'
 import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from '../clients/cloud.js'
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { SKILLS } from '../skills/content.js'
+// Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
+// "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
+import { multimodalRefSummary, multimodalRefModels, seedanceTaskIntentWords } from '../prompts/model-facts.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -282,7 +285,12 @@ export const estimateGenerationCost: Operation<{
           videoResolution:
             input.videoResolution ??
             resolved.videoResolution ??
-            (resolved.model.startsWith('seedance') ? '1080p' : undefined),
+            // Seedance quotes are resolution-scaled, so a missing resolution has
+            // to fall back to the model's OWN default — 2.5 has no 1080p at all,
+            // and a blanket '1080p' here quoted a key that does not exist.
+            (resolved.model === 'seedance-2.5' ? '720p'
+              : resolved.model.startsWith('seedance') ? '1080p'
+              : undefined),
           sound: input.sound ?? resolved.sound,
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
           seedanceRealFace: input.seedanceRealFace,
@@ -1695,6 +1703,11 @@ export const VIDEO_MODELS = [
   'veo-3.1-fast',
   'veo-3.1-standard',
   'seedance-2',
+  // Seedance 2.5 is a SECOND SEAT, not a replacement: 30s takes, 30 image
+  // references, audio-only references — and 480p/720p ONLY. 2.0 keeps the
+  // ladder to native 4K and stays the default. Its EDIT row is not here; edit
+  // models live on slates_edit_video, same as the Kling and Omni Flash ones.
+  'seedance-2.5',
   'omni-flash',
 ] as const
 
@@ -1733,16 +1746,24 @@ export function videoCostKey(input: {
   videoRefSeconds?: number
 }): string {
   if (input.model.startsWith('seedance')) {
-    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (face × vref ×
-    // res × duration). AI-face route bills the `-face-` key (~45% over faceless);
-    // consented real-person route bills the premium `-realface-` key (fal partner
-    // endpoint). A reference video flips to `-vref-{res}-{T}s`, T = in + out (6..30).
-    const res = input.videoResolution ?? '1080p'
+    // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (version × face
+    // × vref × res × duration). AI-face route bills the `-face-` key (~45% over
+    // faceless); consented real-person route bills the premium `-realface-` key
+    // (fal partner endpoint). A reference video flips to `-vref-{res}-{T}s`,
+    // T = in + out.
+    //
+    // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 is 480p/720p only, runs to 30s,
+    // and takes references to 30s combined — so its vref total reaches 60, DOUBLE
+    // 2.0's ceiling of 30. Clamping a 2.5 quote at 30 would quote a real key at a
+    // fraction of the real bill.
+    const v25 = input.model.startsWith('seedance-2.5')
+    const res = input.videoResolution ?? (v25 ? '720p' : '1080p')
     const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
     const vrefSecs = input.videoRefSeconds ?? 0
     if (vrefSecs > 0) {
       // ceil(x - 0.05) matches the server's probe rounding — quote = bill.
-      const total = Math.min(30, Math.max(6, Math.ceil(vrefSecs - 0.05) + input.duration))
+      const maxTotal = v25 ? SEEDANCE_25_VREF_MAX_TOTAL : SEEDANCE_20_VREF_MAX_TOTAL
+      const total = Math.min(maxTotal, Math.max(6, Math.ceil(vrefSecs - 0.05) + input.duration))
       return `${input.model}${face}-vref-${res}-${total}s`
     }
     return `${input.model}${face}-${res}-${input.duration}s`
@@ -1794,6 +1815,32 @@ export function klingEditCostKey(
 // pricing-consistency script). Duration is the CEILED source-clip length.
 export function omniFlashEditCostKey(duration: number): string {
   return `omni-flash-edit-${duration}s`
+}
+
+/** Max billed (input + output) seconds on a Seedance video-reference gen.
+ *  2.0: refs 2–15s + output 4–15s. 2.5: refs to 30s + output to 30s. */
+const SEEDANCE_20_VREF_MAX_TOTAL = 30
+const SEEDANCE_25_VREF_MAX_TOTAL = 60
+/** Seedance 2.5 source-clip bounds for the edit task type. */
+export const SEEDANCE_25_EDIT_MIN_SECONDS = 4
+export const SEEDANCE_25_EDIT_MAX_SECONDS = 30
+
+// Seedance 2.5 video-edit cost key — mirrors seedanceCreditKey() in
+// slate/src/shared/pricing.ts for the edit row (must byte-match; checked by the
+// slates-api pricing-consistency script). Unlike the Kling and Omni Flash edit
+// keys this one carries a RESOLUTION and a FACE ROUTE, because Seedance's edit
+// price moves with both. Duration is the CEILED source-clip length: the edit
+// task type forces `duration: -1` on the wire, so the source clip is the only
+// honest quote.
+export function seedanceEditCostKey(input: {
+  duration: number
+  videoResolution?: '480p' | '720p'
+  seedanceFace?: boolean
+  seedanceRealFace?: boolean
+}): string {
+  const res = input.videoResolution ?? '720p'
+  const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
+  return `seedance-2.5-edit${face}-${res}-${input.duration}s`
 }
 
 // ── Audio ───────────────────────────────────────────────────────
@@ -1933,6 +1980,13 @@ function resolveVideoModel(raw: string): {
     'kling-v3.0-omni-pro': 'kling-v3.0-omni',
     'seedance-2.0': 'seedance-2',
     'seedance-2-0': 'seedance-2',
+    // ⚠️ The 2.5 spellings must resolve to 2.5, and the BARE `seedance` must keep
+    // resolving to 2.0 — 2.0 is the default video model and holds 1080p/4K, which
+    // 2.5 does not have at all.
+    'seedance-2.5': 'seedance-2.5',
+    'seedance-25': 'seedance-2.5',
+    'seedance-2-5': 'seedance-2.5',
+    'seedance2.5': 'seedance-2.5',
     seedance: 'seedance-2',
     'veo-3.1': 'veo-3.1-fast',
     'veo-3': 'veo-3.1-fast',
@@ -1954,6 +2008,10 @@ function resolveVideoModel(raw: string): {
 function promptingSkillFor(model: string): string {
   if (model.startsWith('kling')) return 'slates-prompting-kling-v3'
   if (model.startsWith('veo')) return 'slates-prompting-veo-3'
+  // 2.5 BEFORE the generic seedance test — "seedance-2.5" also starts with
+  // "seedance", and falling through hands 2.0's guide to a model with different
+  // limits, a different resolution ladder and an extra task type.
+  if (model.startsWith('seedance-2.5')) return 'slates-prompting-seedance-2-5'
   if (model.startsWith('seedance')) return 'slates-prompting-seedance'
   if (model.startsWith('omni-flash')) return 'slates-prompting-omni-flash'
   return 'slates-cost-discipline'
@@ -1977,6 +2035,9 @@ export const generateVideo: Operation<{
   videoReferenceAssetId?: string
   videoReferenceSeconds?: number
   audioReferenceAssetId?: string
+  videoReferenceAssetIds?: string[]
+  videoReferenceSecondsEach?: number[]
+  audioReferenceAssetIds?: string[]
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
@@ -1989,23 +2050,36 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
+    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | veo-3.1-fast | veo-3.1-standard | omni-flash. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default, omni-flash = cheap 720p tier with audio included (3-10s, 16:9/9:16; t2v, single-start-frame i2v, or up to 7 reference images; no last frame / video / audio refs). All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
+    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | seedance-2.5 | veo-3.1-fast | veo-3.1-standard | omni-flash. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (4-30s takes, 30 image refs, audio-only refs — but 480p/720p ONLY, so stay on seedance-2 whenever resolution matters), Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default, omni-flash = cheap 720p tier with audio included (3-10s, 16:9/9:16; t2v, single-start-frame i2v, or up to 7 reference images; no last frame / video / audio refs). All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
-    duration: z.number().int().min(3).max(15).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance: 4-15. Omni Flash: 3-10. Default 5 if omitted but always be explicit (cost scales linearly).'),
-    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive). Veo: 720p/1080p same price, 4K more (8s only).'),
+    duration: z.number().int().min(3).max(30).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance 2: 4-15. Seedance 2.5: 4-30 (the only model that reaches 30). Omni Flash: 3-10. Default 5 if omitted but always be explicit — cost scales linearly, and a 30s seedance-2.5 take is several hundred credits.'),
+    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance 2: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive, and Pro-only). Seedance 2.5: 480p/720p ONLY (default 720p) — it has no 1080p and no 4K on any provider, so asking for one is rejected, not downgraded. Veo: 720p/1080p same price, 4K more (8s only).'),
     firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video: asset UUID or badge code ("IMG-A8") — codes resolve against the project at call time, so a code the user just spoke is always safe to pass.'),
     lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
-    ingredientAssetIds: z.array(z.string()).max(9).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni, Seedance, or Omni Flash. Up to 9 (Seedance), 4 (Kling), or 7 (Omni Flash, combined across all ref params).'),
+    ingredientAssetIds: z.array(z.string()).max(30).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni, Seedance, or Omni Flash. Up to 30 (Seedance 2.5), 9 (Seedance 2), 4 (Kling), or 7 (Omni Flash, combined across all ref params). More is not better: 2-4 strong references beat both extremes, and past 4 reference PEOPLE output stability drops on Seedance regardless of the cap.'),
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
     environmentAssetIds: z.array(z.string()).optional().describe('Environment reference assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
     styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
-    videoReferenceAssetId: z.string().optional().describe('Seedance ONLY: an existing VIDEO asset (UUID or badge code) to use as a reference — edit/relocate a clip, or MOTION TRANSFER (pair with a subject in ingredientAssetIds and a prompt like "the character from image 1 performs the motion from video 1"). 2-15s. Billing switches to input+output seconds (the vref key) — pass videoReferenceSeconds so the quote is right. If the clip contains a human/AI character, pair with seedanceFace=true (the default Seedance route blocks people). Ignored by Kling/Veo.'),
-    videoReferenceSeconds: z.number().optional().describe('REQUIRED with videoReferenceAssetId: the reference clip\'s duration in seconds (from the asset listing). Feeds the vref cost key — a video-reference gen bills combined input+output seconds; the server re-derives this by probing the clip, so an understated value just gets corrected upward.'),
-    audioReferenceAssetId: z.string().optional().describe('Seedance ONLY: an AUDIO asset (UUID or badge code), ≤15s, used as a reference — e.g. lip-sync a character to this audio ("the character in image 1 speaks the dialogue from audio 1"). No billing surcharge (Seedance audio is included). Requires at least one image or video reference alongside.'),
+    videoReferenceAssetId: z.string().optional().describe('DEPRECATED — forwarded into videoReferenceAssetIds; prefer that for anything new. A single VIDEO asset (UUID or badge code) used as a reference. Kept working forever: installed CLI and MCP builds send this shape.'),
+    videoReferenceSeconds: z.number().optional().describe('DEPRECATED — the singular partner of videoReferenceSecondsEach. Required with videoReferenceAssetId: that clip\'s duration in seconds.'),
+    audioReferenceAssetId: z.string().optional().describe('DEPRECATED — forwarded into audioReferenceAssetIds; prefer that. A single AUDIO asset (UUID or badge code) used as a reference.'),
+    // ── Multimodal references, the plural surface ──
+    // The capacity sentences are DERIVED from MODEL_FACTS (see
+    // multimodalRefSummary) rather than hand-typed, so a cap change in one
+    // place cannot leave a stale number in a description an LLM reads.
+    videoReferenceAssetIds: z.array(z.string()).optional().describe(
+      `Reference VIDEOS (UUIDs or badge codes) read alongside the images and audio in the same generation — own-footage restyle, MOTION TRANSFER ("the character from image 1 performs the motion from video 1"), or dialogue conditioning. Cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; ignored elsewhere. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')} Billing switches to combined input+output seconds (the vref key) — pass videoReferenceSecondsEach so the quote is right. If any clip contains a human/AI character, pair with seedanceFace=true (the default Seedance route blocks people). Over the cap is REFUSED, never trimmed: a dropped clip would already have been priced in.`
+    ),
+    videoReferenceSecondsEach: z.array(z.number()).optional().describe(
+      'REQUIRED with videoReferenceAssetIds, same order and length: each reference clip\'s duration in seconds (from the asset listing). Feeds the vref cost key — the bill is Σceil(each) + output seconds. The server re-derives this by probing every uploaded clip, so an understated value just gets corrected upward.'
+    ),
+    audioReferenceAssetIds: z.array(z.string()).optional().describe(
+      `Reference AUDIO clips (UUIDs or badge codes) read alongside the images and video — e.g. lip-sync a character to a line ("the character in image 1 speaks the dialogue from audio 1"). Cited as "audio 1", "audio 2"… in the order given. No billing surcharge (Seedance audio is included). ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')}`
+    ),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
@@ -2075,7 +2149,12 @@ export const generateVideo: Operation<{
           message: `Omni Flash supports 3-10 seconds (you passed ${input.duration}s). Pick a duration in that range.`,
         })
       }
-      if (input.lastFrameAssetId || input.videoReferenceAssetId || input.audioReferenceAssetId) {
+      if (
+        input.lastFrameAssetId ||
+        input.videoReferenceAssetId || input.audioReferenceAssetId ||
+        (input.videoReferenceAssetIds?.length ?? 0) > 0 ||
+        (input.audioReferenceAssetIds?.length ?? 0) > 0
+      ) {
         return ok({
           requires_clarification: true,
           missing: [],
@@ -2132,6 +2211,8 @@ export const generateVideo: Operation<{
     for (const r of input.styleAssetIds ?? []) refInputs.push({ ref: r, role: 'style' })
     if (input.videoReferenceAssetId) refInputs.push({ ref: input.videoReferenceAssetId, role: 'video reference' })
     if (input.audioReferenceAssetId) refInputs.push({ ref: input.audioReferenceAssetId, role: 'audio reference' })
+    for (const r of input.videoReferenceAssetIds ?? []) refInputs.push({ ref: r, role: 'video reference' })
+    for (const r of input.audioReferenceAssetIds ?? []) refInputs.push({ ref: r, role: 'audio reference' })
     const resolvedRefs = await resolveAssetRefs(
       ctx,
       input.projectId,
@@ -2145,6 +2226,8 @@ export const generateVideo: Operation<{
     input.lastFrameAssetId = rid(input.lastFrameAssetId)
     input.videoReferenceAssetId = rid(input.videoReferenceAssetId)
     input.audioReferenceAssetId = rid(input.audioReferenceAssetId)
+    input.videoReferenceAssetIds = rids(input.videoReferenceAssetIds)
+    input.audioReferenceAssetIds = rids(input.audioReferenceAssetIds)
     input.ingredientAssetIds = rids(input.ingredientAssetIds)
     input.characterAssetIds = rids(input.characterAssetIds)
     input.environmentAssetIds = rids(input.environmentAssetIds)
@@ -2154,12 +2237,63 @@ export const generateVideo: Operation<{
     // A video reference bills combined input+output seconds (the vref key) —
     // the quote needs the clip's length. The server probes the uploaded ref
     // and corrects the key anyway, so this only gates quote accuracy.
-    if (input.videoReferenceAssetId && input.model.startsWith('seedance') && !input.videoReferenceSeconds) {
+    // 🚨 Seedance 2.5 PROMPT-INTENT PRE-FLIGHT. With references attached, the
+    // provider sorts a request into one of five task types from the roles PLUS
+    // the prompt's intent, then fails a mismatch ASYNCHRONOUSLY — after the task
+    // queues and credits are reserved. Catch it before the spend, NAME the words,
+    // and never rewrite the prompt (the prompt-transparency invariant).
+    if (input.model === 'seedance-2.5') {
+      // 🚨 EVERY reference shape counts, singular AND plural. The classifier
+      // engages on the presence of reference ROLES, and the plural arrays are
+      // the surface new callers use — listing only the deprecated singular ones
+      // meant the modern call path got no warning at all, which is precisely
+      // backwards.
+      const hasRefs =
+        !!input.firstFrameAssetId || !!input.lastFrameAssetId ||
+        (input.ingredientAssetIds?.length ?? 0) > 0 ||
+        (input.characterAssetIds?.length ?? 0) > 0 ||
+        (input.environmentAssetIds?.length ?? 0) > 0 ||
+        (input.styleAssetIds?.length ?? 0) > 0 ||
+        !!input.videoReferenceAssetId || !!input.audioReferenceAssetId ||
+        (input.videoReferenceAssetIds?.length ?? 0) > 0 ||
+        (input.audioReferenceAssetIds?.length ?? 0) > 0
+      // Trigger words are DERIVED from the model-facts SSOT, not retyped here —
+      // a local literal had already lost 'continue the story'.
+      const hits = hasRefs ? seedanceTaskIntentWords(input.prompt) : []
+      if (hits.length > 0 && !input.confirm) {
+        return ok({
+          requires_clarification: true,
+          missing: ['prompt'],
+          message:
+            `Seedance 2.5 reads ${hits.map((w) => `"${w}"`).join(', ')} in this prompt as an EDIT or EXTEND instruction and may run it as a video edit, ` +
+            `which fails after the job has queued. If you mean to edit an existing clip, call slates_edit_video with model "seedance-2.5-edit". ` +
+            `If you mean a fresh shot, describe the finished frame instead of an instruction to change one ("the workshop bench, clear and uncluttered" rather than "remove the tripod"). ` +
+            `Pass confirm=true to send it as written.`,
+        })
+      }
+    }
+    // The quote needs a length for EVERY reference clip, in both shapes. A
+    // missing one doesn't fail the generation (the server probes and corrects
+    // upward) — it silently under-quotes, which is worse than asking.
+    const isSeedance = input.model.startsWith('seedance')
+    if (input.videoReferenceAssetId && isSeedance && !input.videoReferenceSeconds) {
       return ok({
         requires_clarification: true,
         missing: ['videoReferenceSeconds'],
         message:
           'A Seedance video reference bills on combined input+output seconds. Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+      })
+    }
+    const pluralRefCount = input.videoReferenceAssetIds?.length ?? 0
+    if (
+      pluralRefCount > 0 && isSeedance &&
+      (input.videoReferenceSecondsEach?.length ?? 0) !== pluralRefCount
+    ) {
+      return ok({
+        requires_clarification: true,
+        missing: ['videoReferenceSecondsEach'],
+        message:
+          `A Seedance video reference bills on combined input+output seconds. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
     const cloud = ctx.cloud()
@@ -2171,7 +2305,17 @@ export const generateVideo: Operation<{
       sound: input.sound,
       seedanceFace: input.seedanceFace,
       seedanceRealFace: input.seedanceRealFace,
-      videoRefSeconds: input.videoReferenceAssetId ? input.videoReferenceSeconds : 0,
+      // Σ ceil(d - 0.05) over every reference clip, both shapes — the same
+      // expression the desktop's estimateCost and the handler's key builder
+      // use. Quoting only the singular would understate a multi-clip call.
+      videoRefSeconds:
+        (input.videoReferenceAssetId && input.videoReferenceSeconds
+          ? Math.ceil(input.videoReferenceSeconds - 0.05)
+          : 0) +
+        (input.videoReferenceSecondsEach ?? []).reduce(
+          (n, d) => n + (d > 0 ? Math.ceil(d - 0.05) : 0),
+          0
+        ),
     })
     // Hard consent gate, checked before any spend: the real-face route is
     // consent-attested by design (the desktop enforces it too).
@@ -2279,8 +2423,13 @@ export const generateVideo: Operation<{
       characterAssetIds: input.characterAssetIds ?? [],
       environmentAssetIds: input.environmentAssetIds ?? [],
       styleAssetIds: input.styleAssetIds ?? [],
+      // Both shapes on the wire. The route merges and dedupes them, so an old
+      // client sending only the singular and a new one sending only the plural
+      // reach the identical handler params.
       videoReferenceAssetId: input.videoReferenceAssetId,
       audioReferenceAssetId: input.audioReferenceAssetId,
+      videoReferenceAssetIds: input.videoReferenceAssetIds,
+      audioReferenceAssetIds: input.audioReferenceAssetIds,
       sound: input.sound,
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
@@ -2816,24 +2965,28 @@ export const editVideo: Operation<{
   projectId: string
   sourceVideoAssetId: string
   prompt: string
-  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit' | 'omni-flash-edit'
+  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit' | 'omni-flash-edit' | 'seedance-2.5-edit'
   characterAssetIds?: string[]
   styleAssetIds?: string[]
   keepAudio?: boolean
+  videoResolution?: '480p' | '720p'
+  seedanceFace?: boolean
   background?: boolean
   confirm?: boolean
 }> = {
   id: 'slates_edit_video',
   description:
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements) or omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements), omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat), or seedance-2.5-edit (4–30s clips — the ONLY engine that takes a clip over 15s; 480p/720p, seedanceFace:true for AI-character faces). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. seedance-2.5-edit is priced per second of output on the video-reference tier and bills roughly double a plain 2.5 generation of the same length, because every provider charges an edit on input + output seconds — always read the quote from the confirm gate rather than assuming. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
     prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
-    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit', 'omni-flash-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s, 720p, 3–10s) for prompt-only edits — it takes NO character/style refs.'),
+    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit', 'omni-flash-edit', 'seedance-2.5-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s, 720p, 3–10s) for prompt-only edits — it takes NO character/style refs. seedance-2.5-edit (480p/720p, 4–30s) is the ONLY engine that accepts a clip longer than 15s; it also takes NO character/style refs on this op.'),
     characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN). KLING MODELS ONLY — rejected on omni-flash-edit.'),
     styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
-    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit output carries its own audio).'),
+    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit and seedance-2.5-edit output carry their own audio).'),
+    videoResolution: z.enum(['480p', '720p']).optional().describe('seedance-2.5-edit ONLY (default 720p). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.'),
+    seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Faceless edits run on BytePlus; faces are blocked there and must route to the relaxed provider, which costs ~35% more. A face edit submitted without this flag is rejected by the provider, not silently downgraded.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
   }),
@@ -2845,12 +2998,15 @@ export const editVideo: Operation<{
     }
     const model = input.model ?? 'kling-v3.0-omni-edit'
     const isOmniFlashEdit = model === 'omni-flash-edit'
-    // Kling edit: 3–15s source clips; Omni Flash edit: 3–10s.
-    const maxClipSeconds = isOmniFlashEdit ? 10 : 15
+    const isSeedanceEdit = model === 'seedance-2.5-edit'
+    // Kling edit: 3–15s source clips; Omni Flash edit: 3–10s; Seedance 2.5
+    // edit: 4–30s — the only engine that takes a clip over 15s.
+    const minClipSeconds = isSeedanceEdit ? SEEDANCE_25_EDIT_MIN_SECONDS : 3
+    const maxClipSeconds = isSeedanceEdit ? SEEDANCE_25_EDIT_MAX_SECONDS : isOmniFlashEdit ? 10 : 15
 
-    if (isOmniFlashEdit && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
+    if ((isOmniFlashEdit || isSeedanceEdit) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
       throw new Error(
-        'omni-flash-edit is prompt-only — it takes no character/style reference images. Drop the refs, or switch to kling-v3.0-omni-edit which supports elements.'
+        `${model} takes the prompt and the source clip only on this op — no character/style reference images. Drop the refs, or switch to kling-v3.0-omni-edit which supports elements.`
       )
     }
 
@@ -2884,14 +3040,26 @@ export const editVideo: Operation<{
     if (!Number.isFinite(clipSeconds) || clipSeconds <= 0) {
       throw new Error('Source clip has no recorded duration — cannot quote the edit. Re-import the clip or pick another.')
     }
-    if (clipSeconds > maxClipSeconds + 0.05 || clipSeconds < 2.95) {
+    if (clipSeconds > maxClipSeconds + 0.05 || clipSeconds < minClipSeconds - 0.05) {
       throw new Error(
-        `Source clip is ${clipSeconds.toFixed(1)}s — ${model} accepts 3–${maxClipSeconds}s. ` +
-          `Trim it first with slates_trim_video (e.g. inSec 0, outSec ${maxClipSeconds}), then edit the trimmed clip.`
+        `Source clip is ${clipSeconds.toFixed(1)}s — ${model} accepts ${minClipSeconds}–${maxClipSeconds}s. ` +
+          `Trim it first with slates_trim_video (e.g. inSec 0, outSec ${maxClipSeconds}), then edit the trimmed clip` +
+          (maxClipSeconds < SEEDANCE_25_EDIT_MAX_SECONDS ? ', or switch to seedance-2.5-edit which accepts up to 30s' : '') +
+          '.'
       )
     }
-    const billedSeconds = Math.min(maxClipSeconds, Math.max(3, Math.ceil(clipSeconds - 0.05)))
-    const costKey = isOmniFlashEdit ? omniFlashEditCostKey(billedSeconds) : klingEditCostKey(model, billedSeconds)
+    const billedSeconds = Math.min(maxClipSeconds, Math.max(minClipSeconds, Math.ceil(clipSeconds - 0.05)))
+    // Three engines, three key shapes — only Seedance's carries a resolution and
+    // a face route, because only its price moves with them.
+    const costKey = isSeedanceEdit
+      ? seedanceEditCostKey({
+          duration: billedSeconds,
+          videoResolution: input.videoResolution ?? '720p',
+          seedanceFace: input.seedanceFace === true,
+        })
+      : isOmniFlashEdit
+        ? omniFlashEditCostKey(billedSeconds)
+        : klingEditCostKey(model as 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit', billedSeconds)
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
@@ -2939,6 +3107,8 @@ export const editVideo: Operation<{
       characterAssetIds,
       styleAssetIds,
       keepAudio: input.keepAudio !== false,
+      videoResolution: input.videoResolution,
+      seedanceFace: input.seedanceFace,
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Video edit failed')
@@ -3878,6 +4048,18 @@ function resolveGuideTopic(topic: string): string | null {
   }
   if (t.startsWith('eleven') || t.startsWith('elevenlabs') || t === 'sfx' || t === 'sound-effects' || t === 'sound effects') {
     return 'slates-prompting-elevenlabs'
+  }
+  // ⚠️ 2.5 BEFORE the generic `seedance` prefix — the same ordering trap as
+  // seed-audio-before-seedance above. Falling through silently hands the 2.0
+  // guide to 2.5, whose limits, resolutions and task types are all different.
+  if (
+    t.startsWith('seedance-2.5') ||
+    t.startsWith('seedance-25') ||
+    t.startsWith('seedance-2-5') ||
+    t.startsWith('seedance2.5') ||
+    t === 'seedance 2.5'
+  ) {
+    return 'slates-prompting-seedance-2-5'
   }
   if (t.startsWith('seedance')) return 'slates-prompting-seedance'
   if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'

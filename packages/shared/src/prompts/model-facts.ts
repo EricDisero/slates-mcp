@@ -12,7 +12,85 @@ export interface ModelFact {
   maxRefImages: number | null
   /** Max ingredient images (video models) — null if not applicable. */
   maxIngredients: number | null
+  // ── Multimodal reference capacity (video models that read clips + audio) ──
+  //
+  // Mirrors `MODEL_REGISTRY.maxReference*` in slate/src/shared/pricing.ts, which
+  // is the RUNTIME truth (and is itself locked against the server's constants by
+  // slates-api/scripts/reference-caps-lockstep-check.mjs). These exist so op
+  // descriptions and skills can DERIVE the numbers instead of hand-typing them —
+  // the root CLAUDE.md rule: never hand-type a fact an LLM will read.
+  /** Reference VIDEOS accepted in one generation. null/absent = none. */
+  maxReferenceVideos?: number | null
+  /** Reference AUDIO clips accepted in one generation. null/absent = none. */
+  maxReferenceAudio?: number | null
+  /** Combined seconds across every reference video. */
+  maxReferenceVideoSeconds?: number | null
+  /** Combined seconds across every reference audio clip. */
+  maxReferenceAudioSeconds?: number | null
+  /** Ceiling on TOTAL reference files across all modalities. */
+  maxReferenceFilesTotal?: number | null
+  /** An audio reference needs at least one image or video reference alongside. */
+  audioRefNeedsCompanion?: boolean
   notes: string
+}
+
+/**
+ * One sentence of multimodal-reference capacity for a model, derived. Returns
+ * an empty string for a model that takes none, so a caller can append it
+ * unconditionally.
+ */
+export function multimodalRefSummary(id: string): string {
+  const f = MODEL_FACTS.find((m) => m.id === id)
+  if (!f) return ''
+  const v = f.maxReferenceVideos ?? 0
+  const a = f.maxReferenceAudio ?? 0
+  if (v === 0 && a === 0) return ''
+  const parts: string[] = []
+  if (v > 0) parts.push(`${v} reference video${v === 1 ? '' : 's'} (${f.maxReferenceVideoSeconds}s combined)`)
+  if (a > 0) parts.push(`${a} reference audio clip${a === 1 ? '' : 's'} (${f.maxReferenceAudioSeconds}s combined)`)
+  const total = f.maxReferenceFilesTotal ? `, ${f.maxReferenceFilesTotal} files max across all modalities` : ''
+  const companion = f.audioRefNeedsCompanion
+    ? ' Audio needs at least one image or video reference alongside it.'
+    : ' Audio-only references are allowed.'
+  return `${f.label}: up to ${parts.join(' and ')}${total}.${companion}`
+}
+
+/**
+ * The prompt words that make Seedance 2.5 reclassify a reference-carrying
+ * request as a video EDIT or EXTEND — after which it fails on task-type
+ * constraints it never set, ASYNCHRONOUSLY, once the job has queued.
+ *
+ * 🚨 THIS DRIVES A WARNING THAT NAMES THE WORDS. It must never drive a rewrite:
+ * silently mutating the user's prompt to dodge a provider classifier is banned
+ * by the prompt-transparency invariant (slate/CLAUDE.md). "Remove the tripod" is
+ * the user's sentence; the honest move is to say what will happen.
+ *
+ * ⚠️ MIRRORED, and the mirror is deliberate. The desktop's copy is
+ * `SEEDANCE_EDIT_INTENT_KEYWORDS` + `SEEDANCE_EXTEND_INTENT_KEYWORDS` in
+ * `slate/src/shared/pricing.ts`, which cannot import from this package (it is
+ * loaded by the renderer through the `@shared/*` alias, with no npm dependency).
+ * Same situation as `promptComposition.ts` ↔ `reference-composer.ts`. Change one,
+ * change the other in the same pass. Both sides match on a WORD BOUNDARY, so
+ * "added" and "readdress" are not hits.
+ */
+export const SEEDANCE_TASK_INTENT_WORDS = [
+  'add', 'remove', 'replace', 'change', 'edit the video',
+  'extend', 'continue', 'continue the story',
+] as const
+
+/** Which trigger words a prompt actually contains, so a warning can name them.
+ *  Mirrors `seedanceTaskIntentWords()` in slate/src/shared/pricing.ts. */
+export function seedanceTaskIntentWords(prompt: string): string[] {
+  return SEEDANCE_TASK_INTENT_WORDS.filter((w) =>
+    new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(prompt)
+  )
+}
+
+/** Every model that reads reference video and/or audio, for op descriptions. */
+export function multimodalRefModels(): string[] {
+  return MODEL_FACTS
+    .filter((m) => (m.maxReferenceVideos ?? 0) > 0 || (m.maxReferenceAudio ?? 0) > 0)
+    .map((m) => m.id)
 }
 
 export const MODEL_FACTS: ModelFact[] = [
@@ -77,7 +155,38 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     maxRefImages: null,
     maxIngredients: 9, // ingredient images per video gen
-    notes: 'PREMIUM video tier — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). Up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K, but 4K VIDEO is a Pro-only tier gate (base maxes at 1080p; server returns PRO_REQUIRED) — default 1080p unless the user is on Pro. Attaching a clip as a video reference (own-footage restyle, motion or dialogue conditioning) bills combined input+output seconds.',
+    maxReferenceVideos: 3,
+    maxReferenceAudio: 3,
+    maxReferenceVideoSeconds: 15,
+    maxReferenceAudioSeconds: 15,
+    maxReferenceFilesTotal: 12,
+    audioRefNeedsCompanion: true,
+    notes: 'PREMIUM video tier and the DEFAULT video model — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). 4-15s, up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K, but 4K VIDEO is a Pro-only tier gate (base maxes at 1080p; server returns PRO_REQUIRED) — default 1080p unless the user is on Pro. Attaching a clip as a video reference (own-footage restyle, motion or dialogue conditioning) bills combined input+output seconds. 2.0 STAYS THE DEFAULT over 2.5 because it is the only Seedance with 1080p and 4K.',
+  },
+  {
+    id: 'seedance-2.5',
+    label: 'Seedance 2.5',
+    kind: 'video',
+    maxRefImages: null,
+    maxIngredients: 30, // 30 image refs; the model also takes 10 video + 10 audio (50 total)
+    maxReferenceVideos: 10,
+    maxReferenceAudio: 10,
+    maxReferenceVideoSeconds: 30,
+    maxReferenceAudioSeconds: 30,
+    maxReferenceFilesTotal: 50,
+    // No companion requirement — audio-only references are one of the things
+    // the second seat actually buys.
+    notes:
+      'A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE OF IT — and the single most important fact is that it is 480p/720p ONLY. No 1080p, no 4K, on any provider. Pick 2.5 over 2.0 when the shot needs LENGTH (one 30s take vs 15s), MANY REFERENCES (30 images, plus video and audio references — 50 total), an AUDIO-ONLY reference (2.0 requires an image or video alongside audio; 2.5 does not), or tighter prompt adherence. Pick 2.0 when resolution matters at all. VIDEO-ONLY. 🚨 COST DISCIPLINE: 720p STOPS READING AS "THE CHEAP ONE" HERE. A 30s 720p clip on the real-face route is 710 credits and on the AI-face route 484 — more than a 15s 1080p Seedance 2.0 face generation (411), against a 1,000-credit welcome grant. Always quote with slates_estimate_generation_cost before a long take, and draft at 480p/4-8s. 🚨 PROMPT INTENT IS A TASK-TYPE TRIGGER: when a request carries reference images/video/audio, the words "add", "remove", "replace", "change", "edit the video", "extend" or "continue" make the provider reclassify it as a video EDIT or EXTEND and fail it AFTER the job queues (credits are refunded, but the run stalls). If you mean to edit an existing clip, use slates_edit_video with model seedance-2.5-edit. If you mean a fresh shot, describe the finished frame rather than an instruction to change one.',
+  },
+  {
+    id: 'seedance-2.5-edit',
+    label: 'Seedance 2.5 Edit',
+    kind: 'video',
+    maxRefImages: null,
+    maxIngredients: 0, // prompt + source clip only on slates_edit_video
+    notes:
+      'VIDEO-TO-VIDEO EDIT via slates_edit_video — the ONLY edit engine that accepts a clip LONGER THAN 15 SECONDS (4-30s vs Kling O3 edit 3-15s and Omni Flash edit 3-10s). That length is the whole reason to route here; for a clip inside the others\' range compare on fidelity instead (Omni Flash edit won the 7/09 prompt-only head-to-head; Kling edit is the one that takes element/style reference images). 480p/720p output, native audio. Prompt + source clip only on this op — no reference images. Output length follows the SOURCE clip and is billed as the ceiled source length, on the video-reference rate tier: an edit costs roughly DOUBLE a plain 2.5 generation of the same length, because every provider bills an edit on input + output seconds. Set seedanceFace:true when a character face is visible in the clip — the faceless provider blocks faces outright. There is no consented-real-face route for editing.',
   },
   {
     id: 'kling-v3',

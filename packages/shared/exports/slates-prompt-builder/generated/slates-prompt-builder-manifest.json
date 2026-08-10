@@ -12,7 +12,7 @@
     },
     {
       "path": "skills/slates-prompting-seedance.md",
-      "sha256": "a67f8c72bf187b726d39d2efb3c72a44740f43d44d5166d9767b93c55b4dd0a2"
+      "sha256": "81ba0d25c52ef503500d532d9376898400c0a192c63c6ce2af566a5176c92050"
     },
     {
       "path": "skills/slates-prompting-kling-v3.md",
@@ -28,14 +28,14 @@
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "7d4098ca0af31a3c7932e1fede62a365753d936d39754e2ca76007e8e7e695b9"
+      "sha256": "b55054947d0286024f0bf0565968cf5b0a5c5e0d786aa5b2b78aed7e7be9706b"
     }
   ],
   "outputs": [
     {
       "path": "SKILL.md",
-      "bytes": 4837,
-      "sha256": "a267cf1dfcdb79f35eb38cc82f04ddf74c8e7241104bbd2108b57cc990f42a50"
+      "bytes": 4954,
+      "sha256": "8d161adfb51a6da1800d9cacd93181e13966807a3490e75bd89a0093d0311cde"
     },
     {
       "path": "reference-character.md",
@@ -44,8 +44,8 @@
     },
     {
       "path": "reference-seedance.md",
-      "bytes": 31667,
-      "sha256": "53a77f7bcfaa35be875df221f99843a74481ef6c6d8f7813b97a6e65d12f9dfe"
+      "bytes": 32473,
+      "sha256": "0175afc387d27ca47439dfa2a33d6f96394a369044b4539928ff4f36fbf8126d"
     },
     {
       "path": "reference-kling.md",
@@ -65,8 +65,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 37875,
-    "sha256": "c00b6e32711f7f38bb03c95d448990453137e5f1d2c16f0708074a78c9366f83",
+    "bytes": 38258,
+    "sha256": "66c29297ee18dab6f429b48b75f47bb53d8180e35674adf03f3290ee84a7779b",
     "entries": [
       "SKILL.md",
       "reference-character.md",

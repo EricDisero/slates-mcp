@@ -1,7 +1,20 @@
-// Per-model PROMPTING TIPS — the user-facing card content rendered by the
-// desktop app's "See prompting tips" modals. SINGLE SOURCE OF TRUTH: this
-// file. The desktop renders whatever this exports (no hand-written tips JSX
-// in slate — that's how the Omni Flash / Veo / Kling chimera modal shipped).
+// Per-model PROMPTING TIPS — the short, curated, FREE prompting guidance.
+// SINGLE SOURCE OF TRUTH: this file. Nothing downstream authors tips copy (no
+// hand-written tips JSX or prose anywhere — that's how the Omni Flash / Veo /
+// Kling chimera modal shipped).
+//
+// WHERE IT RENDERS (changed 2026-08-10): exactly one place, the generated page
+// https://slates.video/docs/prompting, emitted by slates-web
+// scripts/build-llm-docs.mjs via scripts/llm-docs/extract-tips.ts. It used to
+// render inside the desktop app's Settings modal — 92 cards, 12 families,
+// two-up, in a 448px drawer. It is documentation, so it lives on the web; the
+// app links to it. Do not add an in-app renderer back (slate/CLAUDE.md →
+// Prompting-tips SSOT).
+//
+// A NEW ENTRY NEEDS A READING GROUP. extract-tips.ts owns the order the page
+// lists families in; a key that appears in no group ships in this package and
+// renders on no page. The generator warns, it does not fail — check the
+// `npm run build:llm-docs` output.
 //
 // Relationship to the skills: packages/shared/skills/slates-prompting-*.md
 // are the LONG-FORM agent guidance; these tips are the curated end-user
@@ -41,6 +54,8 @@ export interface PromptingTipsEntry {
 
 export type PromptingTipsKey =
   | 'seedance'
+  | 'seedance-2-5'
+  | 'seedance-2-5-edit'
   | 'kling'
   | 'kling-edit'
   | 'veo'
@@ -103,6 +118,12 @@ const SEEDANCE: PromptingTipsEntry = {
         note: 'Two different sentences. Mixing them ("the camera speed ramps as the earbud rises") is a common cause of shaky, glitchy output.',
       },
       {
+        heading: 'Images, clips and audio in ONE generation',
+        example: 'Marcus (image 1) performs the motion from video 1, speaking the line in audio 1.',
+        note: 'Attaching a clip does NOT mean "edit this clip". A video or audio attachment is a REFERENCE, numbered in the rail exactly like an image, and it sits alongside your images in the same generation — the composer cites them as "image N", "video N", "audio N", in rail order, and shows you the exact sentence before you press Generate. Reorder the tiles to change what those numbers mean. To actually rewrite a clip, use Edit with AI instead — that is a different, deliberate choice.',
+        critical: true,
+      },
+      {
         heading: 'Multi-character shots — forbid twins',
         example: 'Throughout the video, characters with completely identical appearance, clothing, and accessories are prohibited. Do not generate duplicate avatars or a twin effect.',
         note: 'With several characters in frame, Seedance can render the same person twice. ByteDance\'s fix: bind each character to its image ("Marcus (image 1)"), append that constraint verbatim at the end, and prefer single-person reference photos. Past 4 reference people, stability drops — compose a group still first.',
@@ -112,8 +133,90 @@ const SEEDANCE: PromptingTipsEntry = {
   footer: [
     'Quality and constraint slots have their own official vocabulary: ask for "HD, rich details, cinematic texture, natural colors, soft lighting" — not "8K / masterpiece / trending on artstation." Seedance has no negative-prompt field, so constraints go inline: "keep it subtitle-free", "do not generate a logo", "do not generate a watermark".',
     'Style block at the end: one primary anchor plus 2-3 supporting details. End with "Single continuous take" if you want one shot with no cuts. Never write "no cut" or "seamless transition" — those aren\'t in the training vocabulary.',
-    'Multi-modal: up to 9 images, 3 videos and 3 audio references. Cite them by type and index — "Zhang San@Image 1", or the "Marcus (image 1)" form Slates composes from your @mentions. Never cite an asset ID instead of the image number; the model can\'t associate the two. Max length: 4,000 characters.',
+    'Multi-modal: up to 9 images, 3 videos and 3 audio references — 12 files in total, with the reference video capped at 15 seconds combined and the audio at 15. An audio reference on 2.0 needs at least one image or video alongside it (2.5 accepts audio on its own). Cite them by type and index — "Zhang San@Image 1", or the "Marcus (image 1)" form Slates composes from your @mentions. Never cite an asset ID instead of the image number; the model can\'t associate the two. Max length: 4,000 characters.',
+    'A reference VIDEO changes the price: it bills input seconds PLUS output seconds, summed across every clip attached. Two 5-second references on an 8-second generation bills 18 seconds, not 8. The Generate button and the duration menu both show that total before you commit. Over the cap is refused rather than trimmed, precisely so you are never charged for a clip the model never saw.',
     'Don\'t cross-pollinate image-model syntax: named lenses, apertures and film stocks ("85mm f/1.4", "Kodak Portra 400") are a Nano Banana lever and a Seedance anti-pattern. Translate them into shot size, depth of field and colour tone instead.',
+  ],
+}
+
+const SEEDANCE_25: PromptingTipsEntry = {
+  ...SEEDANCE,
+  label: 'Seedance 2.5',
+  intro: [
+    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), and audio-only references — and it gives up 1080p and 4K entirely. It is 480p or 720p, on every route. Everything below about writing the prompt is the same as 2.0.',
+    "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
+  ],
+  columns: [
+    [
+      {
+        heading: 'Do not write edit instructions here',
+        example: '\u274c a wide shot of the workshop, remove the tripod\n\u2705 the workshop bench, clear and uncluttered',
+        note: 'With references attached, "add", "remove", "replace", "change", "extend" and "continue" make Seedance 2.5 treat the request as a video EDIT, and it then fails on constraints it never set — after the job has queued. Describe the finished frame instead. To actually edit a clip, attach it and pick Seedance 2.5 Edit.',
+        critical: true,
+      },
+      ...SEEDANCE.columns[0],
+    ],
+    [
+      {
+        heading: '720p is not the cheap one here',
+        example: '30s \u00b7 720p \u00b7 Face route = 484 credits\n15s \u00b7 1080p \u00b7 Seedance 2.0 Face = 411 credits',
+        note: 'Length is what moves the price, and 2.5 doubles the length ceiling — so a 30-second 720p clip can cost more than a 15-second 1080p one, against a 1,000-credit starting balance. Draft at 480p and 4-8 seconds; spend the length only on a take you already know works. The Generate button always shows the exact number first.',
+        critical: true,
+      },
+      {
+        heading: 'Audio-only references',
+        example: 'Reference the timbre in audio 1 to generate...',
+        note: '2.5 accepts an audio reference on its own — a voice line, a music bed, a room tone — with no image or video alongside it. 2.0 could not. Audio references never cost extra on any Seedance route.',
+      },
+      ...SEEDANCE.columns[1],
+    ],
+  ],
+  footer: [
+    '30 image references is a budget, not a target. Every reference rule still holds: 2-4 strong references beat both extremes, one reference per role, one authoritative rendering per subject — and past 4 reference PEOPLE, output stability drops regardless of the cap. The larger budget is for long multi-shot takes and for video plus audio references alongside images.',
+    'A reference VIDEO bills input seconds PLUS output seconds, and 2.5 accepts references up to 30s combined — so a 20-second reference driving a 20-second output bills 40 seconds. The Generate button shows the total.',
+    ...(SEEDANCE.footer ?? []).slice(0, 2),
+    'Frames and reference images stay mutually exclusive, and on a first/last-frame generation Seedance 2.5 chooses the aspect ratio itself — the ratio control shows "Adaptive" because the start frame decides the shape.',
+  ],
+}
+
+const SEEDANCE_25_EDIT: PromptingTipsEntry = {
+  ...SEEDANCE_25,
+  label: 'Seedance 2.5 Edit',
+  intro: [
+    'Seedance 2.5 Edit changes an existing clip: attach the clip, describe only what should be different, and the original motion, framing and timing are kept. It is the only editor in Slates that takes a clip longer than 15 seconds — 4 to 30s, against Kling O3 Edit\'s 3-15s and Omni Flash Edit\'s 3-10s.',
+    'Output length and aspect ratio follow the SOURCE clip, so there is no duration or ratio control — the clip you attach is the quote. Output is 480p or 720p with native audio.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Name the change, keep the rest',
+        example: 'Strictly edit the clip, and change the blue jacket to a red one.',
+        note: 'The clip already carries its composition, motion, timing and performance — re-describing them fights the model. One change per pass; chain passes for compound edits. Never write "reference the video" in an edit: that phrasing gets the request re-read as a fresh generation inspired by your clip instead of an edit of it.',
+        critical: true,
+      },
+      {
+        heading: 'Turn Face on when a face is visible',
+        note: 'The default provider blocks character faces outright — this is not a price optimisation, it is whether the job runs at all. There is no consented-real-face route for editing; real-person footage the Face route rejects has to go to Kling O3 Edit.',
+        critical: true,
+      },
+      {
+        heading: 'An edit costs about double a generation',
+        note: 'Every provider bills an edit on the input clip AND the output, so a 20-second edit is priced like 40 seconds of generation. Read the number on the Generate button rather than reasoning from the generation rate.',
+      },
+    ],
+    [
+      {
+        heading: 'When to use it instead of the others',
+        note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner and the cheapest seat, and Kling O3 Edit is the one that takes subject and style reference images.',
+      },
+      {
+        heading: 'Prompt and clip only',
+        note: 'No character or style reference images on this engine. If the edit needs a reference image to lock an identity, that is Kling O3 Edit\'s job.',
+      },
+    ],
+  ],
+  footer: [
+    'Trim before you edit, not after: the bill is the source clip\'s length rounded up, so a 30-second clip you only needed 8 seconds of costs nearly four times what it had to.',
   ],
 }
 
@@ -508,6 +611,8 @@ const ELEVEN_SFX: PromptingTipsEntry = {
 
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
+  'seedance-2-5': SEEDANCE_25,
+  'seedance-2-5-edit': SEEDANCE_25_EDIT,
   kling: KLING,
   'kling-edit': KLING_EDIT,
   veo: VEO,

@@ -28,10 +28,21 @@ export type ReferenceKind =
   | 'first-frame'
   | 'last-frame'
   | 'video'
+  // 🚨 'video-ref' IS NOT 'video'. 'video' is the EDIT SOURCE — the clip being
+  // rewritten — and it emits "Video N is the motion source." Overloading it for
+  // a plain reference clip would silently rewrite the prompt of the shipped
+  // Kling O3 / Seedance edit path, which is the one thing the transparency
+  // invariant forbids. A reference clip emits "Video N is a provided
+  // reference." — and unlike the pinned-IMAGE line that used to say the same
+  // thing (deleted 2026-08-10, see step 3), that sentence is real information:
+  // a video attachment could genuinely be either role, so naming which one is
+  // not a tautology.
+  | 'video-ref'
+  | 'audio-ref'
 
 export interface ReferenceMedia {
   path: string
-  mediaKind: 'image' | 'video'
+  mediaKind: 'image' | 'video' | 'audio'
 }
 
 /**
@@ -54,8 +65,12 @@ export interface ComposedReferences {
   prompt: string
   /** Free-reference image paths in cited order — flatten yields "image 1..N". */
   orderedImagePaths: string[]
-  /** Video reference paths in cited order — "video 1..M". */
+  /** Video paths in cited order — "video 1..M". Edit sources and reference
+   *  clips SHARE this list and one counter, so a mixed state can never emit
+   *  two "Video 1"s. */
   orderedVideoPaths: string[]
+  /** Reference audio paths in cited order — "audio 1..K". */
+  orderedAudioPaths: string[]
   /**
    * Tokens written in the prompt that matched NO reference group, as authored
    * (`'#noir'`, `'@bob'`), first-appearance order, deduped case-insensitively.
@@ -123,6 +138,7 @@ function humanizeToken(raw: string): string {
 export interface ComposeOptions {
   startImageNumber?: number
   startVideoNumber?: number
+  startAudioNumber?: number
 }
 
 export function composeReferences(
@@ -133,21 +149,32 @@ export function composeReferences(
   // ── 1. Assign global numbers by walking the list in order ──
   let imageNum = opts.startImageNumber ?? 0
   let videoNum = opts.startVideoNumber ?? 0
+  let audioNum = opts.startAudioNumber ?? 0
   const orderedImagePaths: string[] = []
   const orderedVideoPaths: string[] = []
+  const orderedAudioPaths: string[] = []
 
   interface NumberedGroup extends ReferenceGroup {
     imageNums: number[]
     videoNums: number[]
+    audioNums: number[]
   }
   const numbered: NumberedGroup[] = groups.map((g) => {
     const imageNums: number[] = []
     const videoNums: number[] = []
+    const audioNums: number[] = []
     for (const m of g.media) {
-      if (m.mediaKind === 'video' && g.kind === 'video') {
+      // ONE video counter across the edit source and reference clips. They are
+      // mutually exclusive in practice, and a shared counter means a mixed
+      // state degrades to wrong-but-unambiguous rather than two "Video 1"s.
+      if (m.mediaKind === 'video' && (g.kind === 'video' || g.kind === 'video-ref')) {
         videoNum += 1
         videoNums.push(videoNum)
         orderedVideoPaths.push(m.path)
+      } else if (m.mediaKind === 'audio' && g.kind === 'audio-ref') {
+        audioNum += 1
+        audioNums.push(audioNum)
+        orderedAudioPaths.push(m.path)
       } else if (m.mediaKind === 'image' && isFreeRefImageKind(g.kind)) {
         imageNum += 1
         imageNums.push(imageNum)
@@ -155,7 +182,7 @@ export function composeReferences(
       }
       // first-frame / last-frame media: not numbered, not in the free-ref pool.
     }
-    return { ...g, imageNums, videoNums }
+    return { ...g, imageNums, videoNums, audioNums }
   })
 
   // ── 2. Inline-name token groups in the prompt body ──
@@ -234,14 +261,54 @@ export function composeReferences(
     }
   }
 
-  // Pinned/base references ("Image 1 is a provided reference.").
+  // Reference clips ("Video 2 is a provided reference."). This line SURVIVES
+  // the 2026-08-10 cull of null-role key lines because it is not one: the
+  // "motion source" wording above belongs to the edit path alone, so a video
+  // attachment has two possible roles and the sentence says which. The pinned
+  // IMAGE line had no such contrast partner and was deleted (see step 3).
   for (const g of numbered) {
-    if (g.kind === 'pinned' && g.imageNums.length > 0) {
-      const noun = g.imageNums.length === 1 ? 'Image' : 'Images'
-      const tail = g.imageNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
-      topKeys.push(`${noun} ${joinNums(g.imageNums)} ${tail}`)
+    if (g.kind === 'video-ref' && g.videoNums.length > 0) {
+      const noun = g.videoNums.length === 1 ? 'Video' : 'Videos'
+      const tail = g.videoNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
+      topKeys.push(`${noun} ${joinNums(g.videoNums)} ${tail}`)
     }
   }
+
+  // Reference audio ("Audio 1 is a provided reference.").
+  for (const g of numbered) {
+    if (g.kind === 'audio-ref' && g.audioNums.length > 0) {
+      const noun = g.audioNums.length === 1 ? 'Audio' : 'Audios'
+      const tail = g.audioNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
+      topKeys.push(`${noun} ${joinNums(g.audioNums)} ${tail}`)
+    }
+  }
+
+  // 🚨 A PINNED REFERENCE IMAGE GETS NO KEY LINE, DELIBERATELY (2026-08-10).
+  // It used to emit "Image 1 is a provided reference." — the only branch here
+  // that assigns NO role, and therefore says nothing: every image in the request
+  // IS a provided reference, so the sentence restated the transport. Its
+  // siblings all carry information — "is the motion source" contrasts with a
+  // reference clip, "is the subject" / "is Marcus" name the thing, the style
+  // clause assigns a job. This one was the null member of that set, and unlike
+  // video there is no competing numbered image role for it to disambiguate
+  // against (frames ride dedicated slots and are never numbered).
+  //
+  // It was also actively wrong for the case pinned-first exists to serve: the
+  // desktop's `referenceGroups.ts` orders these images FIRST for the
+  // edit/injection case (the movie still you paint over reads as image 1) —
+  // where image 1 is the CANVAS, not a reference, and the line asserted the
+  // opposite.
+  //
+  // Every vendor assigns roles inline in natural language instead. Google's own
+  // multi-reference example is "the attached napkin sketch as the structure and
+  // the attached fabric sample as the texture"; ByteDance's is "use @Image 2 as
+  // the dormitory scene style reference". Nobody declares a null role. Our own
+  // skills say the same thing: "the model does NOT infer a reference's role from
+  // its position; the NAME carries it" — and this line had no name to carry.
+  //
+  // Do not add it back. Attaching an image already means "here is an image"; if
+  // a reference needs a role, it gets one from a role badge or from the user's
+  // own words, both of which compose into real sentences above.
 
   // Token-less or not-in-prompt subjects/environments ("Image 1 is Marcus.").
   for (const g of numbered) {
@@ -275,6 +342,7 @@ export function composeReferences(
     prompt: parts.join('\n\n'),
     orderedImagePaths,
     orderedVideoPaths,
+    orderedAudioPaths,
     unresolvedTokens,
   }
 }

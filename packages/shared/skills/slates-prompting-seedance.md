@@ -202,7 +202,23 @@ These are ByteDance's own end-to-end cases. Note the shape: an asset-binding pre
 
 Reference-to-video accepts up to **9 reference images, 3 reference videos, 3 audio clips** `[official :275-281]`. Text+audio-only and audio-only inputs are not supported.
 
-**Mutually exclusive:** first-frame/last-frame mode CANNOT be combined with reference images. The error reads `"first/last frame content cannot be mixed with reference media content."` Pick one or the other. *(Official note `[:284]`: you can approximate first/last frames via prompt wording inside a multimodal call, but if the frames must be exact, use the dedicated first/last-frame route.)*
+**Mutually exclusive:** first-frame/last-frame mode CANNOT be combined with reference images. The error reads `"first/last frame content cannot be mixed with reference media content."` Pick one or the other. *(Official note `[:284]`: you can approximate first/last frames via prompt wording inside a multimodal call, but if the frames must be exact, use the dedicated first/last-frame route.)* The same rule covers reference VIDEO and AUDIO: they ride the reference endpoint, which has no frame parameters at all.
+
+### All three modalities go in ONE call
+
+The caps are a shared budget, not three separate features: **12 files total on 2.0** (9 image + 3 video + 3 audio), **15 seconds of reference video combined**, **15 seconds of audio combined**. On 2.0 an audio reference needs at least one image or video alongside it; 2.5 accepts audio on its own.
+
+Cite each by type and index, in the order they were attached — `image 1`, `video 1`, `audio 1`. The index is positional: reorder the attachments and the numbers move with them.
+
+```
+Marcus (image 1) performs the motion from video 1, in the workshop from image 2,
+speaking the line in audio 1. Preserve his identity, appearance and outfit.
+```
+<!-- slates-only -->
+**Attaching a clip is NOT the same as editing it.** "Add as reference" puts it in the composer alongside everything else and wipes nothing; "Edit with AI" makes the clip the canvas and clears the tray for a fresh instruction. Two different jobs, two different menu entries — never infer one from the other.
+
+**Over the cap is REFUSED, never trimmed.** A reference video is priced into the quote before it is sent, so a clip silently dropped after the quote would be a clip you paid for and the model never saw. Remove one and retry.
+<!-- /slates-only -->
 
 ### Motion transfer & lip-sync recipes (reference video / audio)
 
