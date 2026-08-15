@@ -161,7 +161,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
       {
         heading: 'Timestamps work here — they do not on 2.0',
         example: '0-3 seconds: he steps off the curb, rain starting.\n3-7 seconds: headlights sweep across him; he turns.\n7-15 seconds: he runs; the camera falls behind.',
-        note: 'This is the difference that makes a 30-second take usable. Seedance 2.0 ignores timing and answers only to "Shot 1 / Shot 2"; 2.5 acts on whole-second timestamps. Three forms work: intervals ("0-3 seconds…3-7 seconds"), a point ("at the 5-second mark"), or relative ("after 3 seconds"). Whole seconds only, no gaps between intervals, and never use them to choreograph fast repeated motion.',
+        note: PARTIALS['seedance-25-timestamps-short'],
         critical: true,
       },
       ...SEEDANCE.columns[0].filter((t) => t.heading !== SEEDANCE_NO_TIMESTAMPS_HEADING),
@@ -207,7 +207,7 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
       {
         heading: 'Scope the edit in time',
         example: 'Change the man\'s action from drinking coffee to mopping the floor from 4-6 seconds, and leave the rest of the clip unchanged.',
-        note: 'Seedance 2.5 reads whole-second timestamps on an edit as well as on a generation, so a change can be pinned to a range instead of applied across the whole clip. Without a range, expect the instruction everywhere.',
+        note: PARTIALS['seedance-25-timestamps-short'],
         critical: true,
       },
       {

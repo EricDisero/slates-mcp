@@ -3,6 +3,13 @@
 // RUNTIME source of truth for limits is slate/src/shared/pricing.ts
 // (MODEL_REGISTRY.maxRefImages / maxIngredientImages); these mirror it for
 // documentation. Code-verified 2026-06-25.
+//
+// Prose that ALSO appears in a skill or the tips card comes from
+// skills/_partials/*.md via PARTIALS — never restated here. A `notes` string is
+// a third rendering of a fact, and a third rendering is a third thing that can
+// survive a doctrine reversal the other two got.
+
+import { PARTIALS } from './partials.generated.js'
 
 export interface ModelFact {
   id: string
@@ -182,7 +189,7 @@ export const MODEL_FACTS: ModelFact[] = [
     // No companion requirement — audio-only references are one of the things
     // the second seat actually buys.
     notes:
-      'A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE OF IT — and the single most important fact is that it is 480p/720p ONLY. No 1080p, no 4K, on any provider. Pick 2.5 over 2.0 when the shot needs LENGTH (one 30s take vs 15s), MANY REFERENCES (30 images, plus video and audio references — 50 total), an AUDIO-ONLY reference (2.0 requires an image or video alongside audio; 2.5 does not), TIMED BEATS, or tighter prompt adherence. Pick 2.0 when resolution matters at all. VIDEO-ONLY. TIMESTAMPS: 2.5 acts on integer-second timestamps and 2.0 does not (2.0 answers only to "Shot 1 / Shot 2"). Three forms work — intervals ("0-3 seconds…3-7 seconds"), a point ("at the 5-second mark"), relative ("after 3 seconds"). Whole seconds, no gaps between intervals, never for fast repeated motion. This is what makes a 30s take controllable, and it applies to edits as well as generations. Multi-view subject reference images are also supported on 2.5 (up to 5 subjects) where 2.0 wanted one view per subject. 🚨 COST DISCIPLINE: 720p STOPS READING AS "THE CHEAP ONE" HERE. A 30s 720p clip on the real-face route is 710 credits and on the AI-face route 484 — more than a 15s 1080p Seedance 2.0 face generation (411), against a 1,000-credit welcome grant. Always quote with slates_estimate_generation_cost before a long take, and draft at 480p/4-8s. 🚨 PROMPT INTENT IS A TASK-TYPE TRIGGER: when a request carries reference images/video/audio, the words "add", "remove", "replace", "change", "edit the video", "extend" or "continue" make the provider reclassify it as a video EDIT or EXTEND and fail it AFTER the job queues (credits are refunded, but the run stalls). If you mean to edit an existing clip, use slates_edit_video with model seedance-2.5-edit. If you mean a fresh shot, describe the finished frame rather than an instruction to change one.',
+      `A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE OF IT — and the single most important fact is that it is 480p/720p ONLY. No 1080p, no 4K, on any provider. Pick 2.5 over 2.0 when the shot needs LENGTH (one 30s take vs 15s), MANY REFERENCES (30 images, plus video and audio references — 50 total), an AUDIO-ONLY reference (2.0 requires an image or video alongside audio; 2.5 does not), TIMED BEATS, or tighter prompt adherence. Pick 2.0 when resolution matters at all. VIDEO-ONLY. TIMESTAMPS: ${PARTIALS['seedance-25-timestamps-short']} Multi-view subject reference images are also supported on 2.5 (up to 5 subjects) where 2.0 wanted one view per subject. 🚨 COST DISCIPLINE: 720p STOPS READING AS "THE CHEAP ONE" HERE. A 30s 720p clip on the real-face route is 710 credits and on the AI-face route 484 — more than a 15s 1080p Seedance 2.0 face generation (411), against a 1,000-credit welcome grant. Always quote with slates_estimate_generation_cost before a long take, and draft at 480p/4-8s. 🚨 PROMPT INTENT IS A TASK-TYPE TRIGGER: when a request carries reference images/video/audio, the words "add", "remove", "replace", "change", "edit the video", "extend" or "continue" make the provider reclassify it as a video EDIT or EXTEND and fail it AFTER the job queues (credits are refunded, but the run stalls). If you mean to edit an existing clip, use slates_edit_video with model seedance-2.5-edit. If you mean a fresh shot, describe the finished frame rather than an instruction to change one.`,
   },
   {
     id: 'seedance-2.5-edit',

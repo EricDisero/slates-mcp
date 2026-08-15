@@ -112,6 +112,7 @@ real-face route has spent 71% of their welcome grant on one clip.
 
 ## Timestamps — the one grammar change
 
+<!-- @inject:seedance-25-timestamps -->
 **2.0 does not respond to timestamps and answers only to shot numbers. 2.5 responds to
 integer-second timestamps.** That is ByteDance's own first line under "Differences from Seedance
 2.0", and it is why a 30-second take is usable at all: the length is only worth buying if you can
@@ -139,9 +140,14 @@ pacing you are happy to leave to the model, timestamps when a beat has to land a
   explicitly called out as a misuse — timestamps schedule beats, they don't choreograph frames.
 - **Transitions want both halves:** the moment AND the method — *"At the 5-second mark, the camera
   transitions leftward with a left wipe into a natural dissolve."*
+- **Timestamps work on an EDIT too**, and that is where they earn the most: they scope a change in
+  time as well as in content — *"Change the man's action from drinking coffee to mopping the floor
+  from 4-6 seconds in Video 1, and leave the rest of the content unchanged."* Without a range, a
+  whole-clip instruction is applied to the whole clip.
 
 Do **not** carry this back to 2.0, and do not carry Veo's `[00:00-00:02]` bracket syntax into
 either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
+<!-- @end:seedance-25-timestamps -->
 
 ---
 
@@ -252,11 +258,9 @@ Two things sharpen an edit prompt, both first-party:
 - **Say it as A → B, not as an outcome.** *"Change the man's action from drinking coffee to mopping
   the floor"* beats *"the man mops the floor"* — naming what it currently is tells the model what
   to overwrite.
-- **Timestamp a partial edit.** The edit task type reads the same integer-second timestamps the
-  generation path does, so scope the change in time as well as in content: *"Change the man's
-  action from drinking coffee to mopping the floor **from 4-6 seconds** in Video 1, and leave the
-  rest of the content unchanged."* This is the single most useful thing timestamps buy on an edit —
-  without it a whole-clip instruction gets applied to the whole clip.
+- **Timestamp a partial edit** — the edit task type reads the same integer-second timestamps the
+  generation path does. Rules and forms are in § Timestamps above; this is the single most useful
+  thing they buy.
 
 **Audio is editable too, and it is the least obvious use of this row.** The same op rewrites what
 is heard while the picture stays put: change a spoken line, change the accent, translate the

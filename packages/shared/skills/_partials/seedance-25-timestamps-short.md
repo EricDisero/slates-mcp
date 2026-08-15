@@ -1,0 +1,2 @@
+<!-- consumer:ts -->
+Seedance 2.0 ignores timing and answers only to "Shot 1 / Shot 2"; 2.5 acts on whole-second timestamps, and that is what makes a 30-second take controllable rather than just long. Three forms work: intervals ("0-3 seconds…3-7 seconds"), a point ("at the 5-second mark"), or relative ("after 3 seconds"). Whole seconds only, no gaps between intervals, and never to choreograph fast repeated motion. They work on edits too, where a range scopes the change: "…from 4-6 seconds…".
