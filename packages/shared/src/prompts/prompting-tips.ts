@@ -82,7 +82,7 @@ const SEEDANCE: PromptingTipsEntry = {
       {
         heading: 'Shot 1 / Shot 2 / Shot 3 — never time stamps',
         example: 'Shot 1: Side shot of the alley; the man slowly starts running.\nShot 2: He knocks over a fruit stand; the camera shakes and cuts to his face.\nShot 3: He climbs a low wall; the camera pulls back onto the empty street.',
-        note: 'ByteDance: write a "Shot 1 / Shot 2 / Shot 3" storyboard in the order events occur, then merge it into one prompt. Do NOT write "At 4 seconds" or "0:00–0:03" and do not set per-shot durations — official docs say precise timing is unstable and forcing it "may lead to abnormal generation results." Let the plot set the pacing.',
+        note: 'ByteDance: write a "Shot 1 / Shot 2 / Shot 3" storyboard in the order events occur, then merge it into one prompt. Do NOT write "At 4 seconds" or "0:00–0:03" and do not set per-shot durations — Seedance 2.0 does not respond to timestamps at all, and forcing them "may lead to abnormal generation results." Let the plot set the pacing. (Seedance 2.5 is the exception: it does read integer-second timestamps.)',
         critical: true,
       },
       {
@@ -139,11 +139,15 @@ const SEEDANCE: PromptingTipsEntry = {
   ],
 }
 
+/** The 2.0 tip that 2.5 REVERSES — 2.0 ignores timestamps, 2.5 acts on them.
+ *  Matched by heading so the 2.5 entry drops it rather than contradicting it. */
+const SEEDANCE_NO_TIMESTAMPS_HEADING = 'Shot 1 / Shot 2 / Shot 3 — never time stamps'
+
 const SEEDANCE_25: PromptingTipsEntry = {
   ...SEEDANCE,
   label: 'Seedance 2.5',
   intro: [
-    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), and audio-only references — and it gives up 1080p and 4K entirely. It is 480p or 720p, on every route. Everything below about writing the prompt is the same as 2.0.',
+    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 1080p and 4K entirely. It is 480p or 720p, on every route.',
     "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
@@ -151,10 +155,16 @@ const SEEDANCE_25: PromptingTipsEntry = {
       {
         heading: 'Do not write edit instructions here',
         example: '\u274c a wide shot of the workshop, remove the tripod\n\u2705 the workshop bench, clear and uncluttered',
-        note: 'With references attached, "add", "remove", "replace", "change", "extend" and "continue" make Seedance 2.5 treat the request as a video EDIT, and it then fails on constraints it never set — after the job has queued. Describe the finished frame instead. To actually edit a clip, attach it and pick Seedance 2.5 Edit.',
+        note: 'With references attached, "add", "insert", "remove", "delete", "modify", "replace", "change", "extend" and "continue" make Seedance 2.5 treat the request as a video EDIT, and it then fails on constraints it never set — after the job has queued. Describe the finished frame instead. To actually edit a clip, attach it and pick Seedance 2.5 Edit.',
         critical: true,
       },
-      ...SEEDANCE.columns[0],
+      {
+        heading: 'Timestamps work here — they do not on 2.0',
+        example: '0-3 seconds: he steps off the curb, rain starting.\n3-7 seconds: headlights sweep across him; he turns.\n7-15 seconds: he runs; the camera falls behind.',
+        note: 'This is the difference that makes a 30-second take usable. Seedance 2.0 ignores timing and answers only to "Shot 1 / Shot 2"; 2.5 acts on whole-second timestamps. Three forms work: intervals ("0-3 seconds…3-7 seconds"), a point ("at the 5-second mark"), or relative ("after 3 seconds"). Whole seconds only, no gaps between intervals, and never use them to choreograph fast repeated motion.',
+        critical: true,
+      },
+      ...SEEDANCE.columns[0].filter((t) => t.heading !== SEEDANCE_NO_TIMESTAMPS_HEADING),
     ],
     [
       {
@@ -172,7 +182,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
     ],
   ],
   footer: [
-    '30 image references is a budget, not a target. Every reference rule still holds: 2-4 strong references beat both extremes, one reference per role, one authoritative rendering per subject — and past 4 reference PEOPLE, output stability drops regardless of the cap. The larger budget is for long multi-shot takes and for video plus audio references alongside images.',
+'30 image references is a budget, not a target — 2-4 strong references still beat both extremes, one per role. ByteDance\'s own ceilings for 2.5: 1-8 subjects bound by image reference stay stable (9-12 works but needs re-rolls), 1-5 subjects bound by video or audio reference, and 5-10 seconds is the sweet spot for a reference clip. Unlike 2.0, a multi-view turnaround sheet can be a single subject reference here — past 5 subjects, go back to one view per image. The larger budget is for long multi-shot takes and for video plus audio references alongside images.',
     'A reference VIDEO bills input seconds PLUS output seconds, and 2.5 accepts references up to 30s combined — so a 20-second reference driving a 20-second output bills 40 seconds. The Generate button shows the total.',
     ...(SEEDANCE.footer ?? []).slice(0, 2),
     'Frames and reference images stay mutually exclusive, and on a first/last-frame generation Seedance 2.5 chooses the aspect ratio itself — the ratio control shows "Adaptive" because the start frame decides the shape.',
@@ -190,8 +200,14 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
     [
       {
         heading: 'Name the change, keep the rest',
-        example: 'Strictly edit the clip, and change the blue jacket to a red one.',
-        note: 'The clip already carries its composition, motion, timing and performance — re-describing them fights the model. One change per pass; chain passes for compound edits. Never write "reference the video" in an edit: that phrasing gets the request re-read as a fresh generation inspired by your clip instead of an edit of it.',
+        example: 'Strictly edit the clip, and change the blue jacket from navy to red.',
+        note: 'The clip already carries its composition, motion, timing and performance — re-describing them fights the model. Say the change as "from A to B" rather than as an outcome: naming what it currently is tells the model what to overwrite. One change per pass; chain passes for compound edits. Never write "reference the video" in an edit: that phrasing gets the request re-read as a fresh generation inspired by your clip instead of an edit of it.',
+        critical: true,
+      },
+      {
+        heading: 'Scope the edit in time',
+        example: 'Change the man\'s action from drinking coffee to mopping the floor from 4-6 seconds, and leave the rest of the clip unchanged.',
+        note: 'Seedance 2.5 reads whole-second timestamps on an edit as well as on a generation, so a change can be pinned to a range instead of applied across the whole clip. Without a range, expect the instruction everywhere.',
         critical: true,
       },
       {
@@ -210,13 +226,19 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
         note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner and the cheapest seat, and Kling O3 Edit is the one that takes subject and style reference images.',
       },
       {
+        heading: 'It edits the audio too',
+        example: 'Only edit the man\'s dialogue: change it to "Don\'t come over here," in an American accent. Keep everything else unchanged.',
+        note: 'The same engine rewrites what is heard while the picture stays put — change a line, change an accent, translate the dialogue and re-fit the lip movement, or strip and replace music and sound effects. Priced like any other edit, on the source clip\'s length.',
+      },
+      {
         heading: 'Prompt and clip only',
-        note: 'No character or style reference images on this engine. If the edit needs a reference image to lock an identity, that is Kling O3 Edit\'s job.',
+        note: 'No character or style reference images on this engine in Slates today. If the edit needs a reference image to lock an identity, that is Kling O3 Edit\'s job.',
       },
     ],
   ],
   footer: [
     'Trim before you edit, not after: the bill is the source clip\'s length rounded up, so a 30-second clip you only needed 8 seconds of costs nearly four times what it had to.',
+    'Clips under 20 seconds edit most reliably. Up to 30 is accepted, and the returned clip can land within about a third of a second of the source length — only transition frames are compressed, nothing is cut.',
   ],
 }
 

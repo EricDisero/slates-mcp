@@ -161,7 +161,7 @@ Seedance has **no `negativePrompt` field** — constraints go inline in this slo
 
 ## Worked examples `[official :1689-1745]`
 
-These are ByteDance's own end-to-end cases. Note the shape: an asset-binding preamble, then `Shot N` blocks in event order, then a trailing style + stability paragraph. No time stamps anywhere.
+These are ByteDance's own end-to-end cases. Note the shape: an asset-binding preamble, then `Shot N` blocks in event order, then a trailing style + stability paragraph. No time stamps anywhere — 2.0 does not respond to them at all, which is version-scoped and reverses on 2.5.
 
 **Example 1 — dormitory emotional short drama (dialogue-focused).** Assets: `@Image 1` half-body photo of the female lead · `@Image 2` dormitory scene reference · `@Video 1` camera-movement reference · `@Audio 1` indoor ambience.
 

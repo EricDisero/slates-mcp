@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance
-description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2. Seedance structures multi-beat prompts as a "Shot 1 / Shot 2 / Shot 3" storyboard against an 8-slot advanced formula — never per-second time stamps. Its syntax differs from Kling, Veo and the image models; don't cross-pollinate (in particular, no lens / aperture / film-stock vocabulary).
+description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2. Seedance 2.0 structures multi-beat prompts as a "Shot 1 / Shot 2 / Shot 3" storyboard against an 8-slot advanced formula — never per-second time stamps, which 2.0 does not respond to (Seedance 2.5 does; see slates-prompting-seedance-2-5). Its syntax differs from Kling, Veo and the image models; don't cross-pollinate (in particular, no lens / aperture / film-stock vocabulary).
 ---
 
 # Seedance 2.0 — prompting
@@ -162,7 +162,7 @@ Seedance has **no `negativePrompt` field** — constraints go inline in this slo
 
 ## Worked examples `[official :1689-1745]`
 
-These are ByteDance's own end-to-end cases. Note the shape: an asset-binding preamble, then `Shot N` blocks in event order, then a trailing style + stability paragraph. No time stamps anywhere.
+These are ByteDance's own end-to-end cases. Note the shape: an asset-binding preamble, then `Shot N` blocks in event order, then a trailing style + stability paragraph. No time stamps anywhere — 2.0 does not respond to them at all, which is version-scoped and reverses on 2.5.
 
 **Example 1 — dormitory emotional short drama (dialogue-focused).** Assets: `@Image 1` half-body photo of the female lead · `@Image 2` dormitory scene reference · `@Video 1` camera-movement reference · `@Audio 1` indoor ambience.
 

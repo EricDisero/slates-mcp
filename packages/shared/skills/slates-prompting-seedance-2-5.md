@@ -1,14 +1,15 @@
 ---
 name: slates-prompting-seedance-2-5
-description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references and audio-only references, and it gives up 1080p and 4K entirely. Shares 2.0's prompt grammar (read slates-prompting-seedance for the shot structure, subject binding, camera and constraint vocabulary); this file covers only what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap at 720p.
+description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up 1080p and 4K entirely. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap at 720p.
 ---
 
 # Seedance 2.5 — prompting
 
 **Read `slates-prompting-seedance` first.** The prompt GRAMMAR is the same model family: the
-8-slot advanced formula, the `Shot 1 / Shot 2 / Shot 3` storyboard, subject binding by
-`<Subject_N>@<Image_N>`, camera vocabulary, externalised emotion, inline constraint words, the
-anti-twin fix. None of it is restated here. This file is only what 2.5 changes.
+8-slot advanced formula, subject binding by `<Subject_N>@<Image_N>`, camera vocabulary,
+externalised emotion, inline constraint words, the anti-twin fix. None of it is restated here.
+This file is only what 2.5 changes — and the biggest change is that **2.5 acts on timestamps
+where 2.0 ignores them.**
 
 ---
 
@@ -26,6 +27,8 @@ So 2.5 does not replace 2.0; it sits beside it:
 | Reference budget | 15 (9 image + 3 video + 3 audio) | **50 (30 image + 10 video + 10 audio)** |
 | Combined reference video/audio | ≤15s | **≤30s** |
 | Audio-only reference | ✗ (needs an image or video alongside) | **✓** |
+| **Timestamps in the prompt** | **✗ — ignored; shot numbers only** | **✓ — integer seconds, acted on** |
+| Multi-view image as ONE subject reference | ✗ (not recommended) | **✓ (up to 5 subjects)** |
 | Video edit as its own task type | ✗ | **✓ (`seedance-2.5-edit`)** |
 | Default video model | **yes** | no |
 
@@ -47,10 +50,10 @@ does it fail.
 
 The trigger words are ordinary English:
 
-| Reclassified as | Words that do it |
+| Reclassified as | Words that do it (ByteDance's own list) |
 |---|---|
-| **video edit** | `add` · `remove` · `replace` · `change` · `edit the video` |
-| **video extend** | `extend` · `continue` · `continue the story` |
+| **video edit** | `edit video` · `add` · `insert` · `remove` · `delete` · `modify` · `replace` · `change to` |
+| **video extend** | `extend forward` · `extend backward` · `continue` · `continue from` · `extend the story` |
 
 So a perfectly legitimate reference-to-video prompt — *"a wide shot of the workshop, **remove** the
 tripod from frame"* — gets classified as an edit and fails on constraints it never set.
@@ -107,12 +110,58 @@ real-face route has spent 71% of their welcome grant on one clip.
 
 ---
 
+## Timestamps — the one grammar change
+
+**2.0 does not respond to timestamps and answers only to shot numbers. 2.5 responds to
+integer-second timestamps.** That is ByteDance's own first line under "Differences from Seedance
+2.0", and it is why a 30-second take is usable at all: the length is only worth buying if you can
+say *when* things happen inside it.
+
+Both formats are valid on 2.5, and you can mix them — `Shot N` blocks for a storyboard whose
+pacing you are happy to leave to the model, timestamps when a beat has to land at a moment.
+
+**Three ways to control time, all first-party:**
+
+| Form | Write it like |
+|---|---|
+| **Interval** | `0-3 seconds… 3-7 seconds… 7-15 seconds` or `[1s-4s]… [4s-8s]… [8s-12s]` |
+| **Time point** | *"Quick left sideways transition at the 5-second mark."* |
+| **Relative** | *"After 3 seconds, everyone around him shakes their head."* · *"The frame freezes for 1 second after he presses the shutter."* |
+
+**The rules that come with them:**
+
+- **One second is the smallest unit.** Integers only — no `2.5s`, no frames.
+- **No gaps in the timeline.** `0-3s… 5-6s…` leaves 3-5s unspecified and the model fills it however
+  it likes. Intervals must abut: `0-3s`, `3-7s`, `7-15s`.
+- **Budget the plot to the seconds.** Too little content in a range and the model improvises to
+  fill it; too much and you get extra cuts or dropped beats. This is the actual craft of a 30s take.
+- **Never time-code a high-frequency action.** *"Shake your head three times per second"* is
+  explicitly called out as a misuse — timestamps schedule beats, they don't choreograph frames.
+- **Transitions want both halves:** the moment AND the method — *"At the 5-second mark, the camera
+  transitions leftward with a left wipe into a natural dissolve."*
+
+Do **not** carry this back to 2.0, and do not carry Veo's `[00:00-00:02]` bracket syntax into
+either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
+
+---
+
 ## What the extra reference budget is actually for
 
 30 image references (up from 9) does **not** mean "attach 30 images". Every rule in
-`slates-prompting-seedance` about references still holds — 2–4 strong references beat both extremes,
-one reference per role, one authoritative rendering per subject, and past **4 reference people**
-output stability drops regardless of the cap.
+`slates-prompting-seedance` about references still holds — 2–4 strong references beat both
+extremes, and one reference per role.
+
+**Where 2.5 moves the ceiling, per ByteDance's own input recommendations:**
+
+| | Stable | Works, but expect re-rolls |
+|---|---|---|
+| Subjects bound by IMAGE reference | 1–8 | 9–12 |
+| Subjects bound by VIDEO or AUDIO reference | 1–5 | 6–10 |
+| Reference clip length, per subject | 5–10s | longer drops stability |
+
+**Multi-view images of one subject are supported on 2.5** — a turnaround sheet can be a single
+reference image, where 2.0 wanted one authoritative rendering per subject. Past **5 subjects**,
+go back to single-view images, one per view, rather than one image carrying several viewpoints.
 
 The larger budget earns its keep in exactly two places:
 
@@ -172,11 +221,17 @@ Kling O3 Edit is the one that takes element and style reference images.
 
 - **Output length follows the SOURCE clip**, and the bill is the ceiled source length. The provider
   requires an automatic duration on this task type, so there is no length knob — the clip you attach
-  is the quote.
+  is the quote. The returned clip can differ from the source by up to ~0.3s, which only compresses
+  transition frames; a clip that 2.5 itself generated comes back at exactly its input length.
+- **Source clips under 20 seconds edit more reliably.** 4–30s is what the task type accepts;
+  ByteDance's own recommendation is to stay inside 20 for quality. A 28-second source is legal and
+  will need more attempts.
 - **The aspect ratio follows the source clip too.** No ratio control; the frame is the clip's frame.
 - **480p or 720p output**, native audio.
-- **Prompt and source clip only** on this op — no character or style reference images. If the edit
-  needs a reference image to lock an identity, that is Kling O3 Edit's job.
+- **Prompt and source clip only** on this op. The MODEL takes reference images on an edit
+  (ByteDance recommends 1–5 — *"replace the man in dark clothing in @Video 1 with @Image 2"*);
+  **Slates has not wired that path**, so today an edit that must lock an identity from a photo
+  goes to Kling O3 Edit. Constraint of our build, not of the model — worth revisiting.
 - **An edit bills roughly DOUBLE a plain 2.5 generation of the same length**, because every provider
   charges an edit on input + output seconds. Read the confirm gate's number; do not reason from the
   generation rate.
@@ -192,6 +247,23 @@ them fights the model. Use Seedance's own edit grammar from `slates-prompting-se
 **never** write *"reference video 1"* in an edit — the official guide is explicit that this phrasing
 gets the request reclassified as a reference task, which is the same landmine as Hazard 1.
 
+Two things sharpen an edit prompt, both first-party:
+
+- **Say it as A → B, not as an outcome.** *"Change the man's action from drinking coffee to mopping
+  the floor"* beats *"the man mops the floor"* — naming what it currently is tells the model what
+  to overwrite.
+- **Timestamp a partial edit.** The edit task type reads the same integer-second timestamps the
+  generation path does, so scope the change in time as well as in content: *"Change the man's
+  action from drinking coffee to mopping the floor **from 4-6 seconds** in Video 1, and leave the
+  rest of the content unchanged."* This is the single most useful thing timestamps buy on an edit —
+  without it a whole-clip instruction gets applied to the whole clip.
+
+**Audio is editable too, and it is the least obvious use of this row.** The same op rewrites what
+is heard while the picture stays put: change a spoken line, change the accent, translate the
+dialogue and re-fit the lip movement, strip or replace the BGM or a sound effect. *"Only edit the
+man's dialogue in Video 1: change it to 'Don't come over here,' in an American accent"* is an edit,
+not a lip-sync job. Bill it like any other edit — on the source clip's length.
+
 ---
 
 ## Faces, and what does NOT change
@@ -205,11 +277,10 @@ including why the real-vs-AI call is the provider's and not yours, are in
 
 Also unchanged, and worth restating because 2.5's length makes each one more expensive to get wrong:
 
-- **No time stamps.** `Shot 1 / Shot 2 / Shot 3`, ordered by when events occur, pacing left to the
-  model. A 30-second take makes this rule matter more, not less — it is more shots, not longer
-  segment labels.
 - **One primary camera move per shot.**
 - **No lens / aperture / film-stock vocabulary.** That is image-model syntax and a Seedance
   anti-pattern.
-- **No `negativePrompt` field** — constraints go inline.
+- **No `negativePrompt` field** — constraints go inline, and 2.5 acts on negative phrasing in
+  exactly two dimensions: subtitles (*"no subtitles"*) and audio (*"no BGM; environmental and
+  action sounds only"*, *"no audio"*). Everywhere else, describe what you want, not what you don't.
 - **Legible in-shot text still belongs in a baked start frame**, not in the video prompt.
