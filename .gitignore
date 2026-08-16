@@ -6,6 +6,12 @@ packages/*/dist/
 packages/*/tsconfig.tsbuildinfo
 packages/mcp/dist-mcpb/
 
+# Paid skills-pack build output. The ZIP is a binary artifact — it lives in the
+# Tigris bucket, not in git. dist-pack/pack-manifest.json IS committed: it is
+# what slates-web's check-skills-pack-lockstep.mjs reads to prove the live
+# SKILLS_PACK_DOWNLOAD_URL matches a pack that was actually built.
+dist-pack/*.zip
+
 # Generated (by packages/shared/scripts/embed-skills.mjs on every build)
 packages/shared/src/skills/content.ts
 

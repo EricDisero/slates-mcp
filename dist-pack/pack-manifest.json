@@ -1,0 +1,38 @@
+{
+  "version": "1.1.0",
+  "filename": "agentic-skills-pack-v1.1.0-02a460e62e36fef2.zip",
+  "sha256": "02a460e62e36fef278575fcdd38e4c1d5574f13dad9dde24ccabeadb69a949b1",
+  "bytes": 121556,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.0-02a460e62e36fef2.zip",
+  "skillCount": 26,
+  "freeSkills": [
+    "slates-character-identity",
+    "slates-content-policy",
+    "slates-cost-discipline",
+    "slates-direct-response-ad",
+    "slates-edit-and-iterate",
+    "slates-model-selection",
+    "slates-one-prompt-film",
+    "slates-project-organization",
+    "slates-prompting-elevenlabs",
+    "slates-prompting-flux-2-max",
+    "slates-prompting-gpt-image-2",
+    "slates-prompting-kling-v3",
+    "slates-prompting-lip-sync",
+    "slates-prompting-motion-transfer",
+    "slates-prompting-nano-banana-2",
+    "slates-prompting-omni-flash",
+    "slates-prompting-seed-audio",
+    "slates-prompting-seedance-2-5",
+    "slates-prompting-seedance",
+    "slates-prompting-seedream-5-lite",
+    "slates-prompting-veo-3",
+    "slates-storyboard-from-script",
+    "slates-style-prompting",
+    "slates-vision-feedback-loop"
+  ],
+  "paidSkills": [
+    "slates-cinematic-advertisement",
+    "slates-ugc-advertisement"
+  ]
+}
