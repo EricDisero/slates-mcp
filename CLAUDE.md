@@ -66,7 +66,29 @@ If the op needs new desktop endpoints, add the route in `slate/src/main/agent/ro
 
 ## Adding a new skill
 
-**⚠️ The bundled skills here are FREE product quality — they are NOT the paid "Agentic Skills Pack" ($29 funnel order bump).** The free/paid line is locked (Eric, 2026-07-09): *capability free, outcomes paid.* Everything in `packages/shared/skills/` ships free to every user (CLI `install-skills`, MCP prompting-guide op, desktop Studio Agent) — never gate any of it behind the bump. The paid pack's content is **campaign blueprints harvested from our real ads** (exact prompt stacks, shot lists, workflow runs per ad, replayable as "make this for my product") plus any pack-exclusive skills built specifically for the bump — those live in the pack zip only, never in this folder. Doctrine: `second-brain/business/projects/slates/strategy/funnel-architecture.md` → "Pack content doctrine". The currently-shipped pack zip is a placeholder built from these free skills until blueprints exist.
+**⚠️ The bundled skills here are FREE product quality — they are NOT the paid "Agentic Skills Pack" ($29 funnel order bump).** The free/paid line is locked (Eric, 2026-07-09): *capability free, outcomes paid.* Everything in `packages/shared/skills/` ships free to every user (CLI `install-skills`, MCP prompting-guide op, desktop Studio Agent) — never gate any of it behind the bump. The paid pack's content is **campaign blueprints harvested from our real ads** (exact prompt stacks, shot lists, workflow runs per ad, replayable as "make this for my product") plus any pack-exclusive skills built specifically for the bump. Doctrine: `second-brain/business/projects/slates/strategy/funnel-architecture.md` → "Pack content doctrine".
+
+**🚨 Paid skills live in `pack-skills/` at the repo root — NEVER in `packages/shared/skills/`.**
+`packages/shared/package.json`'s `files` array includes `skills`, so **that folder ships inside the
+public npm tarball**: anyone can `npm pack @slatesvideo/shared` and read every file in it. An
+entitlement filter in `install-skills` protects nothing — it is security by omission over a public
+artifact. **The only real gate is not shipping the file.** (`install-skills.ts` iterates
+`Object.entries(SKILLS)` with no entitlement check of any kind, and that is fine *because* the
+paid files never reach the record.)
+
+`scripts/embed-skills.mjs` globs `packages/shared/skills/*.md` only, so moving a file into
+`pack-skills/` automatically drops it from the `SKILLS` record — and therefore from npm, the
+`/members` feed, the MCP prompting-guide op and the desktop Studio Agent, in one move.
+
+Two ad skills were written straight into `packages/shared/skills/` on 2026-08-16 and swept into a
+release commit by a `git add -A`. They never reached npm (the build ran before the files landed),
+but the near-miss is why this rule is now explicit. **Use explicit paths in `git add`, never `-A`.**
+
+Build the pack with `npm run build:skills-pack` (root). It assembles the free skills plus
+everything in `pack-skills/` into a deterministic zip, refuses to build when `pack-skills/` is empty,
+and generates the README so the inventory is never hand-typed. The zip's download URL is
+hand-mirrored in **two** repos and gated by `slates-web/scripts/check-skills-pack-lockstep.mjs` —
+**never move that URL before the object is uploaded**, or every paying customer gets a 404.
 
 1. Drop a markdown file with frontmatter into `packages/shared/skills/`.
 2. Frontmatter must include `name:` and `description:` for skill discovery.
