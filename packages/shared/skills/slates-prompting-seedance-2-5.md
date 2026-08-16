@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance-2-5
-description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up 1080p and 4K entirely. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap at 720p.
+description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up 1080p and 4K — it is 480p or 720p on every route Slates offers. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap at 720p.
 ---
 
 # Seedance 2.5 — prompting
@@ -15,10 +15,11 @@ where 2.0 ignores them.**
 
 ## The one fact that decides whether you use it at all
 
-**Seedance 2.5 is 480p or 720p. There is no 1080p and no 4K, on any provider.**
+**Seedance 2.5 is 480p or 720p on every route Slates offers — no 1080p, no 4K.**
 
-That is not a Slates limitation or a tier gate — the model does not produce those resolutions.
-So 2.5 does not replace 2.0; it sits beside it:
+Treat that as the current ceiling on our routes, not a claim about the model everywhere. It is not a
+tier gate either: no Slates plan unlocks a higher resolution on 2.5. So 2.5 does not replace 2.0;
+it sits beside it:
 
 | | Seedance 2.0 | Seedance 2.5 |
 |---|---|---|
@@ -101,8 +102,12 @@ real-face route has spent 71% of their welcome grant on one clip.
 
 - **Always quote with `slates_estimate_generation_cost` before a take over ~10 seconds,** and say
   the number out loud before generating.
-- **Draft at 480p and 4–8 seconds.** Prove the composition, the motion and the identity first;
-  spend the length only on the take you already know works.
+- **Find the shot at short LENGTH, not at low resolution.** Length is what moves the price, so cut
+  seconds while you are still exploring — 4–8s — and stay at the resolution you actually want.
+  **A 480p pass does not de-risk a 720p render.** Generation is stochastic: the 720p run is a
+  different take, not the same shot rendered better. So a 480p draft that looks right buys you no
+  guarantee, and one that looks wrong may have been fine at 720p — you paid 22 credits to learn
+  nothing, when 48 would have bought a real candidate.
 - **Length is a creative decision, not a default.** 30 seconds is available; it is rarely the right
   answer for a single shot. Multi-shot storyboards inside one 30s generation are what the length is
   actually for.

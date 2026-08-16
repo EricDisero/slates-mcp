@@ -147,7 +147,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
   ...SEEDANCE,
   label: 'Seedance 2.5',
   intro: [
-    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 1080p and 4K entirely. It is 480p or 720p, on every route.',
+    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 1080p and 4K. It is 480p or 720p on every route Slates offers.',
     "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
@@ -170,7 +170,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
       {
         heading: '720p is not the cheap one here',
         example: '30s \u00b7 720p \u00b7 Face route = 484 credits\n15s \u00b7 1080p \u00b7 Seedance 2.0 Face = 411 credits',
-        note: 'Length is what moves the price, and 2.5 doubles the length ceiling — so a 30-second 720p clip can cost more than a 15-second 1080p one, against a 1,000-credit starting balance. Draft at 480p and 4-8 seconds; spend the length only on a take you already know works. The Generate button always shows the exact number first.',
+        note: 'Length is what moves the price, and 2.5 doubles the length ceiling — so a 30-second 720p clip can cost more than a 15-second 1080p one, against a 1,000-credit starting balance. Explore at short LENGTH rather than low resolution: cut the seconds to 4-8 while you are finding the shot, and stay at the resolution you actually want. A 480p pass does not de-risk a 720p render — generation is stochastic, so the 720p run is a different take, not the same shot rendered better. The Generate button always shows the exact number first.',
         critical: true,
       },
       {
