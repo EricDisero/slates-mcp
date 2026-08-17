@@ -1,8 +1,13 @@
-// Per-model prompting facts — reference/ingredient limits and the prompt
-// formula, as KNOWLEDGE (for skills + lead-magnet + desktop tooltips). The
-// RUNTIME source of truth for limits is slate/src/shared/pricing.ts
-// (MODEL_REGISTRY.maxRefImages / maxIngredientImages); these mirror it for
-// documentation. Code-verified 2026-06-25.
+// Per-model prompting facts — routing doctrine and the prompt formula, as
+// KNOWLEDGE (for skills + lead-magnet + op descriptions).
+//
+// 🚨 THE REFERENCE CAPS ARE NO LONGER TYPED HERE (2026-08-16). They are DERIVED
+// from `MODEL_CAPABILITIES` in ./model-capabilities.ts, which is now the single
+// definition — the same module `slate/src/shared/pricing.ts` spreads into every
+// MODEL_REGISTRY entry. This file used to hand-mirror those numbers "for
+// documentation"; a hand-mirror in the same package as the source is exactly the
+// defect the capability SSOT exists to delete, so `caps()` below does the lookup
+// and a wrong id throws at module load instead of shipping a stale number.
 //
 // Prose that ALSO appears in a skill or the tips card comes from
 // skills/_partials/*.md via PARTIALS — never restated here. A `notes` string is
@@ -10,25 +15,20 @@
 // survive a doctrine reversal the other two got.
 
 import { PARTIALS } from './partials.generated.js'
+import { MODEL_CAPABILITIES } from './model-capabilities.js'
 
 export interface ModelFact {
   id: string
   label: string
   kind: 'image' | 'video' | 'audio'
+  // ── Reference caps — DERIVED, never typed. See `caps()` below. ──
   /** Max reference images (image models) — null if not applicable. */
   maxRefImages: number | null
   /** Max ingredient images (video models) — null if not applicable. */
   maxIngredients: number | null
-  // ── Multimodal reference capacity (video models that read clips + audio) ──
-  //
-  // Mirrors `MODEL_REGISTRY.maxReference*` in slate/src/shared/pricing.ts, which
-  // is the RUNTIME truth (and is itself locked against the server's constants by
-  // slates-api/scripts/reference-caps-lockstep-check.mjs). These exist so op
-  // descriptions and skills can DERIVE the numbers instead of hand-typing them —
-  // the root CLAUDE.md rule: never hand-type a fact an LLM will read.
-  /** Reference VIDEOS accepted in one generation. null/absent = none. */
+  /** Reference VIDEOS accepted in one generation. null = none. */
   maxReferenceVideos?: number | null
-  /** Reference AUDIO clips accepted in one generation. null/absent = none. */
+  /** Reference AUDIO clips accepted in one generation. null = none. */
   maxReferenceAudio?: number | null
   /** Combined seconds across every reference video. */
   maxReferenceVideoSeconds?: number | null
@@ -36,9 +36,49 @@ export interface ModelFact {
   maxReferenceAudioSeconds?: number | null
   /** Ceiling on TOTAL reference files across all modalities. */
   maxReferenceFilesTotal?: number | null
-  /** An audio reference needs at least one image or video reference alongside. */
+  /**
+   * An audio reference needs at least one image or video reference alongside.
+   *
+   * Still declared here rather than derived: it is a BEHAVIOURAL rule, not a
+   * cap, and its runtime home is the registry FEATURE flag
+   * `features.audioRefNeedsCompanion` (which gates composer affordances). Only
+   * Seedance 2.0 sets it; 2.5 allowing audio-only references is one of the
+   * things the second seat buys.
+   */
   audioRefNeedsCompanion?: boolean
   notes: string
+}
+
+/**
+ * Reference caps for a fact, read out of the capability SSOT.
+ *
+ * The argument is a `MODEL_CAPABILITIES` key, which is a REGISTRY model id — and
+ * three facts here are FAMILY-level (`kling-v3`, `kling-v3-edit`, `veo-3.1`)
+ * with no registry row of their own, so they name a representative variant.
+ * That is safe because the caps are identical across the variants in each
+ * family (std/pro/omni/omni-pro all take 4; both edit rows take 4; both Veo
+ * seats take 3) — and if a future variant diverges, this becomes a wrong number
+ * rather than a crash, so split the fact rather than picking a side.
+ *
+ * Throws on an unknown id: a typo must fail the build, not ship as `null` caps
+ * that quietly tell an agent a model reads no references.
+ */
+function caps(capabilityId: string): Pick<
+  ModelFact,
+  | 'maxRefImages' | 'maxIngredients' | 'maxReferenceVideos' | 'maxReferenceAudio'
+  | 'maxReferenceVideoSeconds' | 'maxReferenceAudioSeconds' | 'maxReferenceFilesTotal'
+> {
+  const c = MODEL_CAPABILITIES[capabilityId]
+  if (!c) throw new Error(`MODEL_FACTS: no MODEL_CAPABILITIES entry for "${capabilityId}"`)
+  return {
+    maxRefImages: c.maxRefImages ?? null,
+    maxIngredients: c.maxIngredientImages ?? null,
+    maxReferenceVideos: c.maxReferenceVideos ?? null,
+    maxReferenceAudio: c.maxReferenceAudio ?? null,
+    maxReferenceVideoSeconds: c.maxReferenceVideoSeconds ?? null,
+    maxReferenceAudioSeconds: c.maxReferenceAudioSeconds ?? null,
+    maxReferenceFilesTotal: c.maxReferenceFilesTotal ?? null,
+  }
 }
 
 /**
@@ -113,8 +153,8 @@ export const MODEL_FACTS: ModelFact[] = [
     // (gemini-3-pro-image-preview); do not conflate them.
     label: 'Nano Banana 2 (Gemini 3.1 Flash Image)',
     kind: 'image',
-    maxRefImages: 14, // 10 object-fidelity + 4 character-consistency; categories don't trade.
-    maxIngredients: null,
+    // 14 = 10 object-fidelity + 4 character-consistency; the categories don't trade.
+    ...caps('nano-banana-2'),
     notes:
       'Default image model. 14 refs hard cap (10 object + 4 character). Brief it like a creative director, not tag soup. No negativePrompt field — use positive reframing. Best image start-frame for legible text. Knowledge cutoff Jan 2025.',
   },
@@ -122,8 +162,7 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'nano-banana-2-lite',
     label: 'Nano Banana 2 Lite',
     kind: 'image',
-    maxRefImages: 4,
-    maxIngredients: null,
+    ...caps('nano-banana-2-lite'),
     notes:
       'FAST/DRAFT image tier — ~half the price of NB2 full, ~2.7× faster, 1K output ONLY. Same Gemini content filter as NB2. Route here for iteration volume and drafts where 1K is fine; keep NB2 full for final 2K/4K. Character consistency + legible text hold up.',
   },
@@ -131,8 +170,7 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'nano-banana-pro',
     label: 'Nano Banana Pro',
     kind: 'image',
-    maxRefImages: 14,
-    maxIngredients: null,
+    ...caps('nano-banana-pro'),
     notes:
       'HERO-FRAME / typography PREMIUM image tier (Gemini 3 Pro backbone; ~2× NB2 price). NB2 ≈ 95% of Pro — route here only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element reasoning must be perfect. Up to 14 reference images (character locking, multi-subject fusion). Native 16:9 + 4K.',
   },
@@ -140,8 +178,7 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'gpt-image-2',
     label: 'GPT Image 2',
     kind: 'image',
-    maxRefImages: 10,
-    maxIngredients: null,
+    ...caps('gpt-image-2'),
     notes:
       'TEXT/DIAGRAM/PANEL king — near-perfect character-level text, ordered panels, exact placement (~3s gens). Route here for character sheets, shot grids, and text-bearing panels. Quality tiers: medium (default, the value seat — half NB2 price at 1080p) / high (~4×, max text precision). Third filter regime (OpenAI moderate). 4K is API-only — even paid ChatGPT can\'t render it. Photoreal/character-locked/edit-heavy → Banana line instead.',
   },
@@ -149,29 +186,21 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'flux-2-max',
     label: 'FLUX.2 Max',
     kind: 'image',
-    maxRefImages: 4,
-    maxIngredients: null,
+    ...caps('flux-2-max'),
     notes: 'Photoreal, less censored, up to ~4MP. Auto-routes to its edit endpoint when references are present. Lower ref cap than NB2.',
   },
   {
     id: 'seedream-5-lite',
     label: 'Seedream 5 Lite',
     kind: 'image',
-    maxRefImages: 10,
-    maxIngredients: null,
+    ...caps('seedream-5-lite'),
     notes: 'Cheapest image model (~flat price). Less censored. Routes to its edit endpoint with references.',
   },
   {
     id: 'seedance-2',
     label: 'Seedance 2.0',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 9, // ingredient images per video gen
-    maxReferenceVideos: 3,
-    maxReferenceAudio: 3,
-    maxReferenceVideoSeconds: 15,
-    maxReferenceAudioSeconds: 15,
-    maxReferenceFilesTotal: 12,
+    ...caps('seedance-2'),
     audioRefNeedsCompanion: true,
     notes: 'PREMIUM video tier and the DEFAULT video model — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). 4-15s, up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K, but 4K VIDEO is a Pro-only tier gate (base maxes at 1080p; server returns PRO_REQUIRED) — default 1080p unless the user is on Pro. Attaching a clip as a video reference (own-footage restyle, motion or dialogue conditioning) bills combined input+output seconds. 2.0 STAYS THE DEFAULT over 2.5 because it is the only Seedance with 1080p and 4K.',
   },
@@ -179,13 +208,7 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'seedance-2.5',
     label: 'Seedance 2.5',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 30, // 30 image refs; the model also takes 10 video + 10 audio (50 total)
-    maxReferenceVideos: 10,
-    maxReferenceAudio: 10,
-    maxReferenceVideoSeconds: 30,
-    maxReferenceAudioSeconds: 30,
-    maxReferenceFilesTotal: 50,
+    ...caps('seedance-2.5'),
     // No companion requirement — audio-only references are one of the things
     // the second seat actually buys.
     notes:
@@ -195,8 +218,8 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'seedance-2.5-edit',
     label: 'Seedance 2.5 Edit',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 0, // prompt + source clip only on slates_edit_video
+    // 0 ingredients: prompt + source clip only on slates_edit_video.
+    ...caps('seedance-2.5-edit'),
     notes:
       'VIDEO-TO-VIDEO EDIT via slates_edit_video — the ONLY edit engine that accepts a clip LONGER THAN 15 SECONDS (4-30s vs Kling O3 edit 3-15s and Omni Flash edit 3-10s), though ByteDance recommends staying inside 20s for quality. That length is the whole reason to route here; for a clip inside the others\' range compare on fidelity instead (Omni Flash edit won the 7/09 prompt-only head-to-head; Kling edit is the one that takes element/style reference images). 480p/720p output, native audio. Prompt + source clip only on this op — no reference images (the MODEL takes 1-5 reference images on an edit; Slates has not wired that path). Phrase the change as "from A to B", and TIMESTAMP a partial edit ("…from 4-6 seconds…") — 2.5 reads whole-second timestamps on edits, and without a range the instruction applies to the whole clip. AUDIO is editable on this same row: change a line, change an accent, translate dialogue with re-fitted lips, strip or replace BGM and sound effects. Output length follows the SOURCE clip and is billed as the ceiled source length, on the video-reference rate tier: an edit costs roughly DOUBLE a plain 2.5 generation of the same length, because every provider bills an edit on input + output seconds. Set seedanceFace:true when a character face is visible in the clip — the faceless provider blocks faces outright. There is no consented-real-face route for editing.',
   },
@@ -204,16 +227,16 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'kling-v3',
     label: 'Kling 3.0',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 4,
+    // Family-level fact — caps are identical across std/pro/omni/omni-pro.
+    ...caps('kling-v3.0-std'),
     notes: 'DEFAULT general-purpose video model — cost-effective, strong start-frame adherence (identity/layout/text), acting, dialogue, lip-sync, any aspect ratio. Escalate to Seedance for physics. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools (MC std/pro, lip-sync, avatar) — those two tools are Kling-only.',
   },
   {
     id: 'kling-v3-edit',
     label: 'Kling O3 Video Edit',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 4, // combined subject elements + style refs per edit
+    // Family-level fact; 4 = combined subject elements + style refs per edit.
+    ...caps('kling-v3.0-omni-edit'),
     notes:
       'VIDEO-TO-VIDEO EDIT — the REF-DRIVEN edit tool: takes an EXISTING 3–15s clip and changes what the prompt names, with element/style reference images (@ElementN = frontal + angles) locking subject identity; max 4 combined refs. keep_audio preserves the ORIGINAL audio verbatim (spoken words cannot drift) — but video lips can drift slightly against it, and multi-beat instructions get under-executed (7/09 receipt: missed a second action beat Omni Flash edit landed) — ONE beat per pass. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the 7/09 fidelity head-to-head. Billed per second of output (≈ clip length, rounded up). Seedance edit/relocate is the alternative for style-transfer-heavy jobs.',
   },
@@ -221,16 +244,16 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'veo-3.1',
     label: 'Veo 3.1',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 3,
+    // Family-level fact — fast and standard declare the same caps.
+    ...caps('veo-3.1-fast'),
     notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one gen. 16:9 only, 4/6/8s only. Otherwise Kling (default) or Seedance (physics/premium) win.',
   },
   {
     id: 'omni-flash',
     label: 'Gemini Omni Flash',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 7, // ref2v image_urls; 7 mirrors Google's own reference limit
+    // 7 ref2v image_urls — mirrors Google's own reference limit.
+    ...caps('omni-flash'),
     notes:
       'CHEAP 720p tier with native synced audio included — t2v, single-start-frame i2v, or reference-to-video with up to 7 reference images. 3-10s, 16:9/9:16 only. No last frame, no video/audio references. VIDEO-ONLY. New seat: quality vs Kling/Seedance unproven pending comparison gens — do not route hero shots here; use it for cheap drafts, audio-in-one-gen at low cost, ref2v character consistency trials, and its edit variant.',
   },
@@ -238,8 +261,8 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'omni-flash-edit',
     label: 'Omni Flash Edit',
     kind: 'video',
-    maxRefImages: null,
-    maxIngredients: 0, // prompt + source clip ONLY — no element/style refs on this endpoint
+    // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
+    ...caps('omni-flash-edit'),
     notes:
       'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (7/09 head-to-head vs Kling edit on real talking footage: lips held perfectly, audio near-identical, both action beats landed). Takes an EXISTING 3-10s clip and changes what the prompt names, footage-synced (prop/effect/environment/lighting swaps). Fidelity is EARNED by prompt discipline: ONE short instruction + "Keep everything else the same." — long descriptive prompts DESTROY it (Google-documented + 7/09 receipt). Never name objects as metaphors ("candle-like" → literal candle). Quirk: occasional tail jitter/doubled last speech beat — trim the tail. NO reference images (identity swaps needing refs → Kling edit); bit-exact audio needs → Kling keep_audio or segment-splice. 720p output, cheapest edit seat (~2/3 of Kling edit Std).',
   },
@@ -247,8 +270,8 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'seed-audio',
     label: 'Seed Audio 1.0',
     kind: 'audio',
-    maxRefImages: 1, // ONE image XOR up to 3 audio clips — the two inputs are mutually exclusive.
-    maxIngredients: null,
+    // ONE image XOR up to 3 audio clips — the two inputs are mutually exclusive.
+    ...caps('seed-audio'),
     notes:
       'DEFAULT audio model — the one-pass SCENE workhorse: dialogue, SFX, and ambience together from ONE plain sentence. Route here for continuity beds, room tone, crowd/nature soundscapes, and quick scratch VO. AUDIO-ONLY: cannot generate images or video. 🚨 THERE IS NO DURATION PARAMETER — length comes from the words, so you MUST NAME THE LENGTH IN THE PROMPT TEXT ("... 15 seconds"). Slates appends the requested length automatically and BILLS the requested seconds, so a prompt that fights the number wastes credits. Prompts are ONE plain sentence, no production jargon and no SFX:/Ambient: prefixes (those are Kling syntax and hurt here). Say the crowd size out loud — "applause" returns a full room when the joke was three people. 1-120s. Inputs: ONE image (describe-what-you-see scoring) XOR up to 3 audio clips referenced in the prompt as @Audio1-@Audio3, never both. 20 preset voices, or leave voice unset and let the scene cast itself.',
   },
@@ -256,8 +279,7 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'eleven-sfx',
     label: 'ElevenLabs Sound Effects v2',
     kind: 'audio',
-    maxRefImages: null,
-    maxIngredients: null,
+    ...caps('eleven-sfx'),
     notes:
       'ONE-SHOT SOUND EFFECT with an EXACT duration — route here for a single hit that must land on a frame (door slam, whoosh, impact, UI blip) or for a seamless loop. AUDIO-ONLY. 0.5-22s, and Slates always sends the duration explicitly (a null duration means a non-deterministic charge, so it is never left to the model). Describe the physical CAUSE, not the label: "heavy oak door slams shut in a stone hallway" beats "door sound". Text caps at 450 characters. loop=true produces a seamless bed. prompt_influence 0-1: higher hugs the prompt with less variation, lower explores. For layered scenes with dialogue or room tone, seed-audio does it in one pass instead.',
   },

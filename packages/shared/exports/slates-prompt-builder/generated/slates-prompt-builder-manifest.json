@@ -28,7 +28,7 @@
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "e32e844562164293983eabb853a6cee58bd9bba2ec3679699f9cd2f81716b5e0"
+      "sha256": "998772c92eb0b443007c49a23f11c1ec80d9a0b4a28baacbecfe27cda8acbd21"
     }
   ],
   "outputs": [

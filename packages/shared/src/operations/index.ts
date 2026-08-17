@@ -17,6 +17,24 @@ import { SKILLS } from '../skills/content.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
 import { multimodalRefSummary, multimodalRefModels, seedanceTaskIntentWords } from '../prompts/model-facts.js'
+// 🚨 MODEL CAPABILITY SSOT. Aspect ratios, video resolutions and durations are
+// VALIDATED against and DESCRIBED from `MODEL_CAPABILITIES` — this file must
+// never re-state one of those constraints as a literal enum or a sentence
+// again. It did until 2026-08-16, and every axis had drifted: an invented
+// `9:21`, "Kling/Seedance support all" (Seedance takes 6 of 11 and has no
+// `4:5`), "Veo locks to 16:9" (two on fal), "Kling: 5-15" (min is 3), a
+// `videoResolution` line that never mentioned Kling, and 4s quoted for Veo at
+// 1080p. A customer burned a round trip on `4:5` + Seedance: accepted here,
+// queued, credits reserved, rejected by the provider asynchronously.
+import {
+  AGENT_ROUTE_PROVIDER,
+  aspectRatioUnion, videoResolutionUnion, durationBounds,
+  aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
+  checkAspectRatio, checkVideoResolution, checkDuration,
+  describeAspectRatios, describeVideoResolutions, describeDurations,
+  describeReferenceImageCaps,
+  type AspectRatio, type VideoResolution,
+} from '../prompts/model-capabilities.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -48,6 +66,18 @@ export interface Operation<I> {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
+
+/**
+ * `z.enum` over a GENERATED list. Zod's signature wants a non-empty tuple
+ * literal, which is exactly what you can't write when the values come from the
+ * capability SSOT — and writing them out is how the enums drifted in the first
+ * place. Callers must pass a non-empty array; every call site derives from
+ * `MODEL_CAPABILITIES`, which never yields an empty union for a real model set.
+ */
+function zEnum<T extends string>(values: readonly T[]): z.ZodEnum<[T, ...T[]]> {
+  if (values.length === 0) throw new Error('zEnum: empty value list')
+  return z.enum(values as unknown as [T, ...T[]])
+}
 
 function ok(data: unknown, text?: string): OperationResult {
   return {
@@ -179,6 +209,80 @@ export const listAvailableModels: Operation<{ filter?: string }> = {
   },
 }
 
+// ── Video model vocabulary ──────────────────────────────────────
+//
+// Declared HERE, above every op, because both `slates_estimate_generation_cost`
+// and `slates_generate_video` build their Zod schemas from it at module load —
+// and a schema is evaluated in source order, so a list declared below the first
+// op that reads it is a temporal-dead-zone crash, not a lint nit.
+
+// Exported: the exact `model` ids slates_generate_video accepts — consumed
+// by the desktop Studio Agent system prompt (SSOT; never restate these ids
+// in prose that can drift).
+export const VIDEO_MODELS = [
+  'kling-v3.0-std',
+  'kling-v3.0-pro',
+  'kling-v3.0-omni',
+  'veo-3.1-fast',
+  'veo-3.1-standard',
+  'seedance-2',
+  // Seedance 2.5 is a SECOND SEAT, not a replacement: 30s takes, 30 image
+  // references, audio-only references — and 480p/720p ONLY. 2.0 keeps the
+  // ladder to native 4K and stays the default. Its EDIT row is not here; edit
+  // models live on slates_edit_video, same as the Kling and Omni Flash ones.
+  'seedance-2.5',
+  'omni-flash',
+] as const
+
+type VideoModel = (typeof VIDEO_MODELS)[number]
+
+// ── Capability-derived param vocabulary + guard ─────────────────
+//
+// 🚨 EVERYTHING BELOW IS GENERATED FROM `MODEL_CAPABILITIES`. Not one aspect
+// ratio, resolution or duration is typed into this file any more, and none may
+// be again. The enums are the UNION of what the video models accept (so the
+// JSON schema still advertises the legal universe to the LLM) and
+// `assertVideoCapabilities` does the PER-MODEL narrowing.
+
+/** Union of the ratios every video model accepts on the agent's route. */
+const VIDEO_ASPECT_RATIOS = aspectRatioUnion(VIDEO_MODELS, AGENT_ROUTE_PROVIDER)
+/** Union of the resolutions every video model renders at. */
+const VIDEO_RESOLUTIONS = videoResolutionUnion(VIDEO_MODELS)
+/** Widest legal duration window across every video model. */
+const VIDEO_DURATION_BOUNDS = durationBounds(VIDEO_MODELS)
+/** Omni Flash's combined reference-image cap, read from the SSOT (7). */
+const omniFlashRefCap = getModelCapability('omni-flash')?.maxIngredientImages ?? 0
+
+/** The exact `model` ids `slates_edit_video` accepts. Edit rows are deliberately
+ *  NOT in VIDEO_MODELS — they take a source clip, not frames. */
+export const EDIT_VIDEO_MODELS = [
+  'kling-v3.0-omni-edit',
+  'kling-v3.0-omni-pro-edit',
+  'omni-flash-edit',
+  'seedance-2.5-edit',
+] as const
+
+type EditVideoModel = (typeof EDIT_VIDEO_MODELS)[number]
+
+/**
+ * Source-clip length an edit engine accepts, read from the SSOT.
+ *
+ * On an edit row the output length FOLLOWS the source clip, so the model's
+ * declared duration window is exactly the legal clip window — Kling 3-15s,
+ * Omni Flash 3-10s, Seedance 2.5 4-30s. These three pairs used to be typed
+ * inline as `isSeedanceEdit ? 4 : 3` / `isSeedanceEdit ? 30 : isOmniFlashEdit ?
+ * 10 : 15`, i.e. a fourth copy of registry data keyed on model-id comparisons.
+ */
+function editClipBounds(model: string): { min: number; max: number } {
+  const d = getModelCapability(model)?.duration
+  if (!d) throw new Error(`editClipBounds: no duration capability for "${model}"`)
+  return { min: d.min, max: d.max }
+}
+
+/** Resolutions any edit engine exposes as a PARAM. Only Seedance's edit price
+ *  moves with resolution; the Kling and Omni Flash rows are fixed to the source. */
+const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit'])
+
 export const estimateGenerationCost: Operation<{
   model: string
   quantity?: number
@@ -196,8 +300,16 @@ export const estimateGenerationCost: Operation<{
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
-    duration: z.number().int().min(1).max(360).optional().describe('Seconds. Video 3-15 (cost scales linearly; required with a video base id). Audio: seed-audio 3-120 (⚠️ the requested duration IS the bill), eleven-sfx 1-22 — required with either audio base id.'),
-    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Video only. Seedance defaults to 1080p.'),
+    // Video windows and resolutions GENERATED from MODEL_CAPABILITIES. The
+    // hand-typed "Video 3-15" here was wrong the day seedance-2.5 (4-30s)
+    // shipped, and "Seedance defaults to 1080p" was wrong for 2.5, which has no
+    // 1080p at all.
+    duration: z.number().int().min(1).max(360).optional().describe(
+      `Seconds; cost scales linearly. Required with a video or audio base id. Video per model: ${describeDurations(VIDEO_MODELS)}. Audio: seed-audio 3-120 (⚠️ the requested duration IS the bill), eleven-sfx 1-22.`
+    ),
+    videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
+      `Video only. Omitted, each model quotes at its own default. Per model: ${describeVideoResolutions(VIDEO_MODELS)}`
+    ),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k = gpt-image-2 1440p class).'),
     quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
@@ -279,6 +391,15 @@ export const estimateGenerationCost: Operation<{
             message: `"${resolved.model}" cost scales with duration — pass duration (seconds) to estimate.`,
           })
         }
+        // Refuse an out-of-range combination rather than quoting a key that does
+        // not exist — the generate op gates the same way, from the same data, so
+        // a quote can never promise something generation then refuses.
+        const capErr = assertVideoCapabilities({
+          model: resolved.model,
+          videoResolution: input.videoResolution ?? resolved.videoResolution,
+          duration,
+        })
+        if (capErr) return ok(capErr)
         key = videoCostKey({
           model: resolved.model,
           duration,
@@ -287,10 +408,9 @@ export const estimateGenerationCost: Operation<{
             resolved.videoResolution ??
             // Seedance quotes are resolution-scaled, so a missing resolution has
             // to fall back to the model's OWN default — 2.5 has no 1080p at all,
-            // and a blanket '1080p' here quoted a key that does not exist.
-            (resolved.model === 'seedance-2.5' ? '720p'
-              : resolved.model.startsWith('seedance') ? '1080p'
-              : undefined),
+            // and a blanket '1080p' here quoted a key that does not exist. Read
+            // from the SSOT; this used to be a hand-typed model-id ternary.
+            defaultVideoResolutionFor(resolved.model),
           sound: input.sound ?? resolved.sound,
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
           seedanceRealFace: input.seedanceRealFace,
@@ -1167,6 +1287,32 @@ export type ImageModelId =
   | 'flux-2-max'
   | 'seedream-5-lite'
 
+/** The exact `model` ids `slates_generate_image` accepts. */
+export const IMAGE_MODELS = [
+  'nano-banana-2',
+  'nano-banana-2-lite',
+  'nano-banana-pro',
+  'gpt-image-2',
+  'flux-2-max',
+  'seedream-5-lite',
+] as const satisfies readonly ImageModelId[]
+
+/**
+ * The aspect ratios an image generation can carry — the UNION over what these
+ * models declare in `MODEL_CAPABILITIES`, generated so the enum cannot hold a
+ * value no model accepts. It used to be a hand-typed eleven-value list whose
+ * `9:21` exists in ZERO models; that phantom is gone by construction.
+ *
+ * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. `gpt-image-2` takes five of these
+ * ten and the other five would be accepted here. The image param surface has
+ * not been audited (aspect ratios, resolution classes, per-model reference
+ * caps) — that audit is the named follow-up in
+ * `slate/docs/plan-docs/2026-08-16-MODEL-CAPABILITY-SSOT.md` §5. The machinery
+ * to close it already exists: call `checkAspectRatio(model, ratio)` the way
+ * `assertVideoCapabilities` does below.
+ */
+const IMAGE_ASPECT_RATIOS = aspectRatioUnion(IMAGE_MODELS)
+
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
 // in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
 // videoCostKey): NB2/NB Pro price per resolution, FLUX.2 Max prices per
@@ -1190,7 +1336,7 @@ export const generateImage: Operation<{
   model?: ImageModelId
   projectId?: string
   resolution?: '1k' | '2k' | '3k' | '4k'
-  aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
+  aspectRatio?: AspectRatio
   quality?: 'medium' | 'high'
   count?: number
   referenceImageUrls?: string[]
@@ -1203,11 +1349,13 @@ export const generateImage: Operation<{
     'Generate an image via Slates credits. Models: nano-banana-2 (default), nano-banana-2-lite (fast/cheap drafts, 1K only), nano-banana-pro (hero-frame/typography premium), gpt-image-2 (sharp text / character sheets / grids; quality medium|high), flux-2-max (photoreal, less censored), seedream-5-lite (cheapest flat, less censored). Which model for which job: read the slates-model-selection skill. Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use.',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite']).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
+    model: zEnum(IMAGE_MODELS).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. nano-banana-2-lite is 1k-only. gpt-image-2 classes: 1k=1024², 2k=1080p, 3k=1440p, 4k=2160p (3k is gpt-image-2 only). Never default this.'),
     quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only. medium (default) = sharp text, fast, the value seat; high = max text precision + reasoning at ~4× the price. Ignored by other models.'),
-    aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous.'),
+    aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
+      `Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
+    ),
     count: z.number().int().min(1).max(4).optional(),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
     referenceAssetIds: z.array(z.string()).max(14).optional().describe("Project assets to use as reference/ingredient images — asset UUIDs or badge codes (\"IMG-A8\"); codes resolve against the project at call time. Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
@@ -1229,7 +1377,8 @@ export const generateImage: Operation<{
         message:
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-prompting-nano-banana-2 + slates-cost-discipline skills, ` +
-          `or ask the user. Aspect ratio options: 1:1 16:9 9:16 4:3 3:4 21:9 9:21 4:5 5:4 2:3 3:2. ` +
+          // Generated from MODEL_CAPABILITIES — never retype a ratio list.
+          `or ask the user. Aspect ratio by model: ${describeAspectRatios(IMAGE_MODELS)}. ` +
           `Resolution options: 1k 2k 4k (same price band — pick by need, not cost).`,
       })
     }
@@ -1692,26 +1841,68 @@ export const editImage: Operation<{
 }
 
 // ── Generate video ──────────────────────────────────────────────
+//
+// VIDEO_MODELS and the capability-derived param vocabulary are declared near the
+// top of this file: `slates_estimate_generation_cost`'s schema is evaluated at
+// module load and reads them, so they have to initialise before it.
 
-// Exported: the exact `model` ids slates_generate_video accepts — consumed
-// by the desktop Studio Agent system prompt (SSOT; never restate these ids
-// in prose that can drift).
-export const VIDEO_MODELS = [
-  'kling-v3.0-std',
-  'kling-v3.0-pro',
-  'kling-v3.0-omni',
-  'veo-3.1-fast',
-  'veo-3.1-standard',
-  'seedance-2',
-  // Seedance 2.5 is a SECOND SEAT, not a replacement: 30s takes, 30 image
-  // references, audio-only references — and 480p/720p ONLY. 2.0 keeps the
-  // ladder to native 4K and stays the default. Its EDIT row is not here; edit
-  // models live on slates_edit_video, same as the Kling and Omni Flash ones.
-  'seedance-2.5',
-  'omni-flash',
-] as const
 
-type VideoModel = (typeof VIDEO_MODELS)[number]
+/**
+ * Reject an illegal aspectRatio / videoResolution / duration BEFORE submit,
+ * naming the legal set. Returns a `requires_clarification` payload or null.
+ *
+ * ⚠️ WHY THIS IS A RUN()-TIME GUARD AND NOT A SCHEMA `superRefine`. The op
+ * accepts registry COST-KEY spellings as `model` ("seedance-2-1080p-8s") and
+ * `resolveVideoModel()` unpacks them into base id + duration + resolution at
+ * the top of `run()`. A schema-level refinement runs BEFORE that, so it would
+ * see an unnormalised model id and a `duration` that is still undefined — it
+ * would reject legal calls and wave illegal ones through. The check has to sit
+ * after normalisation, which is here. It also lets the failure arrive as the
+ * same teaching `requires_clarification` shape as every other gate in this op,
+ * rather than a raw Zod error the agent has to guess its way out of.
+ *
+ * `promptMode` matters: Veo's reference-to-video endpoint is 8s only, declared
+ * as `duration.modeOverrides.ingredients`. Free reference images with no
+ * first/last frame IS ingredients mode — the same condition
+ * `buildFalVeoRequest` uses to pick the ref2v endpoint.
+ */
+function assertVideoCapabilities(input: {
+  model: string
+  aspectRatio?: string
+  videoResolution?: string
+  duration?: number
+  firstFrameAssetId?: string
+  lastFrameAssetId?: string
+  ingredientAssetIds?: string[]
+  characterAssetIds?: string[]
+  environmentAssetIds?: string[]
+  styleAssetIds?: string[]
+}): { requires_clarification: true; missing: string[]; message: string } | null {
+  const freeRefs =
+    (input.ingredientAssetIds?.length ?? 0) +
+    (input.characterAssetIds?.length ?? 0) +
+    (input.environmentAssetIds?.length ?? 0) +
+    (input.styleAssetIds?.length ?? 0)
+  const promptMode =
+    freeRefs > 0 && !input.firstFrameAssetId && !input.lastFrameAssetId ? 'ingredients' : undefined
+
+  const ratioErr = checkAspectRatio(input.model, input.aspectRatio, AGENT_ROUTE_PROVIDER)
+  if (ratioErr) return { requires_clarification: true, missing: ['aspectRatio'], message: ratioErr }
+
+  const resErr = checkVideoResolution(input.model, input.videoResolution)
+  if (resErr) return { requires_clarification: true, missing: ['videoResolution'], message: resErr }
+
+  // Duration LAST: its legal window depends on the resolution, so a bad
+  // resolution must be reported first or the duration message names a window
+  // derived from a value the model never had.
+  const durErr = checkDuration(input.model, input.duration, {
+    videoResolution: input.videoResolution,
+    promptMode,
+  })
+  if (durErr) return { requires_clarification: true, missing: ['duration'], message: durErr }
+
+  return null
+}
 
 // Model → registry cost-key. Each provider's keys ship with their own
 // shape (verified against /api/agent/models):
@@ -1821,9 +2012,11 @@ export function omniFlashEditCostKey(duration: number): string {
  *  2.0: refs 2–15s + output 4–15s. 2.5: refs to 30s + output to 30s. */
 const SEEDANCE_20_VREF_MAX_TOTAL = 30
 const SEEDANCE_25_VREF_MAX_TOTAL = 60
-/** Seedance 2.5 source-clip bounds for the edit task type. */
-export const SEEDANCE_25_EDIT_MIN_SECONDS = 4
-export const SEEDANCE_25_EDIT_MAX_SECONDS = 30
+/** Seedance 2.5 source-clip bounds for the edit task type — READ from the
+ *  capability SSOT, not typed. Kept as named exports because published builds
+ *  import them. */
+export const SEEDANCE_25_EDIT_MIN_SECONDS = editClipBounds('seedance-2.5-edit').min
+export const SEEDANCE_25_EDIT_MAX_SECONDS = editClipBounds('seedance-2.5-edit').max
 
 // Seedance 2.5 video-edit cost key — mirrors seedanceCreditKey() in
 // slate/src/shared/pricing.ts for the edit row (must byte-match; checked by the
@@ -2023,9 +2216,9 @@ export const generateVideo: Operation<{
   // resolveVideoModel() at the top of run() before any use.
   model: string
   projectId?: string
-  aspectRatio?: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' | '21:9' | '9:21' | '4:5' | '5:4' | '2:3' | '3:2'
+  aspectRatio?: AspectRatio
   duration?: number
-  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  videoResolution?: VideoResolution
   firstFrameAssetId?: string
   lastFrameAssetId?: string
   ingredientAssetIds?: string[]
@@ -2053,14 +2246,34 @@ export const generateVideo: Operation<{
     'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: z.string().describe('One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | seedance-2.5 | veo-3.1-fast | veo-3.1-standard | omni-flash. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (4-30s takes, 30 image refs, audio-only refs — but 480p/720p ONLY, so stay on seedance-2 whenever resolution matters), Veo = native-synced-audio niche only (16:9, 4/6/8s) — never the default, omni-flash = cheap 720p tier with audio included (3-10s, 16:9/9:16; t2v, single-start-frame i2v, or up to 7 reference images; no last frame / video / audio refs). All are VIDEO-only. For per-call cost, call slates_estimate_generation_cost — never quote prices from memory.'),
+    // ROUTING doctrine only. Every capability number was stripped on 2026-08-16
+    // and now lives in the aspectRatio / duration / videoResolution descriptions
+    // below, generated from MODEL_CAPABILITIES. "Veo = 16:9 only" and
+    // "seedance-2.5 480p/720p" were both stated here AND there, and the two
+    // copies disagreed.
+    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 1080p or 4K, so stay on seedance-2 whenever resolution matters), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs). All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
-    aspectRatio: z.enum(['1:1', '16:9', '9:16', '4:3', '3:4', '21:9', '9:21', '4:5', '5:4', '2:3', '3:2']).optional().describe('Veo locks to 16:9 — passing anything else will be ignored or fail. Kling/Seedance support all.'),
-    duration: z.number().int().min(3).max(30).optional().describe('Seconds. Kling: 5-15. Veo: 4, 6, or 8 only (4K only at 8s). Seedance 2: 4-15. Seedance 2.5: 4-30 (the only model that reaches 30). Omni Flash: 3-10. Default 5 if omitted but always be explicit — cost scales linearly, and a 30s seedance-2.5 take is several hundred credits.'),
-    videoResolution: z.enum(['480p', '720p', '1080p', '4k']).optional().describe('Veo + Seedance. Seedance 2: 480p/720p/1080p/4K (default 1080p; 4K is native, the most expensive, and Pro-only). Seedance 2.5: 480p/720p ONLY (default 720p) — no 1080p and no 4K on any route Slates offers, so asking for one is rejected, not downgraded. Veo: 720p/1080p same price, 4K more (8s only).'),
+    // 🚨 THESE THREE DESCRIPTIONS ARE GENERATED FROM `MODEL_CAPABILITIES`.
+    // Never hand-write a ratio, resolution or duration into them again — every
+    // one of the hand-written claims that stood here had drifted, and an
+    // out-of-set value is accepted by the client and rejected by the provider
+    // ASYNCHRONOUSLY, after the job queues and credits reserve.
+    aspectRatio: zEnum(VIDEO_ASPECT_RATIOS).optional().describe(
+      `NOT every model takes every value — an out-of-set ratio is REFUSED before submit, not silently ignored. Per model: ${describeAspectRatios(VIDEO_MODELS, AGENT_ROUTE_PROVIDER)}`
+    ),
+    duration: z.number().int().min(VIDEO_DURATION_BOUNDS.min).max(VIDEO_DURATION_BOUNDS.max).optional().describe(
+      `Seconds. Cost scales linearly — a 30s seedance-2.5 take is several hundred credits, so be explicit rather than defaulting. Per model: ${describeDurations(VIDEO_MODELS)}`
+    ),
+    videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
+      `An unsupported resolution is REJECTED, never downgraded. Per model: ${describeVideoResolutions(VIDEO_MODELS)}. 4K video is Pro-only (the server returns PRO_REQUIRED for a base-tier account).`
+    ),
     firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video: asset UUID or badge code ("IMG-A8") — codes resolve against the project at call time, so a code the user just spoke is always safe to pass.'),
     lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
-    ingredientAssetIds: z.array(z.string()).max(30).optional().describe('Visual reference / ingredient assets (UUIDs or badge codes) for Kling Omni, Seedance, or Omni Flash. Up to 30 (Seedance 2.5), 9 (Seedance 2), 4 (Kling), or 7 (Omni Flash, combined across all ref params). More is not better: 2-4 strong references beat both extremes, and past 4 reference PEOPLE output stability drops on Seedance regardless of the cap.'),
+    ingredientAssetIds: z.array(z.string()).max(30).optional().describe(
+      // Caps DERIVED from MODEL_CAPABILITIES — the hand-typed list omitted
+      // kling-v3.0-omni-pro entirely and read as if 7 were an Omni Flash-only rule.
+      `Visual reference / ingredient assets (UUIDs or badge codes). Cap per model (combined across ingredient/character/environment/style params): ${describeReferenceImageCaps(VIDEO_MODELS)}. More is not better: 2-4 strong references beat both extremes, and past 4 reference PEOPLE output stability drops on Seedance regardless of the cap.`
+    ),
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
     environmentAssetIds: z.array(z.string()).optional().describe('Environment reference assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
     styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
@@ -2132,23 +2345,29 @@ export const generateVideo: Operation<{
         message:
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-cost-discipline + ${promptingSkillFor(input.model)} skills, ` +
-          `or ask the user. Veo locks to 16:9. Kling/Seedance support 1:1 16:9 9:16 4:3 3:4 21:9. Omni Flash: 16:9/9:16 only. ` +
-          `Duration: Kling 5-15s, Veo 4/6/8s (4K only at 8s), Seedance 4-15s, Omni Flash 3-10s. Cost scales linearly with duration.`,
+          // Generated from MODEL_CAPABILITIES. The prose that stood here claimed
+          // "Veo locks to 16:9", "Kling/Seedance support 1:1 16:9 9:16 4:3 3:4
+          // 21:9" and "Kling 5-15s" — three wrong claims in one sentence.
+          `or ask the user. ` +
+          `Aspect ratio for ${input.model}: ${aspectRatiosFor(input.model, AGENT_ROUTE_PROVIDER).join(', ')}. ` +
+          `Duration: ${describeDurations([input.model])}. ` +
+          `Cost scales linearly with duration.`,
       })
     }
 
-    // Omni Flash: 3-10s, 720p only — t2v, single-start-frame i2v, or ref2v
-    // with up to 7 reference IMAGES. No last frame, no video/audio refs.
-    // Validate up front so the agent gets an actionable message instead of
-    // a registry throw.
+    // 🚨 CAPABILITY GATE — the one that stops a client-side accept of a
+    // server-side reject. Registry-driven and model-keyed: an aspect ratio,
+    // resolution or duration the chosen model does not take is refused HERE,
+    // before the job queues and credits reserve. Runs after normalisation so it
+    // sees the resolved model and any params a cost key back-filled.
+    const capErr = assertVideoCapabilities(input)
+    if (capErr) return ok(capErr)
+
+    // Omni Flash's SHAPE constraints — t2v, single-start-frame i2v, or ref2v
+    // with reference IMAGES. No last frame, no video/audio refs. (Its duration
+    // and resolution are covered by the capability gate above; the 3-10s check
+    // that used to live here was a hand-typed duplicate of registry data.)
     if (input.model === 'omni-flash') {
-      if (input.duration < 3 || input.duration > 10) {
-        return ok({
-          requires_clarification: true,
-          missing: ['duration'],
-          message: `Omni Flash supports 3-10 seconds (you passed ${input.duration}s). Pick a duration in that range.`,
-        })
-      }
       if (
         input.lastFrameAssetId ||
         input.videoReferenceAssetId || input.audioReferenceAssetId ||
@@ -2159,7 +2378,7 @@ export const generateVideo: Operation<{
           requires_clarification: true,
           missing: [],
           message:
-            'Omni Flash takes a prompt, an optional start frame, and up to 7 reference IMAGES — last frames and video/audio references are not supported. Drop those, or switch to seedance-2 (video/audio refs, last frame) or veo (last frame).',
+            `Omni Flash takes a prompt, an optional start frame, and up to ${omniFlashRefCap} reference IMAGES — last frames and video/audio references are not supported. Drop those, or switch to seedance-2 (video/audio refs, last frame) or veo (last frame).`,
         })
       }
       const refCount =
@@ -2167,34 +2386,20 @@ export const generateVideo: Operation<{
         (input.characterAssetIds?.length ?? 0) +
         (input.environmentAssetIds?.length ?? 0) +
         (input.styleAssetIds?.length ?? 0)
-      if (refCount > 7) {
+      if (refCount > omniFlashRefCap) {
         return ok({
           requires_clarification: true,
           missing: [],
-          message: `Omni Flash takes at most 7 reference images combined (you passed ${refCount}). Trim the list.`,
+          message: `Omni Flash takes at most ${omniFlashRefCap} reference images combined (you passed ${refCount}). Trim the list.`,
         })
       }
     }
 
-    // Veo exists only at discrete durations 4/6/8s, and 4K only at 8s.
-    // Validate up front so the agent gets an actionable message instead of
-    // a generic "Model variant not in registry" throw from the cost lookup.
-    if (input.model.startsWith('veo')) {
-      if (![4, 6, 8].includes(input.duration)) {
-        return ok({
-          requires_clarification: true,
-          missing: ['duration'],
-          message: `Veo 3.1 supports only 4s, 6s, or 8s (you passed ${input.duration}s). Pick one of those.`,
-        })
-      }
-      if (input.videoResolution === '4k' && input.duration !== 8) {
-        return ok({
-          requires_clarification: true,
-          missing: ['duration'],
-          message: `Veo 3.1 4K renders only at 8s (you passed ${input.duration}s at 4k). Use duration=8 for 4K, or drop to 720p/1080p for 4s/6s.`,
-        })
-      }
-    }
+    // ⛔ The hand-written Veo duration block that stood here is GONE. It read
+    // `![4,6,8].includes(duration)` plus "4K only at 8s" — and the registry
+    // forces 8s at 1080p TOO, so it happily quoted a 4s 1080p Veo the provider
+    // rejects. `assertVideoCapabilities` above covers both, plus the
+    // reference-to-video 8s rule it never knew about, from the SSOT.
 
     // Resolve every asset reference (UUID or badge code) against the
     // project AT CALL TIME. Codes the user just spoke ("a8 is the one")
@@ -2965,11 +3170,15 @@ export const editVideo: Operation<{
   projectId: string
   sourceVideoAssetId: string
   prompt: string
-  model?: 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit' | 'omni-flash-edit' | 'seedance-2.5-edit'
+  model?: EditVideoModel
   characterAssetIds?: string[]
   styleAssetIds?: string[]
   keepAudio?: boolean
-  videoResolution?: '480p' | '720p'
+  // Widened to the full VideoResolution union because the Zod enum is GENERATED
+  // from MODEL_CAPABILITIES and TypeScript can only see its element type, not
+  // the two values it actually holds at runtime. The runtime schema still
+  // rejects anything but 480p/720p, and `seedanceEditCostKey` narrows again.
+  videoResolution?: VideoResolution
   seedanceFace?: boolean
   background?: boolean
   confirm?: boolean
@@ -2981,11 +3190,16 @@ export const editVideo: Operation<{
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
     prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
-    model: z.enum(['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit', 'omni-flash-edit', 'seedance-2.5-edit']).optional().describe('Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s, 720p, 3–10s) for prompt-only edits — it takes NO character/style refs. seedance-2.5-edit (480p/720p, 4–30s) is the ONLY engine that accepts a clip longer than 15s; it also takes NO character/style refs on this op.'),
+    // Clip windows and resolutions GENERATED from MODEL_CAPABILITIES.
+    model: zEnum(EDIT_VIDEO_MODELS).optional().describe(
+      `Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s) for prompt-only edits — it takes NO character/style refs. seedance-2.5-edit is the ONLY engine that accepts a clip longer than 15s; it also takes NO character/style refs on this op. Source-clip length per engine: ${describeDurations(EDIT_VIDEO_MODELS)}. Output resolution: ${describeVideoResolutions(EDIT_VIDEO_MODELS)}`
+    ),
     characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN). KLING MODELS ONLY — rejected on omni-flash-edit.'),
     styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
     keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit and seedance-2.5-edit output carry their own audio).'),
-    videoResolution: z.enum(['480p', '720p']).optional().describe('seedance-2.5-edit ONLY (default 720p). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.'),
+    videoResolution: zEnum(EDIT_VIDEO_RESOLUTIONS).optional().describe(
+      `seedance-2.5-edit ONLY (default ${defaultVideoResolutionFor('seedance-2.5-edit')}). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.`
+    ),
     seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Faceless edits run on BytePlus; faces are blocked there and must route to the relaxed provider, which costs ~35% more. A face edit submitted without this flag is rejected by the provider, not silently downgraded.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
@@ -2999,10 +3213,9 @@ export const editVideo: Operation<{
     const model = input.model ?? 'kling-v3.0-omni-edit'
     const isOmniFlashEdit = model === 'omni-flash-edit'
     const isSeedanceEdit = model === 'seedance-2.5-edit'
-    // Kling edit: 3–15s source clips; Omni Flash edit: 3–10s; Seedance 2.5
-    // edit: 4–30s — the only engine that takes a clip over 15s.
-    const minClipSeconds = isSeedanceEdit ? SEEDANCE_25_EDIT_MIN_SECONDS : 3
-    const maxClipSeconds = isSeedanceEdit ? SEEDANCE_25_EDIT_MAX_SECONDS : isOmniFlashEdit ? 10 : 15
+    // Source-clip window, read from the capability SSOT per engine — never a
+    // model-id ternary. (Kling 3–15s, Omni Flash 3–10s, Seedance 2.5 4–30s.)
+    const { min: minClipSeconds, max: maxClipSeconds } = editClipBounds(model)
 
     if ((isOmniFlashEdit || isSeedanceEdit) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
       throw new Error(
@@ -3054,7 +3267,7 @@ export const editVideo: Operation<{
     const costKey = isSeedanceEdit
       ? seedanceEditCostKey({
           duration: billedSeconds,
-          videoResolution: input.videoResolution ?? '720p',
+          videoResolution: (input.videoResolution ?? defaultVideoResolutionFor('seedance-2.5-edit')) as '480p' | '720p',
           seedanceFace: input.seedanceFace === true,
         })
       : isOmniFlashEdit

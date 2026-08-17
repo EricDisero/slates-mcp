@@ -57,9 +57,9 @@ Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the chara
 `slates_generate_video` with `firstFrameAssetId` = the bound frame, `background: true`. Submit ALL shots, collect the generationIds, then poll `slates_get_generation_status` every 10-15s (1-5 min per gen; they survive app restarts). This parallelizes a 6-shot film into one wait instead of six.
 
 **Model mixing — route per `slates-model-selection`** (details in the per-model guides):
-- **Kling V3** (`slates-prompting-kling-v3`): the DEFAULT for most shots — any aspect ratio, 5-15s, strong start-frame adherence; std is the workhorse, Omni for multi-character dialogue.
+- **Kling V3** (`slates-prompting-kling-v3`): the DEFAULT for most shots — 16:9 / 9:16 / 1:1, 3-15s, strong start-frame adherence; std is the workhorse, Omni for multi-character dialogue.
 - **Seedance 2** (`slates-prompting-seedance`): the PREMIUM tier — any shot where physics/effects/scale remotely matter, plus the hero shot; audio included, first+last frame guidance, native 4K (4K video is Pro-only).
-- **Veo 3.1** (`slates-prompting-veo-3`): niche, never the default — only when native synced audio must generate WITH the video in one gen; 16:9 only, 4/6/8s.
+- **Veo 3.1** (`slates-prompting-veo-3`): niche, never the default — only when native synced audio must generate WITH the video in one gen; 16:9 or 9:16, 4/6/8s (8s only at 1080p/4K or with reference images).
 
 Failed gen? Check the error via `slates_get_generation_status`, fix the prompt, resubmit that one shot (a retry beyond the plan = announce the delta cost).
 

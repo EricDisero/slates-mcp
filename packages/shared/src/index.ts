@@ -14,6 +14,20 @@ export {
   SEEDANCE_TASK_INTENT_WORDS, seedanceTaskIntentWords,
   type ModelFact,
 } from './prompts/model-facts.js'
+// Model CAPABILITY SSOT — what each model will ACCEPT (aspect ratios incl.
+// per-provider overrides, video resolutions, duration windows, reference caps).
+// `slate/src/shared/pricing.ts` spreads these into every MODEL_REGISTRY entry;
+// the op surface validates against them and GENERATES its `.describe()` prose
+// from them. Never hand-type a capability fact an LLM will read.
+export {
+  MODEL_CAPABILITIES, ALL_ASPECT_RATIOS, AGENT_ROUTE_PROVIDER,
+  getModelCapability, aspectRatiosFor, videoResolutionsFor, defaultVideoResolutionFor,
+  durationsFor, durationValuesFor, aspectRatioUnion, videoResolutionUnion, durationBounds,
+  checkAspectRatio, checkVideoResolution, checkDuration,
+  describeAspectRatios, describeVideoResolutions, describeDurations, describeReferenceImageCaps,
+  type AspectRatio, type VideoResolution, type ModelCapability,
+  type DurationCapability, type VideoResolutionCapability,
+} from './prompts/model-capabilities.js'
 // Per-model prompting tips — the SSOT for the desktop "See prompting tips"
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'

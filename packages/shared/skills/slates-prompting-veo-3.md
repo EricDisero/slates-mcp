@@ -1,13 +1,13 @@
 ---
 name: slates-prompting-veo-3
-description: How to prompt Veo 3.1 (Google). Read before calling slates_generate_video with veo-3.1-fast or veo-3.1-standard. Veo is a NICHE pick, never the default (route per slates-model-selection — Kling is the general default, Seedance the premium tier) — reach for it only when native synchronized audio must generate WITH the video in one gen. 16:9 only. Different cinematography formula than Seedance/Kling. (no subtitles) is mandatory after every dialogue line.
+description: How to prompt Veo 3.1 (Google). Read before calling slates_generate_video with veo-3.1-fast or veo-3.1-standard. Veo is a NICHE pick, never the default (route per slates-model-selection — Kling is the general default, Seedance the premium tier) — reach for it only when native synchronized audio must generate WITH the video in one gen. 16:9 or 9:16, 4/6/8s. Different cinematography formula than Seedance/Kling. (no subtitles) is mandatory after every dialogue line.
 ---
 
 # Veo 3.1 — prompting
 
 Google DeepMind's video model. Two tiers: `veo-3.1-fast` (cheaper, quick) and `veo-3.1-standard` (higher quality). 4k variants exist for both (4K video requires Slates Pro).
 
-**Native single-shot duration: 4, 6, or 8 seconds.** Longer durations require chaining clips via Extend / last-frame reuse — quality degrades if naively requested past 8s in a single generation. Aspect ratio: **16:9 only** — `slates_generate_video` locks Veo to 16:9; anything else is ignored or fails. For 9:16 vertical, use Kling or Seedance instead.
+**Native single-shot duration: 4, 6, or 8 seconds** — and **8s only** at 1080p or 4K, or whenever you attach reference images (that endpoint is 8s-fixed). 4s and 6s exist at 720p, text-to-video or single-start-frame only. Longer durations require chaining clips via Extend / last-frame reuse — quality degrades if naively requested past 8s in a single generation. Aspect ratio: **16:9 or 9:16** on the route Slates uses. `slates_generate_video` REFUSES anything outside these before submit and names the legal set — nothing is silently ignored or downgraded.
 
 Native synchronized audio at 48kHz: dialogue, SFX, ambient — generated WITH video, not added after.
 

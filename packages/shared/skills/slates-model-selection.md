@@ -1,6 +1,6 @@
 ---
 name: slates-model-selection
-description: Which model to pick for a given job — the routing doctrine. Read BEFORE choosing any video or image model, before quoting a plan, and before defaulting anywhere. Kling 3.0 is the general-purpose video default; Seedance 2.0 is the premium tier for anything where physics, effects, or scale remotely matter; Seedance 2.5 is a SECOND SEAT beside 2.0 (30s takes, 30 references and timestamp control, but 480p/720p only — never an upgrade); Veo 3.1 is a narrow niche (native synced audio in one gen, 16:9 only) and never the default.
+description: Which model to pick for a given job — the routing doctrine. Read BEFORE choosing any video or image model, before quoting a plan, and before defaulting anywhere. Kling 3.0 is the general-purpose video default; Seedance 2.0 is the premium tier for anything where physics, effects, or scale remotely matter; Seedance 2.5 is a SECOND SEAT beside 2.0 (30s takes, 30 references and timestamp control, but 480p/720p only — never an upgrade); Veo 3.1 is a narrow niche (native synced audio in one gen, 16:9 or 9:16, 4/6/8s) and never the default.
 ---
 
 # Model selection — the routing doctrine
@@ -23,7 +23,7 @@ The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni F
 
 | Job | Model | Why |
 |---|---|---|
-| **General-purpose — the default for most shots** | **Kling 3.0 std** | Cost-effective workhorse. Strong image-to-video: preserves identity, layout, and text from the start frame. Any aspect ratio, 5–15s. |
+| **General-purpose — the default for most shots** | **Kling 3.0 std** | Cost-effective workhorse. Strong image-to-video: preserves identity, layout, and text from the start frame. 16:9 / 9:16 / 1:1, 3–15s. |
 | Higher visual polish, no physics demands | Kling 3.0 pro | Mid-price fidelity bump on the same strengths. |
 | Multi-character dialogue / audio co-generation | Kling 3.0 omni | Dialogue syntax, voice direction, language codes, `@element` refs. |
 | **Anything with remotely important physics** — effects, destruction, water/fire/smoke/cloth, creature motion, scale, complex simultaneous action | **Seedance 2.0** | The premium tier. Physics and effects are its whole edge; up to 9 ingredient refs, first+last frame, native 4K (4K video is Pro-only). |
@@ -75,10 +75,11 @@ Both tools are **Kling-only**. Every entry in them is a real Kling endpoint that
 **Rules:**
 
 - **Default video = Kling 3.0 std.** Escalate to Seedance the moment the shot has physics/effects weight or is the hero moment — and say why in the plan ("physics-heavy, routing to Seedance").
-- **Veo is never the default.** 16:9 only, 4/6/8s only, and it is not the quality pick — treat it as a single-purpose tool for native-synced-audio shots. If audio can be added after (Kling lip-sync, edit stage), prefer Kling or Seedance + audio in post.
-- **9:16 vertical → Kling or Seedance.** Veo can't.
+- **Veo is never the default.** 16:9 or 9:16 only, 4/6/8s only (and 8s only at 1080p/4K, or with reference images), and it is not the quality pick — treat it as a single-purpose tool for native-synced-audio shots. If audio can be added after (Kling lip-sync, edit stage), prefer Kling or Seedance + audio in post.
+- **9:16 vertical → Kling or Seedance by preference**, not by necessity: Veo does take 9:16 on the route Slates uses. Route away from it because it is the niche seat, not because it can't.
+- **Ratios and durations are enforced before submit.** `slates_generate_video` validates the aspect ratio, resolution and duration against the model you picked and refuses out-of-set values with the legal list — it will not silently ignore or downgrade them. The authoritative per-model sets are in the op's own param descriptions, which are generated from the capability SSOT; prefer those over any list written in prose here.
 - **Image-to-video from an NB2 start frame** (the standard pipeline) → Kling by default, Seedance when the motion is physics-heavy. Not Veo.
-- **User names a model explicitly → use it.** But if it's a mismatch for the job (crazy physics on Kling std, vertical on Veo), say so in one line and offer the right route before generating.
+- **User names a model explicitly → use it.** But if it's a mismatch for the job (crazy physics on Kling std, a 30s take on anything but Seedance 2.5, 1080p on Seedance 2.5 which has none), say so in one line and offer the right route before generating.
 
 ## Image routing
 

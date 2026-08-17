@@ -14,6 +14,10 @@ export * from './reference-rules.js'
 export * from './reference-composer.js'
 export * from './content-policy.js'
 export * from './style-library.js'
+// Model CAPABILITY SSOT (aspect ratios, video resolutions, durations, reference
+// caps). The desktop's MODEL_REGISTRY spreads these into every entry and the op
+// surface validates + generates its descriptions from them — never hand-typed.
+export * from './model-capabilities.js'
 export * from './model-facts.js'
 export * from './character-sheet.js'
 export * from './environment-sheet.js'
