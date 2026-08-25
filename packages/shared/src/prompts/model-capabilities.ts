@@ -343,8 +343,16 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'seedance-2.5': {
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
-    // 🚨 480p/720p ONLY, on BytePlus, EvoLink AND fal. No 1080p, no 4K.
-    videoResolution: { options: ['480p', '720p'], default: '720p' },
+    // 1080p landed 2026-08-24 on ALL THREE rails — BytePlus and EvoLink publish
+    // 1080p rate rows and fal's live OpenAPI enum reads
+    // ['480p','720p','1080p']. There is still NO 4K on 2.5 (2.0 is the only
+    // Seedance with one), which is what keeps `is4kVideoKey` version-blind.
+    //
+    // DEFAULT STAYS 720p, deliberately: a 30s take at 1080p is ~614 credits
+    // against a 1,000-credit welcome grant, and that is at the promotional
+    // 1080p rate — it rises when the promo lapses. Reaching a tier and
+    // defaulting to it are different decisions.
+    videoResolution: { options: ['480p', '720p', '1080p'], default: '720p' },
     duration: { min: 4, max: 30, mode: 'continuous' },
     maxIngredientImages: 30,
     maxReferenceVideos: 10,
@@ -357,7 +365,10 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'seedance-2.5-edit': {
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
-    videoResolution: { options: ['480p', '720p'], default: '720p' },
+    // Same ladder as the generation row (1080p added 2026-08-24). EvoLink's
+    // rate card carries 1080p on the edit/extend row and BytePlus's video-input
+    // column runs the full tier list; an edit bills that tier × 2.
+    videoResolution: { options: ['480p', '720p', '1080p'], default: '720p' },
     duration: { min: 4, max: 30, mode: 'continuous' },
     // 🚨 ZERO, AND IT MUST MATCH WHAT THE HANDLER SENDS. The model's edit task
     // type does accept reference images, but slate's

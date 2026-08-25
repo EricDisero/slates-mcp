@@ -5,6 +5,8 @@ description: Build a 30-second hyper-motion direct-response ad in Slates from a 
 
 # Direct-response ad — Slates workflow
 
+🚨 **Wrong skill if a PERSON talks to camera.** This file builds a product-led hyper-motion spot — product hero frames, punchy cuts, no presenter. **A creator-style ad where a synthetic person speaks to the lens is a different discipline with an inverted rulebook (ugly on purpose, one shot per generation, plate-before-video): read `slates-ugc-influencer-ad`.** Route on the presence of a talking person, not on the platform.
+
 You are building a 30-second hyper-motion direct-response ad. The user has handed you a product image (or product URL) and a short brief. Slates desktop is open on the second monitor; the user watches it populate as you work.
 
 **Hard rules**

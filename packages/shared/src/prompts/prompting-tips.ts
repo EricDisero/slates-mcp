@@ -147,7 +147,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
   ...SEEDANCE,
   label: 'Seedance 2.5',
   intro: [
-    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 1080p and 4K. It is 480p or 720p on every route Slates offers.',
+    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 4K. It runs at 480p, 720p or 1080p, and it costs more than 2.0 at every tier they share, so pick 2.0 when you want the same resolution cheaper or you want 4K.',
     "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
@@ -194,7 +194,7 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
   label: 'Seedance 2.5 Edit',
   intro: [
     'Seedance 2.5 Edit changes an existing clip: attach the clip, describe only what should be different, and the original motion, framing and timing are kept. It is the only editor in Slates that takes a clip longer than 15 seconds — 4 to 30s, against Kling O3 Edit\'s 3-15s and Omni Flash Edit\'s 3-10s.',
-    'Output length and aspect ratio follow the SOURCE clip, so there is no duration or ratio control — the clip you attach is the quote. Output is 480p or 720p with native audio.',
+    'Output length and aspect ratio follow the SOURCE clip, so there is no duration or ratio control — the clip you attach is the quote. Output is 480p, 720p or 1080p with native audio.',
   ],
   columns: [
     [

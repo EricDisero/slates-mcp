@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance-2-5
-description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up 1080p and 4K — it is 480p or 720p on every route Slates offers. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap at 720p.
+description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up native 4K and costs more than 2.0 at every resolution they share. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap that comes with 30-second takes.
 ---
 
 # Seedance 2.5 — prompting
@@ -15,15 +15,16 @@ where 2.0 ignores them.**
 
 ## The one fact that decides whether you use it at all
 
-**Seedance 2.5 is 480p or 720p on every route Slates offers — no 1080p, no 4K.**
+**Seedance 2.5 is the EXPENSIVE seat, not the cheap one — and it has no 4K.**
 
-Treat that as the current ceiling on our routes, not a claim about the model everywhere. It is not a
-tier gate either: no Slates plan unlocks a higher resolution on 2.5. So 2.5 does not replace 2.0;
-it sits beside it:
+It runs at 480p, 720p or 1080p (1080p landed on all three routes on 2026-08-24), and at every
+resolution the two seats share it costs MORE than 2.0 — 720p $0.231/s against $0.15/s, **54% more**.
+So 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:
 
 | | Seedance 2.0 | Seedance 2.5 |
 |---|---|---|
-| Resolution | 480p / 720p / 1080p / **native 4K** | **480p / 720p only** |
+| Resolution | 480p / 720p / 1080p / **native 4K** | 480p / 720p / 1080p — **no 4K** |
+| Price at 720p (faceless) | **$0.15/s** | $0.231/s |
 | Length | 4–15s | **4–30s in one take** |
 | Reference budget | 15 (9 image + 3 video + 3 audio) | **50 (30 image + 10 video + 10 audio)** |
 | Combined reference video/audio | ≤15s | **≤30s** |
@@ -78,7 +79,7 @@ is forbidden — the words that reach the model are always the words the user ca
 
 ---
 
-## 🚨 Hazard 2 — 720p is not "the cheap one" any more
+## 🚨 Hazard 2 — resolution is not the price dial here. LENGTH is.
 
 Every other model in Slates trains the habit that lower resolution means lower cost. 2.5 breaks it,
 because the thing that moves the bill is **length**, and 2.5's length ceiling is double 2.0's.
@@ -87,16 +88,20 @@ Worked, at the shipped rates:
 
 | Generation | Credits |
 |---|---|
-| 2.5 · 480p · 5s · faceless | 28 |
-| 2.5 · 720p · 5s · faceless | 59 |
-| 2.5 · 720p · 30s · faceless | 355 |
-| 2.5 · 720p · 30s · AI-face route | **484** |
+| 2.5 · 480p · 5s · faceless | 26 |
+| 2.5 · 720p · 5s · faceless | 58 |
+| 2.5 · 1080p · 5s · faceless | 103 |
+| 2.5 · 720p · 30s · faceless | 347 |
+| 2.5 · 720p · 30s · AI-face route | **489** |
 | 2.5 · 720p · 30s · consented real-face route | **710** |
+| 2.5 · 1080p · 30s · faceless | **614** |
+| 2.5 · 1080p · 30s · consented real-face route | **1,749** |
 | *(for scale)* 2.0 · 1080p · 15s · AI-face route | 411 |
 
 **A 30-second 720p clip can cost more than a 15-second 1080p one** — and a base licence starts
 with 1,000 credits. Someone who reads "720p" as "cheap" and asks for a 30-second take on the
-real-face route has spent 71% of their welcome grant on one clip.
+real-face route has spent 71% of their welcome grant on one clip; **on the real-face route a single
+30-second 1080p take is more than the whole grant.**
 
 **Discipline:**
 
@@ -104,10 +109,10 @@ real-face route has spent 71% of their welcome grant on one clip.
   the number out loud before generating.
 - **Find the shot at short LENGTH, not at low resolution.** Length is what moves the price, so cut
   seconds while you are still exploring — 4–8s — and stay at the resolution you actually want.
-  **A 480p pass does not de-risk a 720p render.** Generation is stochastic: the 720p run is a
-  different take, not the same shot rendered better. So a 480p draft that looks right buys you no
-  guarantee, and one that looks wrong may have been fine at 720p — you paid 22 credits to learn
-  nothing, when 48 would have bought a real candidate.
+  **A 480p pass does not de-risk a 720p or 1080p render.** Generation is stochastic: the higher-
+  resolution run is a different take, not the same shot rendered better. So a 480p draft that looks
+  right buys you no guarantee, and one that looks wrong may have been fine at 720p — you paid 26
+  credits to learn nothing, when 58 would have bought a real candidate.
 - **Length is a creative decision, not a default.** 30 seconds is available; it is rarely the right
   answer for a single shot. Multi-shot storyboards inside one 30s generation are what the length is
   actually for.
@@ -238,7 +243,8 @@ Kling O3 Edit is the one that takes element and style reference images.
   ByteDance's own recommendation is to stay inside 20 for quality. A 28-second source is legal and
   will need more attempts.
 - **The aspect ratio follows the source clip too.** No ratio control; the frame is the clip's frame.
-- **480p or 720p output**, native audio.
+- **480p, 720p or 1080p output**, native audio — and an edit bills the video-reference tier ×2,
+  so 1080p on this row is the most expensive second in the app. Quote it.
 - **Prompt and source clip only** on this op. The MODEL takes reference images on an edit
   (ByteDance recommends 1–5 — *"replace the man in dark clothing in @Video 1 with @Image 2"*);
   **Slates has not wired that path**, so today an edit that must lock an identity from a photo

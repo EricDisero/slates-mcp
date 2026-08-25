@@ -227,9 +227,10 @@ export const VIDEO_MODELS = [
   'veo-3.1-standard',
   'seedance-2',
   // Seedance 2.5 is a SECOND SEAT, not a replacement: 30s takes, 30 image
-  // references, audio-only references — and 480p/720p ONLY. 2.0 keeps the
-  // ladder to native 4K and stays the default. Its EDIT row is not here; edit
-  // models live on slates_edit_video, same as the Kling and Omni Flash ones.
+  // references, audio-only references, up to 1080p (2026-08-24) — but no 4K,
+  // and dearer than 2.0 at every shared tier, so 2.0 stays the default. Its
+  // EDIT row is not here; edit models live on slates_edit_video, same as the
+  // Kling and Omni Flash ones.
   'seedance-2.5',
   'omni-flash',
 ] as const
@@ -407,9 +408,10 @@ export const estimateGenerationCost: Operation<{
             input.videoResolution ??
             resolved.videoResolution ??
             // Seedance quotes are resolution-scaled, so a missing resolution has
-            // to fall back to the model's OWN default — 2.5 has no 1080p at all,
-            // and a blanket '1080p' here quoted a key that does not exist. Read
-            // from the SSOT; this used to be a hand-typed model-id ternary.
+            // to fall back to the model's OWN default — the ladders differ per
+            // row (2.5 has no 4K) and a blanket literal quotes a key that does
+            // not exist. Read from the SSOT; this used to be a hand-typed
+            // model-id ternary.
             defaultVideoResolutionFor(resolved.model),
           sound: input.sound ?? resolved.sound,
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
@@ -1943,10 +1945,11 @@ export function videoCostKey(input: {
     // (fal partner endpoint). A reference video flips to `-vref-{res}-{T}s`,
     // T = in + out.
     //
-    // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 is 480p/720p only, runs to 30s,
-    // and takes references to 30s combined — so its vref total reaches 60, DOUBLE
-    // 2.0's ceiling of 30. Clamping a 2.5 quote at 30 would quote a real key at a
-    // fraction of the real bill.
+    // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 runs 480p/720p/1080p (no 4K),
+    // reaches 30s, and takes references to 30s combined — so its vref total
+    // reaches 60, DOUBLE 2.0's ceiling of 30. Clamping a 2.5 quote at 30 would
+    // quote a real key at a fraction of the real bill. The ladder itself lives in
+    // MODEL_CAPABILITIES; only the per-version DEFAULT is stated below.
     const v25 = input.model.startsWith('seedance-2.5')
     const res = input.videoResolution ?? (v25 ? '720p' : '1080p')
     const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
@@ -2027,7 +2030,9 @@ export const SEEDANCE_25_EDIT_MAX_SECONDS = editClipBounds('seedance-2.5-edit').
 // honest quote.
 export function seedanceEditCostKey(input: {
   duration: number
-  videoResolution?: '480p' | '720p'
+  /** Widened to the full union because the Zod enum is GENERATED from
+   *  MODEL_CAPABILITIES; the runtime schema is the narrowing authority. */
+  videoResolution?: '480p' | '720p' | '1080p' | '4k'
   seedanceFace?: boolean
   seedanceRealFace?: boolean
 }): string {
@@ -2250,8 +2255,9 @@ export const generateVideo: Operation<{
     // and now lives in the aspectRatio / duration / videoResolution descriptions
     // below, generated from MODEL_CAPABILITIES. "Veo = 16:9 only" and
     // "seedance-2.5 480p/720p" were both stated here AND there, and the two
-    // copies disagreed.
-    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 1080p or 4K, so stay on seedance-2 whenever resolution matters), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs). All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
+    // copies disagreed — and the second of those went stale on 2026-08-24 when
+    // 2.5 gained 1080p, which is exactly the failure mode generating it fixes.
+    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 4K, and dearer than seedance-2 at every shared resolution, so stay on seedance-2 unless length or reference count is the point), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs). All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     // 🚨 THESE THREE DESCRIPTIONS ARE GENERATED FROM `MODEL_CAPABILITIES`.
     // Never hand-write a ratio, resolution or duration into them again — every
@@ -3176,8 +3182,9 @@ export const editVideo: Operation<{
   keepAudio?: boolean
   // Widened to the full VideoResolution union because the Zod enum is GENERATED
   // from MODEL_CAPABILITIES and TypeScript can only see its element type, not
-  // the two values it actually holds at runtime. The runtime schema still
-  // rejects anything but 480p/720p, and `seedanceEditCostKey` narrows again.
+  // the values it actually holds at runtime. The runtime schema is the
+  // narrowing authority — never re-state the list here, it moved once already
+  // (1080p landed on the 2.5 edit row 2026-08-24).
   videoResolution?: VideoResolution
   seedanceFace?: boolean
   background?: boolean
@@ -3185,7 +3192,7 @@ export const editVideo: Operation<{
 }> = {
   id: 'slates_edit_video',
   description:
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements), omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat), or seedance-2.5-edit (4–30s clips — the ONLY engine that takes a clip over 15s; 480p/720p, seedanceFace:true for AI-character faces). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. seedance-2.5-edit is priced per second of output on the video-reference tier and bills roughly double a plain 2.5 generation of the same length, because every provider charges an edit on input + output seconds — always read the quote from the confirm gate rather than assuming. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements), omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat), or seedance-2.5-edit (4–30s clips — the ONLY engine that takes a clip over 15s; up to 1080p, seedanceFace:true for AI-character faces). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. seedance-2.5-edit is priced per second of output on the video-reference tier and bills roughly double a plain 2.5 generation of the same length, because every provider charges an edit on input + output seconds — always read the quote from the confirm gate rather than assuming. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
@@ -3267,7 +3274,10 @@ export const editVideo: Operation<{
     const costKey = isSeedanceEdit
       ? seedanceEditCostKey({
           duration: billedSeconds,
-          videoResolution: (input.videoResolution ?? defaultVideoResolutionFor('seedance-2.5-edit')) as '480p' | '720p',
+          // Cast to the full union, never to the row's current two-or-three
+          // values: MODEL_CAPABILITIES is the narrowing authority and that list
+          // moves (1080p landed on the 2.5 edit row 2026-08-24).
+          videoResolution: (input.videoResolution ?? defaultVideoResolutionFor('seedance-2.5-edit')) as VideoResolution,
           seedanceFace: input.seedanceFace === true,
         })
       : isOmniFlashEdit
