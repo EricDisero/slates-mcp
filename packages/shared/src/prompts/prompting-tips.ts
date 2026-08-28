@@ -636,7 +636,7 @@ const MINIMAX_H3: PromptingTipsEntry = {
   label: 'MiniMax H3',
   intro: [
     'MiniMax H3 generates picture and sound in one pass — 24fps, 32kHz stereo, 5-15 seconds, 11 stably-supported languages. It is the only video model in Slates where audio is AUTHORED rather than switched on: synchronised dialogue and action sounds go in the body of the prompt, ambience goes in a soundscape section, and audience-only music goes in a score section. Put a sound in the wrong section and it is dropped, doubled, or attributed to the wrong source.',
-    'Two seats. Base H3 runs 480p / 768p / 2K / 4K and reads up to 9 reference images plus 3 video and 3 audio clips. H3 Max is fal\'s faster post-train: 768p ceiling, no references at all, and dearer than base H3 at 768p — a deliberate speed pick, never the cheap one. 768p is the default on both because it is the tier the model natively generates; 2K and 4K are upscales of a 768p base.',
+    'Two seats. Base H3 runs 480p / 768p / 2K / 4K and reads up to 9 reference images plus 3 video and 3 audio clips. H3 Max is fal\'s faster post-train: 768p ceiling, and dearer than base H3 at 768p — a deliberate speed pick, never the cheap one. It still animates a start frame and an end frame; what it does not have is the reference set (the extra identity, style, environment, video and audio references), which is base-H3 only. 768p is the default on both because it is the tier the model natively generates; 2K and 4K are upscales of a 768p base.',
   ],
   columns: [
     [

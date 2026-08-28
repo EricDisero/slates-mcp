@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-minimax-h3
-description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling slates_generate_video with model minimax-h3 or minimax-h3-max. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, capped at 768p, takes NO references of any kind, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one. Two hazards live here: reference images past the fifth cost 4 credits each on the base row, and audio written into the wrong section is dropped or duplicated.
+description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling slates_generate_video with model minimax-h3 or minimax-h3-max. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, capped at 768p, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it still animates start and end frames, but it has no reference-to-video endpoint, so the omni-reference set is base-H3 only. Two hazards live here: reference images past the fifth cost 4 credits each on the base row, and audio written into the wrong section is dropped or duplicated.
 ---
 
 # MiniMax H3 — prompting
@@ -17,7 +17,7 @@ endpoint accepts:
 | | `minimax-h3` | `minimax-h3-max` |
 |---|---|---|
 | Resolution | 480p / 768p / **2K / 4K** | 480p / 768p |
-| References | 9 images + 3 video + 3 audio (12 files) | **none — no reference endpoint exists** |
+| References | 9 images + 3 video + 3 audio (12 files) | **none — no reference endpoint exists.** Frames still work; see the row below |
 | Frames | start and/or end | start and/or end |
 | Price at 768p | **$0.060/s** | $0.080/s |
 | Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) |
