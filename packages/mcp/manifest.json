@@ -24,7 +24,9 @@
     "storyboard",
     "veo",
     "kling",
-    "seedance"
+    "seedance",
+    "minimax",
+    "hailuo"
   ],
   "tools_generated": true,
   "server": {

@@ -1,6 +1,6 @@
 ---
 name: slates-model-selection
-description: Which model to pick for a given job — the routing doctrine. Read BEFORE choosing any video or image model, before quoting a plan, and before defaulting anywhere. Kling 3.0 is the general-purpose video default; Seedance 2.0 is the premium tier for anything where physics, effects, or scale remotely matter; Seedance 2.5 is a SECOND SEAT beside 2.0 (30s takes, 30 references and timestamp control, but no 4K and dearer at every shared resolution — never an upgrade); Veo 3.1 is a narrow niche (native synced audio in one gen, 16:9 or 9:16, 4/6/8s) and never the default.
+description: Which model to pick for a given job — the routing doctrine. Read BEFORE choosing any video or image model, before quoting a plan, and before defaulting anywhere. Kling 3.0 is the general-purpose video default; Seedance 2.0 is the premium tier for anything where physics, effects, or scale remotely matter; Seedance 2.5 is a SECOND SEAT beside 2.0 (30s takes, 30 references and timestamp control, but no 4K and dearer at every shared resolution — never an upgrade); MiniMax H3 is the AUTHORED-AUDIO seat (three directable sound layers in one pass, declared reference relationships, 480p-4K) with MiniMax H3 Max beside it as a faster 768p-capped, reference-free premium; Veo 3.1 is a narrow niche (native synced audio in one gen, 16:9 or 9:16, 4/6/8s) and never the default.
 ---
 
 # Model selection — the routing doctrine
@@ -29,6 +29,10 @@ The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni F
 | **Anything with remotely important physics** — effects, destruction, water/fire/smoke/cloth, creature motion, scale, complex simultaneous action | **Seedance 2.0** | The premium tier. Physics and effects are its whole edge; up to 9 ingredient refs, first+last frame, native 4K (4K video is Pro-only). |
 | The premium hero shot a piece hangs on | Seedance 2.0 | Spend where it shows. |
 | **One take longer than 15 seconds**, or a shot needing more than 9 image references, or an AUDIO-ONLY reference, or **beats that have to land at a named second** | **Seedance 2.5** | A SECOND SEAT beside 2.0, never an upgrade: 4–30s in one take, 30 image + 10 video + 10 audio references, audio-only refs, and the only Seedance seat that **acts on timestamps** (rules in `slates-prompting-seedance-2-5` § Timestamps) — 480p / 720p / 1080p, **no 4K**, and **dearer than 2.0 at every shared resolution** (720p $0.231/s vs $0.15/s, +54%). If you want 4K, or the same resolution cheaper, stay on 2.0. 🚨 Two live hazards: (a) with references attached, the words *add / remove / replace / change / extend / continue* make it reclassify the request as a video EDIT and fail AFTER the job queues — describe the finished frame, or use `seedance-2.5-edit`; (b) LENGTH is the price dial, not resolution — a 30s 720p face gen is 489 credits and a 30s 1080p faceless gen is 614, against a 1,000-credit welcome grant. Quote before any take over ~10s. |
+| **The SOUND has to be directed, not just present** — a specific line delivered a specific way, scene sound that has to sit under it, and score that must stay out of the characters' world | **MiniMax H3** | The only seat where audio is authored in three separate layers in ONE pass (synchronised events in the body, ambience in a soundscape section, audience-only score in its own) rather than toggled on. 5–15s, 480p / 768p / 2K / 4K, 24fps, 32kHz stereo, 11 languages. Rules in `slates-prompting-minimax-h3`. |
+| **A reference has to keep a DECLARED amount of itself** — especially moving one subject's characteristic onto a *different* subject | **MiniMax H3** | The only seat that understands a stated retention relationship (kept whole / kept in part / transferred onto another subject / loose echo). 9 images + 3 video + 3 audio, 12 files total. 🚨 The first 5 reference images are free and every one after that costs 4 credits — pass `referenceImages` to `slates_estimate_generation_cost` before a reference-heavy job. |
+| **Turnaround is the requirement** on a text-to-video or start-frame shot at 480p/768p | **MiniMax H3 Max** | fal's self-hosted post-train of H3. **Measured 2026-08-27: a 5s 768p clip finished in 4.8s against 57s on base H3 — about 12x faster**, same prompt, queue to file. When turnaround is the requirement this is not a marginal win. 🚨 It is the PREMIUM seat, not a cheap H3 — $0.080/s at 768p against base H3's $0.060/s, 33% more, and it tops out at 768p with NO references of any kind. Never the default; never reach for it to save money. |
+| Native synchronized audio (dialogue + SFX generated WITH the video in one gen), 16:9, ≤8s | Veo 3.1 | Narrow, and now narrower: if the sound needs DIRECTING rather than merely existing, MiniMax H3 is the better seat. |
 
 ### Named Seedance escalation triggers
 
@@ -40,7 +44,6 @@ The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni F
 - **One continuous unbroken take.**
 
 Concrete beats route better than an abstract category. Cost stays a tiebreaker, never the router (see below).
-| Native synchronized audio (dialogue + SFX generated WITH the video in one gen), 16:9, ≤8s | Veo 3.1 | The only job Veo wins. |
 
 ## Video EDIT routing (changing an existing clip)
 

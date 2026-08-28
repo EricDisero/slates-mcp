@@ -59,6 +59,7 @@ Per shot: `slates_generate_image` with `referenceAssetIds` pointing at the chara
 **Model mixing — route per `slates-model-selection`** (details in the per-model guides):
 - **Kling V3** (`slates-prompting-kling-v3`): the DEFAULT for most shots — 16:9 / 9:16 / 1:1, 3-15s, strong start-frame adherence; std is the workhorse, Omni for multi-character dialogue.
 - **Seedance 2** (`slates-prompting-seedance`): the PREMIUM tier — any shot where physics/effects/scale remotely matter, plus the hero shot; audio included, first+last frame guidance, native 4K (4K video is Pro-only).
+- **MiniMax H3** (`slates-prompting-minimax-h3`): route here when a shot's SOUND is part of the writing — a line delivered a particular way, scene sound under it, score that must stay outside the characters' world. It authors all three in one pass, which **collapses a shot's audio pass into its video pass** and removes the separate `slates_generate_audio` step for that shot. 5-15s, 480p/768p/2K/4K. Its sibling `minimax-h3-max` is faster but capped at 768p, takes no references, and costs MORE at 768p — a deliberate speed pick, never a saving.
 - **Veo 3.1** (`slates-prompting-veo-3`): niche, never the default — only when native synced audio must generate WITH the video in one gen; 16:9 or 9:16, 4/6/8s (8s only at 1080p/4K or with reference images).
 
 Failed gen? Check the error via `slates_get_generation_status`, fix the prompt, resubmit that one shot (a retry beyond the plan = announce the delta cost).

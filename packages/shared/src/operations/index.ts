@@ -233,6 +233,18 @@ export const VIDEO_MODELS = [
   // Kling and Omni Flash ones.
   'seedance-2.5',
   'omni-flash',
+  // MiniMax H3, two seats in one family (2026-08-27). Base H3 is the AUTHORED-
+  // AUDIO seat — three directable sound layers in one pass, declared reference
+  // relationships, 480p to 4K, and the cheapest 768-class second we sell.
+  // H3 Max is fal's self-hosted post-train: faster, capped at 768p, takes NO
+  // references, and costs MORE than base H3 at the tier they share — a
+  // premium-speed seat, never a cheap H3.
+  //
+  // NEVER PREFIX-MATCH: 'minimax-h3-max' starts with 'minimax-h3'. Every
+  // branch keyed on these ids matches EXACTLY; a prefix test silently bills
+  // the Max row at base rates and offers it 2K/4K it cannot render.
+  'minimax-h3',
+  'minimax-h3-max',
 ] as const
 
 type VideoModel = (typeof VIDEO_MODELS)[number]
@@ -253,6 +265,60 @@ const VIDEO_RESOLUTIONS = videoResolutionUnion(VIDEO_MODELS)
 const VIDEO_DURATION_BOUNDS = durationBounds(VIDEO_MODELS)
 /** Omni Flash's combined reference-image cap, read from the SSOT (7). */
 const omniFlashRefCap = getModelCapability('omni-flash')?.maxIngredientImages ?? 0
+
+/** Every resolution token any video model speaks, for the forgiving cost-key
+ *  parser. Derived, so 768p and 2k arrived with the models rather than with a
+ *  later bug report. */
+const VIDEO_RESOLUTION_VOCAB = VIDEO_RESOLUTIONS
+
+// ── MiniMax H3: the reference-image surcharge, as a KEY DIMENSION ────────────
+//
+// fal charges $0.080 per reference image PAST THE FIRST FIVE on
+// `minimax/h3/reference-to-video`, and nowhere else — not on image-to-video
+// start/end frames (those are FL2VA inputs, not Ref2VA references), and not on
+// h3-max, which has no reference endpoint at all. Left unmodelled it inverts
+// the margin: a 10s 768p clip earns $0.30 and four extra images cost $0.32.
+//
+// `/proxy/generate` resolves ONE key to ONE integer, so a surcharge has to live
+// IN the key — exactly the shape Kling's `-audio` suffix uses. The bare key
+// stays identical to every other model's; the suffix appears only when the
+// option costs money.
+//
+// The rounding is EXACT and worth knowing before anyone changes the rate:
+// $0.080 x 1.5 x 100 = 12 cents, and 12 is divisible by CENTS_PER_CREDIT (3),
+// so every extra image is 4 credits at every resolution and every duration with
+// zero drift. A rate that is not a multiple of 2 cents breaks that property.
+const MINIMAX_MODELS = new Set<string>(['minimax-h3', 'minimax-h3-max'])
+/** Reference images fal does not charge for. */
+const MINIMAX_FREE_REF_IMAGES = 5
+
+/** K for the `-ref{K}` suffix: images past the free five, capped by the model's
+ *  own declared ceiling. 0 for h3-max (no reference transport) and for anything
+ *  that is not a MiniMax row. Mirrors refImageSurchargeCount() in
+ *  slate/src/shared/pricing.ts. */
+/** Reference IMAGES a generate_video call carries — the four free-reference
+ *  arrays, combined, exactly as the desktop composer counts them. */
+function minimaxRefImageCount(input: {
+  ingredientAssetIds?: string[]
+  characterAssetIds?: string[]
+  environmentAssetIds?: string[]
+  styleAssetIds?: string[]
+}): number {
+  return (
+    (input.ingredientAssetIds?.length ?? 0) +
+    (input.characterAssetIds?.length ?? 0) +
+    (input.environmentAssetIds?.length ?? 0) +
+    (input.styleAssetIds?.length ?? 0)
+  )
+}
+
+function minimaxRefSurchargeCount(model: string, referenceImages?: number): number {
+  if (!MINIMAX_MODELS.has(model)) return 0
+  const cap = getModelCapability(model)?.maxIngredientImages ?? 0
+  const n = Math.floor(referenceImages ?? 0)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.max(0, Math.min(n, cap) - MINIMAX_FREE_REF_IMAGES)
+}
 
 /** The exact `model` ids `slates_edit_video` accepts. Edit rows are deliberately
  *  NOT in VIDEO_MODELS — they take a source clip, not frames. */
@@ -288,12 +354,15 @@ export const estimateGenerationCost: Operation<{
   model: string
   quantity?: number
   duration?: number
-  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  /** The FULL union — the runtime Zod enum is generated from MODEL_CAPABILITIES
+   *  and `assertVideoCapabilities` is the per-model narrowing authority. */
+  videoResolution?: VideoResolution
   resolution?: '1k' | '2k' | '3k' | '4k'
   quality?: 'medium' | 'high'
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
+  referenceImages?: number
 }> = {
   id: 'slates_estimate_generation_cost',
   description:
@@ -316,6 +385,9 @@ export const estimateGenerationCost: Operation<{
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
     seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
+    referenceImages: z.number().int().min(0).optional().describe(
+      `minimax-h3 only — how many reference IMAGES the generation will carry. The first ${MINIMAX_FREE_REF_IMAGES} are free and each one after that is a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. Ignored by every other model (minimax-h3-max takes no references at all).`
+    ),
   }),
   async run(input, ctx) {
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
@@ -416,6 +488,7 @@ export const estimateGenerationCost: Operation<{
           sound: input.sound ?? resolved.sound,
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
           seedanceRealFace: input.seedanceRealFace,
+          referenceImages: input.referenceImages ?? resolved.referenceImages,
         })
       }
     }
@@ -1929,7 +2002,9 @@ const KLING_TIER_MAP: Record<string, string> = {
 export function videoCostKey(input: {
   model: VideoModel
   duration: number
-  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  /** Widened to the full union because the Zod enum is GENERATED from
+   *  MODEL_CAPABILITIES; the runtime schema is the narrowing authority. */
+  videoResolution?: VideoResolution
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
@@ -1937,7 +2012,19 @@ export function videoCostKey(input: {
    *  transfer / lip-sync on video / relocate). >0 bills the vref key on TOTAL
    *  (input+output) seconds — the server re-derives this by probing the refs. */
   videoRefSeconds?: number
+  /** MiniMax H3 base only: how many reference IMAGES the request carries. Past
+   *  the fifth, fal charges per image, so it is a KEY DIMENSION — omit it on a
+   *  reference-heavy call and the quote under-reports what the proxy bills
+   *  (which it re-derives from the request itself). */
+  referenceImages?: number
 }): string {
+  // EXACT-ID MAP, NEVER A PREFIX: 'minimax-h3-max' starts with 'minimax-h3'.
+  // Mirrors minimaxCreditKey() in slate/src/shared/pricing.ts.
+  if (MINIMAX_MODELS.has(input.model)) {
+    const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
+    const k = minimaxRefSurchargeCount(input.model, input.referenceImages)
+    return `${input.model}-${res}-${input.duration}s${k > 0 ? `-ref${k}` : ''}`
+  }
   if (input.model.startsWith('seedance')) {
     // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (version × face
     // × vref × res × duration). AI-face route bills the `-face-` key (~45% over
@@ -2032,7 +2119,7 @@ export function seedanceEditCostKey(input: {
   duration: number
   /** Widened to the full union because the Zod enum is GENERATED from
    *  MODEL_CAPABILITIES; the runtime schema is the narrowing authority. */
-  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  videoResolution?: VideoResolution
   seedanceFace?: boolean
   seedanceRealFace?: boolean
 }): string {
@@ -2138,9 +2225,10 @@ export function audioCostKey(input: {
 function resolveVideoModel(raw: string): {
   model: VideoModel
   duration?: number
-  videoResolution?: '480p' | '720p' | '1080p' | '4k'
+  videoResolution?: VideoResolution
   sound?: boolean
   seedanceFace?: boolean
+  referenceImages?: number
 } | null {
   let s = raw.trim().toLowerCase()
   const out: ReturnType<typeof resolveVideoModel> = { model: 'kling-v3.0-std' }
@@ -2149,10 +2237,22 @@ function resolveVideoModel(raw: string): {
     out!.duration = parseInt(dur[1], 10)
     s = s.replace(/-(\d+)s\b/, '')
   }
-  const res = /-(480p|720p|1080p|4k)\b/.exec(s)
+  // MiniMax H3's paid-reference suffix, stripped like every other key dimension
+  // so a pasted `minimax-h3-768p-10s-ref2` resolves instead of erroring. The
+  // number it carries is K (images PAST the free five), so it is converted back
+  // to a TOTAL before anything can re-surcharge it.
+  const ref = /-ref(\d+)\b/.exec(s)
+  if (ref) {
+    out!.referenceImages = MINIMAX_FREE_REF_IMAGES + parseInt(ref[1], 10)
+    s = s.replace(/-ref(\d+)\b/, '')
+  }
+  // The RESOLUTION vocabulary is GENERATED from MODEL_CAPABILITIES — the
+  // hand-typed list that stood here went stale the day 768p and 2k shipped.
+  const resRe = new RegExp(`-(${VIDEO_RESOLUTION_VOCAB.join('|')})\\b`)
+  const res = resRe.exec(s)
   if (res) {
-    out!.videoResolution = res[1] as '480p' | '720p' | '1080p' | '4k'
-    s = s.replace(/-(480p|720p|1080p|4k)\b/, '')
+    out!.videoResolution = res[1] as VideoResolution
+    s = s.replace(resRe, '')
   }
   if (/-audio\b/.test(s)) {
     out!.sound = true
@@ -2191,6 +2291,19 @@ function resolveVideoModel(raw: string): {
     'gemini-omni-flash': 'omni-flash',
     'gemini-omni-flash-preview': 'omni-flash',
     'omni-flash-preview': 'omni-flash',
+    // The MAX spellings must come out as MAX. Bare `minimax`, `h3` and
+    // `hailuo-3` all mean the BASE row — it holds the full ladder and the
+    // references, and it is cheaper at the tier they share.
+    'minimax-h3-max': 'minimax-h3-max',
+    'minimax-h3max': 'minimax-h3-max',
+    'h3-max': 'minimax-h3-max',
+    'hailuo-3-max': 'minimax-h3-max',
+    minimax: 'minimax-h3',
+    'minimax-h3': 'minimax-h3',
+    h3: 'minimax-h3',
+    'hailuo-3': 'minimax-h3',
+    'hailuo-3.0': 'minimax-h3',
+    hailuo: 'minimax-h3',
   }
   if (aliases[s]) {
     out!.model = aliases[s]
@@ -2212,6 +2325,9 @@ function promptingSkillFor(model: string): string {
   if (model.startsWith('seedance-2.5')) return 'slates-prompting-seedance-2-5'
   if (model.startsWith('seedance')) return 'slates-prompting-seedance'
   if (model.startsWith('omni-flash')) return 'slates-prompting-omni-flash'
+  // ONE skill covers both H3 seats — the prompt grammar is identical and only
+  // the ladder and the reference transport differ — so a prefix is right here.
+  if (model.startsWith('minimax-h3')) return 'slates-prompting-minimax-h3'
   return 'slates-cost-discipline'
 }
 
@@ -2248,7 +2364,7 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
+    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3 / slates-prompting-minimax-h3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
   input: z.object({
     prompt: z.string().min(1).max(4000),
     // ROUTING doctrine only. Every capability number was stripped on 2026-08-16
@@ -2257,7 +2373,7 @@ export const generateVideo: Operation<{
     // "seedance-2.5 480p/720p" were both stated here AND there, and the two
     // copies disagreed — and the second of those went stale on 2026-08-24 when
     // 2.5 gained 1080p, which is exactly the failure mode generating it fixes.
-    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 4K, and dearer than seedance-2 at every shared resolution, so stay on seedance-2 unless length or reference count is the point), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs). All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
+    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 4K, and dearer than seedance-2 at every shared resolution, so stay on seedance-2 unless length or reference count is the point), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs), minimax-h3 = the AUTHORED-AUDIO seat (dialogue, scene sound and score directed as three separate layers in one pass, plus declared reference relationships; reference images past the fifth are a PAID key dimension — pass referenceImages when quoting), minimax-h3-max = the same model post-trained by fal for SPEED, capped at 768p, no references of any kind, and DEARER than minimax-h3 at the tier they share — a deliberate pick, never a default and never the cheap H3. All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     // 🚨 THESE THREE DESCRIPTIONS ARE GENERATED FROM `MODEL_CAPABILITIES`.
     // Never hand-write a ratio, resolution or duration into them again — every
@@ -2401,6 +2517,82 @@ export const generateVideo: Operation<{
       }
     }
 
+    // MiniMax H3's SHAPE constraints. Counts and caps are read from the
+    // capability SSOT; only the endpoint SHAPE is stated here, because it is
+    // not a number the registry models: fal publishes text-to-video,
+    // image-to-video and reference-to-video for `minimax/h3`, and only the
+    // first two for `minimax/h3-max` (its reference-to-video 404s). The
+    // reference endpoint has no frame parameters at all, so frames and
+    // references are mutually exclusive — a shape mismatch, not a preference.
+    if (MINIMAX_MODELS.has(input.model)) {
+      const cap = getModelCapability(input.model)
+      const refImages = minimaxRefImageCount(input)
+      const refMedia =
+        (input.videoReferenceAssetIds?.length ?? 0) +
+        (input.audioReferenceAssetIds?.length ?? 0) +
+        (input.videoReferenceAssetId ? 1 : 0) +
+        (input.audioReferenceAssetId ? 1 : 0)
+      const maxImages = cap?.maxIngredientImages ?? 0
+      const maxVideos = cap?.maxReferenceVideos ?? 0
+      const maxAudio = cap?.maxReferenceAudio ?? 0
+      const maxTotal = cap?.maxReferenceFilesTotal ?? 0
+      if (maxImages === 0 && (refImages > 0 || refMedia > 0)) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message:
+            `${input.model} takes a prompt and up to two frames (start and/or end) — it has no reference endpoint at all, so reference images, video and audio cannot be sent. Drop them, or switch to minimax-h3, which reads ${getModelCapability('minimax-h3')?.maxIngredientImages ?? 9} images plus reference video and audio.`,
+        })
+      }
+      if ((refImages > 0 || refMedia > 0) && (input.firstFrameAssetId || input.lastFrameAssetId)) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message:
+            `${input.model} can use first/last frames OR references, not both — they are different endpoints and the reference one has no frame slots. Drop one side.`,
+        })
+      }
+      if (refImages > maxImages) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `${input.model} takes at most ${maxImages} reference images combined (you passed ${refImages}). Trim the list — and note the first ${MINIMAX_FREE_REF_IMAGES} are free while each one after that adds a paid dimension to the cost key.`,
+        })
+      }
+      if ((input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0) > maxVideos) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `${input.model} takes at most ${maxVideos} reference videos.`,
+        })
+      }
+      if ((input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0) > maxAudio) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `${input.model} takes at most ${maxAudio} reference audio clips.`,
+        })
+      }
+      if (maxTotal > 0 && refImages + refMedia > maxTotal) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `${input.model} takes at most ${maxTotal} reference files across all modalities (you passed ${refImages + refMedia}).`,
+        })
+      }
+      // fal: "Audio cannot be the only reference input; provide at least one
+      // reference image or video with it."
+      const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
+      const videoRefs = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
+      if (audioRefs > 0 && refImages === 0 && videoRefs === 0) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `${input.model} rejects an audio-only reference set — add at least one reference image or video alongside it.`,
+        })
+      }
+    }
+
     // ⛔ The hand-written Veo duration block that stood here is GONE. It read
     // `![4,6,8].includes(duration)` plus "4K only at 8s" — and the registry
     // forces 8s at 1080p TOO, so it happily quoted a 4s 1080p Veo the provider
@@ -2516,6 +2708,10 @@ export const generateVideo: Operation<{
       sound: input.sound,
       seedanceFace: input.seedanceFace,
       seedanceRealFace: input.seedanceRealFace,
+      // MiniMax H3 base: reference images past the fifth are a PAID key
+      // dimension. Counted from the same four arrays the request sends, so the
+      // quote and the server's own re-derivation see the same number.
+      referenceImages: minimaxRefImageCount(input),
       // Σ ceil(d - 0.05) over every reference clip, both shapes — the same
       // expression the desktop's estimateCost and the handler's key builder
       // use. Quoting only the singular would understate a multi-clip call.
@@ -2542,7 +2738,9 @@ export const generateVideo: Operation<{
     if (!entry) {
       throw new Error(
         `Model variant not in registry: ${costKey}. ` +
-          `Available video models: ${registry.models.filter((m) => m.model.startsWith('kling') || m.model.startsWith('veo') || m.model.startsWith('seedance') || m.model.startsWith('omni-flash')).map((m) => m.model).slice(0, 20).join(', ')}`
+          // Prefixes DERIVED from the model list, so a new family cannot be
+          // missing from the hint the way minimax-h3 was on day one.
+          `Available video models: ${registry.models.filter((m) => VIDEO_MODELS.some((v) => m.model.startsWith(v.split('.')[0]))).map((m) => m.model).slice(0, 20).join(', ')}`
       )
     }
     const totalCents = creditCost(entry)
@@ -4250,6 +4448,17 @@ function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('veo')) return 'slates-prompting-veo-3'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
+  // MiniMax H3 — both seats share one skill. Placed BEFORE the seed/seedance
+  // block for the same reason seed-audio is: no prefix collision exists today,
+  // but a `minimax-*` id must never fall through to a Seedance guide.
+  if (
+    t.startsWith('minimax') ||
+    t.startsWith('hailuo') ||
+    t === 'h3' ||
+    t.startsWith('h3-')
+  ) {
+    return 'slates-prompting-minimax-h3'
+  }
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return 'slates-prompting-kling-v3'
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'

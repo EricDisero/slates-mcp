@@ -61,6 +61,7 @@ export type PromptingTipsKey =
   | 'veo'
   | 'omni-flash'
   | 'omni-flash-edit'
+  | 'minimax-h3'
   | 'nano-banana'
   | 'nano-banana-lite'
   | 'seed-audio'
@@ -631,6 +632,68 @@ const ELEVEN_SFX: PromptingTipsEntry = {
   ],
 }
 
+const MINIMAX_H3: PromptingTipsEntry = {
+  label: 'MiniMax H3',
+  intro: [
+    'MiniMax H3 generates picture and sound in one pass — 24fps, 32kHz stereo, 5-15 seconds, 11 stably-supported languages. It is the only video model in Slates where audio is AUTHORED rather than switched on: synchronised dialogue and action sounds go in the body of the prompt, ambience goes in a soundscape section, and audience-only music goes in a score section. Put a sound in the wrong section and it is dropped, doubled, or attributed to the wrong source.',
+    'Two seats. Base H3 runs 480p / 768p / 2K / 4K and reads up to 9 reference images plus 3 video and 3 audio clips. H3 Max is fal\'s faster post-train: 768p ceiling, no references at all, and dearer than base H3 at 768p — a deliberate speed pick, never the cheap one. 768p is the default on both because it is the tier the model natively generates; 2K and 4K are upscales of a 768p base.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Three audio layers, three places',
+        example: 'body: "First batch of the morning."\nSoundscape: shutters scrape, trays clink\nScore: solo piano, slow, no swell',
+        note: 'Dialogue, singing and diegetic music (a radio in the scene) go in the BODY on the beat they land. Ambience goes in the soundscape. The score is audience-only — name instruments and tempo, not moods.',
+        critical: true,
+      },
+      {
+        heading: 'Shots and cut times',
+        example: '[Shot 2] At 00:03.500, the camera cuts to...',
+        note: 'The first shot carries no timestamp; later shots open with the bracket and a rising cut time inside the clip length. Transition verbs: cuts to / transitions to / changes to / switches to.',
+      },
+      {
+        heading: 'Write the camera into the sentence',
+        example: 'The camera pushes in with small amplitude at slow speed toward the letter in her hands.',
+        note: 'Named moves (push in, pull out, arc, tracking, POV, roll) with amplitude and speed modifiers. Never stack them as labels.',
+      },
+      {
+        heading: 'Voiceover needs both halves',
+        example: 'says in an off-screen voiceover: "..." — his lips remain completely closed.',
+        note: 'The off-screen phrase alone still animates a mouth. State the closed lips explicitly.',
+      },
+    ],
+    [
+      {
+        heading: 'Cite references by number',
+        example: 'Marcus (image 1) walks into the workshop (image 2)...',
+        note: `H3 takes references as typed slots and expects plain numbered prose — image 1, video 1, audio 1. Do not hand-write angle-bracket tags. ${PARTIALS['reference-tips-short']}`,
+      },
+      {
+        heading: 'Say how much of a reference survives',
+        example: 'Give the man in image 3 the weathered leather texture of the jacket in image 4.',
+        note: 'H3 is the only seat that understands transferring a characteristic onto a DIFFERENT subject. State each reference\'s job and how much of it should carry through — kept whole, kept in part, transferred, or a loose echo.',
+      },
+      {
+        heading: 'Reference images past the fifth cost extra',
+        note: 'The first 5 are free; each one after that adds 4 credits at every resolution and length, and the model takes 9. Four extra images on a 10s 768p clip add 16 credits to a 30-credit generation. Attach what the shot needs, not the ceiling.',
+        critical: true,
+      },
+      {
+        heading: '2K and 4K are upscales, not bigger renders',
+        note: 'Only 480p and 768p are generated natively; 2K and 4K enlarge a finished 768p take. In our own testing the 2K pass showed MORE artifacting than the 768p original while costing 33 credits for a 5-second take against 15. Generate and judge at 768p; step up only when a delivery spec demands the pixels.',
+        critical: true,
+      },
+      {
+        heading: 'Frames or references, never both',
+        note: 'A start and/or end frame runs on a different endpoint from references — the reference endpoint has no frame slots. Slates refuses the combination rather than dropping one side. An audio reference also cannot travel alone: pair it with an image or video.',
+      },
+    ],
+  ],
+  footer: [
+    'Slates disables the provider\'s prompt expander, so what you write is what the model reads — nothing will pad a thin prompt. Aim for a 350-500 word body on a reference-carrying shot, and let dialogue-heavy scenes run longer if that is what fits the spoken timeline.',
+  ],
+}
+
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   'seedance-2-5': SEEDANCE_25,
@@ -640,6 +703,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   veo: VEO,
   'omni-flash': OMNI_FLASH,
   'omni-flash-edit': OMNI_FLASH_EDIT,
+  'minimax-h3': MINIMAX_H3,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
   'seed-audio': SEED_AUDIO,

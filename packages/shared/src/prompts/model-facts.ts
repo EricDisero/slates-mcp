@@ -267,6 +267,28 @@ export const MODEL_FACTS: ModelFact[] = [
       'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (7/09 head-to-head vs Kling edit on real talking footage: lips held perfectly, audio near-identical, both action beats landed). Takes an EXISTING 3-10s clip and changes what the prompt names, footage-synced (prop/effect/environment/lighting swaps). Fidelity is EARNED by prompt discipline: ONE short instruction + "Keep everything else the same." — long descriptive prompts DESTROY it (Google-documented + 7/09 receipt). Never name objects as metaphors ("candle-like" → literal candle). Quirk: occasional tail jitter/doubled last speech beat — trim the tail. NO reference images (identity swaps needing refs → Kling edit); bit-exact audio needs → Kling keep_audio or segment-splice. 720p output, cheapest edit seat (~2/3 of Kling edit Std).',
   },
   {
+    id: 'minimax-h3',
+    label: 'MiniMax H3',
+    kind: 'video',
+    ...caps('minimax-h3'),
+    // fal's reference-to-video refuses an audio-only reference: "Audio cannot
+    // be the only reference input; provide at least one reference image or
+    // video with it." Same behavioural rule as Seedance 2.0.
+    audioRefNeedsCompanion: true,
+    notes:
+      'THE AUTHORED-AUDIO SEAT. Reach for H3 when the sound is part of the shot rather than a switch on it: it writes synchronised dialogue, scene sound and an audience-only score in ONE pass, as three separate layers of the prompt, at 24fps with 32kHz stereo, across 11 stably-supported languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Russian, Spanish). Kling and Seedance treat audio as on/off; Veo generates it but gives you no way to direct the layers. The second thing only H3 gives you is a DECLARED REFERENCE RELATIONSHIP — you state how much of each reference survives (kept whole, partly kept, transferred onto a different subject, or a loose echo), including moving one subject\'s characteristic onto another. VIDEO-ONLY. 5-15s, 480p / 768p / 2K / 4K (768p default and native; 2K and 4K are upscales of a 768p base). $0.060/s at 768p — the cheapest 768-class second in the catalogue. Omni-reference ceiling: 9 images + 3 video clips + 3 audio clips, 12 files total, video and audio each 15s combined; an audio reference needs an image or video alongside it. 🚨 REFERENCE IMAGES PAST THE FIFTH COST 4 CREDITS EACH, on top of the per-second price — the first five are free, the model takes nine, and four paid images on a 10s 768p clip add 16 credits to a 30-credit generation. Attach the references the shot needs, not the maximum. 4K video is Pro-only (the server returns PRO_REQUIRED for a base account); 2K is open to every tier. \u2b06\ufe0f 2K AND 4K ARE UPSCALES OF A 768p RENDER, NOT LARGER GENERATIONS \u2014 fal states this outright, and in our own 2026-08-27 test the 2K pass came back with MORE artifacting than the 768p original it was built from, while costing 33 credits for a 5s take against 15 and taking almost twice as long. Treat them as a delivery-size convenience, never as a quality tier: generate at 768p, judge it there, and upscale in post if the pixels are genuinely needed.',
+  },
+  {
+    id: 'minimax-h3-max',
+    label: 'MiniMax H3 Max',
+    kind: 'video',
+    // No reference caps: fal publishes no reference-to-video endpoint for this
+    // row, so `caps()` returns nulls and the composer refuses references.
+    ...caps('minimax-h3-max'),
+    notes:
+      'THE SPEED SEAT, and the EXPENSIVE one at the tier they share — never the cheap H3 and never the default. fal\'s own post-train of the open H3 weights, self-hosted. 🚨 MEASURED 2026-08-27, same prompt and params on both rows: a 5s 768p text-to-video took **4.8 seconds** on Max against **57 seconds** on base H3 — **about 12x faster**, queue to finished file. That is the seat\'s whole case and it is now our own number, not fal\'s (fal claims under 3s; the literal claim did not hold at 4.8s wall-clock, the order of magnitude did). It also carries a thin quality edge on the with-audio Arena boards (1,204 vs 1,184 image-to-video, 1,235 vs 1,226 text-to-video — real, but 20 and 9 ELO, and vendor-reported). It gives up everything above 768p (no 2K, no 4K — the upscaler is not in the open weights) and takes NO references of any kind (no reference-to-video endpoint exists). It costs $0.080/s at 768p against base H3\'s $0.060/s: 33% more for a shorter ladder. So route here when a fast turnaround on a 480p/768p text-to-video or start-frame shot is worth the premium, and to base H3 for resolution, references, or the same tier cheaper. Same native audio, same 5-15s window, same six aspect ratios.',
+  },
+  {
     id: 'seed-audio',
     label: 'Seed Audio 1.0',
     kind: 'audio',

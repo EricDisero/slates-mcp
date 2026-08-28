@@ -98,9 +98,20 @@ hand-mirrored in **two** repos and gated by `slates-web/scripts/check-skills-pac
 1. Drop a markdown file with frontmatter into `packages/shared/skills/`.
 2. Frontmatter must include `name:` and `description:` for skill discovery.
 3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
-4. Three categories — keep them separate:
+4. **🚨 A first-party prompt guide is authority on the MODEL; the ENDPOINT SCHEMA is authority on the
+   REQUEST — and the skill has to serve the request** (learned on MiniMax H3, 2026-08-27). MiniMax's
+   own guides document an angle-bracket tag block (`<Subject N>` / `<Picture N>` / `<Video N>` /
+   `<Audio N>`) as the way to declare references. fal — the provider we actually call — exposes
+   references as TYPED SLOTS and its `prompt` description instructs *"refer to reference assets by
+   their modality and order: Image 1, Image 2, Video 1, Audio 1"*. Writing the skill from the
+   first-party guide alone would have shipped a syntax that reaches the model as literal angle
+   brackets. **Read the live OpenAPI before writing a per-model skill, not just the model card.**
+   The same read found `prompt_expansion_mode` defaulting to `balanced` — a provider-side prompt
+   rewrite that the desktop now disables on every request (prompt-transparency invariant), which is
+   itself a fact the skill has to teach.
+5. Three categories — keep them separate:
    - **Workflow skills** (`slates-one-prompt-film`, `slates-direct-response-ad`, `slates-storyboard-from-script`, etc.) compose multiple ops into a recipe. Cap ~6 — more than that and the LLM can't tell which one fires. Currently AT the cap (6).
    - **Per-model prompting skills** (`slates-prompting-nano-banana-2`, `slates-prompting-veo-3`, etc.) fire when calling the matching `slates_generate_*` op. Naming convention: `slates-prompting-{model}.md`. One per model variant family. The audio lane adds two: `slates-prompting-seed-audio` and `slates-prompting-elevenlabs` (Sound Effects v2 — the ElevenLabs TTS surface was removed 2026-08-01, so that skill is SFX-only and `tts`/`voiceover` alias to Seed Audio instead). ⚠️ In `resolveGuideTopic()` the `seed-audio` alias MUST be tested **before** `seedance` — "seed-audio" also starts with "seed", and falling through hands the video guide to an audio model.
    - **Per-style prompting** (`slates-style-prompting`) — cross-model style depth (photoreal/anime/painterly/3d-render on Seedance vs Kling vs NB2). Fires on style requests; style names alias to it in `resolveGuideTopic()`. SSOT: born in second-brain `research/style-prompting-research.md`, encoded here — never author style content directly in this file.
    - **Cross-cutting hygiene skills** (`slates-cost-discipline`) fire on every generation call regardless of model. Should be rare — only add when a discipline applies across many ops.
-5. If the skill maps to a model id, extend the alias table in `resolveGuideTopic()` (operations/index.ts) so `slates_get_prompting_guide` resolves the model id to it.
+6. If the skill maps to a model id, extend the alias table in `resolveGuideTopic()` (operations/index.ts) so `slates_get_prompting_guide` resolves the model id to it.

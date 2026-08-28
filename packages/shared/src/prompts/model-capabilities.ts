@@ -52,7 +52,14 @@
 export type AspectRatio =
   | '1:1' | '2:3' | '3:2' | '3:4' | '4:3' | '4:5' | '5:4' | '9:16' | '16:9' | '21:9'
 
-export type VideoResolution = '480p' | '720p' | '1080p' | '4k'
+/**
+ * 🚨 `768p` and `2k` entered this vocabulary with MiniMax H3 (2026-08-27) and
+ * are NOT aliases of anything already here. 768p is H3's native generation tier
+ * and prices between 480p and 2K ($0.060/s vs 720p Seedance's $0.15/s — a
+ * different tier of a different model, not a rename); 2K is H3's upscaled tier.
+ * Aliasing either onto 720p/1080p would build a cost key that does not exist.
+ */
+export type VideoResolution = '480p' | '720p' | '768p' | '1080p' | '2k' | '4k'
 
 /**
  * The full ten, in display order. `9:21` was in the MCP op's enum and in NO
@@ -87,6 +94,22 @@ const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
 
 /** Seedance (both seats, and the edit row): six — notably NO `4:5`. */
 const SEEDANCE_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
+
+/**
+ * MiniMax H3, both seats: six. Read off fal's live OpenAPI 2026-08-27 for
+ * `minimax/h3/text-to-video` and `minimax/h3-max/text-to-video` — identical
+ * enums. It happens to be the same six Seedance takes; kept as its OWN constant
+ * because a provider that adds a ratio adds it to ITS family, and sharing the
+ * Seedance constant would silently move H3 the next time ByteDance moves.
+ *
+ * Two endpoint quirks the registry deliberately does not model:
+ *   · `image-to-video` has NO `aspect_ratio` param at all — the output follows
+ *     the start frame. The handler simply omits it there.
+ *   · `reference-to-video` adds an `adaptive` value on top of these six. We
+ *     never send it: the composer always has an explicit ratio, and `adaptive`
+ *     is not an AspectRatio in this vocabulary.
+ */
+const MINIMAX_H3_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
 
@@ -387,6 +410,69 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // canvas and arrives through `sourceVideo`, not as a reference.
   },
 
+  // ── MiniMax H3 (both seats on fal — added 2026-08-27) ──────────────────────
+  //
+  // Every value below is READ OFF fal's live OpenAPI, fetched 2026-08-27:
+  //   minimax/h3/{text-to-video,image-to-video,reference-to-video}
+  //   minimax/h3-max/{text-to-video,image-to-video}
+  // `minimax/h3-max/reference-to-video` returns 404 — it does not exist, which
+  // is why the Max row declares no reference capacity at all.
+  //
+  // 🚨 NEVER PREFIX-MATCH THESE TWO IDS. `minimax-h3-max` starts with
+  // `minimax-h3`, so any `startsWith('minimax-h3')` swallows the Max row into
+  // the base row's branch — a different ladder AND a different price at the one
+  // tier they share. Every lookup downstream is an exact-id map, not a prefix.
+
+  'minimax-h3': {
+    aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
+    // The full ladder. 480p/768p are NATIVE generation modes; 2K and 4K upscale
+    // a 768p base result through H3-Regenerate-2K, which is API-only and not in
+    // the open weights — that is why fal can undercut list at the bottom two
+    // tiers and matches it exactly at the top two.
+    //
+    // DEFAULT 768p, NOT fal's own default of 2K. 768p is the tier the model was
+    // trained to output and the one every benchmark quotes; 2K is a 2.2x price
+    // step and 4K a 2.7x step, and reaching a tier is a different decision from
+    // defaulting to it (same reasoning that keeps Seedance 2.5 on 720p).
+    videoResolution: { options: ['480p', '768p', '2k', '4k'], default: '768p' },
+    // 5, not 4. MiniMax's own model card says 4-15s; fal's schema — which is
+    // what our request actually hits — says `minimum: 5`. The endpoint wins.
+    duration: { min: 5, max: 15, mode: 'continuous' },
+    // Ref2VA omni-reference caps, verbatim from the reference-to-video schema:
+    // reference_image_urls maxItems 9, reference_video_urls maxItems 3,
+    // reference_audio_urls maxItems 3, and in every one of the three
+    // descriptions: "Reference images, videos, and audio clips must add up to
+    // at most 12 files."
+    maxIngredientImages: 9,
+    maxReferenceVideos: 3,
+    maxReferenceAudio: 3,
+    maxReferenceFilesTotal: 12,
+    // COMBINED, not per clip. fal states "2-15 seconds each, combined duration
+    // at most 15 seconds" for both media arms — so the per-clip floor of 2s is
+    // the shared reference-video minimum already enforced by the composer, and
+    // 15 is the sum these fields have always meant.
+    maxReferenceVideoSeconds: 15,
+    maxReferenceAudioSeconds: 15,
+  },
+
+  'minimax-h3-max': {
+    aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
+    // 480p/768p ONLY — fal's post-train of the open weights, and the 2K
+    // upscaler was never open-sourced. Declaring the shorter ladder here IS the
+    // whole Max-seat mechanism: `assertVideoCapabilities` refuses 2K/4K on this
+    // id, the desktop picker renders only what this entry declares, and the
+    // agent's Zod enum stays the union while the per-model guard narrows.
+    // Anything shaped like "disable the higher tiers when Max is selected" is
+    // re-implementing a guard that already exists.
+    videoResolution: { options: ['480p', '768p'], default: '768p' },
+    duration: { min: 5, max: 15, mode: 'continuous' },
+    // NO reference caps, deliberately: fal publishes text-to-video and
+    // image-to-video for h3-max and NOTHING else (reference-to-video 404s), so
+    // there is no transport for a reference of any modality. A cap declared
+    // above what the handler sends is a SILENT DROP — the exact failure
+    // `seedance-2.5-edit` shipped with. Absent means the composer refuses.
+  },
+
   // ── Audio ──────────────────────────────────────────────────────────────────
   //
   // `aspectRatios: []` is deliberate, not an oversight: audio has no frame, and
@@ -483,7 +569,9 @@ export function aspectRatioUnion(models: readonly string[], provider?: string): 
 
 /** Union of every resolution the given models accept. */
 export function videoResolutionUnion(models: readonly string[]): VideoResolution[] {
-  const order: VideoResolution[] = ['480p', '720p', '1080p', '4k']
+  // Ascending by output height, so an enum reads as a ladder. 768p sits between
+  // 720p and 1080p; 2k (≈2560×1440) between 1080p and 4k.
+  const order: VideoResolution[] = ['480p', '720p', '768p', '1080p', '2k', '4k']
   const seen = new Set<VideoResolution>()
   for (const m of models) for (const r of videoResolutionsFor(m)) seen.add(r)
   return order.filter((r) => seen.has(r))
