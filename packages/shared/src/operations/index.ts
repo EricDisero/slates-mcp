@@ -13,6 +13,7 @@
 import { z } from 'zod'
 import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from '../clients/cloud.js'
 import { SlatesDesktopClient } from '../clients/desktop.js'
+import { BlenderBridgeClient, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
@@ -2312,6 +2313,35 @@ function resolveVideoModel(raw: string): {
   return null
 }
 
+/**
+ * Pair each reference-audio asset id with the words spoken in it.
+ *
+ * 🚨 THE MODEL RE-TRANSCRIBES A SUPPLIED TAKE. Seedance does not consume
+ * reference audio verbatim — it re-synthesises something close to it, and a
+ * 2026-08-28 field test heard "an app called Slates" come back as "a map called
+ * Slates". The clip carries the voice, the accent and the timing; only text
+ * carries the words. This is the text, and without it every generation with a
+ * voice take has its line guessed.
+ *
+ * Positional in, KEYED out: the desktop route merges its deprecated singular
+ * `audioReferenceAssetId` onto the END of the plural list, so an index would
+ * address different clips depending on which shape the caller used. Blank
+ * entries are dropped rather than sent as empty strings — a clip with no
+ * speech has no line, which is not the same as a line that is empty.
+ */
+function spokenTextByAssetId(
+  assetIds: string[] | undefined,
+  spoken: string[] | undefined
+): Record<string, string> | undefined {
+  if (!assetIds?.length || !spoken?.length) return undefined
+  const out: Record<string, string> = {}
+  assetIds.forEach((id, i) => {
+    const text = spoken[i]?.trim()
+    if (id && text) out[id] = text
+  })
+  return Object.keys(out).length > 0 ? out : undefined
+}
+
 // Maps a video model id to its bundled prompting skill (frontmatter `name:`),
 // so guidance text points at a skill that actually exists. Deriving the name
 // via model.split('-')[0] produced 'slates-prompting-kling' / '...-veo', which
@@ -2352,6 +2382,7 @@ export const generateVideo: Operation<{
   videoReferenceAssetIds?: string[]
   videoReferenceSecondsEach?: number[]
   audioReferenceAssetIds?: string[]
+  audioReferenceSpokenText?: string[]
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
@@ -2414,6 +2445,9 @@ export const generateVideo: Operation<{
     ),
     audioReferenceAssetIds: z.array(z.string()).optional().describe(
       `Reference AUDIO clips (UUIDs or badge codes) read alongside the images and video — e.g. lip-sync a character to a line ("the character in image 1 speaks the dialogue from audio 1"). Cited as "audio 1", "audio 2"… in the order given. No billing surcharge (Seedance audio is included). ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')}`
+    ),
+    audioReferenceSpokenText: z.array(z.string()).optional().describe(
+      'STRONGLY RECOMMENDED whenever a reference clip contains SPEECH. Same order and length as audioReferenceAssetIds; use "" for a clip with no words (music, ambience, room tone). The model RE-TRANSCRIBES a supplied take rather than using it verbatim — a field test heard "an app called Slates" come back as "a map called Slates" — so the audio decides the VOICE, the ACCENT and the TIMING while only text decides the WORDS. Give the exact line here and it is quoted into the prompt beside the citation. Omit it and the words are a guess. Pairs with the plural audioReferenceAssetIds; the deprecated singular audioReferenceAssetId carries no text.'
     ),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
@@ -2578,6 +2612,23 @@ export const generateVideo: Operation<{
           requires_clarification: true,
           missing: [],
           message: `${input.model} takes at most ${maxTotal} reference files across all modalities (you passed ${refImages + refMedia}).`,
+        })
+      }
+      // A misaligned spoken-text array would attach one clip's line to another
+      // and send the model the wrong words with nothing on screen to say so.
+      // Refuse rather than truncate: the whole point of the field is that the
+      // WORDS are exact.
+      if (
+        input.audioReferenceSpokenText &&
+        input.audioReferenceSpokenText.length !== (input.audioReferenceAssetIds?.length ?? 0)
+      ) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message:
+            `audioReferenceSpokenText must be the same length as audioReferenceAssetIds ` +
+            `(${input.audioReferenceSpokenText.length} vs ${input.audioReferenceAssetIds?.length ?? 0}) ` +
+            `— it pairs by position. Use "" for a clip with no speech.`,
         })
       }
       // fal: "Audio cannot be the only reference input; provide at least one
@@ -2839,6 +2890,16 @@ export const generateVideo: Operation<{
       audioReferenceAssetId: input.audioReferenceAssetId,
       videoReferenceAssetIds: input.videoReferenceAssetIds,
       audioReferenceAssetIds: input.audioReferenceAssetIds,
+      // The route keys this by ASSET ID, not by position, because its own
+      // singular/plural merge appends to the END of the list — an index would
+      // mean different clips depending on which shape the caller used. The op
+      // takes the friendlier positional array and re-keys it here, AFTER
+      // `rids()` has resolved badge codes, so the keys are the ids the route
+      // will resolve. A blank entry is dropped rather than sent as "".
+      audioReferenceSpokenText: spokenTextByAssetId(
+        input.audioReferenceAssetIds,
+        input.audioReferenceSpokenText
+      ),
       sound: input.sound,
       audioLanguage: input.audioLanguage,
       generateMusic: input.generateMusic,
@@ -4432,6 +4493,35 @@ function resolveGuideTopic(topic: string): string | null {
   if (t === 'slates-character-turnaround' || t === 'character-turnaround') {
     return 'slates-character-identity'
   }
+  // ⚠️ Previs aliases sit HIGH, before the model-prefix rules below. `dialogue`
+  // already resolves to the Seed Audio guide, and `style`/`camera` words are a
+  // hair away from the style-prompting and model blocks — anchoring these here
+  // keeps a previs ask out of an audio guide.
+  if (
+    t === 'previs' ||
+    t === 'pre-vis' ||
+    t === 'previz' ||
+    t === 'blocking' ||
+    t === 'blockout' ||
+    t === 'greybox' ||
+    t === 'grey-box' ||
+    t === 'graybox' ||
+    t === 'blender'
+  ) {
+    return 'slates-previs-blocking'
+  }
+  if (t === 'camera' || t === 'camera-moves' || t === 'camera moves' || t === 'shot-list' || t === 'shot list') {
+    return 'slates-camera-language'
+  }
+  if (t === 'blocking-to-prompt' || t === 'previs-prompt' || t === 'reference-video' || t === 'video-to-video' || t === 'v2v') {
+    return 'slates-blocking-to-prompt'
+  }
+  if (t === 'dialogue-blocking' || t === 'dialogue blocking' || t === '180-rule' || t === 'eyelines' || t === 'seating') {
+    return 'slates-dialogue-blocking'
+  }
+  if (t === 'restyle' || t === 're-style' || t === 'style-swap' || t === 'style swap' || t === 'style-variants') {
+    return 'slates-restyle-from-blocking'
+  }
   if (
     t === 'model-selection' ||
     t === 'model selection' ||
@@ -4522,7 +4612,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
       .string()
       .min(1)
       .describe(
-        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-seed-audio, slates-prompting-elevenlabs, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
+        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-seed-audio, slates-prompting-elevenlabs, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Blender previs (3D-blocked camera control): slates-previs-blocking (start here), slates-camera-language, slates-blocking-to-prompt, slates-dialogue-blocking, slates-restyle-from-blocking. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
       ),
   }),
   async run(input) {
@@ -4540,9 +4630,181 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
   },
 }
 
+// ── Blender previs ──────────────────────────────────────────────
+//
+// The only ops that talk to a third transport: a localhost socket into a
+// running Blender carrying the Slates add-on. They exist to produce ONE
+// artifact — a grey-box blocking clip whose asset id goes straight into
+// `slates_generate_video`'s `videoReferenceAssetIds`, so the model renders a
+// world around a camera path instead of inventing one.
+//
+// 🚨 There is deliberately no camera-move library here. Camera work is written
+// as `bpy` by the agent through `slates_blender_execute`, against the Blender
+// API reference the add-on ships. A fixed menu of moves would cap the workflow
+// at whatever we thought of; code execution plus real docs does not.
+
+const BLENDER_UNAVAILABLE_HINT =
+  'Blender previs needs the Slates Blender add-on running. Install it from ' +
+  'https://slates.video/blender, then press N in the viewport, open the Slates ' +
+  'tab and click Start Bridge.'
+
+export const blenderStatus: Operation<Record<string, never>> = {
+  id: 'slates_blender_status',
+  description:
+    'Check whether a Blender running the Slates add-on is reachable, and if so return its scene summary (timing, camera, collection tree). Call this FIRST in any previs workflow — every other Blender op fails with the same setup message when the bridge is down, and knowing the frame range and fps up front is what keeps the blocking and the prompt timings in agreement.',
+  input: z.object({}),
+  async run() {
+    const client = new BlenderBridgeClient()
+    if (!(await client.isReachable())) {
+      return ok({ connected: false, hint: BLENDER_UNAVAILABLE_HINT })
+    }
+    return ok({ connected: true, scene: await client.call('result = _mod("scene").summary()') })
+  },
+}
+
+export const blenderExecute: Operation<{ code: string; timeoutSeconds?: number }> = {
+  id: 'slates_blender_execute',
+  description:
+    'Run Python (`bpy`) inside the connected Blender and return whatever the code assigns to a dict named `result`. This is how blocking gets built: primitives, empties, constraints, camera rigs, keyframes, markers. Anything Blender can do, this can do. Assign a dict to `result` to get data back (e.g. `result = {"camera": cam.name}`); print() output comes back separately as stdout. On an exception you get the full traceback — read it, fix the code, retry. Before writing an unfamiliar call, look up its real signature with slates_blender_docs rather than guessing: the add-on ships the Blender 5.1 API reference precisely so you do not have to recall it.',
+  input: z.object({
+    code: z
+      .string()
+      .min(1)
+      .describe('Python source. Assign a JSON-serialisable dict to `result` to return data.'),
+    timeoutSeconds: z
+      .number()
+      .int()
+      .min(5)
+      .max(900)
+      .optional()
+      .describe('How long to wait for Blender (default 60). Raise it for heavy geometry.'),
+  }),
+  async run(input) {
+    const client = new BlenderBridgeClient()
+    const { result, stdout, stderr } = await client.execute(input.code, {
+      timeoutMs: input.timeoutSeconds ? input.timeoutSeconds * 1000 : undefined,
+    })
+    return ok({ result, ...(stdout ? { stdout } : {}), ...(stderr ? { stderr } : {}) })
+  },
+}
+
+export const blenderScene: Operation<Record<string, never>> = {
+  id: 'slates_blender_scene',
+  description:
+    'Scene summary from the connected Blender: frame range, fps, duration, render resolution, the active camera with its keyframe times in both frames and seconds, and the full collection/object tree with transforms and constraints. Cheap — call it freely between edits. The camera keyframe times ARE the cut structure, so read them before writing any shot-by-shot prompt.',
+  input: z.object({}),
+  async run() {
+    return ok(await new BlenderBridgeClient().call('result = _mod("scene").summary()'))
+  },
+}
+
+export const blenderDocs: Operation<{ identifier: string }> = {
+  id: 'slates_blender_docs',
+  description:
+    'Look up a dotted Blender Python API identifier in the bundled 5.1 reference — e.g. "bpy.ops.object", "bpy.types.Camera", "bpy.types.FollowPathConstraint". Pass "*" for top-level modules or "bpy.ops.*" to list a namespace. Use this instead of recalling a signature from memory: invented operator names and wrong enum values are the most common way previs code fails, and they fail silently often enough to be worth the lookup.',
+  input: z.object({
+    identifier: z.string().min(1).describe('Dotted identifier, or a namespace wildcard like "bpy.ops.*".'),
+  }),
+  async run(input) {
+    const code = `result = _mod("docs").lookup(${JSON.stringify(input.identifier)})`
+    return ok(await new BlenderBridgeClient().call(code))
+  },
+}
+
+export const blenderSearchDocs: Operation<{
+  query: string
+  scope?: 'api' | 'manual'
+  maxResults?: number
+}> = {
+  id: 'slates_blender_search_docs',
+  description:
+    'Full-text search of the bundled Blender documentation for when you do not know the identifier yet. scope "api" searches the Python reference; "manual" searches the user manual for concepts and workflow ("how does Follow Path work", "bezier interpolation handles"). Use slates_blender_docs when you know the name and this when you do not.',
+  input: z.object({
+    query: z.string().min(2),
+    scope: z.enum(['api', 'manual']).optional().describe('Default "api".'),
+    maxResults: z.number().int().min(1).max(20).optional().describe('Default 8.'),
+  }),
+  async run(input) {
+    const args = [
+      JSON.stringify(input.query),
+      JSON.stringify(input.scope ?? 'api'),
+      String(input.maxResults ?? 8),
+    ].join(', ')
+    return ok(await new BlenderBridgeClient().call(`result = _mod("docs").search(${args})`))
+  },
+}
+
+export const blenderRenderBlocking: Operation<{
+  projectId?: string
+  resolutionX?: number
+  resolutionY?: number
+  fps?: number
+  frameStart?: number
+  frameEnd?: number
+  basename?: string
+}> = {
+  id: 'slates_blender_render_blocking',
+  description:
+    "Render the connected Blender scene camera to a grey-box mp4 — the blocking clip that locks camera motion for generation — and, when projectId is given, import it into that Slates project as a video asset in the same call. The returned asset id goes into slates_generate_video's videoReferenceAssetIds and the returned durationSeconds into videoReferenceSecondsEach. Renders through the SCENE camera using scene render settings, never the user's viewport, so output does not depend on where they left their mouse. Untextured is correct: the clip supplies camera path and timing, the references supply the look. Keep it at or under 30s — seedance-2.5 accepts reference videos up to 30s, the other reference-video models up to 15s.",
+  input: z.object({
+    projectId: z
+      .string()
+      .uuid()
+      .optional()
+      .describe('Import the clip into this project and return its asset. Omit to just get a file path.'),
+    resolutionX: z.number().int().min(256).max(4096).optional().describe('Default 1920.'),
+    resolutionY: z.number().int().min(256).max(4096).optional().describe('Default 1080.'),
+    fps: z.number().int().min(1).max(120).optional().describe('Default 24. Match what the shot list assumes.'),
+    frameStart: z.number().int().optional().describe("Default: the scene's own frame_start."),
+    frameEnd: z.number().int().optional().describe("Default: the scene's own frame_end."),
+    basename: z.string().min(1).max(64).optional().describe('Filename stem. Default "blocking".'),
+  }),
+  async run(input, ctx) {
+    const kwargs: string[] = []
+    if (input.resolutionX !== undefined) kwargs.push(`resolution_x=${input.resolutionX}`)
+    if (input.resolutionY !== undefined) kwargs.push(`resolution_y=${input.resolutionY}`)
+    if (input.fps !== undefined) kwargs.push(`fps=${input.fps}`)
+    if (input.frameStart !== undefined) kwargs.push(`frame_start=${input.frameStart}`)
+    if (input.frameEnd !== undefined) kwargs.push(`frame_end=${input.frameEnd}`)
+    if (input.basename !== undefined) kwargs.push(`basename=${JSON.stringify(input.basename)}`)
+
+    const render = (await new BlenderBridgeClient().call(
+      `result = _mod("previs").render_blocking(${kwargs.join(', ')})`,
+      { timeoutMs: RENDER_TIMEOUT_MS }
+    )) as { filePath: string; durationSeconds: number }
+
+    if (!input.projectId) {
+      return ok({
+        ...render,
+        next: 'Pass projectId to import this into a Slates project, or call slates_upload_reference_image with type "video".',
+      })
+    }
+
+    // The same desktop route slates_upload_reference_image uses — the file is
+    // probed on ingest, so duration and dimensions are known immediately.
+    const uploaded = await ctx.desktop().post<{ asset: unknown }>('/agent/assets/upload', {
+      projectId: input.projectId,
+      filePath: render.filePath,
+      type: 'video',
+    })
+
+    return ok({
+      ...render,
+      asset: (uploaded as { asset?: unknown }).asset ?? uploaded,
+      next: "Pass the asset's id in slates_generate_video videoReferenceAssetIds, with videoReferenceSecondsEach set to durationSeconds.",
+    })
+  },
+}
+
 // ── Aggregation ─────────────────────────────────────────────────
 
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
+  blenderStatus as unknown as Operation<unknown>,
+  blenderExecute as unknown as Operation<unknown>,
+  blenderScene as unknown as Operation<unknown>,
+  blenderDocs as unknown as Operation<unknown>,
+  blenderSearchDocs as unknown as Operation<unknown>,
+  blenderRenderBlocking as unknown as Operation<unknown>,
   getWorkspaceState as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,

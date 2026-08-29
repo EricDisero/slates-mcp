@@ -58,6 +58,24 @@ export interface ReferenceGroup {
   kind: ReferenceKind
   /** A group can carry several images for workflows that genuinely need them. */
   media: ReferenceMedia[]
+  /**
+   * What is SAID in this group's reference audio, typed by the user.
+   * `audio-ref` groups only; every other kind ignores it.
+   *
+   * 🚨 THE MODEL RE-TRANSCRIBES REFERENCE AUDIO AND GUESSES THE WORDS.
+   * Seedance does not consume a supplied take verbatim — it re-synthesises
+   * something very close to it, and a field test on 2026-08-28 heard "an app
+   * called Slates" come back as "a map called Slates". The audio carries the
+   * voice, the accent and the timing; only TEXT carries the words. Composing
+   * this line is the whole fix, and every user who attached a voice take since
+   * v1.5.2 was exposed to silent mistranscription without it.
+   *
+   * It is USER-AUTHORED and optional. Nothing transcribes the clip and fills
+   * this in: a second model in the request path silently rewriting the prompt
+   * is exactly what the prompt-transparency invariant forbids. An empty value
+   * composes byte-identically to before this field existed.
+   */
+  spokenText?: string
 }
 
 export interface ComposedReferences {
@@ -274,12 +292,23 @@ export function composeReferences(
     }
   }
 
-  // Reference audio ("Audio 1 is a provided reference.").
+  // Reference audio ("Audio 1 is a provided reference."), plus THE WORDS when
+  // the user has typed them — see ReferenceGroup.spokenText for why the words
+  // have to travel as text as well as audio.
   for (const g of numbered) {
     if (g.kind === 'audio-ref' && g.audioNums.length > 0) {
       const noun = g.audioNums.length === 1 ? 'Audio' : 'Audios'
       const tail = g.audioNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
       topKeys.push(`${noun} ${joinNums(g.audioNums)} ${tail}`)
+      // Trimmed, never rewritten: the words between the quotes are the user's
+      // exactly as typed. The delimiters are CURLY on purpose — a straight
+      // quote inside the user's own line then sits beside them without
+      // colliding, so nothing has to be escaped and nothing is edited.
+      const spoken = (g.spokenText ?? '').trim()
+      if (spoken) {
+        const lower = g.audioNums.length === 1 ? 'audio' : 'audios'
+        topKeys.push(`The words spoken in ${lower} ${joinNums(g.audioNums)} are exactly: “${spoken}”`)
+      }
     }
   }
 
@@ -345,6 +374,86 @@ export function composeReferences(
     orderedAudioPaths,
     unresolvedTokens,
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Seed Audio VOICE transport adapter
+// ═══════════════════════════════════════════════════════════════
+
+/** One character's voice sample, in the order it is attached. */
+export interface VoiceCitation {
+  /**
+   * The mention this voice answers to — '@sarah', or null when the character
+   * is attached without being mentioned.
+   *
+   * Matched through `normToken`, so '@Big Red', '@big_red' and '@big-red' are
+   * the same token. It is therefore NOT guaranteed byte-equal to what the
+   * prompt authored: the desktop builds it from the character's NAME while the
+   * agent passes the token as typed, and both resolve identically. Do not echo
+   * it back to a user as "what they wrote".
+   */
+  token: string | null
+  /** 'Sarah' — the character's name, used verbatim. */
+  name: string
+}
+
+/**
+ * Translate `@character` mentions into Seed Audio's OWN `@AudioN` notation.
+ *
+ * 🚨 AN ADAPTER, NOT A SECOND COMPOSER — the same relationship
+ * `composeKlingEdit` has to `composeReferences`. Seed Audio does not read
+ * "audio 1"; it reads `@Audio1`-`@Audio3`, and a clip the prompt never cites is
+ * a clip the model ignores. Attaching a voice without citing it would be the
+ * silent-drop failure this repo catalogues by name: attach the reference, get
+ * no error, get no warning, and get a request that does nothing with it.
+ *
+ * It emits the SAME grammar the image composer uses — the first mention
+ * becomes `Sarah (@Audio1)`, later ones stay `Sarah` — so the NAME still
+ * carries the identity and the citation carries the slot. A voice that is
+ * attached but never mentioned gets one short key line instead, exactly as an
+ * unmentioned character's image does.
+ *
+ * Everything else is left as authored: an `@token` that is not one of these
+ * voices is not ours to touch.
+ *
+ * A `null` slot means "this position is a clip the caller cites itself" — it
+ * holds its @AudioN number and is otherwise ignored.
+ */
+export function composeVoiceCitations(
+  rawPrompt: string,
+  voices: Array<VoiceCitation | null>
+): string {
+  if (voices.length === 0) return rawPrompt
+
+  const byNorm = new Map<string, { n: number; name: string }>()
+  voices.forEach((v, i) => {
+    if (v?.token) byNorm.set(normToken(v.token), { n: i + 1, name: v.name })
+  })
+
+  const seen = new Set<string>()
+  const body = rawPrompt.replace(/@([\w-]+)/g, (full, tok: string) => {
+    const key = normToken(`@${tok}`)
+    const v = byNorm.get(key)
+    if (!v) return full
+    if (seen.has(key)) return v.name
+    seen.add(key)
+    return `${v.name} (@Audio${v.n})`
+  })
+
+  const keys: string[] = []
+  voices.forEach((v, i) => {
+    // A null slot is a clip the CALLER already cited itself (the agent route
+    // passes its own `audioReferenceAssetIds` this way). It still occupies its
+    // @AudioN position — renumbering would repoint every citation a published
+    // CLI build wrote — but it is not ours to name.
+    if (!v) return
+    if (v.token && seen.has(normToken(v.token))) return
+    keys.push(`${v.name} is @Audio${i + 1}.`)
+  })
+  if (keys.length === 0) return body
+
+  const trimmed = body.trim()
+  return trimmed ? `${keys.join(' ')}\n\n${trimmed}` : keys.join(' ')
 }
 
 // ═══════════════════════════════════════════════════════════════
