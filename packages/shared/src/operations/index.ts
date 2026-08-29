@@ -13,7 +13,7 @@
 import { z } from 'zod'
 import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from '../clients/cloud.js'
 import { SlatesDesktopClient } from '../clients/desktop.js'
-import { BlenderBridgeClient, RENDER_TIMEOUT_MS } from '../clients/blender.js'
+import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
@@ -4643,10 +4643,9 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
 // API reference the add-on ships. A fixed menu of moves would cap the workflow
 // at whatever we thought of; code execution plus real docs does not.
 
-const BLENDER_UNAVAILABLE_HINT =
-  'Blender previs needs the Slates Blender add-on running. Install it from ' +
-  'https://slates.video/blender, then press N in the viewport, open the Slates ' +
-  'tab and click Start Bridge.'
+// The setup sentence and the download URL live in `clients/blender.ts`, beside
+// the port range they belong to — one home, so a moved page is one edit.
+const BLENDER_UNAVAILABLE_HINT = `Blender previs needs the Slates Blender add-on running. ${BLENDER_SETUP_HINT}`
 
 export const blenderStatus: Operation<Record<string, never>> = {
   id: 'slates_blender_status',
@@ -4799,12 +4798,6 @@ export const blenderRenderBlocking: Operation<{
 // ── Aggregation ─────────────────────────────────────────────────
 
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
-  blenderStatus as unknown as Operation<unknown>,
-  blenderExecute as unknown as Operation<unknown>,
-  blenderScene as unknown as Operation<unknown>,
-  blenderDocs as unknown as Operation<unknown>,
-  blenderSearchDocs as unknown as Operation<unknown>,
-  blenderRenderBlocking as unknown as Operation<unknown>,
   getWorkspaceState as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
@@ -4881,4 +4874,17 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   batchUpdateFrames as unknown as Operation<unknown>,
   deleteFrame as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
+  // ── Blender previs, LAST and deliberately ────────────────────────────
+  // This order is not cosmetic: `slate/src/main/studio-agent/ops.ts` maps this
+  // array straight into the Anthropic `tools` array, and that block sits inside
+  // the desktop Studio Agent's PROMPT-CACHED PREFIX. These six landed at the
+  // TOP, which put a third transport nobody without Blender can reach ahead of
+  // `slates_get_workspace_state` in every conversation the app has. They are a
+  // niche lane off the end of the surface, and the list should read that way.
+  blenderStatus as unknown as Operation<unknown>,
+  blenderExecute as unknown as Operation<unknown>,
+  blenderScene as unknown as Operation<unknown>,
+  blenderDocs as unknown as Operation<unknown>,
+  blenderSearchDocs as unknown as Operation<unknown>,
+  blenderRenderBlocking as unknown as Operation<unknown>,
 ]

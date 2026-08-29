@@ -29,11 +29,27 @@ export const RENDER_TIMEOUT_MS = 15 * 60_000
 
 const CONNECT_TIMEOUT_MS = 1_500
 
+/**
+ * Where the add-on comes from, and how to switch it on. ONE string.
+ *
+ * 🚨 IT WAS TWO, AND THAT IS ALWAYS A DRIFT. The op layer had its own
+ * differently-worded copy naming the same URL, so a moved download page or a
+ * renamed panel button would have had to be found in two files by someone who
+ * remembered both existed. Same fact, same sentence, one home.
+ *
+ * ⚠️ `slates.video/blender` DOES NOT EXIST YET. The page is one of three
+ * prerequisites for publishing the `slates_blender_*` ops — see the DO NOT
+ * PUBLISH note in this repo's `CLAUDE.md`. Until it ships, this string is a
+ * documented 404 at the end of every "Blender isn't running" message.
+ */
+export const BLENDER_SETUP_HINT =
+  'Install the Slates add-on from https://slates.video/blender, then in the 3D ' +
+  'viewport sidebar (press N) open the Slates tab and click Start Bridge.'
+
 const NOT_RUNNING_MESSAGE =
   'No Blender with the Slates add-on is listening on ' +
   `${HOST}:${BASE_PORT}-${BASE_PORT + PORT_FALLBACKS}. ` +
-  'Open Blender, then in the 3D viewport sidebar (press N) open the Slates tab ' +
-  'and click Start Bridge. Add-on: https://slates.video/blender'
+  BLENDER_SETUP_HINT
 
 export class BlenderNotRunningError extends Error {
   constructor() {
