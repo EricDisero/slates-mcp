@@ -94,6 +94,14 @@ ACTING TASK — <character>
 
 That safety line is not filler. Dead eyes are the characteristic failure of generated faces in dialogue, and naming it is what prevents it.
 
+### Split any strong emotion into phases
+
+The other characteristic failure is a face that strikes one extreme expression and holds it for the whole shot — a mouth stuck open for three seconds. Give the beat two phases with a hinge, and name the failure you are excluding:
+
+> PHASE 1 (17.3-18.6s) — she SCREAMS at him, mouth wide, eyes huge, hand clamped on the grab handle. PHASE 2 (18.6-19.9s) — the scream breaks off: she shuts her eyes tight and CLOSES her mouth, both hands now on the handle, head ducked, braced. Scream, then brace — never one frozen open mouth held through the whole shot.
+
+The hinge timestamp is what makes it a performance instead of a pose.
+
 ### Dialogue must not restructure the edit
 
 Both of these, verbatim, every time:
@@ -118,6 +126,7 @@ Dialogue directed as separate layers (voices, scene sound, score) is **minimax-h
 - [ ] Presence rule present
 - [ ] Ongoing business, background life and scene event all specified
 - [ ] Acting task per character, safety line included
+- [ ] Any strong emotion split into phases with a hinge timestamp
 - [ ] Dialogue-never-creates-shots and off-screen-voices rules present
 
 ## Related

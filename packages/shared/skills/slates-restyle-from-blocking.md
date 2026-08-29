@@ -72,6 +72,10 @@ identical in every shot where it appears:
 
 Then tag every beat: `SHOT 9 — 7.79-9.33s — LOCKED, LOC-B: <description>`.
 
+**On a piece that visits many places, make the map absolute and countable** — otherwise the model reuses a room it liked and you get the same interior three times:
+
+> The location map is absolute — SEVEN locations, each appearing EXACTLY ONCE, in this exact order: 1) yard 00:00-00:03.3 … 7) rooftop 00:20-00:30. No location ever appears twice, and the three interiors are three COMPLETELY DIFFERENT rooms — different walls, furniture, people and light — never the same room repeated.
+
 ## Style references
 
 A style reference is **not a keyframe**, and saying so prevents the model reproducing its composition as a shot:
@@ -107,7 +111,7 @@ Quote the whole set before firing — `slates_estimate_generation_cost` per styl
 - [ ] Every timestamp and shot count identical to style 1
 - [ ] Dummy mapping written for this style's cast
 - [ ] Style reference declared as style-only, or none used
-- [ ] Location labels reused
+- [ ] Location labels reused; on a travelling piece the map is absolute and countable
 - [ ] Acting-inside-existing-shots clause present
 - [ ] HOLD block copied verbatim
 - [ ] Cost quoted and confirmed
