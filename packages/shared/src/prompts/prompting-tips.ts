@@ -62,6 +62,7 @@ export type PromptingTipsKey =
   | 'omni-flash'
   | 'omni-flash-edit'
   | 'minimax-h3'
+  | 'ltx-2-5'
   | 'nano-banana'
   | 'nano-banana-lite'
   | 'seed-audio'
@@ -694,6 +695,71 @@ const MINIMAX_H3: PromptingTipsEntry = {
   ],
 }
 
+const LTX_2_5: PromptingTipsEntry = {
+  label: 'LTX-2.5',
+  intro: [
+    'LTX-2.5 scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE, not the last. Lightricks ranks the six parts of a prompt in this order: sound, camera, character detail, shot type and scene, then scene dressing — and scene dressing is the first thing to cut when a prompt sprawls. Everything goes in ONE flowing paragraph, not a list of labelled sections.',
+    'Two seats. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest native 1080p second in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Anchor every sound to something in frame',
+        example: 'the rope creaks against the cleat, gulls somewhere off the port bow',
+        note: 'Write the audio line last, then check each cue has a visible or at least locatable source. Anything unanchored gets invented for you. "Not visible but locatable" passes — a whistle is fine if you name the marshal post it comes from.',
+        critical: true,
+      },
+      {
+        heading: 'Never write mood words for sound',
+        example: 'Bad: "tense atmosphere, sense of dread"\nGood: "a loose shutter knocks twice against the frame"',
+        note: 'Atmosphere adjectives produce nothing. If a scene feels thin, add one more MOVING OBJECT with a sound attached to it rather than another adjective.',
+      },
+      {
+        heading: 'Dialogue takes quotes, language and accent',
+        example: '"We should not have come back," in English with a slight German accent.',
+        note: 'Give the character a beat of stillness before they speak so the lip sync has something to lock against. Describe the beat: looks, waits, speaks, looks away.',
+      },
+      {
+        heading: 'Emotion is physical, not abstract',
+        example: 'Bad: "she looks anxious"\nGood: "her jaw sets, she turns the ring on her finger twice"',
+        note: 'The model renders actions, not adjectives. Tension in the jaw, weight shifts, fidgeting hands — these read; "anxious" does not.',
+      },
+    ],
+    [
+      {
+        heading: 'Multishot: two to four shots, and re-establish at every cut',
+        example: 'wide establishing shot — hard cut — macro close-up — match cut — medium shot',
+        note: 'One generation can carry several connected shots holding character, light and voice across the cuts. Name the edit ("hard cut", "dissolve") in the prose, then RESET scale, angle, lens and light. Two to four is the working range.',
+        critical: true,
+      },
+      {
+        heading: 'Re-identify characters at every cut',
+        example: 'Good: "the woman in the bronze gown"\nBad: "she"',
+        note: 'Pronouns lose the character across a cut. Repeat the original descriptor every time. Also state what the SOUND does at the cut — silence is not assumed.',
+      },
+      {
+        heading: 'Write the camera into the sentence',
+        example: 'a slow push-in settles as she reaches the door, then holds',
+        note: 'Slates does not expose the camera_motion enum, and prose is the better tool anyway: a written move can be tied to a specific moment, an enum value cannot. Name lens, framing and the moment the move resolves.',
+      },
+      {
+        heading: 'Durations are even numbers only, from six',
+        note: '6, 8, 10, 12, 14, 16, 18 or 20 seconds — there is no 5s or 7s LTX clip. And the long end is 1080p-and-below only: at 1440p and 4K the ceiling drops to 10s. Slates always sends an explicit length rather than letting the model pick one, so what you choose is what you are billed for.',
+        critical: true,
+      },
+      {
+        heading: 'Do not ask for text on screen',
+        note: 'Neither the spelling nor its stability frame to frame can be relied on. Signage, labels and captions belong in post.',
+      },
+    ],
+  ],
+  footer: [
+    'Frames, not references. LTX takes a start frame and an optional end frame (which generates a transition between the two) — it has no reference endpoint at all, so identity, style and environment reference images are not available on this model. For character consistency across separate shots, use MiniMax H3 or Kling.',
+    'Aspect ratios are 16:9 and 9:16 only, and native audio is included free at every resolution — there is no sound surcharge on either seat.',
+    'In image-to-video, do not cut away from the opening frame too early: you have paid for that frame, so let it play before the first move.',
+  ],
+}
+
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   'seedance-2-5': SEEDANCE_25,
@@ -704,6 +770,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'omni-flash': OMNI_FLASH,
   'omni-flash-edit': OMNI_FLASH_EDIT,
   'minimax-h3': MINIMAX_H3,
+  'ltx-2-5': LTX_2_5,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
   'seed-audio': SEED_AUDIO,

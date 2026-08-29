@@ -58,8 +58,20 @@ export type AspectRatio =
  * and prices between 480p and 2K ($0.060/s vs 720p Seedance's $0.15/s — a
  * different tier of a different model, not a rename); 2K is H3's upscaled tier.
  * Aliasing either onto 720p/1080p would build a cost key that does not exist.
+ *
+ * 🚨 `1440p` entered with LTX-2.5 (2026-08-29) and is likewise NOT an alias —
+ * specifically it is NOT `2k`, despite both being ~1440 lines tall. `2k` is
+ * H3's UPSCALED tier ($0.130/s, an H3-Regenerate-2K pass over a 768p base);
+ * `1440p` is LTX's NATIVELY GENERATED tier ($0.190/s). Different models,
+ * different mechanisms, different prices, and `ltx-2-5-2k-6s` is a key that
+ * exists nowhere. Co-height is not sameness.
+ *
+ * ⚠️ Our `4k` is LTX's `2160p` ON THE WIRE. fal's enum literal for that tier is
+ * `2160p` while its own pricing copy calls it "4K". `4k` stays the token here
+ * because it is what every cost key, `is4kVideoKey` and the Pro gate already
+ * speak; the handler translates at the request boundary.
  */
-export type VideoResolution = '480p' | '720p' | '768p' | '1080p' | '2k' | '4k'
+export type VideoResolution = '480p' | '720p' | '768p' | '1080p' | '1440p' | '2k' | '4k'
 
 /**
  * The full ten, in display order. `9:21` was in the MCP op's enum and in NO
@@ -110,6 +122,19 @@ const SEEDANCE_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:
  *     is not an AspectRatio in this vocabulary.
  */
 const MINIMAX_H3_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
+
+/**
+ * LTX-2.5, all four integrated endpoints: TWO. Read off fal's live OpenAPI
+ * 2026-08-29 — `text-to-video/{fast,pro}` declare exactly `['16:9','9:16']`,
+ * the narrowest video set in the roster alongside Veo-on-fal.
+ *
+ * `image-to-video/{fast,pro}` additionally offer `auto` (follow the start
+ * frame). We never send it and it is not an `AspectRatio` in this vocabulary —
+ * identical treatment to H3's `adaptive`, and for the identical reason: the
+ * composer always holds an explicit ratio, so `auto` would only ever be a way
+ * to lose track of what was actually generated.
+ */
+const LTX_2_5_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
 
@@ -473,6 +498,90 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // `seedance-2.5-edit` shipped with. Absent means the composer refuses.
   },
 
+  // ── LTX-2.5 (both seats on fal — added 2026-08-29) ─────────────────────────
+  //
+  // Every value below is READ OFF fal's live OpenAPI, fetched 2026-08-29:
+  //   lightricks/ltx-2.5/{text-to-video,image-to-video}/{fast,pro}
+  // Note the owner namespace — no `fal-ai/` prefix, exactly like `minimax/h3/`.
+  //
+  // 🚨 SAME PREFIX COLLISION AS THE MINIMAX PAIR, AND IT IS WORSE HERE.
+  // `ltx-2-5-pro` starts with `ltx-2-5`, so ANY `startsWith('ltx-2-5')` swallows
+  // the Pro row into the Fast row's branch — a shorter ladder, a shorter
+  // duration list AND a 31-33% higher price at both tiers they share. Every
+  // lookup downstream is an exact-id map, never a prefix test.
+  //
+  // 🚨 THE CHEAP ROW IS THE ONE WITH THE LONGER REACH. Counter to how every
+  // other Fast/Pro pair in this file behaves, `ltx-2-5` (the distilled 8-step
+  // build) reaches 1440p, 4K and 20s while `ltx-2-5-pro` (full diffusion) stops
+  // at 1080p and 10s. Pro buys fidelity on a NARROWER ladder. Do not "fix" this
+  // by assuming Pro is a superset — it is not, on either axis.
+  //
+  // ⛔ `audio-to-video/{fast,pro}` EXIST AND ARE DELIBERATELY ABSENT from this
+  // file. They carry no `resolution` and no `duration` parameter at all: output
+  // length is dictated by the uploaded audio, so they bill per second of INPUT
+  // while every credit key we own bills OUTPUT. That is a billing-SHAPE change,
+  // not a missing row. See slates-api/PRICING.md.
+
+  'ltx-2-5': {
+    aspectRatios: LTX_2_5_ASPECT_RATIOS,
+    // Full ladder, all four tiers NATIVELY generated (no upscale pass anywhere
+    // — the contrast with H3's 2K/4K is the whole reason `1440p` is its own
+    // token). DEFAULT 1080p, which is also fal's own schema default: unusually
+    // for this file the default tier is not the floor. It is the cheapest
+    // native 1080p second in the roster at $0.130/s.
+    videoResolution: { options: ['720p', '1080p', '1440p', '4k'], default: '1080p' },
+    // 🚨 DISCRETE AND EVEN-ONLY. There is NO 5s LTX clip and no odd duration of
+    // any length — fal's enum is literally [6,8,10,12,14,16,18,20]. A
+    // `{ min: 6, max: 20, mode: 'continuous' }` here would offer 7s in the
+    // composer, quote a `ltx-2-5-1080p-7s` key that exists on no server, and
+    // fail at the proxy after the user had already chosen it.
+    //
+    // The evenness is also what makes all 28 cost keys round exactly (every
+    // basis is a multiple of CENTS_PER_CREDIT=3) — see PRICING.md. If fal ever
+    // admits odd seconds, the rounding proof must be re-verified.
+    duration: {
+      min: 6,
+      max: 20,
+      mode: 'discrete',
+      values: [6, 8, 10, 12, 14, 16, 18, 20],
+      // fal: "At 720p and 1080p, 24 or 25 FPS supports up to 20 seconds […] At
+      // 1440p and 2160p, all frame rates support up to 10 seconds."
+      //
+      // ⚠️ THE REAL CEILING IS A FUNCTION OF RESOLUTION *AND* FPS, and this
+      // field can only express the resolution half. It is correct ONLY because
+      // we pin fps to fal's default of 25 and never expose the control. If fps
+      // is ever exposed, 48/50 drops the 720p/1080p ceiling to 10s too, and
+      // that needs a second override axis — not a wider window here.
+      resolutionOverrides: {
+        '1440p': { min: 6, max: 10, mode: 'discrete', values: [6, 8, 10] },
+        '4k': { min: 6, max: 10, mode: 'discrete', values: [6, 8, 10] },
+      },
+    },
+    // NO reference caps of any kind, deliberately. fal publishes text-to-video
+    // and image-to-video for LTX and NOTHING else — there is no
+    // `reference-to-video` endpoint, so there is no transport for an ingredient
+    // or a multimodal reference, and a cap declared above what the handler
+    // sends is a SILENT DROP (the failure `seedance-2.5-edit` shipped with).
+    // The start/end frames i2v does carry are FRAME SLOTS, not references, and
+    // live in MODEL_REGISTRY.features.lastFrame — not here.
+  },
+
+  'ltx-2-5-pro': {
+    aspectRatios: LTX_2_5_ASPECT_RATIOS,
+    // 720p/1080p ONLY. Declaring the shorter ladder here IS the whole Pro-seat
+    // mechanism: `assertVideoCapabilities` refuses 1440p/4K on this id, the
+    // desktop picker renders only what this entry declares, and the agent's Zod
+    // enum stays the union while the per-model guard narrows. Anything shaped
+    // like "hide the top tiers when Pro is selected" re-implements a guard that
+    // already exists.
+    videoResolution: { options: ['720p', '1080p'], default: '1080p' },
+    // Three values, full stop — fal's enum is [6,8,10] on both Pro endpoints,
+    // with no resolution override needed because the ceiling is already 10s at
+    // both tiers this row reaches.
+    duration: { min: 6, max: 10, mode: 'discrete', values: [6, 8, 10] },
+    // No reference caps — same reasoning as the Fast row above.
+  },
+
   // ── Audio ──────────────────────────────────────────────────────────────────
   //
   // `aspectRatios: []` is deliberate, not an oversight: audio has no frame, and
@@ -570,8 +679,10 @@ export function aspectRatioUnion(models: readonly string[], provider?: string): 
 /** Union of every resolution the given models accept. */
 export function videoResolutionUnion(models: readonly string[]): VideoResolution[] {
   // Ascending by output height, so an enum reads as a ladder. 768p sits between
-  // 720p and 1080p; 2k (≈2560×1440) between 1080p and 4k.
-  const order: VideoResolution[] = ['480p', '720p', '768p', '1080p', '2k', '4k']
+  // 720p and 1080p; 1440p and 2k (≈2560×1440) are CO-HEIGHT and sit together
+  // between 1080p and 4k — their relative order here is cosmetic, because no
+  // model declares both (1440p is LTX-only, 2k is H3-only).
+  const order: VideoResolution[] = ['480p', '720p', '768p', '1080p', '1440p', '2k', '4k']
   const seen = new Set<VideoResolution>()
   for (const m of models) for (const r of videoResolutionsFor(m)) seen.add(r)
   return order.filter((r) => seen.has(r))

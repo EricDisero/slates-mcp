@@ -289,6 +289,25 @@ export const MODEL_FACTS: ModelFact[] = [
       'THE SPEED SEAT, and the EXPENSIVE one at the tier they share — never the cheap H3 and never the default. fal\'s own post-train of the open H3 weights, self-hosted. 🚨 MEASURED 2026-08-27, same prompt and params on both rows: a 5s 768p text-to-video took **4.8 seconds** on Max against **57 seconds** on base H3 — **about 12x faster**, queue to finished file. That is the seat\'s whole case and it is now our own number, not fal\'s (fal claims under 3s; the literal claim did not hold at 4.8s wall-clock, the order of magnitude did). It also carries a thin quality edge on the with-audio Arena boards (1,204 vs 1,184 image-to-video, 1,235 vs 1,226 text-to-video — real, but 20 and 9 ELO, and vendor-reported). It gives up everything above 768p (no 2K, no 4K — the upscaler is not in the open weights). 🚨 FRAMES ARE UNAFFECTED — it takes a start frame and an end frame exactly like base H3, on `minimax/h3-max/image-to-video`, which is the route the image-to-video Arena score above is measured on. What it lacks is the REFERENCE endpoint (`minimax/h3-max/reference-to-video` 404s), so the omni-reference set — up to 9 identity/style/environment images plus reference video and audio — is base-H3 only. Never describe this row as taking no image input: an image-to-video shot is one of the two things it is FOR. It costs $0.080/s at 768p against base H3\'s $0.060/s: 33% more for a shorter ladder. So route here when a fast turnaround on a 480p/768p text-to-video or start-frame shot is worth the premium, and to base H3 for resolution, references, or the same tier cheaper. Same native audio, same 5-15s window, same six aspect ratios.',
   },
   {
+    id: 'ltx-2-5',
+    label: 'LTX-2.5',
+    kind: 'video',
+    // No reference caps: fal publishes text-to-video and image-to-video for LTX
+    // and no reference endpoint at all, so `caps()` returns nulls and the
+    // composer refuses references. Start/end FRAMES are unaffected.
+    ...caps('ltx-2-5'),
+    notes:
+      'THE VOLUME SEAT — the cheapest native 1080p second in the catalogue at $0.130/s, and the row to reach for when the job is MANY takes rather than one hero shot. Native synchronised audio is INCLUDED FREE at every tier (no audio surcharge and no audio toggle in the price, unlike Kling where sound is a paid key dimension), so a 6s 1080p clip WITH sound is 39 credits. Two more things only this row gives you: it is the ONLY model that reaches 1440p, and it makes the LONGEST clips in the catalogue — up to 20 SECONDS at 720p and 1080p, against H3\'s 15 and Veo\'s 8. 🚨 DURATIONS ARE EVEN NUMBERS ONLY AND START AT SIX: 6, 8, 10, 12, 14, 16, 18, 20. There is no 5-second LTX clip and no odd duration of any length — asking for 5s or 7s is not a rounding matter, the key does not exist. 🚨 AND THE LONG END IS 1080p-ONLY: at 1440p and 4K the ceiling drops to 10s (6, 8 or 10). VIDEO-ONLY. Aspect ratios are 16:9 and 9:16 ONLY — the narrowest set in the catalogue alongside Veo, so any squarish or vertical-portrait framing has to go elsewhere. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video, or image-to-video from a start frame plus an OPTIONAL end frame (which generates a transition between the two). There is no reference-to-video endpoint, so no identity/style/element images, no reference video, no reference audio — for character consistency across shots use H3 or Kling. 4K is Pro-only (the server returns PRO_REQUIRED for a base account); 720p, 1080p and 1440p are open to every tier. Route here for: batch coverage, long takes, cheap 1080p with sound, and anything where the credit budget is the binding constraint.',
+  },
+  {
+    id: 'ltx-2-5-pro',
+    label: 'LTX-2.5 Pro',
+    kind: 'video',
+    ...caps('ltx-2-5-pro'),
+    notes:
+      'THE FIDELITY SEAT of the LTX pair — the full diffusion build ("Diffusion Fidelity Rendering", which spends more compute on complex scenes) against the distilled 8-step build the base row runs. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, AND THAT IS THE OPPOSITE OF EVERY OTHER PRO SEAT IN THIS CATALOGUE. Pro reaches a SHORTER ladder and makes SHORTER clips: 720p and 1080p only (no 1440p, no 4K) and 6, 8 or 10 seconds only (no 12-20). It also costs 33% more at 720p and 31% more at 1080p — $0.120/s and $0.170/s against $0.090 and $0.130. So Pro buys picture quality on a NARROWER envelope, and reaching for it because the name says Pro will cost more AND take away the reach. Everything else matches the base row exactly: same 16:9/9:16 pair, same free native synced audio at both tiers, same even-numbered durations, same frames-not-references input model (start frame plus optional end frame, no reference endpoint). Route here only when a specific shot needs the fidelity and fits inside 1080p and 10 seconds; route to base LTX for reach, length, 1440p/4K, and volume.',
+  },
+  {
     id: 'seed-audio',
     label: 'Seed Audio 1.0',
     kind: 'audio',
