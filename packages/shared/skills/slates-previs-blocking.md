@@ -11,7 +11,7 @@ The spine of the whole workflow. Read this first; the other four previs skills a
 
 A text prompt asks the model to *invent* camera motion, so it invents differently every roll. You cannot iterate on a variable you do not control, so you re-roll and pay again.
 
-A **reference video** removes the invention. You build the shot in Blender as untextured grey boxes — free, instant, deterministic — render the camera's path to mp4, and hand the model that clip alongside the prompt. **Blender locks the motion; the model builds the world.** Iteration moves to the free half, and the paid half usually lands first try.
+A **reference video** removes the invention. You build the shot in Blender as untextured proxies — a neutral grey set with colour-coded figures, free, instant, deterministic — render the camera's path to mp4, and hand the model that clip alongside the prompt. **Blender locks the motion; the model builds the world.** Iteration moves to the free half, and the paid half usually lands first try.
 
 Two halves, and keeping them separate is the whole discipline:
 
@@ -43,9 +43,9 @@ result = {"seconds": 720 / 24}
 
 Frame maths, stated once so you never redo it in your head: **frame = seconds × fps + 1**. A cut at 7.79s is frame 188.
 
-### 2. Geometry and light — grey, simple, named
+### 2. Geometry and light — grey set, coded figures, named
 
-Proxies only. A person is a box or a capsule with a sphere head. A car is a stretched cube. A can is a cylinder. **Neutral grey, one light, a floor and enough wall that the space reads.** Anything you spend on materials here you pay for twice, because the model repaints every surface anyway.
+Proxies only. A person is a box or a capsule with a sphere head. A car is a stretched cube. A can is a cylinder. **The SET is neutral grey — one light, a floor and enough wall that the space reads.** Colour is reserved for the figures, where it carries meaning (below); a grey set is what makes those few colours legible as notation rather than décor. Anything you spend on materials here you pay for twice, because the model repaints every surface anyway.
 
 **Name every object for what it *is* in the story**, not `Cube.003`. The name is how you refer to it later, and it is how you keep your own timeline honest.
 
@@ -53,6 +53,7 @@ Two conventions that cost nothing now and save a re-roll later:
 
 - **Colour is identity.** Give each character a distinct viewport colour and *write the mapping down* — `red = the boss, green = the kid, blue = the driver`. The generation prompt will restate that mapping so the model knows which grey body is which person across cuts. Without it, characters swap.
 - **Encode facing on featureless proxies.** A box has no front. Mark one face red, the back black, the sides green, and say so in the prompt: `RED face = the direction he faces`. Otherwise the model guesses which way people are looking.
+- **Checker a surface when SCALE or SPEED has to read.** Flat grey gives a model no parallax cue, so a fast move over a featureless floor reads as slow, and a big room reads as a small one. A black-and-white checker on the ground (or the wall a camera races past) gives it something to measure against. Like every other colour here it is notation, so it goes in the translation list and gets dressed over.
 
 ```python
 mat = bpy.data.materials.new("ID_Red")

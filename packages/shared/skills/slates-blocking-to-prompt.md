@@ -88,6 +88,7 @@ Your grey-box render contains things that are *notation*, not content. Every one
 |---|---|
 | Colour-coded bodies | `red = the boss, green = the kid, blue = the driver` |
 | A marked face on a proxy | `RED face = the direction he faces, BLACK = his back` |
+| A checkered floor or wall | `the checkerboard is a scale reference, not a surface — it becomes <the real material>` |
 | Flat black background | `a PLACEHOLDER — replace with the location assigned below` |
 | A floor grid | `a motion-tracking aid — render as light on the surface, never as wireframe or tiles` |
 | A deliberate black gap | `CUT 7 (14.5-17.0, black gap in the reference) — <what fills it>` |
