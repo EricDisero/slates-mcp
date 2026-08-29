@@ -66,7 +66,7 @@ Workbench (what the blocking render uses) draws `object.color` when the shading 
 
 ### 3. Camera
 
-The whole of `slates-camera-language`. Build the rig, then keyframe it. Then **read back what you built** with `slates_blender_scene` — its `camera.keyframeSeconds` is your cut list, and it is the number you will write timings against.
+The whole of `slates-camera-language`. Build the rig, then keyframe it. Then **read back what you built** with `slates_blender_scene` — its `cutSeconds` is your cut list, and it is the number you will write timings against. That field is the authoritative one on EITHER rig — marker frames when cameras are bound to markers, the active camera's own keyframes when they are not. `camera.keyframeSeconds` is empty on a marker-bound edit, which is the rig `slates-camera-language` recommends for anything past a handful of cuts.
 
 ### 4. Handheld, last
 
@@ -128,7 +128,7 @@ Where the model outperforms any blockout you could build — liquid, smoke, fire
 - **Don't texture, light or material the blocking.** Grey is the specification. The reference supplies motion; the references supply look.
 - **Don't animate what you don't need.** Heads especially — a proxy head turning wrong is worse than one that never turns.
 - **Don't build the camera before the geometry.** It has nothing to aim at, and every value you set gets redone.
-- **Don't skip reading the scene back.** Write timings from `slates_blender_scene`, never from what you intended to build.
+- **Don't skip reading the scene back.** Write timings from `slates_blender_scene`'s `cutSeconds`, never from what you intended to build.
 - **Don't exceed the model's reference-video ceiling.** A 40s blocking against a 30s cap silently truncates.
 
 ## Related

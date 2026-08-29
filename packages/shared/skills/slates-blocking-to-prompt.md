@@ -27,7 +27,7 @@ Those two sentences do more work than any other part of the prompt.
 slates_blender_scene
 ```
 
-Write timings from `camera.keyframeSeconds`, never from the shot list you intended to build. At 24fps cuts land on frame boundaries and the honest values are not round — `7.79s`, `9.33s`, `19.875s`. **Use the exact ones.** Rounding to `7.8` is a tenth of drift you are handing the model for free.
+Write timings from `cutSeconds`, never from the shot list you intended to build. It resolves to the marker frames on a multi-camera edit and to the camera's own keyframes otherwise, so it is the one field that is never empty on a rig that has cuts. At 24fps cuts land on frame boundaries and the honest values are not round — `7.79s`, `9.33s`, `19.875s`. **Use the exact ones.** Rounding to `7.8` is a tenth of drift you are handing the model for free.
 
 ## Structure
 
@@ -229,7 +229,7 @@ Restating is not redundancy here. It is the last thing the model reads.
 
 ## Checklist before you generate
 
-- [ ] Timings taken from `slates_blender_scene`, frame-exact, not rounded
+- [ ] Timings taken from `slates_blender_scene`'s `cutSeconds`, frame-exact, not rounded
 - [ ] Every reference has an explicit "NOT inherited"
 - [ ] The placement-only clause is present
 - [ ] The tie-break clause is present

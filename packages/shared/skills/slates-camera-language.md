@@ -187,7 +187,9 @@ Either way the invariant is the same: **camera, target and lens all change on th
 slates_blender_scene
 ```
 
-`camera.keyframeSeconds` is your actual cut list in seconds. Check it against the shot list you were given — mismatches here become mismatched prompt timings, and the prompt is what you write next.
+`cutSeconds` is your actual cut list in seconds. Check it against the shot list you were given — mismatches here become mismatched prompt timings, and the prompt is what you write next.
+
+⚠️ **On a marker-bound rig, read `cutSeconds` or `markers`, never `camera.keyframeSeconds`.** The per-setup cameras are usually static (a Track To constraint does the aiming), so the active camera's action is empty and that field reads `[]` on a perfectly good three-cut edit. `cutSeconds` resolves to whichever the scene actually used.
 
 ## Related
 
