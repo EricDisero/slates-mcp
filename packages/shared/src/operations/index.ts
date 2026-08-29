@@ -4767,8 +4767,23 @@ export const blenderRenderBlocking: Operation<{
     if (input.frameEnd !== undefined) kwargs.push(`frame_end=${input.frameEnd}`)
     if (input.basename !== undefined) kwargs.push(`basename=${JSON.stringify(input.basename)}`)
 
+    // 🚨 THE RENDER IS DEFERRED, AND THAT IS WHY THIS IS NOT ONE LINE.
+    // In an interactive Blender `render_blocking` INVOKES the render rather
+    // than executing it — a synchronous animation render driven from the
+    // bridge's own `bpy.app.timers` callback would re-enter the main loop
+    // running it. So it hands back a `check_is_finished` callable instead of
+    // the clip, and assigning that to `check_is_finished` is the bridge's
+    // documented convention for "hold the socket open and answer when the job
+    // lands" (see the add-on's `bridge/deferred.py`). The deferred path wraps
+    // the eventual dict in the SAME `{status, result}` envelope, so everything
+    // downstream of this call is identical either way. Headless Blender has no
+    // job system to poll, renders synchronously, and takes the `else`.
     const render = (await new BlenderBridgeClient().call(
-      `result = _mod("previs").render_blocking(${kwargs.join(', ')})`,
+      `_previs_result = _mod("previs").render_blocking(${kwargs.join(', ')})\n` +
+        'if callable(_previs_result):\n' +
+        '    check_is_finished = _previs_result\n' +
+        'else:\n' +
+        '    result = _previs_result\n',
       { timeoutMs: RENDER_TIMEOUT_MS }
     )) as { filePath: string; durationSeconds: number }
 

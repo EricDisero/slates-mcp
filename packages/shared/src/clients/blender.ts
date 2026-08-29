@@ -37,10 +37,10 @@ const CONNECT_TIMEOUT_MS = 1_500
  * renamed panel button would have had to be found in two files by someone who
  * remembered both existed. Same fact, same sentence, one home.
  *
- * ⚠️ `slates.video/blender` DOES NOT EXIST YET. The page is one of three
- * prerequisites for publishing the `slates_blender_*` ops — see the DO NOT
- * PUBLISH note in this repo's `CLAUDE.md`. Until it ships, this string is a
- * documented 404 at the end of every "Blender isn't running" message.
+ * `slates.video/blender` is a real page as of 2026-08-28 (`slates-web`
+ * `src/app/blender/page.tsx`), and it is the ONLY thing that tells a stuck user
+ * where the add-on comes from. It is a hard dependency of this string, not a
+ * nice-to-have: keep the path or 301 it.
  */
 export const BLENDER_SETUP_HINT =
   'Install the Slates add-on from https://slates.video/blender, then in the 3D ' +
