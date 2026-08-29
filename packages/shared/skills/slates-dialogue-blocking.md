@@ -27,7 +27,7 @@ Give each character a distinct viewport colour and write the mapping down. This 
 
 That mapping goes verbatim into the generation prompt. It is what lets the model bind a grey body to a character sheet across four cuts.
 
-Set both `object.color` and a material — Workbench renders `object.color`, the viewport reads the material.
+Give every proxy a material and set `mat.diffuse_color` to its identity colour — the blocking render pins Workbench to `MATERIAL` shading, so **the material's `diffuse_color` is what reaches the clip**. Set `object.color` to the same value too, so the user's viewport matches what renders. See `slates-previs-blocking` for the snippet.
 
 ### Fix the geography, then never move it
 

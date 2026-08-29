@@ -53,16 +53,33 @@ Two conventions that cost nothing now and save a re-roll later:
 
 - **Colour is identity.** Give each character a distinct viewport colour and *write the mapping down* — `red = the boss, green = the kid, blue = the driver`. The generation prompt will restate that mapping so the model knows which grey body is which person across cuts. Without it, characters swap.
 - **Encode facing on featureless proxies.** A box has no front. Mark one face red, the back black, the sides green, and say so in the prompt: `RED face = the direction he faces`. Otherwise the model guesses which way people are looking.
-- **Checker a surface when SCALE or SPEED has to read.** Flat grey gives a model no parallax cue, so a fast move over a featureless floor reads as slow, and a big room reads as a small one. A black-and-white checker on the ground (or the wall a camera races past) gives it something to measure against. Like every other colour here it is notation, so it goes in the translation list and gets dressed over.
+- **Checker a surface when SCALE or SPEED has to read.** Flat grey gives a model no parallax cue, so a fast move over a featureless floor reads as slow, and a big room reads as a small one. A black-and-white checker on the ground (or the wall a camera races past) gives it something to measure against. ⚠️ **Build it as GEOMETRY, never as a Checker Texture node.** The blocking render is Workbench, which draws one flat colour per material and never evaluates a shader node tree — a `TEX_CHECKER` comes out flat grey and you lose the cue without being told. Subdivide the plane and alternate `material_index` per face. Like every other colour here it is notation, so it goes in the translation list and gets dressed over.
+
+```python
+# Two materials, alternated per face. `TILE` is the square size in metres.
+dark = bpy.data.materials.new("Checker_Dark")
+dark.diffuse_color = (0.05, 0.05, 0.05, 1.0)
+light = bpy.data.materials.new("Checker_Light")
+light.diffuse_color = (0.80, 0.80, 0.80, 1.0)
+floor.data.materials.append(dark)    # material_index 0
+floor.data.materials.append(light)   # material_index 1
+# Subdivide first (edit mode or a Subdivide modifier applied) so there ARE
+# faces to alternate — a 2-triangle plane can only ever be one colour.
+for face in floor.data.polygons:
+    cx, cy = face.center.x, face.center.y
+    face.material_index = (int(cx // TILE) + int(cy // TILE)) % 2
+```
+
+And the identity colour on each proxy:
 
 ```python
 mat = bpy.data.materials.new("ID_Red")
-mat.diffuse_color = (0.8, 0.1, 0.1, 1.0)   # viewport colour
+mat.diffuse_color = (0.8, 0.1, 0.1, 1.0)   # what the blocking render draws
 obj.data.materials.append(mat)
-obj.color = (0.8, 0.1, 0.1, 1.0)           # what Workbench renders
+obj.color = (0.8, 0.1, 0.1, 1.0)           # same value, for viewport parity
 ```
 
-Workbench (what the blocking render uses) draws `object.color` when the shading colour type is `OBJECT`, so set both.
+The blocking render pins Workbench to `MATERIAL` shading, so **`mat.diffuse_color` is the value that reaches the clip** — and an object with no material at all falls back to a neutral grey, which is why an unpainted set still reads correctly. Set `obj.color` to the same value anyway: it costs one line, it makes the user's viewport match what renders, and keeping the two equal means you never have to remember which one is authoritative.
 
 ### 3. Camera
 
