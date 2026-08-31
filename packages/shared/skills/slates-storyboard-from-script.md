@@ -21,25 +21,29 @@ If the user hasn't named the storyboard, suggest one based on the project tone.
 ### 2. Materialize the structure first (no generation yet)
 - `slates_create_storyboard` with the chosen name.
 - For each scene: `slates_add_scene` with a descriptive name and order.
-- For each frame: write a *visual-only* prompt (image, not action), the shot label, and any director notes. **Don't generate yet.**
+- For each shot: `slates_create_shot` with a *visual-only* prompt, the model, the params, and whatever character / environment / style references the project already holds. **Don't generate yet.**
 
-Surface the planned structure back to the user as a tight summary:
-> Storyboard "X" • 4 scenes • 12 frames total
->   Scene 1: Forest opening (3 frames)
->   Scene 2: Confrontation (4 frames)
+🚨 **A Shot needs no image, and that is the point.** `slates_add_frame` requires an `assetId`, so before Shots existed there was nowhere to put a planned shot until it had been paid for — the plan lived in chat and the user had to trust your memory of it. A Shot is a row: named, listed, priced, forkable, and readable back COMPOSED with `slates_get_shot` before a single credit is spent. Write the plan as Shots, not as sentences you will have to re-type later.
+
+Surface the planned structure back to the user as a tight summary — `slates_list_shots` gives you the count and the total in one call:
+> Storyboard "X" • 4 scenes • 12 shots • 340 credits to fire them all
+>   Scene 1: Forest opening (3 shots)
+>   Scene 2: Confrontation (4 shots)
 >   ...
 
 **Surface a decision log alongside that summary.**
 
 <!-- @inject:decision-log -->
-When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify:
+When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify **and that no row already records**:
 
 ```
 source phrase or declared default → what you wrote → what it resolves
 "in a diner"        → chrome-and-vinyl booth, 3/4 on the counter   → fixes the anchor so blocking is repeatable
 (no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
-(no camera)         → slow push-in, single move                    → one move per shot; stacking increases instability
+(no model named)    → seedance-2 on shot 4 only                    → the one shot where physics matter
 ```
+
+🚨 **Keep it to what is NOT already data.** A saved Shot records the references, their roles, the model and every param, and `slates_get_shot` reads them back composed — narrating those is retelling a row the user can open. This convention exists because the model's choices had nowhere structured to land; where they now do, write the Shot and let the log carry the judgement no field holds.
 
 **Hard rule: never silently add weather, props, style, or camera movement.** If it wasn't in the brief and you added it, it goes in the log. This is the "why did you add that?" affordance — for an agent that writes prompts on the user's behalf and spends their credits, it is what keeps the model in assembly and the user in the director's chair.
 
@@ -51,18 +55,18 @@ Turning a script into *visual* frame prompts means resolving things the script l
 Ask: **"Generate frame images now? (y/N)"**
 
 ### 3. Generate frames if requested
-For each frame:
-- Estimate cost (`slates_estimate_generation_cost`, `count = total frames`). Confirm with user if total > ~17 credits.
-- Generate sequentially, with character/environment/style references attached when present in the project (`slates_list_characters`, `slates_list_environments`).
-- Each result returns inline. Evaluate. If wrong, refine prompt + regenerate (charge once, not multiple).
-- Bind to the frame via `slates_add_frame`.
+- `slates_generate_from_shots` with every image Shot's id and no `confirm` — it returns ONE itemised quote for the set plus the largest single item. Show that total, get an explicit OK, then re-call with `confirm: true`.
+- It fires the Shots one after another and BLOCKS until the last one lands, so it can outlast the HTTP timeout on a long set. If that happens the run is still going: poll `slates_get_shot` for each Shot's `generationIds` rather than re-firing, which double-spends.
+- Each result returns inline. Evaluate. If one is wrong, fix that Shot (`slates_update_shot`) and re-fire only it — never the set.
+- Bind the keeper to a frame with `slates_add_frame`, then `slates_update_shot` with `attachFrameId` so the recipe and the picture stay together.
 
 ### 4. Hand back
 - Total frames generated, total credits spent, storyboard id.
-- Suggest next steps: review via `slates_get_storyboard_with_frames`, or take the frames to motion — `slates_generate_video` per frame (`firstFrameAssetId`, `background: true`, poll `slates_get_generation_status`), then `slates_add_clip_to_timeline` in story order and `slates_export_video`. The full frames-to-film pipeline (batch cost authorization, model mixing) is `slates-one-prompt-film`.
+- Suggest next steps: review via `slates_get_storyboard_with_frames`, or take the frames to motion — fork each image Shot with `slates_duplicate_shot` (`model:` the video model), give the copy its frame with `slates_update_shot` (`firstFrameAssetId`), then fire the set with `slates_generate_from_shots`. Assemble with `slates_add_clip_to_timeline` in story order and `slates_export_video`. The full frames-to-film pipeline (batch cost authorization, model mixing) is `slates-one-prompt-film`.
 
 ## Anti-patterns
 
 - **Don't** auto-generate without asking. Generation is the expensive step. Always confirm first.
 - **Don't** invent shot details the script doesn't mention. If the script says "they argue," ask what the shot looks like, don't fabricate "she clenches her fists in a wide shot."
 - **Don't** mix scene structure and frame generation in one pass — building the skeleton first lets the user catch errors before spending credits.
+- **Don't** write the plan into `motionPrompt` or into chat when a Shot can hold it. A frame's motion prompt is one sentence and one picture; a Shot is the whole recipe, and it is the only form of the plan the user can open, price, fork and re-fire without you.

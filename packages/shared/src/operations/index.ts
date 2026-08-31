@@ -50,6 +50,14 @@ import {
 // submitted prompt actually contained, in the result, without blocking it.
 // Never hand-type one of these tokens here; edit the skill.
 import { describeBannedTokens, bannedTokenWarning } from '../prompts/banned-tokens.js'
+// 🚨 THE ONE ROLE LIST + the Shot shape, mirrored into the desktop. The op
+// surface DERIVES its per-role params from these rather than naming roles by
+// hand — a hand-typed bucket name is what `attachmentRoles` exists to kill.
+import {
+  ORDERED_ATTACHMENT_ROLES,
+  ATTACHMENT_ROLE_DESCRIPTION,
+  type OrderedAttachmentRole,
+} from '../prompts/shot-spec.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -78,6 +86,27 @@ export interface Operation<I> {
   description: string
   input: z.ZodType<I>
   run: (input: I, ctx: OperationContext) => Promise<OperationResult>
+  /**
+   * This op causes a provider call the user pays for.
+   *
+   * 🚨 IT IS THE DESKTOP'S CONSENT GATE, DECLARED WHERE THE OP IS WRITTEN.
+   * `slate/src/main/studio-agent/loop.ts` refuses a billable name until
+   * `present_plan` has been approved, and refreshes the balance-derived spend
+   * after each one so the deviation pause can fire. That list used to live only
+   * in the desktop, one repo away from the op it gated — and both
+   * `slates_generate_audio` and `slates_generate_from_shots` shipped without an
+   * entry, so the in-app agent could spend on either with no approved plan and
+   * no ledger entry. Set it HERE, beside the description, and the desktop takes
+   * the union of this and its own list (union, so an older published package can
+   * only ever gate MORE, never less).
+   *
+   * Set it on anything that spends INDIRECTLY too —
+   * `slates_generate_from_shots` fires N generations of its own.
+   *
+   * NOT part of the tool schema: it never reaches the model, so it costs no
+   * prefix bytes.
+   */
+  billable?: boolean
 }
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -1157,6 +1186,7 @@ export const generateCharacterIdentity: Operation<{
   model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2'
 }> = {
   id: 'slates_generate_character_identity',
+  billable: true,
   description:
     "Generate one character identity sheet from a base portrait asset and bind it as the character's canonical reference. Call after slates_create_character. Read slates-character-identity before calling and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
@@ -1189,6 +1219,7 @@ export const generateEnvironmentPlate: Operation<{
   userNotes?: string
 }> = {
   id: 'slates_generate_environment_plate',
+  billable: true,
   description:
     "Generate one clean establishing image from an optional base image and bind it as the environment's canonical reference. Call after slates_create_environment and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
@@ -1492,6 +1523,7 @@ export const generateImage: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_generate_image',
+  billable: true,
   description:
     'Generate an image via Slates credits.\n' +
     // GENERATED from MODEL_FACTS — the hand-typed model list that stood here
@@ -1893,6 +1925,7 @@ export const editImage: Operation<{
   background?: boolean
 }> = {
   id: 'slates_edit_image',
+  billable: true,
   description:
     'Surgically edit an existing image asset with a text instruction (e.g. \'remove the lamppost\', \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The edited result is saved as a NEW asset in the project (prompt prefixed \'[Edit]\'); the source is untouched. Default model nano-banana-2 (only model that also accepts referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
   input: z.object({
@@ -2502,6 +2535,7 @@ export const generateVideo: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_generate_video',
+  billable: true,
   description:
     'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3 / slates-prompting-minimax-h3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
@@ -3136,6 +3170,7 @@ export const generateAudio: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_generate_audio',
+  billable: true,
   description:
     'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Two surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s) and eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop). Which surface for which job: read the slates-model-selection skill. ' +
     '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. Choose it deliberately. ' +
@@ -3348,6 +3383,7 @@ export const generateLipSync: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_generate_lip_sync',
+  billable: true,
   description:
     'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip (~$0.11 / 5s); sourceType=image animates a still avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s). Audio from TTS (ttsText + ttsVoice) or an uploaded file. Always 5 seconds. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
   input: z.object({
@@ -3491,6 +3527,7 @@ export const generateMotionTransfer: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_generate_motion_transfer',
+  billable: true,
   description:
     'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std ($0.95 / 5s) or kling-mc-pro ($1.26 / 5s), structured skeleton/depth retargeting, always 5s. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. Both tiers hit the >$0.50 confirm gate.',
   input: z.object({
@@ -3616,6 +3653,7 @@ export const editVideo: Operation<{
   confirm?: boolean
 }> = {
   id: 'slates_edit_video',
+  billable: true,
   description:
     'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements), omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat), or seedance-2.5-edit (4–30s clips — the ONLY engine that takes a clip over 15s; up to 1080p, seedanceFace:true for AI-character faces). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. seedance-2.5-edit is priced per second of output on the video-reference tier and bills roughly double a plain 2.5 generation of the same length, because every provider charges an edit on input + output seconds — always read the quote from the confirm gate rather than assuming. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
   input: z.object({
@@ -4658,6 +4696,679 @@ export const deleteFrame: Operation<{ frameId: string }> = {
 
 // Model-id → guide-name aliasing. Order matters: kling-mc-* (motion
 // transfer) must match before the generic kling-v3* check.
+// ── Shots — the prompt bar, serialized ──────────────────────────
+//
+// A Shot is a NAMED generation recipe: what to make, with what, on which model,
+// at what settings. It exists to remove one pipeline constraint from this
+// surface — `slates_add_frame` requires a non-null `assetId`, so an agent could
+// not plan a shot before its image existed. A Shot takes no asset at all.
+//
+// 🚨 IT STORES A RAW PROMPT AND REFERENCES, NEVER A COMPOSED PROMPT. The
+// composer is the only thing that numbers anything; a stored "image 3" is a lie
+// the moment a reference moves. `slates_get_shot` returns the composed prompt so
+// the agent can audit its own work through the exact resolver the request uses.
+
+/** Role → its `string[]` param, GENERATED from the role list. Never hand-typed:
+ *  `attachmentRoles`/`shot-spec` is the ONE role list, and a sixth role has to
+ *  appear here without anyone remembering to add it. */
+const SHOT_REF_SHAPE = Object.fromEntries(
+  ORDERED_ATTACHMENT_ROLES.map((role) => [
+    role,
+    z
+      .array(z.string())
+      .optional()
+      .describe(`${ATTACHMENT_ROLE_DESCRIPTION[role]} UUIDs or badge codes ("IMG-A8").`),
+  ])
+) as { [K in OrderedAttachmentRole]: z.ZodOptional<z.ZodArray<z.ZodString>> }
+
+const shotRefsSchema = z
+  .object(SHOT_REF_SHAPE)
+  .optional()
+  .describe(
+    'Attachments by ROLE, ordered within each role. The role decides the sentence the model is told, so a subject reference and a plain one are not interchangeable.'
+  )
+
+// The full ratio vocabulary a Shot can hold — image OR video, because a Shot is
+// any generation. Per-model narrowing happens at create time for video (the same
+// `assertVideoCapabilities` gate `slates_generate_video` uses) and at generate
+// time for everything.
+const SHOT_ASPECT_RATIOS = [...new Set([...VIDEO_ASPECT_RATIOS, ...IMAGE_ASPECT_RATIOS])]
+
+// 🚨 THE PER-MODEL CAPABILITY TABLES ARE DELIBERATELY NOT REPEATED HERE.
+// `slates_generate_video`'s param descriptions already carry them and are always
+// in context on both surfaces; embedding them again — in three shot ops, each
+// taking these same params — would put FOUR more copies of a table that grows on
+// every model addition into the desktop's cached prefix. Measured: it was 15.3%
+// of the whole tool surface, almost all of it those three strings.
+// The vocabulary is still ENFORCED (a Zod enum built from MODEL_CAPABILITIES),
+// and the per-model narrowing is enforced by `assertShotCapabilities` at save
+// time — which is stronger than prose, not weaker.
+const shotParamsSchema = z
+  .object({
+    aspectRatio: zEnum(SHOT_ASPECT_RATIOS).optional().describe(
+      'Validated against the chosen model when the Shot is saved — see slates_generate_video for the per-model sets.'
+    ),
+    duration: z.number().int().min(1).max(360).optional().describe(
+      'Seconds — video or audio. Required before a video Shot can be priced or fired; validated against the model when saved.'
+    ),
+    videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
+      'Validated against the chosen model when the Shot is saved.'
+    ),
+    imageResolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image models only.'),
+    gptQuality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only.'),
+    imageQuantity: z.number().int().min(1).max(4).optional().describe('Image models only — how many to make per fire.'),
+    negativePrompt: z.string().optional(),
+    sound: z.boolean().optional().describe('Video models that co-generate audio.'),
+    seedanceFace: z.boolean().optional().describe('Seedance only — a reference shows an AI character\'s FACE; reroutes to a face-capable provider at ~45% more.'),
+    audioDurationSeconds: z.number().int().min(1).max(120).optional().describe('Audio lane. On seed-audio the requested duration IS the bill.'),
+  })
+  .optional()
+
+interface ShotOpRefs {
+  refs?: Partial<Record<OrderedAttachmentRole, string[]>>
+  firstFrameAssetId?: string
+  lastFrameAssetId?: string
+  audioRefSpokenText?: string[]
+  characterIds?: string[]
+  environmentIds?: string[]
+  styleIds?: string[]
+}
+
+interface ShotOpParams {
+  aspectRatio?: AspectRatio
+  duration?: number
+  videoResolution?: VideoResolution
+  imageResolution?: '1k' | '2k' | '3k' | '4k'
+  gptQuality?: 'medium' | 'high'
+  imageQuantity?: number
+  negativePrompt?: string
+  sound?: boolean
+  seedanceFace?: boolean
+  audioDurationSeconds?: number
+}
+
+/**
+ * The `params` half of a spec patch — ONLY the keys the caller actually named.
+ *
+ * 🚨 AN `undefined` VALUE IS NOT AN ABSENT KEY, AND THE DIFFERENCE IS SILENT
+ * DATA LOSS. `/agent/shots/update` merges `params` one level deep so that
+ * "anything you omit is left exactly as it was" — but a spread copies keys
+ * whose value is `undefined` too, so a hand-built object listing all ten fields
+ * overwrote the nine the caller never mentioned with `undefined`, and the
+ * tolerant reader on the far side then dropped them. `params: { duration: 9 }`
+ * silently cleared the aspect ratio, the resolution, the negative prompt and
+ * the face route. Building the object by omission is what keeps that promise.
+ *
+ * ONE builder, three callers (create / update / duplicate) — the ten field
+ * names were hand-listed twice before this, which is the same near-miss in
+ * waiting.
+ */
+function shotParamsPatch(p: ShotOpParams | undefined): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  if (!p) return out
+  for (const [k, v] of Object.entries(p)) if (v !== undefined) out[k] = v
+  return out
+}
+
+/**
+ * `audioRefSpokenText` pairs POSITIONALLY with the audio references, so it can
+ * only be sent alongside them.
+ *
+ * Refused rather than truncated or silently re-keyed: the whole point of the
+ * field is that the WORDS are exact, and a misaligned array attaches one clip's
+ * line to another clip with nothing on screen to say so. Same rule
+ * `slates_generate_video` already applies.
+ */
+function checkSpokenTextAlignment(input: ShotOpRefs): OperationResult | null {
+  if (input.audioRefSpokenText === undefined) return null
+  const clips = input.refs?.['audio-reference']
+  if (!clips || clips.length !== input.audioRefSpokenText.length) {
+    return ok({
+      requires_clarification: true,
+      missing: ['refs["audio-reference"]'],
+      message:
+        `audioRefSpokenText pairs by position with refs["audio-reference"], so send both together ` +
+        `and at the same length (${input.audioRefSpokenText.length} line(s) vs ${clips?.length ?? 0} clip(s)). ` +
+        `Use "" for a clip with no speech.`,
+    })
+  }
+  return null
+}
+
+/** Every asset reference a Shot input carries, flat, for one `resolveAssetRefs`
+ *  pass. Derived from the role list so a new role resolves badge codes too. */
+function shotRefInputs(input: ShotOpRefs): Array<{ ref: string; role: string }> {
+  const out: Array<{ ref: string; role: string }> = []
+  for (const role of ORDERED_ATTACHMENT_ROLES) {
+    for (const r of input.refs?.[role] ?? []) out.push({ ref: r, role })
+  }
+  if (input.firstFrameAssetId) out.push({ ref: input.firstFrameAssetId, role: 'first frame' })
+  if (input.lastFrameAssetId) out.push({ ref: input.lastFrameAssetId, role: 'last frame' })
+  return out
+}
+
+/**
+ * Op input → the `ShotSpec` shape the desktop stores.
+ *
+ * Badge codes resolve to ids HERE, at call time, against the project as it
+ * stands — never a mapping remembered from earlier in the conversation. A Shot
+ * that recorded a guessed id would look fine in a listing and compose to
+ * something else entirely.
+ */
+async function buildShotSpecInput(
+  ctx: OperationContext,
+  projectId: string,
+  input: ShotOpRefs & { prompt?: string; model?: string; params?: ShotOpParams }
+): Promise<{ spec: Record<string, unknown>; refEcho: string }> {
+  const refInputs = shotRefInputs(input)
+  const resolvedRefs = await resolveAssetRefs(ctx, projectId, refInputs.map((r) => r.ref))
+  const rid = (v: string | undefined): string | null => (v ? (resolvedRefs.get(v)?.id ?? v) : null)
+  const refs: Record<string, string[]> = {}
+  for (const role of ORDERED_ATTACHMENT_ROLES) {
+    refs[role] = (input.refs?.[role] ?? []).map((v) => resolvedRefs.get(v)?.id ?? v)
+  }
+  // Positional in, KEYED out — the same re-keying `slates_generate_video` does,
+  // and for the same reason: an index means different clips depending on how the
+  // list was assembled, while an asset id cannot drift.
+  const audioIds = refs['audio-reference'] ?? []
+  const spoken: Record<string, string> = {}
+  ;(input.audioRefSpokenText ?? []).forEach((text, i) => {
+    const id = audioIds[i]
+    if (id && text?.trim()) spoken[id] = text.trim()
+  })
+  return {
+    spec: {
+      prompt: input.prompt,
+      model: input.model ?? null,
+      // The prompt is recorded as written FOR this model. Swapping the model
+      // later diverges from it and the desktop card says so — the prompt is
+      // never rewritten (that is prompt enhancement, deleted 2026-08-01).
+      authoredFor: input.model ?? null,
+      params: shotParamsPatch(input.params),
+      mentions: {
+        characterIds: input.characterIds ?? [],
+        environmentIds: input.environmentIds ?? [],
+        styleIds: input.styleIds ?? [],
+      },
+      refs,
+      firstFrameAssetId: rid(input.firstFrameAssetId),
+      lastFrameAssetId: rid(input.lastFrameAssetId),
+      audioRefSpokenText: spoken,
+    },
+    refEcho: describeResolvedRefs(refInputs, resolvedRefs),
+  }
+}
+
+/**
+ * The capability gate, applied to a SAVED recipe.
+ *
+ * It enforces exactly what the matching generate op enforces and no more: video
+ * goes through `assertVideoCapabilities` (the MODEL_CAPABILITIES SSOT), image
+ * does not, because `slates_generate_image`'s own per-model ratio check is the
+ * named open follow-up in the capability plan. A Shot that refused what
+ * `slates_generate_image` accepts would be a THIRD opinion about the same
+ * model, which is worse than the gap.
+ */
+function assertShotCapabilities(
+  model: string | undefined,
+  params: ShotOpParams | undefined
+): OperationResult | null {
+  if (!model || !(VIDEO_MODELS as readonly string[]).includes(model)) return null
+  const err = assertVideoCapabilities({
+    model,
+    aspectRatio: params?.aspectRatio,
+    videoResolution: params?.videoResolution,
+    duration: params?.duration,
+  })
+  return err ? ok(err) : null
+}
+
+/** What `/agent/shots` returns per row. Cheap on purpose: no composition, so no
+ *  reference list — which is exactly why a listing quote is a floor. */
+interface ShotSummary {
+  id: string
+  name: string
+  model: string | null
+  authoredFor: string | null
+  rawPrompt: string
+  params: Record<string, unknown>
+  referenceCount: number
+}
+
+/** What `/agent/shots/get` returns: the summary PLUS the composition. */
+interface ShotDetail extends ShotSummary {
+  composedPrompt: string
+  references: Array<{ kind: string; number: number; durationSeconds: number | null }>
+  missing: unknown
+  unresolvedTokens: string[]
+  generationIds: string[]
+  /** The bill-deciding params AFTER the per-model clamp — quote from these, not
+   *  from `params`, or the quote can differ from what the request sends. */
+  firesWith: {
+    videoResolution: string | null
+    imageResolution: string | null
+    duration: number | null
+    audioDurationSeconds: number | null
+  }
+  /** Why this Shot cannot be quoted or fired yet. Null when it can. */
+  blocked: string | null
+}
+
+/**
+ * The registry cost key for a saved Shot, through the SAME builders every quote
+ * in this file uses (`videoCostKey` / `imageCostKey` / `audioCostKey`).
+ *
+ * Returns null when the Shot cannot be priced — no model, or a model this
+ * surface does not carry. The caller REPORTS that rather than quoting zero: a
+ * missing price displayed as free is the failure mode the whole pricing
+ * contract exists to prevent.
+ */
+function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references'] }): string | null {
+  const model = detail.model
+  if (!model) return null
+  const p = detail.params as ShotOpParams & { audioDurationSeconds?: number }
+  // Prefer the CLAMPED values the desktop will actually fire with; a listing row
+  // has none, so it falls back to the raw ones and is announced as a floor.
+  const fires = (detail as Partial<ShotDetail>).firesWith
+  if ((AUDIO_MODELS as readonly string[]).includes(model)) {
+    const seconds = fires?.audioDurationSeconds ?? p.audioDurationSeconds
+    if (!seconds) return null
+    return audioCostKey({ model: model as AudioModel, durationSeconds: seconds })
+  }
+  if ((VIDEO_MODELS as readonly string[]).includes(model)) {
+    const duration = fires?.duration ?? p.duration
+    if (!duration) return null
+    const billed = (d: number): number => (d > 0 ? Math.ceil(d - 0.05) : 0)
+    return videoCostKey({
+      model: model as VideoModel,
+      duration,
+      videoResolution: (fires?.videoResolution as VideoResolution | undefined) ??
+        p.videoResolution ??
+        defaultVideoResolutionFor(model),
+      sound: p.sound,
+      seedanceFace: p.seedanceFace,
+      // `references` is absent on a LISTING row (it does not compose), so both
+      // of these read 0 there. That is why a listing quote is announced as a
+      // floor and `slates_get_shot` is the exact one.
+      referenceImages: (detail.references ?? []).filter((r) => r.kind === 'image').length,
+      videoRefSeconds: (detail.references ?? [])
+        .filter((r) => r.kind === 'video')
+        .reduce((n, r) => n + billed(r.durationSeconds ?? 0), 0),
+    })
+  }
+  if ((IMAGE_MODELS as readonly string[]).includes(model)) {
+    return imageCostKey(
+      model as ImageModelId,
+      ((fires?.imageResolution ?? p.imageResolution) as '1k' | '2k' | '3k' | '4k' | undefined) ??
+        (model === 'nano-banana-2-lite' ? '1k' : '2k'),
+      p.gptQuality ?? 'medium'
+    )
+  }
+  return null
+}
+
+/** Credits for one Shot, and how many generations it fires.
+ *
+ *  `imageQuantity` multiplies IMAGE models only — the same condition the
+ *  desktop's `estimateCostFor` applies and the only lane `/agent/shots/*` sends
+ *  a `count` for. Multiplying it blindly would quote a video Shot 3× for a
+ *  param its request never carries, and the card beside it would say ×1. */
+function shotQuote(
+  detail: ShotSummary & { references?: ShotDetail['references'] },
+  byKey: Map<string, number>
+): { key: string | null; credits: number; quantity: number } {
+  const key = shotCostKey(detail)
+  const isImage =
+    !!detail.model && (IMAGE_MODELS as readonly string[]).includes(detail.model)
+  const quantity = isImage ? ((detail.params as ShotOpParams).imageQuantity ?? 1) || 1 : 1
+  const per = key != null ? byKey.get(key) : undefined
+  return { key, credits: (per ?? 0) * quantity, quantity }
+}
+
+export const createShot: Operation<
+  ShotOpRefs & {
+    projectId: string
+    name?: string
+    prompt: string
+    model?: string
+    params?: ShotOpParams
+    frameId?: string
+  }
+> = {
+  id: 'slates_create_shot',
+  description:
+    'Save a named Shot — a reusable generation recipe (raw prompt, references with their roles, model, params) that needs NO image to exist yet, so a whole sequence can be planned and priced before anything is generated.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    name: z.string().max(120).optional().describe('What to call it. Shown on the card; the prompt supplies one if you omit it.'),
+    prompt: z.string().min(1).max(4000).describe('The RAW prompt, @mentions intact. Never write "image 1" yourself — the composer numbers references, and a hand-written number is wrong the moment one moves.'),
+    model: z.string().optional().describe('Model id — the same ids slates_generate_image / slates_generate_video / slates_generate_audio take, and their descriptions carry the routing. Optional: a Shot can be planned before the model is decided.'),
+    params: shotParamsSchema,
+    refs: shotRefsSchema,
+    firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video (UUID or badge code).'),
+    lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code).'),
+    audioRefSpokenText: z.array(z.string()).optional().describe('Same order and length as refs["audio-reference"]; use "" for a clip with no words. The model RE-TRANSCRIBES a supplied take, so only text decides the words.'),
+    characterIds: z.array(z.string().uuid()).optional().describe('Characters the prompt @mentions — stored as ENTITY ids, so updating the character updates every Shot that names it.'),
+    environmentIds: z.array(z.string().uuid()).optional(),
+    styleIds: z.array(z.string().uuid()).optional(),
+    frameId: z.string().uuid().optional().describe('Attach to this storyboard frame on create. Optional — a Shot needs no storyboard.'),
+  }),
+  async run(input, ctx) {
+    const capErr = assertShotCapabilities(input.model, input.params)
+    if (capErr) return capErr
+    const alignErr = checkSpokenTextAlignment(input)
+    if (alignErr) return alignErr
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const { spec, refEcho } = await buildShotSpecInput(ctx, input.projectId, input)
+    const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots', {
+      projectId: input.projectId,
+      name: input.name,
+      spec,
+      frameId: input.frameId ?? null,
+    })
+    return ok(r.shot, `Saved Shot "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}`.trim())
+  },
+}
+
+export const updateShot: Operation<
+  ShotOpRefs & {
+    shotId: string
+    projectId: string
+    name?: string
+    prompt?: string
+    model?: string
+    params?: ShotOpParams
+    attachFrameId?: string
+    detachFrameId?: string
+  }
+> = {
+  id: 'slates_update_shot',
+  description:
+    'Change part of a saved Shot, or attach/detach it from a storyboard frame — anything you omit is left exactly as it was.',
+  input: z.object({
+    shotId: z.string().uuid(),
+    projectId: z.string().uuid().describe('The Shot\'s project — badge codes and entity ids resolve against it.'),
+    name: z.string().max(120).optional(),
+    prompt: z.string().max(4000).optional(),
+    model: z.string().optional(),
+    params: shotParamsSchema,
+    refs: shotRefsSchema,
+    firstFrameAssetId: z.string().optional(),
+    lastFrameAssetId: z.string().optional(),
+    audioRefSpokenText: z.array(z.string()).optional(),
+    characterIds: z.array(z.string().uuid()).optional(),
+    environmentIds: z.array(z.string().uuid()).optional(),
+    styleIds: z.array(z.string().uuid()).optional(),
+    attachFrameId: z.string().uuid().optional().describe('Attach this Shot to a storyboard frame.'),
+    detachFrameId: z.string().uuid().optional().describe('Detach it from a frame. The Shot itself survives.'),
+  }),
+  async run(input, ctx) {
+    const capErr = assertShotCapabilities(input.model, input.params)
+    if (capErr) return capErr
+    const alignErr = checkSpokenTextAlignment(input)
+    if (alignErr) return alignErr
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const { spec } = await buildShotSpecInput(ctx, input.projectId, input)
+    // Only send the halves the caller actually named; the route merges a PARTIAL
+    // spec over the stored one, so an omitted field is never silently cleared.
+    const patch: Record<string, unknown> = {}
+    if (input.prompt !== undefined) patch.prompt = input.prompt
+    if (input.model !== undefined) {
+      patch.model = input.model
+      // 🚨 `authoredFor` is NOT re-stamped on a model swap. The whole point of
+      // recording it is that the prompt stays written for the model it was
+      // written for — the grammars genuinely differ — so the card can say so.
+    }
+    if (input.params !== undefined) patch.params = (spec as Record<string, unknown>).params
+    // 🚨 ONLY THE ROLES THE CALLER NAMED. `buildShotSpecInput` always returns a
+    // COMPLETE refs record, and the route merges one level deep — so sending all
+    // five would clear every role the caller never mentioned. Clearing a role is
+    // explicit: send `[]`.
+    if (input.refs !== undefined) {
+      const built = (spec as Record<string, unknown>).refs as Record<string, string[]>
+      const named: Record<string, string[]> = {}
+      for (const role of ORDERED_ATTACHMENT_ROLES) {
+        if (input.refs[role] !== undefined) named[role] = built[role]
+      }
+      if (Object.keys(named).length > 0) patch.refs = named
+    }
+    if (input.firstFrameAssetId !== undefined) patch.firstFrameAssetId = (spec as Record<string, unknown>).firstFrameAssetId
+    if (input.lastFrameAssetId !== undefined) patch.lastFrameAssetId = (spec as Record<string, unknown>).lastFrameAssetId
+    if (input.audioRefSpokenText !== undefined) patch.audioRefSpokenText = (spec as Record<string, unknown>).audioRefSpokenText
+    // Same rule for the three mention lists — naming one must not clear the
+    // other two.
+    {
+      const built = (spec as Record<string, unknown>).mentions as Record<string, string[]>
+      const named: Record<string, string[]> = {}
+      if (input.characterIds !== undefined) named.characterIds = built.characterIds
+      if (input.environmentIds !== undefined) named.environmentIds = built.environmentIds
+      if (input.styleIds !== undefined) named.styleIds = built.styleIds
+      if (Object.keys(named).length > 0) patch.mentions = named
+    }
+    const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/update', {
+      id: input.shotId,
+      data: {
+        name: input.name,
+        ...(Object.keys(patch).length > 0 ? { spec: patch } : {}),
+        attachFrameId: input.attachFrameId,
+        detachFrameId: input.detachFrameId,
+      },
+    })
+    return ok(r.shot)
+  },
+}
+
+export const duplicateShot: Operation<{
+  shotId: string
+  name?: string
+  prompt?: string
+  model?: string
+  params?: ShotOpParams
+  frameId?: string | null
+}> = {
+  id: 'slates_duplicate_shot',
+  description:
+    'Fork a saved Shot, changing the prompt, the model or any param on the COPY in the same call — make one, fork it five times, change one thing on each. The original is never touched.',
+  input: z.object({
+    shotId: z.string().uuid(),
+    name: z.string().max(120).optional().describe('Name for the copy (default: the original plus "copy").'),
+    prompt: z.string().max(4000).optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
+    model: z.string().optional().describe('Point the copy at a different model — the A/B lever. The prompt is NOT rewritten, and the copy records which model it was written for.'),
+    params: shotParamsSchema,
+    frameId: z.string().uuid().nullable().optional().describe('Attach the copy to this frame. Omit to keep the original\'s frame; pass null to leave it unattached.'),
+  }),
+  async run(input, ctx) {
+    const capErr = assertShotCapabilities(input.model, input.params)
+    if (capErr) return capErr
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    // Only the halves actually named. The route merges two levels deep, so an
+    // omitted param on the copy keeps the original's value rather than clearing it.
+    const spec: Record<string, unknown> = {}
+    if (input.prompt !== undefined) spec.prompt = input.prompt
+    if (input.model !== undefined) spec.model = input.model
+    if (input.params !== undefined) spec.params = shotParamsPatch(input.params)
+    const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/duplicate', {
+      id: input.shotId,
+      name: input.name,
+      ...(Object.keys(spec).length > 0 ? { spec } : {}),
+      frameId: input.frameId,
+    })
+    return ok(r.shot, `Forked into "${(r.shot?.name as string) || 'Untitled'}".`)
+  },
+}
+
+export const listShots: Operation<{ projectId: string; storyboardId?: string; frameId?: string }> = {
+  id: 'slates_list_shots',
+  description:
+    'List a project\'s saved Shots as compact rows with a total credit quote — optionally only the ones attached to one storyboard or frame.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    storyboardId: z.string().uuid().optional().describe('Only Shots attached to a frame in this storyboard.'),
+    frameId: z.string().uuid().optional().describe('Only Shots attached to this frame.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.get<{ shots: ShotSummary[] }>('/agent/shots', {
+      projectId: input.projectId,
+      storyboardId: input.storyboardId,
+      frameId: input.frameId,
+    })
+    const rows = r.shots ?? []
+    // Deliberately does NOT compose each Shot — that is what slates_get_shot is
+    // for. A listing that composed every row would make browsing cost as much as
+    // auditing.
+    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
+    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    let total = 0
+    let unpriced = 0
+    const shots = rows.map((s) => {
+      const q = shotQuote(s, byKey)
+      if (q.key == null || !byKey.has(q.key)) unpriced += 1
+      total += q.credits
+      return {
+        id: s.id,
+        name: s.name,
+        model: s.model,
+        references: s.referenceCount,
+        credits: q.credits,
+      }
+    })
+    return ok(
+      { shots, total_credits: total, unpriced },
+      `${shots.length} shot(s), at least ${fmtCredits(total)} to fire them all` +
+        (unpriced > 0 ? ` (${unpriced} could not be priced — no model or no duration set).` : '.') +
+        ' 🚨 That is a FLOOR, not the bill: a listing does not compose, so the two dimensions that' +
+        ' depend on the reference set — Seedance reference-clip seconds and MiniMax reference images' +
+        ' past the free five — are missing from it. slates_get_shot prices one exactly, and' +
+        ' slates_generate_from_shots quotes the set exactly before it fires anything.'
+    )
+  },
+}
+
+export const getShot: Operation<{ shotId: string }> = {
+  id: 'slates_get_shot',
+  description:
+    'Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, and its exact credit quote. Audit your own work here before firing.',
+  input: z.object({ shotId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
+    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
+    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    const q = shotQuote(r.shot, byKey)
+    return ok(
+      { ...r.shot, cost_key: q.key, credits: q.credits },
+      `"${r.shot.name || 'Untitled'}" — ${r.shot.model ?? 'no model set'}, ` +
+        (q.key && !r.shot.blocked
+          ? `${fmtCredits(q.credits)} (${q.key}).`
+          : `CANNOT FIRE YET: ${r.shot.blocked ?? 'not priceable — set a model and a duration.'}`) +
+        (r.shot.blocked ? '' : ` Fires with ${JSON.stringify(r.shot.firesWith)}.`) +
+        `\nCOMPOSED PROMPT (what the model is told): ${r.shot.composedPrompt}`
+    )
+  },
+}
+
+export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean }> = {
+  id: 'slates_generate_from_shots',
+  billable: true,
+  description:
+    'Generate from saved Shots, ONE AFTER ANOTHER, with a single quote and a single approval for the whole set. It blocks until the last one lands, so a set of video Shots can outlast the HTTP timeout while the run keeps going — if that happens, poll slates_get_shot for each Shot\'s generationIds instead of re-firing, which double-spends.',
+  input: z.object({
+    shotIds: z.array(z.string().uuid()).min(1).max(20).describe('The Shots to fire, in order.'),
+    confirm: z.boolean().optional().describe('Set true after explicit user OK on the TOTAL below.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    // Resolve and price every Shot BEFORE anything fires. A dead id found
+    // halfway through a batch means a partially-fired, partially-BILLED run.
+    const details: ShotDetail[] = []
+    for (const id of input.shotIds) {
+      const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })
+      details.push(r.shot)
+    }
+    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
+    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    const quotes = details.map((d) => ({ detail: d, ...shotQuote(d, byKey) }))
+    const total = quotes.reduce((n, q) => n + q.credits, 0)
+    const largest = quotes.reduce((m, q) => (q.credits > m ? q.credits : m), 0)
+    const unpriced = quotes.filter((q) => q.key == null || !byKey.has(q.key))
+    const blockedShots = details.filter((d) => d.blocked)
+
+    if (!input.confirm) {
+      // ONE approval for the set, itemised. N approvals would re-introduce the
+      // friction the batch exists to remove; the safety is the STATED TOTAL,
+      // prominent — count, total, and the largest single Shot.
+      const lines = quotes.map(
+        (q) =>
+          `  - ${q.detail.name || 'Untitled'} · ${q.detail.model ?? 'no model'} · ` +
+          (q.key ? fmtCredits(q.credits) : 'NOT PRICEABLE')
+      )
+      const blockedLines = blockedShots.map(
+        (d) => `  ✖ ${d.name || 'Untitled'} WILL NOT FIRE: ${d.blocked}`
+      )
+      const warnings = details
+        .filter((d) => d.missing || d.unresolvedTokens?.length)
+        .map(
+          (d) =>
+            `  ! ${d.name || 'Untitled'}: ${d.missing ? 'references something that no longer exists' : ''}` +
+            `${d.unresolvedTokens?.length ? ` ${d.unresolvedTokens.join(', ')} match nothing saved` : ''}`
+        )
+      return ok(
+        {
+          requires_confirm: true,
+          count: quotes.length,
+          total_credits: total,
+          largest_single_credits: largest,
+          blocked_count: blockedShots.length,
+          shots: quotes.map((q) => ({
+            id: q.detail.id,
+            name: q.detail.name,
+            model: q.detail.model,
+            cost_key: q.key,
+            credits: q.credits,
+            blocked: q.detail.blocked,
+          })),
+        },
+        `Firing ${quotes.length} Shot(s) SEQUENTIALLY.\n` +
+          `TOTAL ${fmtCredits(total)} · largest single ${fmtCredits(largest)}\n` +
+          lines.join('\n') +
+          (blockedLines.length > 0 ? `\n${blockedLines.join('\n')}` : '') +
+          (unpriced.length > 0
+            ? `\n  ! ${unpriced.length} shot(s) could not be priced — they will still be attempted and may fail.`
+            : '') +
+          (warnings.length > 0 ? `\n${warnings.join('\n')}` : '') +
+          `\n\nRe-call with confirm: true after explicit user OK on that total.`
+      )
+    }
+
+    const r = await desktop.post<{
+      results: Array<Record<string, unknown>>
+      total: number
+      failed: number
+      succeeded: number
+    }>('/agent/shots/batch-generate', { shotIds: input.shotIds })
+    const failedLines = (r.results ?? [])
+      .filter((x) => x.status === 'failed')
+      .map((x) => `  ✗ ${(x.name as string) || 'Untitled'}: ${x.error ?? 'failed'}`)
+    return ok(
+      r,
+      `${r.succeeded} of ${r.total} generated for about ${fmtCredits(total)}.` +
+        (failedLines.length > 0
+          ? // Reported, never retried: an agent that treats a failed render as
+            // something to try again spends credits before anyone notices.
+            `\n${failedLines.join('\n')}\nThese were NOT retried. Read each error, fix the Shot, and re-fire only what you meant to.`
+          : '') +
+        ` ${VIDEO_REVIEW_POINTER}`
+    )
+  },
+}
+
 function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (SKILLS[t]) return t
@@ -5086,6 +5797,15 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   updateFrame as unknown as Operation<unknown>,
   batchUpdateFrames as unknown as Operation<unknown>,
   deleteFrame as unknown as Operation<unknown>,
+  // ── Shots: the prompt bar, serialized ────────────────────────────────
+  // Beside the storyboard ops because that is the neighbourhood they belong to
+  // — structure, not spend. The one that spends sits last in the group.
+  createShot as unknown as Operation<unknown>,
+  updateShot as unknown as Operation<unknown>,
+  duplicateShot as unknown as Operation<unknown>,
+  listShots as unknown as Operation<unknown>,
+  getShot as unknown as Operation<unknown>,
+  generateFromShots as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
   // ── Blender previs, LAST and deliberately ────────────────────────────
   // This order is not cosmetic: `slate/src/main/studio-agent/ops.ts` maps this

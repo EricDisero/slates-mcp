@@ -1,11 +1,13 @@
-When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify:
+When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify **and that no row already records**:
 
 ```
 source phrase or declared default → what you wrote → what it resolves
 "in a diner"        → chrome-and-vinyl booth, 3/4 on the counter   → fixes the anchor so blocking is repeatable
 (no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
-(no camera)         → slow push-in, single move                    → one move per shot; stacking increases instability
+(no model named)    → seedance-2 on shot 4 only                    → the one shot where physics matter
 ```
+
+🚨 **Keep it to what is NOT already data.** A saved Shot records the references, their roles, the model and every param, and `slates_get_shot` reads them back composed — narrating those is retelling a row the user can open. This convention exists because the model's choices had nowhere structured to land; where they now do, write the Shot and let the log carry the judgement no field holds.
 
 **Hard rule: never silently add weather, props, style, or camera movement.** If it wasn't in the brief and you added it, it goes in the log. This is the "why did you add that?" affordance — for an agent that writes prompts on the user's behalf and spends their credits, it is what keeps the model in assembly and the user in the director's chair.
 

@@ -19,6 +19,7 @@ slates-mcp/
     │     clients/desktop.ts    ← 127.0.0.1:PORT HTTP client (+ healthz capability handshake)
     │     clients/blender.ts    ← 127.0.0.1:9876-9879 TCP bridge into the slates-blender add-on
     │     operations/index.ts   ← single source of truth for the tool surface
+    │     prompts/shot-spec.ts  ← ShotSpec + THE attachment-role list (mirrored into slate)
     │     skills/content.ts     ← GENERATED — embedded SKILLS record, do not edit
     │     index.ts              ← public re-exports
     ├── mcp/                    ← @slatesvideo/mcp-server (stdio MCP, bin: slates-mcp-server)
@@ -148,6 +149,47 @@ slates-mcp/
   describe the mechanism each surface actually has. **Do not "fix" this asymmetry without re-deciding
   it** — and if you do, the doctrine fork is where it lands, not a second prompt.
 - **Model routing doctrine SSOT = `packages/shared/src/prompts/model-facts.ts`.** `MODEL_FACTS` (kind: image vs video, default/premium/niche notes) and `VIDEO_MODELS` (the exact `slates_generate_video` model ids) are exported from the package and CONSUMED at runtime by `prompts/agent-doctrine.ts`, which derives the MODEL ROUTING block and model-id list from them for BOTH agent surfaces (added 2026-07-03 after the agent suggested Seedance, a video-only model, as an image generator from a hand-written prose copy; moved here from `slate/.../context.ts` on 2026-08-30 when guidance became SSOT). Editing routing = edit `model-facts.ts` (+ `skills/slates-model-selection.md` for the long-form table) and rebuild. NEVER restate model routing in op descriptions, skill files, or desktop prompt prose — point at `slates-model-selection` / derive from `MODEL_FACTS` instead. Op descriptions that duplicate the doctrine are a bug: they drift AND bloat the desktop's cached token prefix.
+- **🚨 SHOT SHAPE + ATTACHMENT-ROLE SSOT = `packages/shared/src/prompts/shot-spec.ts` (added 2026-08-31).**
+  `ShotSpec` is the prompt bar serialized — the recipe a Shot row stores — and it carries THE
+  attachment-role union (`AttachmentRole` / `OrderedAttachmentRole` / `ORDERED_ROLE_EMISSION`). It is
+  mirrored into `slate/src/shared/shotSpec.ts` under the same rule as `reference-composer.ts`: two
+  repos, one shape, a header pointing here, and **no second sync mechanism** —
+  `slate`'s `npm run check:composer-mirror` asserts the role list, its ORDER (order is send order, so
+  a drift renumbers every image), and that both `normalizeShotSpec` implementations read the same
+  hostile input identically. Mutation-tested: swap two role positions and 5 assertions go red.
+  - **The op surface DERIVES its per-role params from `ORDERED_ATTACHMENT_ROLES`**, and their prose
+    from `ATTACHMENT_ROLE_DESCRIPTION` (`satisfies Record<AttachmentRole, string>`). Never hand-type a
+    role name in an op — that is precisely what the desktop's `attachmentRoles.ts` was created to kill.
+  - **Keep it a dependency-free LEAF.** The desktop's renderer bundles the mirror, the desktop's MAIN
+    process reads it, and the schemas here are built from it at module load.
+  - **The shot ops enforce exactly what their lane's generate op enforces, no more.** Video goes
+    through `assertVideoCapabilities`; image does not, because `slates_generate_image`'s own per-model
+    ratio check is still the named open follow-up. A Shot that refused what `slates_generate_image`
+    accepts would be a THIRD opinion about the same model, which is worse than the gap.
+  - **MEASURED PREFIX COST, 2026-08-31: the six shot ops are 12,454 of 95,000 bytes — 13.1% of the
+    whole tool surface** (descriptions + JSON schemas), for 6.8% of the ops. Almost all of it is the
+    `params` and `refs` shapes repeated across create / update / duplicate, which is inherent to
+    three ops taking the same recipe. It was 15.3% until the per-model aspect-ratio, duration and
+    resolution TABLES were stripped out of `shotParamsSchema`: `slates_generate_video` already
+    carries them and is always in context, so three more copies would have been four copies of a
+    table that grows on every model addition — trap 4 of the plan, walked into. The vocabulary is
+    still ENFORCED by a Zod enum built from `MODEL_CAPABILITIES`, and the per-model narrowing by
+    `assertShotCapabilities`, which is stronger than prose rather than weaker.
+  - **`slates_generate_from_shots` is SEQUENTIAL and BLOCKING in v1**, and its description says so
+    plus what to do when it outlasts the HTTP timeout (poll `slates_get_shot` for `generationIds`;
+    re-firing double-spends). Real concurrent batching needs a queue — concurrency limiting against
+    fal's ceiling, per-item failure isolation, partial-billing semantics — and is deliberately not
+    built.
+- **🚨 WHAT SPENDS THE USER'S MONEY IS DECLARED HERE: `Operation.billable` (added 2026-08-31).**
+  The desktop's Studio Agent refuses a billable op until `present_plan` has been approved, and
+  refreshes its spend ledger after each one. That list of op ids lived ONLY in
+  `slate/src/main/studio-agent/ops.ts` — one repo away from the op it gated — and both
+  `slates_generate_audio` and `slates_generate_from_shots` shipped without an entry, so the in-app
+  agent could spend on either with no approved plan and nothing in the ledger. Set `billable: true`
+  beside the description, including on an op that spends INDIRECTLY
+  (`slates_generate_from_shots` fires N generations of its own). The desktop takes the UNION of this
+  and its own hard-coded floor, so a stale published package can only ever gate MORE, never less.
+  It is not part of the tool schema — it never reaches the model, so it costs no prefix bytes.
 - **Asset params take UUIDs OR badge codes.** Generation ops resolve refs ("IMG-A8", bare "a8") against the project AT CALL TIME via `resolveAssetRefs()` and echo the resolved code+label in every result. New ops with asset-id params must use the same helper — stale-code guessing burned a real $4.44 render on the wrong start frame (2026-07-03).
 - **The desktop consumes the PUBLISHED npm package, not this working tree.** Local iteration: `npm run build`, then copy `packages/shared/{dist,package.json,skills}` into `slate/node_modules/@slatesvideo/shared/` so the in-app Studio Agent picks changes up without a publish. `slate/scripts/check-shared-version.mjs` screams on version drift at dev startup. Shipping to users = publish + bump slate's dep + desktop release (publish BEFORE the release build, in that order).
 - **🚨 The Blender bridge is a SEPARATE GPL-3.0 program — keep the boundary clean (added 2026-08-28).** `slates_blender_*` ops talk over a localhost TCP socket to the `slates-blender` add-on (its own repo, `C:\Coding Projects\slates\slates-blender`). That add-on links `bpy` and is therefore GPL, as every Blender add-on is; **this repo stays proprietary because the boundary is a socket, and GPL propagates through linkage, not across a process.** So: never vendor add-on code into this package, and never import from it. The wire protocol (`{type:"execute",code,strict_json}` → `{status,result,stdout,stderr}`, NUL-delimited JSON) is the whole contract, it is documented in `clients/blender.ts` and in the add-on's `CLAUDE.md`, and **changing it is a two-repo edit**.
