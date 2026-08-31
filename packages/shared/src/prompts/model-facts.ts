@@ -9,18 +9,37 @@
 // defect the capability SSOT exists to delete, so `caps()` below does the lookup
 // and a wrong id throws at module load instead of shipping a stale number.
 //
-// Prose that ALSO appears in a skill or the tips card comes from
-// skills/_partials/*.md via PARTIALS — never restated here. A `notes` string is
-// a third rendering of a fact, and a third rendering is a third thing that can
-// survive a doctrine reversal the other two got.
+// 🚨 `notes` IS ROUTING ONLY — why you would pick THIS seat over its neighbour.
+// Nothing else. Not capability numbers (MODEL_CAPABILITIES owns those and already
+// GENERATES prose for them into every op's param descriptions), not prices (the
+// rate functions own those, and the agent's own REAL NUMBERS ONLY rule forbids it
+// repeating a figure it cannot point to in a tool result), not prompt craft (the
+// matching slates-prompting-* skill owns that, loaded on demand).
+//
+// It was all four for a while: 16,799 characters of `notes` carried 80 resolution
+// tokens, 42 duration claims, 23 hard-typed prices and two skills' worth of craft
+// into a prompt prefix that is always in context. A `notes` string is a third
+// rendering of a fact, and a third rendering is a third thing that can survive a
+// doctrine reversal the other two got. `scripts/agent-surface-lockstep-check.mjs`
+// check 5 now fails the build if a price or a capability number reappears here.
+//
+// Relative cost claims STAY ("dearer than 2.0 at every shared tier") — that is
+// routing. The figures go, because those are data.
 
-import { PARTIALS } from './partials.generated.js'
 import { MODEL_CAPABILITIES } from './model-capabilities.js'
 
 export interface ModelFact {
   id: string
   label: string
   kind: 'image' | 'video' | 'audio'
+  /**
+   * Which op this seat is reachable through. `edit` rows live on
+   * slates_edit_video and must never appear in slates_generate_video's routing
+   * list — they were mixed into one VIDEO block with nothing marking them.
+   * Explicit rather than an id-suffix test: a structural test on "-edit" holds
+   * only while that substring is unique, which is how isOmniFlashModel broke.
+   */
+  route: 'generate' | 'edit'
   // ── Reference caps — DERIVED, never typed. See `caps()` below. ──
   /** Max reference images (image models) — null if not applicable. */
   maxRefImages: number | null
@@ -148,6 +167,7 @@ export function multimodalRefModels(): string[] {
 export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2',
+    route: 'generate',
     // Gemini 3.1 FLASH Image — verified against the runtime slug map in
     // slate/src/main/api/google.ts. Nano Banana PRO is a different model
     // (gemini-3-pro-image-preview); do not conflate them.
@@ -155,119 +175,124 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'image',
     // 14 = 10 object-fidelity + 4 character-consistency; the categories don't trade.
     ...caps('nano-banana-2'),
-    notes:
-      'Default image model. 14 refs hard cap (10 object + 4 character). Brief it like a creative director, not tag soup. No negativePrompt field — use positive reframing. Best image start-frame for legible text. Knowledge cutoff Jan 2025.',
+    notes: 'DEFAULT image model and the all-rounder — route here unless another seat\'s speciality is the point. Best start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images.',
   },
   {
     id: 'nano-banana-2-lite',
+    route: 'generate',
     label: 'Nano Banana 2 Lite',
     kind: 'image',
     ...caps('nano-banana-2-lite'),
-    notes:
-      'FAST/DRAFT image tier — ~half the price of NB2 full, ~2.7× faster, 1K output ONLY. Same Gemini content filter as NB2. Route here for iteration volume and drafts where 1K is fine; keep NB2 full for final 2K/4K. Character consistency + legible text hold up.',
+    notes: 'FAST/DRAFT image tier — markedly cheaper and faster than NB2 full, at draft quality. Route here for iteration volume, then re-run the winner on NB2 full. Same Gemini content filter as NB2.',
   },
   {
     id: 'nano-banana-pro',
+    route: 'generate',
     label: 'Nano Banana Pro',
     kind: 'image',
     ...caps('nano-banana-pro'),
-    notes:
-      'HERO-FRAME / typography PREMIUM image tier (Gemini 3 Pro backbone; ~2× NB2 price). NB2 ≈ 95% of Pro — route here only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element reasoning must be perfect. Up to 14 reference images (character locking, multi-subject fusion). Native 16:9 + 4K.',
+    notes: 'HERO-FRAME / typography PREMIUM image tier. NB2 is about 95% of Pro — escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene or deep multi-element reasoning must be perfect, and say why.',
   },
   {
     id: 'gpt-image-2',
+    route: 'generate',
     label: 'GPT Image 2',
     kind: 'image',
     ...caps('gpt-image-2'),
-    notes:
-      'TEXT/DIAGRAM/PANEL king — near-perfect character-level text, ordered panels, exact placement (~3s gens). Route here for character sheets, shot grids, and text-bearing panels. Quality tiers: medium (default, the value seat — half NB2 price at 1080p) / high (~4×, max text precision). Third filter regime (OpenAI moderate). 4K is API-only — even paid ChatGPT can\'t render it. ALSO THE PHOTOREAL FRONT-RUNNER (Eric, 2026-08-24) — at quality high it beat both Nano Banana rails head-to-head on skin realism, so route photoreal people HERE, not away. Banana still owns edit-heavy work and the 14-reference ceiling. Killed if a head-to-head at the intended crop goes the other way — re-run the evidence test, never carry this forward on reputation.',
+    notes: 'TEXT / DIAGRAM / PANEL king — near-perfect character-level text, ordered panels, exact placement. Route here for character sheets, shot grids and text-bearing panels. ALSO THE PHOTOREAL FRONT-RUNNER (Eric, 2026-08-24): at quality high it beat both Nano Banana rails head-to-head on skin realism, so route photoreal people HERE rather than away. Banana still owns edit-heavy work and the largest reference ceiling. Its own content filter, distinct from Gemini\'s. Killed if a head-to-head at the intended crop goes the other way — re-run the evidence test, never carry this forward on reputation.',
   },
   {
     id: 'flux-2-max',
+    route: 'generate',
     label: 'FLUX.2 Max',
     kind: 'image',
     ...caps('flux-2-max'),
-    notes: 'Photoreal, less censored, up to ~4MP. Auto-routes to its edit endpoint when references are present. Lower ref cap than NB2.',
+    notes: 'Photoreal image seat, less censored than the Gemini rails. Auto-routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedream-5-lite',
+    route: 'generate',
     label: 'Seedream 5 Lite',
     kind: 'image',
     ...caps('seedream-5-lite'),
-    notes: 'Cheapest image model (~flat price). Less censored. Routes to its edit endpoint with references.',
+    notes: 'CHEAPEST image seat, flat-priced. Less censored. Routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedance-2',
+    route: 'generate',
     label: 'Seedance 2.0',
     kind: 'video',
     ...caps('seedance-2'),
     audioRefNeedsCompanion: true,
-    notes: 'PREMIUM video tier and the DEFAULT video model — route here the moment physics, effects, destruction, or scale matter, and for hero shots. VIDEO-ONLY: cannot generate standalone images (use NB2/FLUX.2/Seedream for those). 4-15s, up to 9 ingredient images. Strong I2V / own-footage restyle. Native 4K, but 4K VIDEO is a Pro-only tier gate (base maxes at 1080p; server returns PRO_REQUIRED) — default 1080p unless the user is on Pro. Attaching a clip as a video reference (own-footage restyle, motion or dialogue conditioning) bills combined input+output seconds — at a DISCOUNTED per-second rate on every provider, roughly 0.6x the plain rate. 2.0 STAYS THE DEFAULT over 2.5 for two reasons, and neither is 1080p any more (2.5 gained 1080p on 2026-08-24): it is the only Seedance with native 4K, and it is cheaper at every shared tier (720p $0.15/s vs $0.231/s).',
+    notes: 'PREMIUM video tier and the DEFAULT video model — route here the moment physics, effects, destruction or scale matter, and for hero shots. VIDEO-ONLY. Strong image-to-video and own-footage restyle. 4K is Pro-gated (base accounts get PRO_REQUIRED). Stays the default over 2.5: it is the only Seedance with native 4K and it is cheaper at every tier the two share.',
   },
   {
     id: 'seedance-2.5',
+    route: 'generate',
     label: 'Seedance 2.5',
     kind: 'video',
     ...caps('seedance-2.5'),
     // No companion requirement — audio-only references are one of the things
     // the second seat actually buys.
-    notes:
-      `A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE OF IT — and the single most important fact is that it is the EXPENSIVE seat: 480p, 720p or 1080p (1080p added 2026-08-24), no 4K, and it costs MORE than 2.0 at every tier they share — 54% more at 720p ($0.231/s vs $0.15/s faceless). Pick 2.5 over 2.0 when the shot needs LENGTH (one 30s take vs 15s), MANY REFERENCES (30 images, plus video and audio references — 50 total), an AUDIO-ONLY reference (2.0 requires an image or video alongside audio; 2.5 does not), TIMED BEATS, or tighter prompt adherence. Pick 2.0 for 4K, and for the same resolution at a lower price. VIDEO-ONLY. TIMESTAMPS: ${PARTIALS['seedance-25-timestamps-short']} Multi-view subject reference images are also supported on 2.5 (up to 5 subjects) where 2.0 wanted one view per subject. 🚨 COST DISCIPLINE: LENGTH IS THE PRICE DIAL HERE, NOT RESOLUTION. A 30s 720p clip is 347 credits faceless / 489 on the AI-face route / 710 on the real-face route, and a 30s 1080p faceless take is 614 — 61% of a 1,000-credit welcome grant on ONE clip. Even 720p is not "the cheap one": 30s at 720p on the AI-face route beats a 15s 1080p Seedance 2.0 face generation (411). Always quote with slates_estimate_generation_cost before a long take, and explore at SHORT LENGTH (4-8s) rather than at low resolution — a 480p pass does not de-risk a 720p render, because generation is stochastic and the 720p run is a different take, not the same shot rendered better. 🚨 PROMPT INTENT IS A TASK-TYPE TRIGGER: when a request carries reference images/video/audio, the words "add", "remove", "replace", "change", "edit the video", "extend" or "continue" make the provider reclassify it as a video EDIT or EXTEND and fail it AFTER the job queues (credits are refunded, but the run stalls). If you mean to edit an existing clip, use slates_edit_video with model seedance-2.5-edit. If you mean a fresh shot, describe the finished frame rather than an instruction to change one.`,
+    notes: 'A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE — and the dearer one at every tier they share. Pick 2.5 when the shot needs LENGTH, MANY references, an AUDIO-ONLY reference, TIMED BEATS, or tighter prompt adherence; pick 2.0 for 4K and for the same resolution cheaper. VIDEO-ONLY. Timestamp grammar, and the edit/extend words that make the provider reclassify a fresh generation and fail it, are in slates-prompting-seedance-2-5.',
   },
   {
     id: 'seedance-2.5-edit',
+    route: 'edit',
     label: 'Seedance 2.5 Edit',
     kind: 'video',
     // 0 ingredients: prompt + source clip only on slates_edit_video.
     ...caps('seedance-2.5-edit'),
-    notes:
-      'VIDEO-TO-VIDEO EDIT via slates_edit_video — the ONLY edit engine that accepts a clip LONGER THAN 15 SECONDS (4-30s vs Kling O3 edit 3-15s and Omni Flash edit 3-10s), though ByteDance recommends staying inside 20s for quality. That length is the whole reason to route here; for a clip inside the others\' range compare on fidelity instead (Omni Flash edit won the 7/09 prompt-only head-to-head; Kling edit is the one that takes element/style reference images). 480p/720p/1080p output, native audio. Prompt + source clip only on this op — no reference images (the MODEL takes 1-5 reference images on an edit; Slates has not wired that path). Phrase the change as "from A to B", and TIMESTAMP a partial edit ("…from 4-6 seconds…") — 2.5 reads whole-second timestamps on edits, and without a range the instruction applies to the whole clip. AUDIO is editable on this same row: change a line, change an accent, translate dialogue with re-fitted lips, strip or replace BGM and sound effects. Output length follows the SOURCE clip and is billed as the ceiled source length, on the video-reference rate tier: an edit costs roughly DOUBLE a plain 2.5 generation of the same length, because every provider bills an edit on input + output seconds. Set seedanceFace:true when a character face is visible in the clip — the faceless provider blocks faces outright. There is no consented-real-face route for editing.',
+    notes: 'VIDEO-TO-VIDEO EDIT via slates_edit_video, and the only edit engine that takes a clip longer than the other two reach — that length is the whole reason to route here. Inside their range, compare on fidelity instead: Omni Flash edit won the prompt-only head-to-head, and Kling edit is the one that takes reference images. Edits audio on the same row (re-voice, re-accent, translate with re-fitted lips, replace BGM). Costs roughly double a plain 2.5 generation of the same length, because an edit bills input plus output seconds.',
   },
   {
     id: 'kling-v3',
+    route: 'generate',
     label: 'Kling 3.0',
     kind: 'video',
     // Family-level fact — caps are identical across std/pro/omni/omni-pro.
     ...caps('kling-v3.0-std'),
-    notes: 'DEFAULT general-purpose video model — cost-effective, strong start-frame adherence (identity/layout/text), acting, dialogue, lip-sync, any aspect ratio. Escalate to Seedance for physics. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools (MC std/pro, lip-sync, avatar) — those two tools are Kling-only.',
+    notes: 'DEFAULT general-purpose video model — cost-effective, strong start-frame adherence (identity, layout, text), acting, dialogue, lip-sync, and the widest aspect-ratio set. Escalate to Seedance for physics. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.',
   },
   {
     id: 'kling-v3-edit',
+    route: 'edit',
     label: 'Kling O3 Video Edit',
     kind: 'video',
     // Family-level fact; 4 = combined subject elements + style refs per edit.
     ...caps('kling-v3.0-omni-edit'),
-    notes:
-      'VIDEO-TO-VIDEO EDIT — the REF-DRIVEN edit tool: takes an EXISTING 3–15s clip and changes what the prompt names, with element/style reference images (@ElementN = frontal + angles) locking subject identity; max 4 combined refs. keep_audio preserves the ORIGINAL audio verbatim (spoken words cannot drift) — but video lips can drift slightly against it, and multi-beat instructions get under-executed (7/09 receipt: missed a second action beat Omni Flash edit landed) — ONE beat per pass. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the 7/09 fidelity head-to-head. Billed per second of output (≈ clip length, rounded up). Seedance edit/relocate is the alternative for style-transfer-heavy jobs.',
+    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keep_audio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
   },
   {
     id: 'veo-3.1',
+    route: 'generate',
     label: 'Veo 3.1',
     kind: 'video',
     // Family-level fact — fast and standard declare the same caps.
     ...caps('veo-3.1-fast'),
-    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one gen. 16:9 only, 4/6/8s only. Otherwise Kling (default) or Seedance (physics/premium) win.',
+    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one pass, and the narrowest aspect-ratio and duration sets in the catalogue are acceptable. Otherwise Kling (default) or Seedance (physics/premium) win.',
   },
   {
     id: 'omni-flash',
+    route: 'generate',
     label: 'Gemini Omni Flash',
     kind: 'video',
     // 7 ref2v image_urls — mirrors Google's own reference limit.
     ...caps('omni-flash'),
-    notes:
-      'CHEAP 720p tier with native synced audio included — t2v, single-start-frame i2v, or reference-to-video with up to 7 reference images. 3-10s, 16:9/9:16 only. No last frame, no video/audio references. VIDEO-ONLY. New seat: quality vs Kling/Seedance unproven pending comparison gens — do not route hero shots here; use it for cheap drafts, audio-in-one-gen at low cost, ref2v character consistency trials, and its edit variant.',
+    notes: 'CHEAP tier with native synced audio included. Route here for cheap drafts, audio-in-one-pass at low cost, and reference-to-video character-consistency trials. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.',
   },
   {
     id: 'omni-flash-edit',
+    route: 'edit',
     label: 'Omni Flash Edit',
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
     ...caps('omni-flash-edit'),
-    notes:
-      'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (7/09 head-to-head vs Kling edit on real talking footage: lips held perfectly, audio near-identical, both action beats landed). Takes an EXISTING 3-10s clip and changes what the prompt names, footage-synced (prop/effect/environment/lighting swaps). Fidelity is EARNED by prompt discipline: ONE short instruction + "Keep everything else the same." — long descriptive prompts DESTROY it (Google-documented + 7/09 receipt). Never name objects as metaphors ("candle-like" → literal candle). Quirk: occasional tail jitter/doubled last speech beat — trim the tail. NO reference images (identity swaps needing refs → Kling edit); bit-exact audio needs → Kling keep_audio or segment-splice. 720p output, cheapest edit seat (~2/3 of Kling edit Std).',
+    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (head-to-head vs Kling edit on real talking footage: lips held, audio near-identical, both action beats landed) and the cheapest edit seat. Footage-synced prop, effect, environment and lighting swaps. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
   },
   {
     id: 'minimax-h3',
+    route: 'generate',
     label: 'MiniMax H3',
     kind: 'video',
     ...caps('minimax-h3'),
@@ -275,58 +300,77 @@ export const MODEL_FACTS: ModelFact[] = [
     // be the only reference input; provide at least one reference image or
     // video with it." Same behavioural rule as Seedance 2.0.
     audioRefNeedsCompanion: true,
-    notes:
-      'THE AUTHORED-AUDIO SEAT. Reach for H3 when the sound is part of the shot rather than a switch on it: it writes synchronised dialogue, scene sound and an audience-only score in ONE pass, as three separate layers of the prompt, at 24fps with 32kHz stereo, across 11 stably-supported languages (Arabic, Chinese, English, French, German, Italian, Japanese, Korean, Portuguese, Russian, Spanish). Kling and Seedance treat audio as on/off; Veo generates it but gives you no way to direct the layers. The second thing only H3 gives you is a DECLARED REFERENCE RELATIONSHIP — you state how much of each reference survives (kept whole, partly kept, transferred onto a different subject, or a loose echo), including moving one subject\'s characteristic onto another. VIDEO-ONLY. 5-15s, 480p / 768p / 2K / 4K (768p default and native; 2K and 4K are upscales of a 768p base). $0.060/s at 768p — the cheapest 768-class second in the catalogue. Omni-reference ceiling: 9 images + 3 video clips + 3 audio clips, 12 files total, video and audio each 15s combined; an audio reference needs an image or video alongside it. 🚨 REFERENCE IMAGES PAST THE FIFTH COST 4 CREDITS EACH, on top of the per-second price — the first five are free, the model takes nine, and four paid images on a 10s 768p clip add 16 credits to a 30-credit generation. Attach the references the shot needs, not the maximum. 4K video is Pro-only (the server returns PRO_REQUIRED for a base account); 2K is open to every tier. \u2b06\ufe0f 2K AND 4K ARE UPSCALES OF A 768p RENDER, NOT LARGER GENERATIONS \u2014 fal states this outright, and in our own 2026-08-27 test the 2K pass came back with MORE artifacting than the 768p original it was built from, while costing 33 credits for a 5s take against 15 and taking almost twice as long. Treat them as a delivery-size convenience, never as a quality tier: generate at 768p, judge it there, and upscale in post if the pixels are genuinely needed.',
+    notes: 'THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off; Veo generates it but gives you no way to direct the layers. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.',
   },
   {
     id: 'minimax-h3-max',
+    route: 'generate',
     label: 'MiniMax H3 Max',
     kind: 'video',
     // No reference caps: fal publishes no reference-to-video endpoint for this
     // row, so `caps()` returns nulls and the composer refuses references.
     ...caps('minimax-h3-max'),
-    notes:
-      'THE SPEED SEAT, and the EXPENSIVE one at the tier they share — never the cheap H3 and never the default. fal\'s own post-train of the open H3 weights, self-hosted. 🚨 MEASURED 2026-08-27, same prompt and params on both rows: a 5s 768p text-to-video took **4.8 seconds** on Max against **57 seconds** on base H3 — **about 12x faster**, queue to finished file. That is the seat\'s whole case and it is now our own number, not fal\'s (fal claims under 3s; the literal claim did not hold at 4.8s wall-clock, the order of magnitude did). It also carries a thin quality edge on the with-audio Arena boards (1,204 vs 1,184 image-to-video, 1,235 vs 1,226 text-to-video — real, but 20 and 9 ELO, and vendor-reported). It gives up everything above 768p (no 2K, no 4K — the upscaler is not in the open weights). 🚨 FRAMES ARE UNAFFECTED — it takes a start frame and an end frame exactly like base H3, on `minimax/h3-max/image-to-video`, which is the route the image-to-video Arena score above is measured on. What it lacks is the REFERENCE endpoint (`minimax/h3-max/reference-to-video` 404s), so the omni-reference set — up to 9 identity/style/environment images plus reference video and audio — is base-H3 only. Never describe this row as taking no image input: an image-to-video shot is one of the two things it is FOR. It costs $0.080/s at 768p against base H3\'s $0.060/s: 33% more for a shorter ladder. So route here when a fast turnaround on a 480p/768p text-to-video or start-frame shot is worth the premium, and to base H3 for resolution, references, or the same tier cheaper. Same native audio, same 5-15s window, same six aspect ratios.',
+    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It gives up the upper resolution tiers and the REFERENCE endpoint, so the omni-reference set is base-H3 only — but it still animates start and end frames, which is one of the two things it is FOR. Never describe this row as taking no image input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
   },
   {
     id: 'ltx-2-5',
+    route: 'generate',
     label: 'LTX-2.5',
     kind: 'video',
     // No reference caps: fal publishes text-to-video and image-to-video for LTX
     // and no reference endpoint at all, so `caps()` returns nulls and the
     // composer refuses references. Start/end FRAMES are unaffected.
     ...caps('ltx-2-5'),
-    notes:
-      'THE VOLUME SEAT — the cheapest native 1080p second in the catalogue at $0.130/s, and the row to reach for when the job is MANY takes rather than one hero shot. Native synchronised audio is INCLUDED FREE at every tier (no audio surcharge and no audio toggle in the price, unlike Kling where sound is a paid key dimension), so a 6s 1080p clip WITH sound is 39 credits. Two more things only this row gives you: it is the ONLY model that reaches 1440p, and it makes the LONGEST clips in the catalogue — up to 20 SECONDS at 720p and 1080p, against H3\'s 15 and Veo\'s 8. 🚨 DURATIONS ARE EVEN NUMBERS ONLY AND START AT SIX: 6, 8, 10, 12, 14, 16, 18, 20. There is no 5-second LTX clip and no odd duration of any length — asking for 5s or 7s is not a rounding matter, the key does not exist. 🚨 AND THE LONG END IS 1080p-ONLY: at 1440p and 4K the ceiling drops to 10s (6, 8 or 10). VIDEO-ONLY. Aspect ratios are 16:9 and 9:16 ONLY — the narrowest set in the catalogue alongside Veo, so any squarish or vertical-portrait framing has to go elsewhere. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video, or image-to-video from a start frame plus an OPTIONAL end frame (which generates a transition between the two). There is no reference-to-video endpoint, so no identity/style/element images, no reference video, no reference audio — for character consistency across shots use H3 or Kling. 4K is Pro-only (the server returns PRO_REQUIRED for a base account); 720p, 1080p and 1440p are open to every tier. Route here for: batch coverage, long takes, cheap 1080p with sound, and anything where the credit budget is the binding constraint.',
+    notes: 'THE VOLUME SEAT — the cheapest native 1080p second in the catalogue, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It also reaches the highest resolution tier below 4K and makes the LONGEST clips in the catalogue. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.',
   },
   {
     id: 'ltx-2-5-pro',
+    route: 'generate',
     label: 'LTX-2.5 Pro',
     kind: 'video',
     ...caps('ltx-2-5-pro'),
-    notes:
-      'THE FIDELITY SEAT of the LTX pair — the full diffusion build ("Diffusion Fidelity Rendering", which spends more compute on complex scenes) against the distilled 8-step build the base row runs. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, AND THAT IS THE OPPOSITE OF EVERY OTHER PRO SEAT IN THIS CATALOGUE. Pro reaches a SHORTER ladder and makes SHORTER clips: 720p and 1080p only (no 1440p, no 4K) and 6, 8 or 10 seconds only (no 12-20). It also costs 33% more at 720p and 31% more at 1080p — $0.120/s and $0.170/s against $0.090 and $0.130. So Pro buys picture quality on a NARROWER envelope, and reaching for it because the name says Pro will cost more AND take away the reach. Everything else matches the base row exactly: same 16:9/9:16 pair, same free native synced audio at both tiers, same even-numbered durations, same frames-not-references input model (start frame plus optional end frame, no reference endpoint). Route here only when a specific shot needs the fidelity and fits inside 1080p and 10 seconds; route to base LTX for reach, length, 1440p/4K, and volume.',
+    notes: 'THE FIDELITY SEAT of the LTX pair — the full diffusion build against the base row\'s distilled one. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, which is the opposite of every other Pro seat here: it reaches a SHORTER resolution ladder and makes SHORTER clips, and it costs more at both tiers they share. Reaching for it because the name says Pro costs more AND takes away reach. Everything else matches the base row. Route here only when a specific shot needs the fidelity and fits inside its narrower envelope.',
   },
   {
     id: 'seed-audio',
+    route: 'generate',
     label: 'Seed Audio 1.0',
     kind: 'audio',
     // ONE image XOR up to 3 audio clips — the two inputs are mutually exclusive.
     ...caps('seed-audio'),
-    notes:
-      'DEFAULT audio model — the one-pass SCENE workhorse: dialogue, SFX, and ambience together from ONE plain sentence. Route here for continuity beds, room tone, crowd/nature soundscapes, and quick scratch VO. AUDIO-ONLY: cannot generate images or video. 🚨 THERE IS NO DURATION PARAMETER — length comes from the words, so you MUST NAME THE LENGTH IN THE PROMPT TEXT ("... 15 seconds"). Slates appends the requested length automatically and BILLS the requested seconds, so a prompt that fights the number wastes credits. Prompts are ONE plain sentence, no production jargon and no SFX:/Ambient: prefixes (those are Kling syntax and hurt here). Say the crowd size out loud — "applause" returns a full room when the joke was three people. 1-120s. Inputs: ONE image (describe-what-you-see scoring) XOR up to 3 audio clips referenced in the prompt as @Audio1-@Audio3, never both. 20 preset voices, or leave voice unset and let the scene cast itself.',
+    notes: 'DEFAULT audio model — the one-pass SCENE workhorse: dialogue, SFX and ambience together from ONE plain sentence. Route here for continuity beds, room tone, crowd and nature soundscapes, and quick scratch VO. AUDIO-ONLY. Takes one image XOR up to three audio clips as references, never both. Prompt form and the length rule are in slates-prompting-seed-audio.',
   },
   {
     id: 'eleven-sfx',
+    route: 'generate',
     label: 'ElevenLabs Sound Effects v2',
     kind: 'audio',
     ...caps('eleven-sfx'),
-    notes:
-      'ONE-SHOT SOUND EFFECT with an EXACT duration — route here for a single hit that must land on a frame (door slam, whoosh, impact, UI blip) or for a seamless loop. AUDIO-ONLY. 0.5-22s, and Slates always sends the duration explicitly (a null duration means a non-deterministic charge, so it is never left to the model). Describe the physical CAUSE, not the label: "heavy oak door slams shut in a stone hallway" beats "door sound". Text caps at 450 characters. loop=true produces a seamless bed. prompt_influence 0-1: higher hugs the prompt with less variation, lower explores. For layered scenes with dialogue or room tone, seed-audio does it in one pass instead.',
+    notes: 'ONE-SHOT SOUND EFFECT with an EXACT duration — route here for a single hit that must land on a frame (door slam, whoosh, impact, UI blip) or for a seamless loop. AUDIO-ONLY. For layered scenes with dialogue or room tone, seed-audio does it in one pass instead.',
   },
 ]
 
 const FACT_BY_ID = new Map(MODEL_FACTS.map((m) => [m.id, m]))
+
+/**
+ * Routing prose for one lane, generated from the SSOT.
+ *
+ * THE ONE RENDERER. The Studio Agent's system prompt, the MCP server's
+ * instructions and the generate/edit ops' `model` descriptions all call this —
+ * so "never restate model routing in an op description" (slates-mcp/CLAUDE.md)
+ * is now enforced by there being nothing to restate. Before this, the video op
+ * carried 1,282 characters of hand-written routing that repeated MODEL_FACTS
+ * phrase for phrase ("SECOND SEAT", "AUTHORED-AUDIO", "never the default"),
+ * in the same file that forbids exactly that.
+ */
+export function describeRouting(
+  kind: ModelFact['kind'],
+  route: ModelFact['route'] = 'generate'
+): string {
+  return MODEL_FACTS.filter((f) => f.kind === kind && f.route === route)
+    .map((f) => `${f.label}: ${f.notes}`)
+    .join('\n')
+}
 
 export function getModelFact(id: string): ModelFact | undefined {
   return FACT_BY_ID.get(id)

@@ -224,9 +224,25 @@ function stampRouter(text, file, modelFactsSource) {
   )
 }
 
+/**
+ * Build-time markers that mean nothing outside this repo.
+ *
+ * `@banned:start` / `@banned:end` fence the never-use list that
+ * src/prompts/banned-tokens.ts extracts and inlines into the generate ops'
+ * descriptions. The LIST is real content and stays; the fence is a contract
+ * between two files in a repo the reader of this export does not have. Invisible
+ * either way — stripped because a portable artifact should not carry the seams
+ * of the machine that made it.
+ */
+function stripBuildMarkers(text) {
+  return text.replace(/^<!-- @banned:(?:start|end) -->\n/gm, '')
+}
+
 function render(spec, raw, modelFactsSource) {
   if (spec.kind === 'router') return stampRouter(raw, spec.source, modelFactsSource)
-  const body = rewriteCrossRefs(stripSlatesOnly(stripFrontmatter(raw, spec.source), spec.source))
+  const body = rewriteCrossRefs(
+    stripBuildMarkers(stripSlatesOnly(stripFrontmatter(raw, spec.source), spec.source))
+  )
   const note =
     '> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.'
   const output = normalize(`${generatedComment}\n\n${note}\n\n${body}`)

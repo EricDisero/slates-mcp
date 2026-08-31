@@ -49,7 +49,105 @@ slates-mcp/
   - **Validate against `AGENT_ROUTE_PROVIDER` (`'fal'`), not the direct-API sets.** Agent generations are credits-only and the credits route carries Kling and Veo on fal, so an agent gets Kling's 3 ratios and Veo's 2. Validating against the 8/10 direct sets would accept a ratio fal rejects.
   - **Keep it a dependency-free LEAF.** It ships as its own exports subpath (`./model-capabilities`) with a `default` condition, because slate's renderer bundles it AND the slates-api checkers load it through tsx as CommonJS.
   - **Still open (plan §5):** the IMAGE param surface is unaudited — its ratio enum is now generated (so no phantom values) but is a union, not per-model, so `gpt-image-2`'s five ratios are unenforced. `checkAspectRatio` is ready; wire it the way `assertVideoCapabilities` does.
-- **Model routing doctrine SSOT = `packages/shared/src/prompts/model-facts.ts`.** `MODEL_FACTS` (kind: image vs video, default/premium/niche notes) and `VIDEO_MODELS` (the exact `slates_generate_video` model ids) are exported from the package and CONSUMED at runtime by the desktop Studio Agent system prompt (`slate/src/main/studio-agent/context.ts` derives its MODEL ROUTING block and model-id list from them — added 2026-07-03 after the agent suggested Seedance, a video-only model, as an image generator from a hand-written prose copy). Editing routing = edit `model-facts.ts` (+ `skills/slates-model-selection.md` for the long-form table) and rebuild. NEVER restate model routing in op descriptions, skill files, or desktop prompt prose — point at `slates-model-selection` / derive from `MODEL_FACTS` instead. Op descriptions that duplicate the doctrine are a bug: they drift AND bloat the desktop's cached token prefix.
+- **🚨 AGENT GUIDANCE SSOT = `packages/shared/src/prompts/agent-doctrine.ts` (added 2026-08-30).**
+  `buildAgentDoctrine({ surface })` is the ONE working method, the ONE set of hard rules and the ONE
+  guide index, consumed by BOTH surfaces: the desktop Studio Agent's entire system prompt
+  (`slate/src/main/studio-agent/context.ts` is now composition and a cache, nothing else) and the MCP
+  server's `instructions`. Neither consumer may author doctrine prose — `scripts/agent-surface-lockstep-check.mjs`
+  fails the build if one does.
+  - **Why:** capability has been SSOT since the ops registry was built and it HELD. Guidance never
+    was, and it drifted the moment a second surface existed: 37,447 characters of working method,
+    hard rules and routing reached only the desktop, while `new Server(...)` shipped
+    `{ capabilities: { tools: {} } }` with no `instructions` at all. A Claude Code user got tool
+    descriptions and nothing else — no REAL NUMBERS rule, no guide index, no working method. The MCP
+    protocol has had the field the whole time.
+  - **`both()` is the default; `fork()` needs a defensible reason.** Only four lines fork today, and
+    each one names a mechanism that genuinely differs: `present_plan` is a desktop loop-level tool
+    the MCP surface cannot see, and only the desktop loop auto-polls generation status and renders
+    orchestration cost. Two hand-maintained copies is the drift this file deletes.
+  - **The MCP instructions have a PINNED BYTE CEILING** (`MCP_INSTRUCTIONS_CEILING`, 14,000). They are
+    injected into every client session with no prompt cache behind them, unlike the desktop's
+    byte-stable prefix (measured 97.4% cache hit). Measured 2026-08-30 after the cut below: **9,613
+    chars**, down from 37,976. Raise the ceiling deliberately, never to green a red build.
+  - **🚨 EVERY FACT LIVES AT THE DECISION IT INFORMS. The doctrine says only what no single op can
+    say.** The first version of this module was 37,976 characters, and **85% of it was two blocks
+    that duplicated other SSOTs**: a 17,700-char MODEL ROUTING table (80 resolution tokens, 42
+    duration claims and 23 hard-typed prices — all owned by `MODEL_CAPABILITIES` and the rate
+    functions, and the prices flatly contradicted the prompt's own REAL NUMBERS ONLY rule) and a
+    14,556-char guide index of Claude-Code-style discovery blurbs for a mapping `resolveGuideTopic()`
+    already does in code. The rule now:
+
+    | The fact is true… | It lives in | Because |
+    |---|---|---|
+    | every turn (REAL NUMBERS, credits-only, consent, token discipline) | the doctrine | there is no narrower moment |
+    | at one call (routing, capabilities, banned tokens) | that op's `.describe()` | it is in context exactly when the decision happens, and a Zod enum ENFORCES what prose can only request |
+    | as craft (how to write the prompt) | the skill, on demand | it is thousands of words that matter for one model |
+
+    Routing now rides `describeRouting()` on the four ops that choose a model
+    (`slates_generate_image`, `slates_generate_video`, `slates_edit_video`,
+    `slates_generate_audio`); the doctrine keeps one line saying the three KINDS are disjoint, which
+    is the only part no single op can say. **This was not a size exercise** — it is the same lesson
+    the banned-token measurement produced (prose 13% → 13%, op description 0% → 94%): placement
+    beats presence.
+  - **⚠️ AND THE INSTRUCTIONS WERE NEVER THE BIG NUMBER.** Measured the same day, the always-in-context
+    total is ~63K chars: instructions 9.6K, op descriptions 25K, op PARAM descriptions 28K. Roughly
+    7K of the routing that left the doctrine landed in those param descriptions, so the honest cut is
+    the guide index and the duplicated facts, not the relocation. **If someone comes here to shrink
+    the agent's context, the doctrine is 15% of the problem and the tool surface is the rest.**
+- **🚨 "LOAD THE GUIDE" AND "QUALITY-CHECK" ARE STRUCTURAL, NOT PROSE (added 2026-08-30).** Both rules
+  were written in the system prompt and both were skipped in the first real session after the model
+  swap: `slates_get_prompting_guide` zero times, no vision op, and a prompt that tripped the skill's
+  own never-use list twice (`photorealistic`, `cinematic`). **A rule with no check is a suggestion,
+  and an LLM is the least reliable enforcer you could pick.** So:
+  - `packages/shared/src/prompts/banned-tokens.ts` EXTRACTS each never-use list from the skill file
+    itself, between `<!-- @banned:start -->` / `<!-- @banned:end -->` markers, and
+    `describeBannedTokens()` inlines it into `slates_generate_image` / `slates_generate_video`'s
+    descriptions. **An op description is always in context on both surfaces — there is no call to
+    skip and no discretion to exercise.** Never hand-type one of those tokens downstream; edit the
+    skill and rebuild. (The marker note itself sits inside a `slates-only` fence, or
+    `build-prompt-builder`'s portability check correctly refuses to ship an op name in the public
+    lead magnet.)
+  - `bannedTokenWarning()` reports what the submitted prompt actually contained, in the op RESULT,
+    on the pre-spend gates as well as the success path. **Non-blocking** — the generation proceeds
+    (PRODUCT_PHILOSOPHY → make state visible, never block).
+  - Generation results name the review op. Three different pointers, because what the agent already
+    HAS differs: a blocking image generation returns the pixels inline ("look at what you have"), a
+    video generation returns none ("call `slates_get_asset_video_frames`"), a background submission
+    has no asset yet. Telling the agent to re-fetch something already in its context buys a wasted
+    turn and teaches the wrong habit.
+  - **Measured A/B**, `cheap-image` at k=8, same brain, same day, same scorer: with enforcement OFF,
+    `0/8` runs produced a clean prompt and every failure was the same two tokens as the production
+    incident (`photorealistic`, `cinematic`). With it ON, `7/8`. Harness + full numbers:
+    `slate/scripts/agent-eval/README.md`.
+  - **🚨 MEASURED RESULT, 2026-08-30, 48 trials at k=8 — and it is HALF a win. Read it before
+    "improving" any of this.** `no_banned_tokens` went **0/8 → 30/32 (94%)**: the never-use list
+    rides an op description, the model cannot skip it, and it obeyed. `guide_before_generate` was
+    **13% before and 13% after** — the same 4-in-32 either way. **Steps 2(a) and 2(b) changed the
+    OUTPUT and did not change the BEHAVIOUR.** So the skill's NEGATIVE half is enforced and its
+    POSITIVE half (named lens, film stock, physics-based lighting, composition — the levers that
+    make a shot good rather than merely un-bad) still only reaches the model if it chooses to fetch
+    it, and it usually does not.
+    - **The lesson generalises: put the FACT where it cannot be skipped, not a POINTER to the fact.**
+      An op description saying "read the guide first" has been ignored for months; an op description
+      carrying the actual list is obeyed. Anything you want the agent to know belongs in the second
+      shape.
+    - **Step 2(c) — auto-attaching the matching skill to `slates_estimate_generation_cost` — was
+      deliberately NOT built.** "Not yet loaded THIS SESSION" is session state, and the MCP op layer
+      has no session concept at all; that is real architecture, not a tweak, and the plan's own
+      falsification clause warns against reflexively adding a fourth mechanism. It is Eric's call,
+      and now it has evidence behind it.
+    - `pass^8` is 0 on five of six tasks almost entirely because of this one assertion, so **do not
+      read these numbers as a verdict on the model.** Re-run against a candidate brain
+      (`SLATES_EVAL_API_BASE`) before concluding anything about model choice.
+
+- **The MCP surface has NO plan gate, and that is DELIBERATE (decided 2026-08-30).** The desktop
+  rejects a billable op in code until a `present_plan` verdict is approved; MCP's consent is the
+  per-op `requires_confirm` threshold plus the host client's own per-call tool approval. Adding a
+  plan gate here would mean a new op and a stateful session concept on a stdio server, to duplicate
+  a confirmation the Claude Code / Cursor user already sees. The doctrine string forks at step 4 to
+  describe the mechanism each surface actually has. **Do not "fix" this asymmetry without re-deciding
+  it** — and if you do, the doctrine fork is where it lands, not a second prompt.
+- **Model routing doctrine SSOT = `packages/shared/src/prompts/model-facts.ts`.** `MODEL_FACTS` (kind: image vs video, default/premium/niche notes) and `VIDEO_MODELS` (the exact `slates_generate_video` model ids) are exported from the package and CONSUMED at runtime by `prompts/agent-doctrine.ts`, which derives the MODEL ROUTING block and model-id list from them for BOTH agent surfaces (added 2026-07-03 after the agent suggested Seedance, a video-only model, as an image generator from a hand-written prose copy; moved here from `slate/.../context.ts` on 2026-08-30 when guidance became SSOT). Editing routing = edit `model-facts.ts` (+ `skills/slates-model-selection.md` for the long-form table) and rebuild. NEVER restate model routing in op descriptions, skill files, or desktop prompt prose — point at `slates-model-selection` / derive from `MODEL_FACTS` instead. Op descriptions that duplicate the doctrine are a bug: they drift AND bloat the desktop's cached token prefix.
 - **Asset params take UUIDs OR badge codes.** Generation ops resolve refs ("IMG-A8", bare "a8") against the project AT CALL TIME via `resolveAssetRefs()` and echo the resolved code+label in every result. New ops with asset-id params must use the same helper — stale-code guessing burned a real $4.44 render on the wrong start frame (2026-07-03).
 - **The desktop consumes the PUBLISHED npm package, not this working tree.** Local iteration: `npm run build`, then copy `packages/shared/{dist,package.json,skills}` into `slate/node_modules/@slatesvideo/shared/` so the in-app Studio Agent picks changes up without a publish. `slate/scripts/check-shared-version.mjs` screams on version drift at dev startup. Shipping to users = publish + bump slate's dep + desktop release (publish BEFORE the release build, in that order).
 - **🚨 The Blender bridge is a SEPARATE GPL-3.0 program — keep the boundary clean (added 2026-08-28).** `slates_blender_*` ops talk over a localhost TCP socket to the `slates-blender` add-on (its own repo, `C:\Coding Projects\slates\slates-blender`). That add-on links `bpy` and is therefore GPL, as every Blender add-on is; **this repo stays proprietary because the boundary is a socket, and GPL propagates through linkage, not across a process.** So: never vendor add-on code into this package, and never import from it. The wire protocol (`{type:"execute",code,strict_json}` → `{status,result,stdout,stderr}`, NUL-delimited JSON) is the whole contract, it is documented in `clients/blender.ts` and in the add-on's `CLAUDE.md`, and **changing it is a two-repo edit**.
@@ -61,9 +159,18 @@ slates-mcp/
 
 ```bash
 npm install
-npm run build       # builds shared → mcp → cli in order
+npm run build       # shared → mcp → cli, then the agent-surface lockstep check
 npm run typecheck   # whole-monorepo type check
+npm run check:agent-surface   # just the lockstep check (needs a built dist)
 ```
+
+`scripts/agent-surface-lockstep-check.mjs` runs at the end of `npm run build` and asserts four
+things: both surfaces expose the same op id set with no surface-private capability (the desktop's
+`present_plan` is the one documented exception), the MCP server passes non-empty `instructions` built
+from `buildAgentDoctrine` within the byte ceiling, neither consumer contains doctrine prose of its
+own, and every banned token inlined into an op description still appears in its source skill's
+`@banned` block. **All four are mutation-tested** — break one, it goes red on that check. The desktop
+half skips with a warning when `../slate` is not on disk, per the sibling-repo rule.
 
 ## Adding a new operation
 

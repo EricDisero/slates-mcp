@@ -78,6 +78,15 @@ Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and a
 
 These are Stable-Diffusion-era tag soup. The model treats them as low-signal noise. Measured success rate: ~60-70% with these vs ~95%+ with positive description.
 
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is extracted
+     by src/prompts/banned-tokens.ts, inlined verbatim into the slates_generate_image
+     op description (always in context on both surfaces), and matched against every
+     submitted prompt. Editing this list changes what the agent is told AND what it
+     is warned about — keep every entry backticked, and keep prose outside the
+     backticks. -->
+<!-- /slates-only -->
 **Never use:**
 - `8k`, `4k` (as a quality token)
 - `hyperrealistic`, `ultra-realistic`, `photorealistic` standing alone
@@ -86,6 +95,7 @@ These are Stable-Diffusion-era tag soup. The model treats them as low-signal noi
 - `perfect skin`, `flawless`, `airbrushed`, `smooth skin`
 - `cinematic` standing alone — always specify *which cinema* (director, lens, era, stock)
 - `not anime, not cartoon, not 3D` — negation tag soup, replace with a positive style cue
+<!-- @banned:end -->
 
 ## Negative prompting — there is no field
 

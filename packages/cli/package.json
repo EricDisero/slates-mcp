@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/cli",
-  "version": "0.5.12",
+  "version": "0.5.13",
   "description": "Slates CLI: drive the Slates AI video studio from your terminal or let Claude Code shell out to it. Includes the bundled agent skills and an MCP client configurator.",
   "license": "MIT",
   "type": "module",
@@ -47,7 +47,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@slatesvideo/shared": "^0.6.2",
+    "@slatesvideo/shared": "^0.6.3",
     "commander": "^12.1.0",
     "zod": "^3.23.0"
   },

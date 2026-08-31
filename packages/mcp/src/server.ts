@@ -11,6 +11,7 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   ALL_OPERATIONS,
+  buildAgentDoctrine,
   defaultContext,
   type Operation,
 } from '@slatesvideo/shared'
@@ -35,9 +36,23 @@ const pkg = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
 ) as { version: string }
 
+// The MCP protocol carries a field for exactly this, and it sat unused: a
+// Claude Code / Cursor / Codex user got tool descriptions and nothing else —
+// no working method, no REAL NUMBERS rule, no guide index, while the desktop
+// Studio Agent had 37K characters of all three. Same doctrine, one source
+// (@slatesvideo/shared → prompts/agent-doctrine.ts), surface-aware only where
+// the mechanism genuinely differs.
+//
+// ⚠️ SIZE IS DELIBERATE. This is injected into EVERY client session and some
+// clients truncate or ignore long instructions, so it ships the working method
+// + hard rules + guide index and leaves the long-form skills to
+// slates_get_prompting_guide. scripts/agent-surface-lockstep-check.mjs pins the
+// byte count so growth is a review decision, not an accident.
+const instructions = buildAgentDoctrine({ surface: 'mcp' })
+
 const server = new Server(
   { name: 'slates-studio', version: pkg.version },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {} }, instructions }
 )
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -78,7 +93,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main(): Promise<void> {
   const transport = new StdioServerTransport()
   await server.connect(transport)
-  console.error(`[slates-mcp] server started, ${ops.length} tools registered`)
+  console.error(
+    `[slates-mcp] server started, ${ops.length} tools registered, ` +
+      `${instructions.length} chars of agent doctrine sent as instructions`
+  )
 }
 
 main().catch((err) => {

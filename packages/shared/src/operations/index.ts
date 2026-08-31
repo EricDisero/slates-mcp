@@ -17,7 +17,14 @@ import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../c
 import { SKILLS } from '../skills/content.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
-import { multimodalRefSummary, multimodalRefModels, seedanceTaskIntentWords } from '../prompts/model-facts.js'
+import {
+  multimodalRefSummary, multimodalRefModels, seedanceTaskIntentWords,
+  // 🚨 THE routing renderer. Routing prose is GENERATED here, never typed:
+  // slates-mcp/CLAUDE.md forbids restating it in an op description, and this
+  // file did it anyway for 1,282 characters that repeated MODEL_FACTS phrase
+  // for phrase. Edit model-facts.ts; both surfaces follow.
+  describeRouting,
+} from '../prompts/model-facts.js'
 // 🚨 MODEL CAPABILITY SSOT. Aspect ratios, video resolutions and durations are
 // VALIDATED against and DESCRIBED from `MODEL_CAPABILITIES` — this file must
 // never re-state one of those constraints as a literal enum or a sentence
@@ -36,6 +43,13 @@ import {
   describeReferenceImageCaps,
   type AspectRatio, type VideoResolution,
 } from '../prompts/model-capabilities.js'
+// 🚨 "LOAD THE GUIDE" MADE STRUCTURAL. The never-use token lists are EXTRACTED
+// from the skill files (between `@banned` markers) and inlined into the two
+// generate ops' descriptions, which are always in context on both surfaces —
+// no call to skip, no discretion. `bannedTokenWarning` then reports what the
+// submitted prompt actually contained, in the result, without blocking it.
+// Never hand-type one of these tokens here; edit the skill.
+import { describeBannedTokens, bannedTokenWarning } from '../prompts/banned-tokens.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -120,6 +134,35 @@ const BACKGROUND_DESCRIBE =
   'Submit and return immediately with generationId(s) instead of blocking until the file is saved. ' +
   'Poll with slates_get_generation_status. Recommended for video (1-5 min renders).'
 
+// ── Vision QC pointers (the "quality-check with vision" rule, made structural) ──
+//
+// QUALITY-CHECK is a POST-condition, so it cannot be gated the way a
+// pre-condition can. What it CAN have is a result the agent cannot avoid
+// reading, naming the exact op. Deliberately NOT an auto-fetch: that would
+// spend vision tokens on every generation whether review was wanted or not,
+// and the sandbox doctrine says the tool is available, not mandatory.
+//
+// ⚠️ These three differ because what the agent already HAS differs, and telling
+// it to re-fetch something already in front of it burns a turn for nothing:
+// a blocking image generation returns the pixels inline, a video generation
+// returns none, and a background submission has no asset yet.
+const IMAGE_INLINE_REVIEW =
+  'The image is attached to this result — look at it against the brief before you describe it. ' +
+  'Any claim about how it LOOKS must come from pixels you actually received (slates-vision-feedback-loop).'
+const VIDEO_REVIEW_POINTER =
+  'You have NOT seen this clip: call slates_get_asset_video_frames on the asset id above before ' +
+  'describing how it looks. A quality claim you cannot point to a tool result for is a REAL NUMBERS ONLY violation.'
+const BACKGROUND_REVIEW_POINTER =
+  'When it completes, look at it before you describe it — slates_get_asset_image for images, ' +
+  'slates_get_asset_video_frames for video.'
+// The image saved, but reading it back off disk failed (best-effort fetch). The
+// agent has an asset and NO pixels, which is the one state where a quality
+// claim would be pure invention — so this branch has to say so rather than
+// fall through to no pointer at all.
+const IMAGE_FETCH_POINTER =
+  'The pixels could not be attached to this result: call slates_get_asset_image on the asset id ' +
+  'above before describing how it looks.'
+
 // Early-return shape when a generation route accepted the job in background
 // mode ({ background: true } in the response). No inline-image fetch — the
 // asset doesn't exist yet; the poller delivers it on completion.
@@ -134,7 +177,8 @@ function backgroundSubmitted(
     text:
       `Submitted ${kind} in the background — generationId(s): ${idText}. ` +
       `Call slates_get_generation_status with waitSeconds: 45 (it long-polls and returns on completion — ` +
-      `never a rapid loop; video renders commonly take 1-5 minutes). Generations survive app restarts.` +
+      `never a rapid loop; video renders commonly take 1-5 minutes). Generations survive app restarts. ` +
+      BACKGROUND_REVIEW_POINTER +
       (note ? ` ${note}` : ''),
     data: { generationIds: ids, status: 'processing', ...extra },
   }
@@ -1449,7 +1493,17 @@ export const generateImage: Operation<{
 }> = {
   id: 'slates_generate_image',
   description:
-    'Generate an image via Slates credits. Models: nano-banana-2 (default), nano-banana-2-lite (fast/cheap drafts, 1K only), nano-banana-pro (hero-frame/typography premium), gpt-image-2 (sharp text / character sheets / grids; quality medium|high), flux-2-max (photoreal, less censored), seedream-5-lite (cheapest flat, less censored). Which model for which job: read the slates-model-selection skill. Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use.',
+    'Generate an image via Slates credits.\n' +
+    // GENERATED from MODEL_FACTS — the hand-typed model list that stood here
+    // was a third copy of the routing doctrine, and it had already gone stale
+    // (it still described nano-banana-2-lite by a capability the param owns).
+    `${describeRouting('image')}\n` +
+    'Full table: the slates-model-selection skill. ' +
+    'Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use. ' +
+    // GENERATED from the skill file's own never-use list -- the one piece of
+    // prompting doctrine that is ALWAYS in context, because the agent has
+    // demonstrably skipped the call that would have taught it.
+    describeBannedTokens('image'),
   input: z.object({
     prompt: z.string().min(1).max(4000),
     model: zEnum(IMAGE_MODELS).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
@@ -1470,6 +1524,10 @@ export const generateImage: Operation<{
     // Mirrors the cost confirm gate — defaults silently wasted credits
     // (1:1 when user wanted 16:9, 4k when 1k would have done). The LLM
     // is forced to ask the user or read the skill instead of guessing.
+    // Non-blocking prompt hygiene. Computed once, reported on every exit path
+    // that echoes a prompt -- the clarification and confirm gates are PRE-spend,
+    // which is where a rewrite is still free.
+    const promptWarning = bannedTokenWarning(input.prompt, 'image')
     if (!input.aspectRatio || !input.resolution) {
       const missing: string[] = []
       if (!input.aspectRatio) missing.push('aspectRatio')
@@ -1477,7 +1535,9 @@ export const generateImage: Operation<{
       return ok({
         requires_clarification: true,
         missing,
+        ...(promptWarning ? { prompt_warning: promptWarning } : {}),
         message:
+          (promptWarning ? `${promptWarning}\n\n` : '') +
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-prompting-nano-banana-2 + slates-cost-discipline skills, ` +
           // Generated from MODEL_CAPABILITIES — never retype a ratio list.
@@ -1565,7 +1625,9 @@ export const generateImage: Operation<{
           model: costKey,
           estimated_cents: totalCents,
           estimated_credits: totalCents,
+          ...(promptWarning ? { prompt_warning: promptWarning } : {}),
           message:
+            (promptWarning ? `${promptWarning}\n\n` : '') +
             `Cost exceeds ${CONFIRM_CREDITS} credits. Re-call with confirm=true to proceed, or pick a smaller resolution / count.`,
         })
       }
@@ -1582,7 +1644,8 @@ export const generateImage: Operation<{
           `Review them against your prompt — every reference's role must be labeled in the prompt text. ` +
           `If the references suggest a different composition / style than the current prompt captures, REVISE the prompt before confirming. ` +
           `When you talk to the user about this gen, refer to each reference by its code (e.g. "${previews[0]?.ref ?? 'IMG-A?'}") — they'll see the matching badge in the Slates gallery.` +
-          `\n\nWhen ready, re-call slates_generate_image with confirm=true and the (possibly revised) prompt.`,
+          `\n\nWhen ready, re-call slates_generate_image with confirm=true and the (possibly revised) prompt.` +
+          (promptWarning ? `\n\n${promptWarning}` : ''),
         images: previews.flatMap((p) => p.images),
         data: {
           requires_confirm: true,
@@ -1674,7 +1737,13 @@ export const generateImage: Operation<{
       }
       const requestedCount = input.count ?? 1
       return {
-        text: partialFailure
+        // The pixels are ALREADY here when the disk read worked, so the
+        // review pointer says "look at what you have", not "call another op".
+        // Telling the agent to re-fetch an image already in its context would
+        // buy a wasted turn and teach the wrong habit.
+        text: `${images.length > 0 ? IMAGE_INLINE_REVIEW : IMAGE_FETCH_POINTER} ` +
+          (promptWarning ? `${promptWarning} ` : '') +
+          (partialFailure
           ? `Partial result: ${assetList.length} of ${requestedCount} image(s) saved into project ${input.projectId} ` +
             `(error on the rest: ${result.error ?? 'unknown error'}). ` +
             `The saved assets are in data.assets — re-generate only the missing count, don't redo the whole batch. ` +
@@ -1682,7 +1751,7 @@ export const generateImage: Operation<{
           : `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
             `for ${fmtCredits(totalCents)}. ` +
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
-            (refEcho ? ` ${refEcho}` : ''),
+            (refEcho ? ` ${refEcho}` : '')),
         images,
         data: {
           model: imageModel,
@@ -1761,6 +1830,8 @@ export const generateImage: Operation<{
     }
     return {
       text:
+        `${IMAGE_INLINE_REVIEW} ` +
+        (promptWarning ? `${promptWarning} ` : '') +
         `Generated ${urls.length} image(s) for ${fmtCredits(totalCents)}. ` +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
       images,
@@ -2432,7 +2503,10 @@ export const generateVideo: Operation<{
 }> = {
   id: 'slates_generate_video',
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3 / slates-prompting-minimax-h3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8").',
+    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3 / slates-prompting-minimax-h3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
+    // GENERATED from the skill's own slop-token list. Always in context on both
+    // surfaces, so it survives an agent that skips slates_get_prompting_guide.
+    describeBannedTokens('video'),
   input: z.object({
     prompt: z.string().min(1).max(4000),
     // ROUTING doctrine only. Every capability number was stripped on 2026-08-16
@@ -2441,7 +2515,16 @@ export const generateVideo: Operation<{
     // "seedance-2.5 480p/720p" were both stated here AND there, and the two
     // copies disagreed — and the second of those went stale on 2026-08-24 when
     // 2.5 gained 1080p, which is exactly the failure mode generating it fixes.
-    model: z.string().describe(`One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like "kling-v3-standard-8s" auto-resolve). Route per the slates-model-selection skill: Kling std = general-purpose DEFAULT, Seedance 2 = premium physics/effects/hero tier, seedance-2.5 = a SECOND SEAT beside it (longer takes, far more references, audio-only refs — but no 4K, and dearer than seedance-2 at every shared resolution, so stay on seedance-2 unless length or reference count is the point), Veo = native-synced-audio niche only, never the default, omni-flash = cheap tier with audio included (t2v, single-start-frame i2v, or reference images; no last frame, no video/audio refs), minimax-h3 = the AUTHORED-AUDIO seat (dialogue, scene sound and score directed as three separate layers in one pass, plus declared reference relationships; reference images past the fifth are a PAID key dimension — pass referenceImages when quoting), minimax-h3-max = the same model post-trained by fal for SPEED, capped at 768p, and DEARER than minimax-h3 at the tier they share — a deliberate pick, never a default and never the cheap H3; it still takes firstFrameAssetId/lastFrameAssetId, but has no reference endpoint, so the reference set is minimax-h3 only. All are VIDEO-only. Each model's legal aspect ratios, durations and resolutions are in those params' own descriptions — read them there, not from memory. For per-call cost, call slates_estimate_generation_cost.`),
+    model: z.string().describe(
+      `One of: ${VIDEO_MODELS.join(' | ')}. Pass the BASE id — duration and videoResolution are separate ` +
+        `params (registry cost keys like "kling-v3-standard-8s" auto-resolve). All are VIDEO-only.\n` +
+        // GENERATED from MODEL_FACTS. The paragraph that stood here restated it by
+        // hand and had already drifted a phrase at a time.
+        `${describeRouting('video', 'generate')}\n` +
+        `Full table: the slates-model-selection skill. Each model's legal aspect ratios, durations and ` +
+        `resolutions are in those params' own descriptions — read them there, not from memory. ` +
+        `For per-call cost, call slates_estimate_generation_cost.`
+    ),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Strongly recommended — the desktop UI shows a progress card live and the asset appears when complete.'),
     // 🚨 THESE THREE DESCRIPTIONS ARE GENERATED FROM `MODEL_CAPABILITIES`.
     // Never hand-write a ratio, resolution or duration into them again — every
@@ -2520,11 +2603,16 @@ export const generateVideo: Operation<{
     // no asset to reference later, and a failed gen leaves the user with
     // nothing. The MCP-only headless path that exists for image gen is
     // not reasonable for video given the cost.
+    // Non-blocking prompt hygiene, computed once. Reported on the gates that
+    // fire BEFORE any spend, where a rewrite is still free.
+    const promptWarning = bannedTokenWarning(input.prompt, 'video')
     if (!input.projectId) {
       return ok({
         requires_clarification: true,
         missing: ['projectId'],
+        ...(promptWarning ? { prompt_warning: promptWarning } : {}),
         message:
+          (promptWarning ? `${promptWarning}\n\n` : '') +
           'projectId is required for video generation. Use slates_list_projects to find one or slates_create_project to make a new one. Video gens cost tens to a few hundred credits per call — they need to land in a project so the user sees the progress card and the result.',
       })
     }
@@ -2535,7 +2623,9 @@ export const generateVideo: Operation<{
       return ok({
         requires_clarification: true,
         missing,
+        ...(promptWarning ? { prompt_warning: promptWarning } : {}),
         message:
+          (promptWarning ? `${promptWarning}\n\n` : '') +
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-cost-discipline + ${promptingSkillFor(input.model)} skills, ` +
           // Generated from MODEL_CAPABILITIES. The prose that stood here claimed
@@ -2907,6 +2997,7 @@ export const generateVideo: Operation<{
           `Pre-flight for ${input.duration}s ${input.model} (${costKey}): ` +
           `${fmtCredits(totalCents)}.` +
           refSummary +
+          (promptWarning ? `\n\n${promptWarning}` : '') +
           `\n\nWhen ready, re-call slates_generate_video with confirm=true and the (possibly revised) prompt.`,
         images: refImages,
         data: {
@@ -3002,6 +3093,10 @@ export const generateVideo: Operation<{
     }
     return {
       text:
+        // No frames come back with a video generation, so unlike the image op
+        // this one has to name the op that fetches them.
+        `${VIDEO_REVIEW_POINTER} ` +
+        (promptWarning ? `${promptWarning} ` : '') +
         `Generated ${input.duration}s ${input.model} video into project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)}. ` +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
@@ -3051,7 +3146,9 @@ export const generateAudio: Operation<{
     model: z
       .enum(AUDIO_MODELS)
       .describe(
-        'Audio surface. seed-audio = scene/ambience/beds/dialogue (default choice), eleven-sfx = one precise effect or a seamless loop. Routing doctrine: slates-model-selection skill.'
+        // GENERATED from MODEL_FACTS — the audio lane's routing lived only in the
+        // system prompt and in a one-line paraphrase here.
+        `Audio surface.\n${describeRouting('audio')}\nFull table: the slates-model-selection skill.`
       ),
     prompt: z
       .string()
@@ -3527,7 +3624,12 @@ export const editVideo: Operation<{
     prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
     // Clip windows and resolutions GENERATED from MODEL_CAPABILITIES.
     model: zEnum(EDIT_VIDEO_MODELS).optional().describe(
-      `Default kling-v3.0-omni-edit. Pro (~25¢/s vs ~19¢/s) only for hero shots where fidelity matters. omni-flash-edit (~19¢/s) for prompt-only edits — it takes NO character/style refs. seedance-2.5-edit is the ONLY engine that accepts a clip longer than 15s; it also takes NO character/style refs on this op. Source-clip length per engine: ${describeDurations(EDIT_VIDEO_MODELS)}. Output resolution: ${describeVideoResolutions(EDIT_VIDEO_MODELS)}`
+      // Routing GENERATED from MODEL_FACTS; the paragraph that stood here was
+      // hand-written and carried per-second prices, which drift and which the
+      // agent's own REAL NUMBERS ONLY rule forbids it repeating.
+      `Default kling-v3.0-omni-edit. Neither omni-flash-edit nor seedance-2.5-edit takes character/style refs on this op.\n` +
+        `${describeRouting('video', 'edit')}\n` +
+        `Source-clip length per engine: ${describeDurations(EDIT_VIDEO_MODELS)}. Output resolution: ${describeVideoResolutions(EDIT_VIDEO_MODELS)}`
     ),
     characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN). KLING MODELS ONLY — rejected on omni-flash-edit.'),
     styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
@@ -4677,6 +4779,30 @@ function resolveGuideTopic(topic: string): string | null {
   return null
 }
 
+/**
+ * The guide index, GENERATED from SKILLS.
+ *
+ * The list here was hand-typed and had drifted to 25 of 32 names — the prompting
+ * guides for GPT Image 2, MiniMax H3, LTX-2.5, Seedance 2.5 and Omni Flash were
+ * all missing, so an agent reading this description could not learn they exist.
+ * A hand-typed index of a generated corpus is a stale index; it is only a matter
+ * of when.
+ *
+ * Per-model guides are listed as BARE NAMES: the name is the description, and
+ * `resolveGuideTopic()` resolves a model id to the right one anyway.
+ */
+function describeGuideTopics(): string {
+  const names = Object.keys(SKILLS).sort()
+  const perModel = names.filter((n) => n.startsWith('slates-prompting-'))
+  const rest = names.filter((n) => !n.startsWith('slates-prompting-'))
+  return (
+    `Workflow and cross-cutting guides: ${rest.join(', ')}. ` +
+    `Per-model prompting guides (or just pass the model id, which resolves to one of these): ` +
+    `${perModel.join(', ')}. ` +
+    `Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.`
+  )
+}
+
 export const getPromptingGuide: Operation<{ topic: string }> = {
   id: 'slates_get_prompting_guide',
   description:
@@ -4685,9 +4811,7 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
     topic: z
       .string()
       .min(1)
-      .describe(
-        'Guide name, model id, or style name. Guides: slates-model-selection (which model for which job — read before choosing any model), slates-cost-discipline, slates-content-policy, slates-style-prompting, slates-prompting-nano-banana-2, slates-prompting-veo-3, slates-prompting-kling-v3, slates-prompting-seedance, slates-prompting-seed-audio, slates-prompting-elevenlabs, slates-prompting-lip-sync, slates-prompting-motion-transfer, slates-prompting-flux-2-max, slates-prompting-seedream-5-lite, slates-edit-and-iterate, slates-vision-feedback-loop, slates-character-identity, slates-storyboard-from-script, slates-direct-response-ad, slates-one-prompt-film. Blender previs (3D-blocked camera control): slates-previs-blocking (start here), slates-camera-language, slates-blocking-to-prompt, slates-dialogue-blocking, slates-restyle-from-blocking. Style names (photoreal, anime, painterly, 3d-render) resolve to slates-style-prompting.'
-      ),
+      .describe(`Guide name, model id, or style name. ${describeGuideTopics()}`),
   }),
   async run(input) {
     const resolved = resolveGuideTopic(input.topic)

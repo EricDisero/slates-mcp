@@ -339,7 +339,16 @@ Speed ramps and slow-motion are supported in natural language, and `fast` is wid
 the lid opens in slow-motion · the blade whips through the air
 ```
 
-**Slop tokens to avoid:** `epic`, `amazing`, `beautiful`, `lots of movement`, `8K`, `masterpiece`, `trending on artstation`. These are quality *incantations* — the officially sanctioned way to ask for quality is the image-quality slot vocabulary in Part 1 (`HD`, `rich details`, `cinematic texture`, `natural colors`, `soft lighting`).
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ — same contract as the anti-list in slates-prompting-nano-banana-2.
+     Extracted by src/prompts/banned-tokens.ts into the slates_generate_video op
+     description and matched against submitted prompts. The RECOMMENDED vocabulary
+     below sits OUTSIDE the markers on purpose — it is backticked too. -->
+<!-- /slates-only -->
+**Slop tokens to avoid:** `epic`, `amazing`, `beautiful`, `lots of movement`, `8K`, `masterpiece`, `trending on artstation`.
+<!-- @banned:end -->
+These are quality *incantations* — the officially sanctioned way to ask for quality is the image-quality slot vocabulary in Part 1 (`HD`, `rich details`, `cinematic texture`, `natural colors`, `soft lighting`).
 
 ## Style block at the end
 

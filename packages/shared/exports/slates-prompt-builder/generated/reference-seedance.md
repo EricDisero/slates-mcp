@@ -304,7 +304,8 @@ Speed ramps and slow-motion are supported in natural language, and `fast` is wid
 the lid opens in slow-motion · the blade whips through the air
 ```
 
-**Slop tokens to avoid:** `epic`, `amazing`, `beautiful`, `lots of movement`, `8K`, `masterpiece`, `trending on artstation`. These are quality *incantations* — the officially sanctioned way to ask for quality is the image-quality slot vocabulary in Part 1 (`HD`, `rich details`, `cinematic texture`, `natural colors`, `soft lighting`).
+**Slop tokens to avoid:** `epic`, `amazing`, `beautiful`, `lots of movement`, `8K`, `masterpiece`, `trending on artstation`.
+These are quality *incantations* — the officially sanctioned way to ask for quality is the image-quality slot vocabulary in Part 1 (`HD`, `rich details`, `cinematic texture`, `natural colors`, `soft lighting`).
 
 ## Style block at the end
 

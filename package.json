@@ -7,7 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli",
+    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli && node scripts/agent-surface-lockstep-check.mjs && node scripts/mcp-instructions-smoke.mjs",
+    "check:agent-surface": "node scripts/agent-surface-lockstep-check.mjs",
+    "check:mcp-instructions": "node scripts/mcp-instructions-smoke.mjs",
     "sync-partials": "npm run sync-partials -w packages/shared",
     "sync-prompt-builder": "npm run build-prompt-builder -w packages/shared",
     "build:skills-pack": "node scripts/build-skills-pack.mjs",
