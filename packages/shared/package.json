@@ -22,6 +22,10 @@
     "./model-capabilities": {
       "types": "./dist/prompts/model-capabilities.d.ts",
       "default": "./dist/prompts/model-capabilities.js"
+    },
+    "./shot-grammar": {
+      "types": "./dist/prompts/shot-grammar.d.ts",
+      "default": "./dist/prompts/shot-grammar.js"
     }
   },
   "files": [

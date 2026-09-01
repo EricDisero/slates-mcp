@@ -163,6 +163,180 @@ export interface ShotSpec {
    * worst failure keyed is a stale entry, which composes as nothing.
    */
   audioRefSpokenText: Record<string, string>
+
+  // ── The script layer ─────────────────────────────────────────────
+  //
+  // 🚨 A ROW OWNS ITS TEXT. NOTHING POINTS INTO A SIBLING ROW'S CONTENT.
+  // There is no script blob, no screenplay field, no offsets and no spans.
+  // "The full script" is these rows rendered in order. The obvious
+  // implementation — one text blob with cut points as character offsets — is
+  // the one design that cannot be made safe: every edit shifts every
+  // downstream offset and one bad edit orphans every shot after it. If a
+  // proposed feature needs an offset, a span, or a range into another row,
+  // it is that design in disguise; reject it.
+  //
+  // 🚨 THE SCRIPT IS AUTHORED. THE PROMPT IS DERIVED FROM IT (2026-08-31).
+  // This block used to say the opposite — "a planning and counting surface …
+  // none of them reaches a model" — and that was the mistake. It made the
+  // script and the prompt TWO STORES OF THE SAME CONTENT with nothing joining
+  // them: `paste script` filled `line`/`speaker`/`delivery`, `composeShot` read
+  // only `prompt`, and eight beats of real script rendered eight rows of "No
+  // prompt yet". A duplicate encoding, which is the exact bug class
+  // `frame_type` / `motion_prompt` was deleted for.
+  //
+  // The direction matters and only one of the two works. Prompt → script means
+  // parsing prose back into speaker/action/framing, which needs a model, and
+  // there is no model in this app (it is why paste-a-script is a dumb parser).
+  // Script → prompt is a deterministic composition — the same thing the
+  // composer already does for references. So `scriptPromptBody()` below is the
+  // one derivation, and `prompt` stops being a parallel copy of the script:
+  // it is the CRAFT DIRECTION a screenplay cannot hold (lens, grain, lighting,
+  // the specific quality of a move), layered on top.
+  //
+  // Every one is nullable and nothing ever asks for one — a visuals-only piece
+  // must look finished (no empty state, no "add a line", no completeness
+  // meter).
+
+  /** Who speaks: an entity id, a bare name, the literal `VO`, or null. A name
+   *  matching no character is a working state, not an error — it renders as
+   *  plain text and offers "make this a character". */
+  speaker: string | null
+  /** What is said, verbatim. No camera, no scene, no prompt bloat — this is
+   *  the half a person reads aloud. */
+  line: string | null
+  /** The parenthetical: how it is said. `(flat, exhausted)` */
+  delivery: string | null
+  /** What happens in the shot, screenplay-style. ONE field: an action line
+   *  already describes everyone in frame, and splitting out the non-speakers
+   *  invents a distinction writers do not make. */
+  action: string | null
+  /** The one readable object carrying the beat. */
+  prop: string | null
+  /** Framing, FREE TEXT. Bucketed for counting by
+   *  `@slatesvideo/shared/shot-grammar`; never constrained by it. */
+  shotSize: string | null
+  /** Camera move, FREE TEXT. Same rule as `shotSize`. */
+  camera: string | null
+  /**
+   * This row's line runs on from the previous row's — one sentence, two cuts.
+   *
+   * ONE FLAG, NO OFFSETS. It says "these two rows are one sentence" without
+   * either row pointing into the other's text. Set by a mid-sentence split,
+   * editable by hand, and cleared on both sides when a move breaks the run.
+   * `heinrich-ad-prompting.md` §0a is built on exactly this move, so script →
+   * cut is many-to-many and must stay that way.
+   */
+  continues: boolean
+}
+
+/**
+ * What each script field MEANS, in one sentence — the prose the op surface
+ * shows an agent for that parameter.
+ *
+ * It lives beside the fields because `satisfies Record<ScriptField, string>` is
+ * what makes a new field a compile error in the DESCRIPTIONS too. An op that
+ * hand-typed these would ship a ninth field with no explanation, which is the
+ * same failure as a column nothing renders.
+ */
+export const SCRIPT_FIELD_DESCRIPTION = {
+  speaker:
+    'Who says the line — a character id, a bare name (a character that does not exist yet is fine), or "VO". Null for a shot with no words.',
+  line: 'What is SAID, verbatim. Never camera, scene or prompt language — this is the half a person reads aloud.',
+  delivery: 'The parenthetical: how it is said. "(flat, exhausted)"',
+  action: 'What happens in the shot, screenplay-style. One line covering everyone in frame.',
+  prop: 'The one readable object carrying the beat.',
+  shotSize:
+    'Framing, in your own words — "wide", "long-lens CU, other head blurred". FREE TEXT: it is bucketed for the variety count and never rejected or rewritten.',
+  camera:
+    'Camera move, in your own words — "slow push in", "through the rearview, eyes only". FREE TEXT, same rule as shotSize.',
+  continues:
+    'True when this row\'s line runs on from the previous row\'s — one sentence split across two cuts. The signature VO move; set it deliberately.',
+} as const satisfies Record<ScriptField, string>
+
+/** The script fields, as a list. Sorted from the description map so the two
+ *  cannot disagree — never a second hand-written array. */
+export type ScriptField =
+  | 'speaker'
+  | 'line'
+  | 'delivery'
+  | 'action'
+  | 'prop'
+  | 'shotSize'
+  | 'camera'
+  | 'continues'
+
+/** The seven free-text script fields (everything but the `continues` flag) —
+ *  the set an op accepts as `string | null` and a layer renders as text. */
+export const SCRIPT_TEXT_FIELDS = [
+  'speaker',
+  'line',
+  'delivery',
+  'action',
+  'prop',
+  'shotSize',
+  'camera',
+] as const satisfies ReadonlyArray<Exclude<ScriptField, 'continues'>>
+
+export type ScriptTextField = (typeof SCRIPT_TEXT_FIELDS)[number]
+
+/**
+ * The script, composed into prompt prose. **The one derivation, mirrored in
+ * both repos**, so the desktop, `slates_get_shot` and the generation handler
+ * cannot disagree about what a scripted Shot sends.
+ *
+ * 🚨 IT IS A TEMPLATE, NOT A WRITER. Deterministic, inspectable, no model. It
+ * orders the fields the way a shot is actually described — what the camera is
+ * doing, what happens, then who says what — and does nothing else. It never
+ * invents adjectives, never "enhances", and never reorders a sentence the user
+ * wrote. That is the prompt-transparency invariant: Slates may compose, and
+ * every composed character has to be visible in the composer before Generate.
+ *
+ * 🚨 AND IT ONLY FIRES WHEN `prompt` IS EMPTY. A Shot that carries an authored
+ * prompt keeps it byte-for-byte — which is what makes this safe to ship to live
+ * users with no migration. `prompt` wins because it is the more specific
+ * statement of intent; the script still counts, still fits, still reads.
+ *
+ * Dialogue is quoted so a model receives it as speech rather than as
+ * description — the one piece of grammar this adds, and the reason it is not
+ * just `join(' ')`.
+ */
+export function scriptPromptBody(spec: Pick<ShotSpec, ScriptTextField>): string {
+  const clean = (v: string | null): string => (v ?? '').trim()
+  const parts: string[] = []
+
+  // Framing first: it is the camera instruction, and every model's own docs
+  // put shot size and movement at the head of the prompt.
+  const framing = [clean(spec.shotSize), clean(spec.camera)].filter(Boolean).join(', ')
+  if (framing) parts.push(`${framing}.`)
+
+  const action = clean(spec.action)
+  if (action) parts.push(/[.!?]$/.test(action) ? action : `${action}.`)
+
+  const prop = clean(spec.prop)
+  if (prop) parts.push(`${prop} is visible in frame.`)
+
+  const line = clean(spec.line)
+  if (line) {
+    const speaker = clean(spec.speaker)
+    const delivery = clean(spec.delivery).replace(/^\(|\)$/g, '').trim()
+    // "VO" is a screenplay abbreviation, not something to send to a model.
+    const who = !speaker || speaker.toUpperCase() === 'VO' ? 'A voice' : speaker
+    const how = delivery ? `, ${delivery},` : ''
+    parts.push(`${who} says${how} "${line}"`)
+  }
+
+  return parts.join(' ')
+}
+
+/**
+ * What this Shot actually sends: the authored prompt, or the script composed
+ * into one. Every consumer calls THIS, never `spec.prompt` directly — a reader
+ * that reached past it would be the surface that still says "No prompt yet"
+ * while the row plainly has a script in it.
+ */
+export function effectivePrompt(spec: ShotSpec): string {
+  const authored = spec.prompt.trim()
+  return authored || scriptPromptBody(spec)
 }
 
 /** An empty Shot: a prompt bar nobody has touched. Every reader starts here and
@@ -181,6 +355,14 @@ export function emptyShotSpec(): ShotSpec {
     firstFrameAssetId: null,
     lastFrameAssetId: null,
     audioRefSpokenText: {},
+    speaker: null,
+    line: null,
+    delivery: null,
+    action: null,
+    prop: null,
+    shotSize: null,
+    camera: null,
+    continues: false,
   }
 }
 
@@ -261,6 +443,17 @@ export function normalizeShotSpec(raw: unknown): ShotSpec {
     firstFrameAssetId: str(v.firstFrameAssetId),
     lastFrameAssetId: str(v.lastFrameAssetId),
     audioRefSpokenText: spoken,
+    // The script layer reads through the same tolerant `str()` as everything
+    // else: a row written before these existed comes back with nulls, which is
+    // exactly right — it had no line and never claimed one.
+    speaker: str(v.speaker),
+    line: str(v.line),
+    delivery: str(v.delivery),
+    action: str(v.action),
+    prop: str(v.prop),
+    shotSize: str(v.shotSize),
+    camera: str(v.camera),
+    continues: v.continues === true,
   }
   for (const role of ORDERED_ATTACHMENT_ROLES) out.refs[role] = strArray(refs[role])
   return out

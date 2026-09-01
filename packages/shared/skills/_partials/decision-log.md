@@ -2,13 +2,12 @@ When you surface the plan, include a short **decision log** — one line per dec
 
 ```
 source phrase or declared default → what you wrote → what it resolves
-"in a diner"        → chrome-and-vinyl booth, 3/4 on the counter   → fixes the anchor so blocking is repeatable
+"in a diner"        → warm, and the light is the reason           → why the anchor was chosen, not what it is
 (no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
-(no model named)    → seedance-2 on shot 4 only                    → the one shot where physics matter
 ```
 
-🚨 **Keep it to what is NOT already data.** A saved Shot records the references, their roles, the model and every param, and `slates_get_shot` reads them back composed — narrating those is retelling a row the user can open. This convention exists because the model's choices had nowhere structured to land; where they now do, write the Shot and let the log carry the judgement no field holds.
+🚨 **Keep it to what is NOT already data — and almost everything now IS.** A Shot holds the references and their roles, the model, every param, the shot size, the camera, the prop, the action and the spoken line, and `slates_list_shots` reads the whole board back in order with its variety counts. Narrating any of those is retelling a row the user can open. **Write the Shot, and let the log carry only the judgement no field holds** — why this world, why this light, why this register.
 
-**Hard rule: never silently add weather, props, style, or camera movement.** If it wasn't in the brief and you added it, it goes in the log. This is the "why did you add that?" affordance — for an agent that writes prompts on the user's behalf and spends their credits, it is what keeps the model in assembly and the user in the director's chair.
+**Hard rule: never silently add weather, props, style, or camera movement.** Four of those are now FIELDS: put the value on the Shot (`prop`, `camera`, `shotSize`, `action`) so the user can read and change it, and put the *reason* in the log only when you invented it rather than being told it. The rule has not softened — it moved from narration into data, which is stronger, because a field can be corrected and a sentence in chat cannot.
 
 > ❌ **Do NOT turn this into a question gate.** Clarifying questions before optimizing directly fight the locked fast-path rule: *if intent is clear, generate immediately with sane defaults, don't ask questions; only ask for production intent, and batch every question into one message.* Log the decisions, then go. The log is an **output**, not an interrogation — surfaced alongside the plan, never as a separate ceremony, and never as a reason to wait.

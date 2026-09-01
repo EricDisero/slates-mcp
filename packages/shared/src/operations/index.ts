@@ -56,8 +56,16 @@ import { describeBannedTokens, bannedTokenWarning } from '../prompts/banned-toke
 import {
   ORDERED_ATTACHMENT_ROLES,
   ATTACHMENT_ROLE_DESCRIPTION,
+  SCRIPT_FIELD_DESCRIPTION,
+  SCRIPT_TEXT_FIELDS,
   type OrderedAttachmentRole,
+  type ScriptTextField,
 } from '../prompts/shot-spec.js'
+import {
+  SHOT_SIZE_BUCKETS,
+  CAMERA_MOVE_BUCKETS,
+  SPEECH_RATE,
+} from '../prompts/shot-grammar.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
@@ -1275,15 +1283,27 @@ export const createStoryboard: Operation<{
 
 export const getStoryboardWithFrames: Operation<{ storyboardId: string }> = {
   id: 'slates_get_storyboard_with_frames',
-  description: 'Deep-fetch a storyboard with all scenes and frames.',
+  // 🚨 ONE BOARD, TWO READERS. Every frame carries its Shots — the same rows,
+  // in the same order, that the user is looking at. Before this the agent got
+  // scenes and frames with no Shots, so the user read an arranged board while
+  // the agent read an unordered pile.
+  description:
+    "Deep-fetch a storyboard: every scene, every slot, and the SHOT in each slot — its script line, references, model, params and takes — plus the piece's variety distribution. This is the same board, in the same order, that the user is reading.",
   input: z.object({ storyboardId: z.string().uuid() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     const [storyboard, scenes] = await Promise.all([
       desktop.get<{ storyboard: unknown }>('/agent/storyboards/get', { id: input.storyboardId }),
-      desktop.get<{ scenes: unknown[] }>('/agent/scenes/full', { storyboardId: input.storyboardId }),
+      desktop.get<{
+        scenes: unknown[]
+        variety: VarietyReport | null
+        varietySummary: string
+      }>('/agent/scenes/full', { storyboardId: input.storyboardId }),
     ])
-    return ok({ ...storyboard, scenes: scenes.scenes })
+    return ok(
+      { ...storyboard, scenes: scenes.scenes, variety: scenes.variety },
+      describeVarietyReport(scenes.variety)
+    )
   },
 }
 
@@ -1310,7 +1330,12 @@ export const addFrame: Operation<{
   position?: number
 }> = {
   id: 'slates_add_frame',
-  description: 'Add a frame (asset reference) to a scene.',
+  // ⚠️ THIS OP AND `slates_create_shot({ frameId })` NOW OVERLAP: two doors to
+  // "put something in a scene". Naming the wart is cheaper than merging them
+  // mid-release. Use THIS one only to park an existing picture; use
+  // slates_create_shot to write a beat, which is almost always what you want.
+  description:
+    'Park an EXISTING image in a scene as a new slot. It creates a Shot for that picture automatically, because a scene is a list of Shots. To write a beat — line, references, model, prompt — use slates_create_shot instead; it needs no image and files itself.',
   input: z.object({
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid(),
@@ -4585,12 +4610,14 @@ export const updateFrame: Operation<{
   assetId?: string | null
   sceneId?: string | null
   position?: number
-  frameType?: 'first' | 'last' | 'ingredient' | null
-  motionPrompt?: string | null
 }> = {
   id: 'slates_update_frame',
   description:
-    'Update a frame: shot label, notes, bound asset (assetId=null unbinds), scene, position, frameType (first/last/ingredient, null clears), or motion prompt (null clears).',
+    // ⚠️ `frameType` and `motionPrompt` are GONE. They were a weaker duplicate
+    // of what the Shot in this slot already encodes — the image's role and the
+    // beat's words — and they were backfilled into Shots on 2026-08-31. Use
+    // slates_update_shot for either.
+    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
   input: z.object({
     frameId: z.string().uuid(),
     shotLabel: z.string().optional(),
@@ -4598,8 +4625,6 @@ export const updateFrame: Operation<{
     assetId: z.string().uuid().nullable().optional(),
     sceneId: z.string().uuid().nullable().optional(),
     position: z.number().int().min(0).optional(),
-    frameType: z.enum(['first', 'last', 'ingredient']).nullable().optional(),
-    motionPrompt: z.string().nullable().optional(),
   }),
   async run(input, ctx) {
     return ok(
@@ -4611,8 +4636,6 @@ export const updateFrame: Operation<{
           assetId: input.assetId,
           sceneId: input.sceneId,
           position: input.position,
-          frameType: input.frameType,
-          motionPrompt: input.motionPrompt,
         },
       })
     )
@@ -4640,13 +4663,11 @@ export const batchUpdateFrames: Operation<{
     assetId?: string | null
     sceneId?: string | null
     position?: number
-    frameType?: 'first' | 'last' | 'ingredient' | null
-    motionPrompt?: string | null
   }[]
 }> = {
   id: 'slates_batch_update_frames',
   description:
-    'Update MANY frames in one call — motion prompts, shot labels, notes, asset binding, scene/position, frameType. Prefer this over repeated slates_update_frame when writing a scene or a whole storyboard: it is one round-trip and one UI refresh. Every id is validated before anything is written, so the batch never lands half-applied.',
+    'Update MANY slots in one call — shot labels, notes, asset binding, scene/position. Prefer this over repeated slates_update_frame when re-arranging a scene: it is one round-trip and one UI refresh, and every id is validated before anything is written, so the batch never lands half-applied. To write the BEATS themselves, use slates_create_shot / slates_update_shot.',
   input: z.object({
     updates: z
       .array(
@@ -4657,8 +4678,6 @@ export const batchUpdateFrames: Operation<{
           assetId: z.string().uuid().nullable().optional(),
           sceneId: z.string().uuid().nullable().optional(),
           position: z.number().int().min(0).optional(),
-          frameType: z.enum(['first', 'last', 'ingredient']).nullable().optional(),
-          motionPrompt: z.string().nullable().optional(),
         })
       )
       .min(1),
@@ -4674,8 +4693,6 @@ export const batchUpdateFrames: Operation<{
             assetId: u.assetId,
             sceneId: u.sceneId,
             position: u.position,
-            frameType: u.frameType,
-            motionPrompt: u.motionPrompt,
           },
         })),
       })
@@ -4763,6 +4780,65 @@ const shotParamsSchema = z
     audioDurationSeconds: z.number().int().min(1).max(120).optional().describe('Audio lane. On seed-audio the requested duration IS the bill.'),
   })
   .optional()
+
+/**
+ * The script layer, as op params — GENERATED from `SCRIPT_FIELD_DESCRIPTION`.
+ *
+ * 🚨 THE PROSE IS NEVER HAND-TYPED HERE. `shot-spec.ts` owns what each field
+ * MEANS, with `satisfies Record<ScriptField, string>` making a ninth field a
+ * compile error in the descriptions too. An op that spelled these out would
+ * ship a field with no explanation — the same failure as a column nothing
+ * renders.
+ *
+ * 🚨 AND NONE OF THEM IS SENT TO A MODEL. They are a planning and counting
+ * surface; the prompt is the only thing the request carries. The one exception
+ * is pre-existing: a multiShotSegment still prepends its own camera and
+ * shotSize to its own segment prompt.
+ */
+const SHOT_SCRIPT_SHAPE = Object.fromEntries(
+  SCRIPT_TEXT_FIELDS.map((field) => [
+    field,
+    z.string().max(2000).nullable().optional().describe(SCRIPT_FIELD_DESCRIPTION[field]),
+  ])
+) as { [K in ScriptTextField]: z.ZodOptional<z.ZodNullable<z.ZodString>> }
+
+const shotScriptSchema = {
+  ...SHOT_SCRIPT_SHAPE,
+  continues: z.boolean().optional().describe(SCRIPT_FIELD_DESCRIPTION.continues),
+}
+
+/** The framing vocabulary an agent should know about — generated from the
+ *  bucket lists so a seventh bucket cannot ship undescribed, and worded so it
+ *  is unmistakably a COUNTING aid rather than a closed set. */
+const FRAMING_NOTE =
+  `shotSize and camera are FREE TEXT and are never rejected or rewritten. ` +
+  `They are bucketed only for the variety count — shot size into ` +
+  `${SHOT_SIZE_BUCKETS.join(' / ')}, camera into ${CAMERA_MOVE_BUCKETS.join(' / ')} — ` +
+  `and anything unrecognised counts as "other", which is a fine answer.`
+
+interface ShotOpScript {
+  speaker?: string | null
+  line?: string | null
+  delivery?: string | null
+  action?: string | null
+  prop?: string | null
+  shotSize?: string | null
+  camera?: string | null
+  continues?: boolean
+}
+
+/** What the caller actually sent for the script half, by omission. Same rule
+ *  as `shotParamsPatch`: an `undefined` value is not an absent key, and a
+ *  spread of undefineds is silent data loss on a merging route. */
+function shotScriptPatch(input: ShotOpScript): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const raw = input as Record<string, unknown>
+  for (const field of SCRIPT_TEXT_FIELDS) {
+    if (raw[field] !== undefined) out[field] = raw[field]
+  }
+  if (input.continues !== undefined) out.continues = input.continues
+  return out
+}
 
 interface ShotOpRefs {
   refs?: Partial<Record<OrderedAttachmentRole, string[]>>
@@ -4927,12 +5003,57 @@ function assertShotCapabilities(
  *  reference list — which is exactly why a listing quote is a floor. */
 interface ShotSummary {
   id: string
+  /** `SHOT-A1` — the address the user sees on the row. */
+  code: string | null
   name: string
   model: string | null
   authoredFor: string | null
   rawPrompt: string
   params: Record<string, unknown>
   referenceCount: number
+  // The script layer. Read, edited and counted; NEVER sent to a model.
+  speaker: string | null
+  line: string | null
+  delivery: string | null
+  action: string | null
+  prop: string | null
+  shotSize: string | null
+  camera: string | null
+  continues: boolean
+  /** Cuts inside this ONE generation. Rhythm is counted in cuts, money in
+   *  generations, and Seedance 2.5 deliberately decouples them. */
+  cuts: number
+  runtimeSeconds: number | null
+  /** Where it sits on the board, so a listing is ARRANGED rather than flat. */
+  sceneId: string | null
+  sceneName: string | null
+  position: number | null
+}
+
+/**
+ * The variety report the desktop computes across a set of Shots.
+ *
+ * 🔑 IT ARRIVES IN THE RESULT, NOT BEHIND A GUIDE FETCH. Measured on the
+ * 2026-08-30 eval harness: a rule inlined into an op moved compliance from 0/8
+ * to 30/32, while the same guidance behind `slates_get_prompting_guide` sat at
+ * 13% before and after. A variety skill alone would not be read.
+ */
+interface VarietyReport {
+  cuts: number
+  generations: number
+  runtimeSeconds: number | null
+  cutsWithoutDuration: number
+  shotSizes: Array<{ bucket: string; count: number }>
+  cameraMoves: Array<{ bucket: string; count: number }>
+  runs: Array<{ dimension: string; bucket: string; length: number; from: number }>
+  overLongLines: Array<{
+    shotId: string
+    words: number
+    requiredWpm: number
+    durationSeconds: number
+  }>
+  words: number
+  wordBudget: number | null
 }
 
 /** What `/agent/shots/get` returns: the summary PLUS the composition. */
@@ -5026,18 +5147,21 @@ function shotQuote(
 }
 
 export const createShot: Operation<
-  ShotOpRefs & {
-    projectId: string
-    name?: string
-    prompt: string
-    model?: string
-    params?: ShotOpParams
-    frameId?: string
-  }
+  ShotOpRefs &
+    ShotOpScript & {
+      projectId: string
+      name?: string
+      prompt: string
+      model?: string
+      params?: ShotOpParams
+      frameId?: string
+      sceneId?: string
+    }
 > = {
   id: 'slates_create_shot',
   description:
-    'Save a named Shot — a reusable generation recipe (raw prompt, references with their roles, model, params) that needs NO image to exist yet, so a whole sequence can be planned and priced before anything is generated.',
+    'Write one beat of the piece — a Shot: its script line, its references with their roles, its model and params, and the prompt that fires. It needs NO image to exist, so a whole film can be written, arranged and priced before anything is generated. It lands in the storyboard automatically (the open scene, else the most recent storyboard) — never unfiled. ' +
+    FRAMING_NOTE,
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().max(120).optional().describe('What to call it. Shown on the card; the prompt supplies one if you omit it.'),
@@ -5051,7 +5175,9 @@ export const createShot: Operation<
     characterIds: z.array(z.string().uuid()).optional().describe('Characters the prompt @mentions — stored as ENTITY ids, so updating the character updates every Shot that names it.'),
     environmentIds: z.array(z.string().uuid()).optional(),
     styleIds: z.array(z.string().uuid()).optional(),
-    frameId: z.string().uuid().optional().describe('Attach to this storyboard frame on create. Optional — a Shot needs no storyboard.'),
+    frameId: z.string().uuid().optional().describe('Put it in this exact frame. Optional — omit it and the Shot files itself into a scene, creating a storyboard named after the project if there is none.'),
+    sceneId: z.string().uuid().optional().describe('File it into this scene. Optional; ignored when frameId is given.'),
+    ...shotScriptSchema,
   }),
   async run(input, ctx) {
     const capErr = assertShotCapabilities(input.model, input.params)
@@ -5064,30 +5190,39 @@ export const createShot: Operation<
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots', {
       projectId: input.projectId,
       name: input.name,
-      spec,
+      spec: { ...spec, ...shotScriptPatch(input) },
       frameId: input.frameId ?? null,
+      sceneId: input.sceneId ?? null,
     })
-    return ok(r.shot, `Saved Shot "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}`.trim())
+    // The CODE is the address the user sees on the row — say it back so the
+    // next call, and the next sentence to the user, can point at it.
+    return ok(
+      r.shot,
+      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}`.trim()
+    )
   },
 }
 
 export const updateShot: Operation<
-  ShotOpRefs & {
-    shotId: string
-    projectId: string
-    name?: string
-    prompt?: string
-    model?: string
-    params?: ShotOpParams
-    attachFrameId?: string
-    detachFrameId?: string
-  }
+  ShotOpRefs &
+    ShotOpScript & {
+      shotId: string
+      projectId: string
+      name?: string
+      prompt?: string
+      model?: string
+      params?: ShotOpParams
+      attachFrameId?: string
+      detachFrameId?: string
+      posterAssetId?: string | null
+    }
 > = {
   id: 'slates_update_shot',
   description:
-    'Change part of a saved Shot, or attach/detach it from a storyboard frame — anything you omit is left exactly as it was.',
+    'Change part of a Shot, or attach/detach it from a storyboard frame — anything you omit is left exactly as it was. ' +
+    FRAMING_NOTE,
   input: z.object({
-    shotId: z.string().uuid(),
+    shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
     projectId: z.string().uuid().describe('The Shot\'s project — badge codes and entity ids resolve against it.'),
     name: z.string().max(120).optional(),
     prompt: z.string().max(4000).optional(),
@@ -5102,6 +5237,8 @@ export const updateShot: Operation<
     styleIds: z.array(z.string().uuid()).optional(),
     attachFrameId: z.string().uuid().optional().describe('Attach this Shot to a storyboard frame.'),
     detachFrameId: z.string().uuid().optional().describe('Detach it from a frame. The Shot itself survives.'),
+    posterAssetId: z.string().nullable().optional().describe('Which reference represents this Shot as a thumbnail. Defaulted automatically (first frame, else the first image reference, else the newest take) — only set it to OVERRIDE, and pass null to go back to the default.'),
+    ...shotScriptSchema,
   }),
   async run(input, ctx) {
     const capErr = assertShotCapabilities(input.model, input.params)
@@ -5137,6 +5274,7 @@ export const updateShot: Operation<
     if (input.firstFrameAssetId !== undefined) patch.firstFrameAssetId = (spec as Record<string, unknown>).firstFrameAssetId
     if (input.lastFrameAssetId !== undefined) patch.lastFrameAssetId = (spec as Record<string, unknown>).lastFrameAssetId
     if (input.audioRefSpokenText !== undefined) patch.audioRefSpokenText = (spec as Record<string, unknown>).audioRefSpokenText
+    Object.assign(patch, shotScriptPatch(input))
     // Same rule for the three mention lists — naming one must not clear the
     // other two.
     {
@@ -5154,6 +5292,7 @@ export const updateShot: Operation<
         ...(Object.keys(patch).length > 0 ? { spec: patch } : {}),
         attachFrameId: input.attachFrameId,
         detachFrameId: input.detachFrameId,
+        posterAssetId: input.posterAssetId,
       },
     })
     return ok(r.shot)
@@ -5172,7 +5311,7 @@ export const duplicateShot: Operation<{
   description:
     'Fork a saved Shot, changing the prompt, the model or any param on the COPY in the same call — make one, fork it five times, change one thing on each. The original is never touched.',
   input: z.object({
-    shotId: z.string().uuid(),
+    shotId: z.string().describe('The Shot id, or its SHOT-A code.'),
     name: z.string().max(120).optional().describe('Name for the copy (default: the original plus "copy").'),
     prompt: z.string().max(4000).optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
     model: z.string().optional().describe('Point the copy at a different model — the A/B lever. The prompt is NOT rewritten, and the copy records which model it was written for.'),
@@ -5200,10 +5339,55 @@ export const duplicateShot: Operation<{
   },
 }
 
+/**
+ * The variety strip, in words. GENERATED from the report — never hand-typed,
+ * and never a judgement: it states what is there and stops.
+ *
+ * 🔑 IT RIDES THE OP RESULT, NOT A SKILL. Measured on the 2026-08-30 eval
+ * harness: a rule inlined into an op description moved compliance from 0/8 to
+ * 30/32, while the same guidance behind `slates_get_prompting_guide` sat at 13%
+ * before and 13% after. Guidance the agent must CHOOSE to fetch does not reach
+ * it — so the counts arrive in the result it is already reading.
+ *
+ * Slates counts; the agent judges. No suggested shot size, no auto-varied
+ * camera, no "we changed this for you".
+ */
+function describeVarietyReport(v: VarietyReport | null | undefined): string {
+  if (!v || v.cuts === 0) return ''
+  const parts: string[] = []
+  const topSize = v.shotSizes.find((b) => b.bucket !== 'other')
+  if (topSize && topSize.count >= 2) parts.push(`${topSize.count}/${v.cuts} ${topSize.bucket}`)
+  const topMove = v.cameraMoves.find((b) => b.bucket !== 'other')
+  if (topMove && topMove.count >= 2) parts.push(`${topMove.count} ${topMove.bucket}`)
+  for (const run of v.runs) parts.push(`${run.length} ${run.bucket} in a row`)
+  // 🚨 TWO DENOMINATORS, NAMED. Rhythm is counted in CUTS and money in
+  // GENERATIONS; several cuts routinely live inside one generation.
+  const head =
+    `${v.generations} generation(s) · ${v.cuts} cut(s) · ` +
+    `${v.runtimeSeconds == null ? 'no runtime yet' : `${v.runtimeSeconds}s`}` +
+    (v.cutsWithoutDuration > 0 ? ` (${v.cutsWithoutDuration} cut(s) have no duration)` : '')
+  const variety = parts.length > 0 ? `\nVARIETY: ${parts.join(' · ')}` : ''
+  const words =
+    v.words > 0
+      ? `\nWORDS: ${v.words} written` +
+        (v.wordBudget != null
+          ? `, ~${v.wordBudget} fit the runtime at ${SPEECH_RATE.conversational.wpm} wpm` +
+            ` (measured across ${SPEECH_RATE.conversational.n} real ads)`
+          : '')
+      : ''
+  const overLong =
+    v.overLongLines.length > 0
+      ? `\n⚠ ${v.overLongLines.length} line(s) cannot fit their cut at ANY plausible delivery` +
+        ` (over ${SPEECH_RATE.ceiling.wpm} wpm, the fastest read in the corpus).` +
+        ` Split the line or merge the cut — slates_split_shot / slates_merge_shots.`
+      : ''
+  return `${head}${variety}${words}${overLong}`
+}
+
 export const listShots: Operation<{ projectId: string; storyboardId?: string; frameId?: string }> = {
   id: 'slates_list_shots',
   description:
-    'List a project\'s saved Shots as compact rows with a total credit quote — optionally only the ones attached to one storyboard or frame.',
+    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with the piece's cut count, runtime, credit floor and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
   input: z.object({
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid().optional().describe('Only Shots attached to a frame in this storyboard.'),
@@ -5212,7 +5396,11 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    const r = await desktop.get<{ shots: ShotSummary[] }>('/agent/shots', {
+    const r = await desktop.get<{
+      shots: ShotSummary[]
+      variety: VarietyReport | null
+      varietySummary: string
+    }>('/agent/shots', {
       projectId: input.projectId,
       storyboardId: input.storyboardId,
       frameId: input.frameId,
@@ -5231,20 +5419,36 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
       total += q.credits
       return {
         id: s.id,
+        code: s.code,
         name: s.name,
+        scene: s.sceneName,
+        position: s.position,
         model: s.model,
         references: s.referenceCount,
+        cuts: s.cuts,
+        runtime_seconds: s.runtimeSeconds,
+        speaker: s.speaker,
+        line: s.line,
+        delivery: s.delivery,
+        action: s.action,
+        prop: s.prop,
+        shot_size: s.shotSize,
+        camera: s.camera,
+        continues: s.continues,
         credits: q.credits,
       }
     })
     return ok(
-      { shots, total_credits: total, unpriced },
+      { shots, total_credits: total, unpriced, variety: r.variety },
       `${shots.length} shot(s), at least ${fmtCredits(total)} to fire them all` +
         (unpriced > 0 ? ` (${unpriced} could not be priced — no model or no duration set).` : '.') +
         ' 🚨 That is a FLOOR, not the bill: a listing does not compose, so the two dimensions that' +
         ' depend on the reference set — Seedance reference-clip seconds and MiniMax reference images' +
         ' past the free five — are missing from it. slates_get_shot prices one exactly, and' +
-        ' slates_generate_from_shots quotes the set exactly before it fires anything.'
+        ' slates_generate_from_shots quotes the set exactly before it fires anything.' +
+        (describeVarietyReport(r.variety) ? `
+
+${describeVarietyReport(r.variety)}` : '')
     )
   },
 }
@@ -5253,7 +5457,9 @@ export const getShot: Operation<{ shotId: string }> = {
   id: 'slates_get_shot',
   description:
     'Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, and its exact credit quote. Audit your own work here before firing.',
-  input: z.object({ shotId: z.string().uuid() }),
+  input: z.object({
+    shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
@@ -5273,13 +5479,80 @@ export const getShot: Operation<{ shotId: string }> = {
   },
 }
 
+/**
+ * SPLIT and MERGE — the chop decision, and the only two cross-row operations on
+ * this surface.
+ *
+ * 🔑 THIS IS THE EXECUTIVE CALL, AND IT IS WHY THEY ARE OPS. *"Sometimes you
+ * might be using more dialogue in one single 30-second generation. Sometimes it
+ * might just be a 4-second generation of one line."* Merging five lines into
+ * one long take or splitting them into five short ones changes the rhythm AND
+ * the price, and the agent has to be able to re-chop what it wrote.
+ *
+ * 🚨 NEITHER EDITS TEXT AS A SIDE EFFECT. Split moves the text after a caret
+ * the caller placed; merge joins two texts at their boundary. Nothing else in
+ * either row is rewritten. That property is what keeps a finished script
+ * finished, and it is the acceptance test for anything added here later.
+ */
+export const splitShot: Operation<{ shotId: string; caret?: number }> = {
+  id: 'slates_split_shot',
+  description:
+    'Split one Shot into two at a caret in its line. The text after the caret moves to the new Shot, which INHERITS the model, params and references and lands directly after it in the scene. A mid-sentence split marks the second row as continuing the first — one sentence, two cuts, which is the signature voiceover move. Takes stay with the first row. Omit the caret to add a sibling cut with the same visuals and no words moved.',
+  input: z.object({
+    shotId: z.string().describe('The Shot id, or its SHOT-A code.'),
+    caret: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Character offset into the Shot's `line` to cut at. Omitted = the end of the line."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{
+      first: Record<string, unknown>
+      second: Record<string, unknown>
+    }>('/agent/shots/split', { id: input.shotId, caret: input.caret })
+    return ok(
+      r,
+      `Split into ${(r.first?.code as string) || 'the first Shot'} and ` +
+        `${(r.second?.code as string) || 'a new Shot'}. Duration was INHERITED, not divided — ` +
+        `set it on each if the chop changed how long they run.`
+    )
+  },
+}
+
+export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
+  id: 'slates_merge_shots',
+  description:
+    "Merge two adjacent Shots into one. Texts join, references union, the FIRST Shot's model and params win, and the durations SUM — which may exceed the model's window, in which case it is shown and never blocked. Lossy in one direction: the second Shot's model and params are discarded, and there is no undo (the takes are the history).",
+  input: z.object({
+    firstId: z.string().describe('The Shot that survives — its model and params win. Id or SHOT-A code.'),
+    secondId: z.string().describe('The Shot folded into it. Id or SHOT-A code.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/merge', {
+      firstId: input.firstId,
+      secondId: input.secondId,
+    })
+    return ok(
+      r.shot,
+      `Merged into ${(r.shot?.code as string) || 'one Shot'} — ` +
+        `${r.shot?.cuts ?? 1} cut(s), ${r.shot?.runtimeSeconds ?? 'no'} second(s).`
+    )
+  },
+}
+
 export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean }> = {
   id: 'slates_generate_from_shots',
   billable: true,
   description:
     'Generate from saved Shots, ONE AFTER ANOTHER, with a single quote and a single approval for the whole set. It blocks until the last one lands, so a set of video Shots can outlast the HTTP timeout while the run keeps going — if that happens, poll slates_get_shot for each Shot\'s generationIds instead of re-firing, which double-spends.',
   input: z.object({
-    shotIds: z.array(z.string().uuid()).min(1).max(20).describe('The Shots to fire, in order.'),
+    shotIds: z.array(z.string()).min(1).max(20).describe('The Shots to fire, in order — ids or SHOT-A codes.'),
     confirm: z.boolean().optional().describe('Set true after explicit user OK on the TOTAL below.'),
   }),
   async run(input, ctx) {
@@ -5803,6 +6076,10 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   createShot as unknown as Operation<unknown>,
   updateShot as unknown as Operation<unknown>,
   duplicateShot as unknown as Operation<unknown>,
+  // Split and merge are the CHOP decision — where the rhythm and the price are
+  // actually decided. They sit beside the writers, not with the spender.
+  splitShot as unknown as Operation<unknown>,
+  mergeShots as unknown as Operation<unknown>,
   listShots as unknown as Operation<unknown>,
   getShot as unknown as Operation<unknown>,
   generateFromShots as unknown as Operation<unknown>,

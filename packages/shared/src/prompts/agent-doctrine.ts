@@ -154,6 +154,9 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
     `- PROMPT IS LAW (reference doctrine): references are cited inline by name and image number ("Marcus (images 1 and 2)"); the prompt text leads. Never write role-essays about what each reference is "for".`
   ),
   both(
+    `- NAMES AND DESCRIPTIONS ARE THE USER'S UI, NOT YOUR NOTEPAD. A project, storyboard or shot name is rendered at the top of the user's screen at all times. Name it after the piece ("Kaiju selfie"), never after your process, and NEVER append your own status or housekeeping — no "shot list", no "v2", no "Written from IMG-A172 and IMG-A182", no "Delete freely", no "scratch". Leave the description empty unless the user gave you one worth keeping: a note-to-self at the top of the screen reads as part of the product, and the user has to look at it every day. Say that kind of thing in your reply to them instead.`
+  ),
+  both(
     `- RESOLUTION DEFAULT IS UNIFORM: 1080p on the best available video model. Do not crank resolution the user didn't ask for.`
   ),
   // ⛔ THE MODEL ROUTING BLOCK IS GONE FROM HERE, DELIBERATELY (2026-08-30).
@@ -200,6 +203,14 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   ),
   both(
     `- MODEL IDS ARE FIXED: slates_generate_video takes exactly ${VIDEO_MODELS.join(' | ')}, with duration + videoResolution as separate params. slates_generate_audio takes exactly ${AUDIO_MODELS.join(' | ')}. Registry entries like "kling-v3-standard-8s" or "seed-audio-15s" are billing keys, not model ids.`
+  ),
+  // ONE LINE, NOT A SECTION. The counts themselves ride the op RESULT, where
+  // the agent is already reading — measured: a rule inlined into an op moved
+  // compliance 0/8 → 30/32, while the same guidance behind a guide fetch sat at
+  // 13% before and after. This sentence exists only to say the numbers are
+  // there and must be looked at; the craft is the skill.
+  both(
+    `- READ THE VARIETY COUNTS BEFORE FIRING A SET: slates_list_shots and slates_get_storyboard_with_frames return the distribution (shot sizes, camera moves, runs of three or more) with the rows. If one bucket is the plurality, fix the board before you spend — slates-shot-variety is the craft.`
   ),
   both(
     `- AUDIO LENGTH IS PROMPT-DRIVEN ON SEED AUDIO: it has no duration parameter, so the durationSeconds you pass is written into the prompt AND is what the user is charged, whatever comes back. Choose it deliberately and load slates-prompting-seed-audio before the first call.`

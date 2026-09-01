@@ -19,7 +19,8 @@ slates-mcp/
     │     clients/desktop.ts    ← 127.0.0.1:PORT HTTP client (+ healthz capability handshake)
     │     clients/blender.ts    ← 127.0.0.1:9876-9879 TCP bridge into the slates-blender add-on
     │     operations/index.ts   ← single source of truth for the tool surface
-    │     prompts/shot-spec.ts  ← ShotSpec + THE attachment-role list (mirrored into slate)
+    │     prompts/shot-spec.ts  ← ShotSpec + THE attachment-role list + the script layer (mirrored into slate)
+    │     prompts/shot-grammar.ts ← framing buckets + the MEASURED speech rate (leaf subpath)
     │     skills/content.ts     ← GENERATED — embedded SKILLS record, do not edit
     │     index.ts              ← public re-exports
     ├── mcp/                    ← @slatesvideo/mcp-server (stdio MCP, bin: slates-mcp-server)
@@ -180,6 +181,52 @@ slates-mcp/
     re-firing double-spends). Real concurrent batching needs a queue — concurrency limiting against
     fal's ceiling, per-item failure isolation, partial-billing semantics — and is deliberately not
     built.
+  - **THE SCRIPT LAYER RIDES `ShotSpec` TOO (added 2026-08-31).** `speaker` · `line` · `delivery` ·
+    `action` · `prop` · `shotSize` · `camera` · `continues`, all nullable except the flag, with
+    `SCRIPT_FIELD_DESCRIPTION` (`satisfies Record<ScriptField, string>`) as the ONE source for what
+    each one means — the op schemas are GENERATED from it, so a ninth field cannot ship undescribed.
+    - **🚨 THEY ARE A PLANNING AND COUNTING SURFACE. THE PROMPT IS THE ONLY THING SENT.** None of
+      them reaches a model. The one exception is pre-existing and unchanged: a `multiShotSegment`
+      still prepends its own `camera` / `shotSize` to its own segment prompt. Folding them into the
+      composed prompt is a COMPOSER change and belongs with the `audioRefSpokenText` defect, not
+      here — which is why in v1 an author states dialogue twice (as `line` for reading and the fit
+      check, and inside the prompt where the model receives it) and the skill says so.
+    - **🚨 A ROW OWNS ITS TEXT. NOTHING POINTS INTO A SIBLING ROW'S CONTENT.** No script blob, no
+      offsets, no spans — "the full script" is the rows rendered in order. The obvious
+      implementation (one blob, cut points as character offsets) is the one design that cannot be
+      made safe, and every proposed feature needing a range into another row is that design in
+      disguise. `continues` carries "these two rows are one sentence" with one boolean and no
+      pointer. The desktop's `main/storage/shotCuts.ts` header is the long form.
+    - **`audioRefSpokenText` IS NOT `line` and must not be merged into it.** It is keyed by asset id
+      and means *"what this reference recording contains"* — asset binding for a clip you attached,
+      not a line you wrote. It is separately misfiled and separately owned.
+- **🚨 FRAMING GRAMMAR SSOT = `packages/shared/src/prompts/shot-grammar.ts` (added 2026-08-31).**
+  Shot-size and camera-move BUCKETS, the bucketing functions, and the measured `SPEECH_RATE`.
+  Exported from the leaf subpath `@slatesvideo/shared/shot-grammar` for the two reasons
+  `model-capabilities` is a leaf; the desktop imports it directly rather than mirroring it.
+  - **Buckets exist to COUNT, never to constrain.** `shotSize` and `camera` are FREE TEXT —
+    `cinematic-storyboard.md` §4e reconciled against ByteDance's own ModelArk docs: *"camera
+    vocabulary is open standard language … not a closed list of eight moves."* A value matching no
+    bucket counts as `other` and is never rejected, rewritten or warned about. **Never hand-type a
+    bucket name downstream**, and `satisfies Record<Exclude<Bucket, 'other'>, string[]>` makes a
+    seventh bucket a compile error rather than a name nothing matches.
+  - **No two-letter abbreviations in the vocabulary** — no `CU`, `MS`, `WS`. They collide with
+    ordinary words and with each other across conventions, and a value bucketed WRONG is worse than
+    one bucketed `other`: the whole claim of the check is that it is arithmetic you can verify by
+    eye. `long-lens CU, other head blurred` is deliberately `other`.
+  - **🚨 `SPEECH_RATE` IS MEASURED, NOT CITED, AND IT DECAYS.** 71 ads from
+    `second-brain/.../ad-research.db`, each register carrying its `n`, the measurement date and the
+    query. `slate`'s `npm run check:shot-list` RE-DERIVES it from that corpus — a constant whose
+    query no longer reproduces it is STALE, not wrong; update the number and the `n` together. The
+    register split is real (performed 133 · conversational 157 · direct-response 167), which is why
+    a single point value would have been worse than none. The **ceiling** (283) is the fastest read
+    in the corpus and the fit check flags only ABOVE it: never "a bit long", because a check that
+    nags gets ignored.
+- **🔑 THE VARIETY COUNTS RIDE THE OP RESULT, NOT A SKILL.** `slates_list_shots` and
+  `slates_get_storyboard_with_frames` return the distribution inline. Measured on the 2026-08-30
+  eval harness: a rule inlined into an op moved compliance 0/8 → 30/32, while the same guidance
+  behind `slates_get_prompting_guide` sat at 13% before and after. `slates-shot-variety` is the
+  CRAFT; the numbers are the op's job, and one sentence in the doctrine says to read them.
 - **🚨 WHAT SPENDS THE USER'S MONEY IS DECLARED HERE: `Operation.billable` (added 2026-08-31).**
   The desktop's Studio Agent refuses a billable op until `present_plan` has been approved, and
   refreshes its spend ledger after each one. That list of op ids lived ONLY in
