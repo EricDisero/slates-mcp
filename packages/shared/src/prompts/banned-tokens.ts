@@ -43,18 +43,56 @@ export interface BannedToken {
 }
 
 /**
- * Where each scope's list lives.
+ * Where each scope's CROSS-MODEL list lives.
  *
  * One skill per scope on purpose: these are the two lists that are GENERIC to
  * their modality (Stable-Diffusion-era tag soup for images, quality
- * incantations for video), not model-specific quirks. A per-model list would
- * mean the op description changed with the `model` argument, which it cannot —
- * a description is one static string for every call.
+ * incantations for video), not model-specific quirks. A per-model list cannot
+ * ride the op DESCRIPTION — a description is one static string for every call,
+ * so it cannot change with the `model` argument. That is what
+ * `bannedTokensForSkill` below is for: the per-model list rides the estimate
+ * RESULT, where the model has just been named.
  */
 const BANNED_TOKEN_SOURCES: ReadonlyArray<{ skill: string; scope: BannedTokenScope }> = [
   { skill: 'slates-prompting-nano-banana-2', scope: 'image' },
   { skill: 'slates-prompting-seedance', scope: 'video' },
 ]
+
+/**
+ * 🚨 THE ENFORCEMENT THAT WORKED COVERED TWO SKILLS OF FIFTEEN.
+ *
+ * `describeBannedTokens('image')` was Nano Banana's list and `('video')` was
+ * Seedance's, so a Veo, Kling, LTX, MiniMax, FLUX, Seedream, GPT-Image or audio
+ * generation was matched against another model's never-use list and its own was
+ * enforced by nothing — while four skills (content-policy, lip-sync,
+ * minimax-h3, motion-transfer) carried never-use prose with no markers at all,
+ * which is a rule an LLM has to notice.
+ *
+ * Every skill that carries an `@banned` block now contributes to a per-skill
+ * list, delivered on the estimate result beside the craft card. The two above
+ * stay ALSO on the op descriptions, because a modality-wide list is true of
+ * every call that op can make.
+ */
+function extractPerSkill(): Map<string, readonly BannedToken[]> {
+  const out = new Map<string, readonly BannedToken[]>()
+  for (const [skill, content] of Object.entries(SKILLS)) {
+    // Cheap pre-test: only pay the regex for files that carry the marker.
+    if (!content.includes('@banned:start')) continue
+    const scope = inferScope(skill)
+    out.set(
+      skill,
+      extractFromSkill(skill).map((token) => ({ token, skill, scope }))
+    )
+  }
+  return out
+}
+
+/** Image-lane skills prompt for pixels; everything else is a time-based lane.
+ *  Only used to tag a token for the warning text — the per-skill list is
+ *  matched by SKILL, never by scope, so a wrong guess here cannot mis-enforce. */
+function inferScope(skill: string): BannedTokenScope {
+  return /nano-banana|gpt-image|flux|seedream/.test(skill) ? 'image' : 'video'
+}
 
 const FENCE_RE = /<!--\s*@banned:start\s*-->([\s\S]*?)<!--\s*@banned:end\s*-->/g
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g
@@ -145,9 +183,48 @@ for (const { token, skill } of BANNED_PROMPT_TOKENS) {
   }
 }
 
-/** The tokens a submitted prompt actually contains. */
-export function findBannedTokens(prompt: string, scope: BannedTokenScope): BannedToken[] {
-  return bannedTokensFor(scope).filter((b) => matcherFor(b.token).test(prompt))
+/** Every per-skill list, keyed by skill name. */
+const bySkill = extractPerSkill()
+
+/** The never-use list a single skill declares. Empty for a skill with no block. */
+export function bannedTokensForSkill(skill: string): readonly BannedToken[] {
+  return bySkill.get(skill) ?? []
+}
+
+/**
+ * A single model's never-use list, for the estimate RESULT.
+ *
+ * Deliberately NOT the cross-model list — that one already rides the op
+ * description on every call. This is the half that could not: the quirk that is
+ * true of Veo and false of Kling.
+ */
+export function describeBannedTokensForSkill(skill: string): string {
+  const list = bannedTokensForSkill(skill)
+  if (list.length === 0) return ''
+  return (
+    `NEVER put these in a ${skill.replace('slates-prompting-', '')} prompt: ` +
+    list.map((b) => `"${b.token}"`).join(', ') +
+    `. Describe specifically instead (${skill}).`
+  )
+}
+
+/** The tokens a submitted prompt actually contains. `skill` adds that model's
+ *  own list to the modality-wide one — the two overlap for nano-banana-2 and
+ *  seedance, so hits are deduplicated by token. */
+export function findBannedTokens(
+  prompt: string,
+  scope: BannedTokenScope,
+  skill?: string
+): BannedToken[] {
+  const candidates = [...bannedTokensFor(scope), ...(skill ? bannedTokensForSkill(skill) : [])]
+  const seen = new Set<string>()
+  const hits: BannedToken[] = []
+  for (const b of candidates) {
+    if (seen.has(b.token)) continue
+    seen.add(b.token)
+    if (matcherFor(b.token).test(prompt)) hits.push(b)
+  }
+  return hits
 }
 
 /**
@@ -172,8 +249,8 @@ export function describeBannedTokens(scope: BannedTokenScope): string {
  * rather than raised as an error. The generation proceeds either way: the
  * sandbox doctrine says make state visible, never block.
  */
-export function bannedTokenWarning(prompt: string, scope: BannedTokenScope): string {
-  const hits = findBannedTokens(prompt, scope)
+export function bannedTokenWarning(prompt: string, scope: BannedTokenScope, skill?: string): string {
+  const hits = findBannedTokens(prompt, scope, skill)
   if (hits.length === 0) return ''
   const skills = [...new Set(hits.map((b) => b.skill))].join(', ')
   return (

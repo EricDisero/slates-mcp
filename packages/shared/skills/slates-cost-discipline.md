@@ -13,7 +13,7 @@ Generation costs real money. Every call is on the user's credits. The user can't
 
 Before ANY `slates_generate_*` call, run `slates_estimate_generation_cost` first. Inputs you must lock before estimating:
 
-- **Model** — derived from the op (`slates_generate_image` → `nano-banana-2-{resolution}`)
+- **Model** — the id you are about to pass, whatever it is. `slates_estimate_generation_cost` takes the same base ids the generate ops take and resolves the billing key itself; do not build one by hand.
 - **Resolution** — never let the op default. Pick deliberately. Drafts → 1k. Hero → 2k. Print → 4k.
 - **Aspect ratio** — never let the op default to 1:1. Pick from the use case (cinematic → 16:9, mobile vertical → 9:16, square feed → 1:1).
 - **Count** — explicit. Don't generate 4 when 1 will tell you if the prompt works.
@@ -30,7 +30,29 @@ Examples:
 - `About to spend 4 credits on 1 image at 1k 16:9. Proceed?`
 - `About to spend 24 credits on 4 images at 2k 9:16 (variants). Proceed?`
 
-Below ~7 credits you can proceed silently after announcing once. Above ~7 credits wait for explicit confirmation. Above ~17 credits the server itself will gate with `requires_confirm` — pass `confirm: true` only after the user explicitly OKs.
+Announce the cost once, then proceed for anything small. For anything the user would notice on their balance, wait for an explicit yes. Where the LINE is, exactly:
+
+<!-- @inject:thresholds -->
+<!-- GENERATED from @slatesvideo/shared — do not edit between the markers.
+     Source: CONFIRM_CREDITS, DEVIATION_FACTOR and the audio bounds in
+     packages/shared/src/operations/index.ts. Every number here is REFUSED by an
+     op when a prompt gets it wrong, which is why none of them is typed by hand
+     any more: this block replaced four claims that contradicted the code. -->
+
+**The thresholds, from the code that enforces them:**
+
+- **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
+  proceed until you re-call with `confirm: true`. Below it, announce the cost once and go.
+- **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
+  exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
+- **Seed Audio duration:** **3–120 seconds.** There is no duration
+  parameter on the model — the number you pass is written into the prompt AND is what the user is
+  billed. Outside that range the op refuses rather than clamping.
+- **Sound Effects duration:** **1–22 seconds**, billed per second, never left for the
+  model to pick.
+
+Never quote a credit figure from memory: `slates_estimate_generation_cost` returns the real one.
+<!-- @end:thresholds -->
 
 ### 3. Aggregate batches into ONE upfront announcement
 
@@ -46,7 +68,7 @@ When the user approves a batch plan with one aggregated cost total up front ("8 
 
 Boundaries that re-trigger confirmation:
 
-- Any call's actual estimate exceeds what the announced plan implied for it by **>25%** → stop, surface the delta, get a fresh OK.
+- Any call's actual estimate exceeds what the announced plan implied → stop, surface the delta, get a fresh OK. The app enforces its own ceiling on top of this (see the thresholds above); do not wait for it to catch you.
 - New calls are added that weren't in the enumerated plan (extra variants, retries beyond the plan, a new scene) → those are NOT covered. Announce and confirm separately.
 - The batch scope changes (different model, resolution, or duration than announced) → re-announce, re-confirm.
 
@@ -87,7 +109,7 @@ If the user prompt mixes signals (e.g. "cinematic Instagram post"), ask. Don't g
 
 ## When the gate fires
 
-The server returns `requires_clarification` when aspect ratio or resolution is missing. The server returns `requires_confirm` when total spend exceeds ~17 credits. In both cases:
+The server returns `requires_clarification` when aspect ratio or resolution is missing, and `requires_confirm` when total spend crosses the gate above. In both cases:
 
 1. Surface the gate response to the user
 2. Get a clean answer

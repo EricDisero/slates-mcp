@@ -5,6 +5,44 @@ description: How to set up motion transfer — Kling Motion Control only (std an
 
 # Motion transfer — setup guide
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Motion transfer (Kling Motion Control only).** A target IMAGE (your character) plus a source VIDEO (the motion) produces your character performing that motion. Always 5 seconds.
+
+**The five levers**
+1. **The target image must show body proportions clearly** and the character must occupy more than about 5% of the frame. A tiny figure in a wide shot has nothing to drive.
+2. **Single character in the target.** A group image breaks the identity anchor.
+3. **Choose `characterOrientation` on purpose** — `video` takes the source clip's framing, `image` preserves the portrait's. It is the most-missed choice here.
+
+4. **The prompt is atmosphere only** — `Soft afternoon sunlight, dust motes in the air, vintage warm color grade.` Motion verbs are ignored; the motion is already in the driving video.
+5. **Pick the best 5 seconds of the source up front**, and write only atmosphere: `soft afternoon sunlight`, `vintage warm color grade`, `clean studio backdrop`. The output is 5s regardless, so a long driving clip just wastes the choice.
+
+**Examples**
+- `Soft afternoon sunlight, dust motes in the air, vintage warm color grade.`
+- `Clean studio backdrop, sharp focus on the character.` (Or leave it empty.)
+
+**Hard constraint:** cartoon driving videos fail, and a cropped or partial target character drifts. std is fine while the motion-and-framing combination is still moving; switch to pro once it is locked. For a REGENERATED shot instead — physical contact, cloth and hair, camera motion, native audio — that is a normal Seedance video generation with the driving clip as a video reference, not a mode of this tool.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — the motion is already in the driving video, so motion verbs are ignored:
+- `spins faster`, `jumps higher`, `add more energy`, `moves quicker`
+<!-- @banned:end -->
+
 Take a still **target image** (your character) and a **source video** (the motion you want), produce a new video of your character performing the source video's motion. **This tool is Kling-only** — it wraps Kling Motion Control and nothing else.
 
 | Tier | Cost | Use case |

@@ -5,6 +5,44 @@ description: How to prompt LTX-2.5 and LTX-2.5 Pro. Read before calling slates_g
 
 # LTX-2.5 — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — LTX-2.5.** It scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE. Lightricks' own priority order: sound, camera, character detail, shot type and scene, then scene dressing. One flowing paragraph, not labelled sections. When a prompt sprawls, cut from the bottom.
+
+**The five levers**
+1. **Lead with sound, and anchor every sound to something in frame.** The test is "visible, or at least locatable" — `the rope creaks against the cleat`, `the hull knocking hollow against the fenders`, `rain on the awning`. A distant whistle is fine IF you have named the post it comes from.
+2. **Camera second**, because framing decides the visual weight of the shot — `low camera at the gunwale`, `slow drift right`, `static medium behind the counter`.
+3. **Character detail as physical ACTION**, not as adjectives about a person — `she braces a boot on the rail and hauls`, `his hands counting notes`.
+4. **It is the native MULTISHOT seat** — one generation carries two to four connected shots holding character, light and voice across the cuts. Write the cuts.
+5. **Quote dialogue and name the language and accent** — `in English with a slight German accent` — `"We should not have come back," in English with a slight German accent.`
+
+**Examples**
+- `The rope creaks against the cleat as she leans back, gulls calling somewhere off the port bow, the hull knocking hollow against the fenders. Low camera at the gunwale, slow drift right. She braces a boot on the rail and hauls, twice, then stops.`
+- `A till drawer bangs shut, a fan ticks against its cage, rain on the awning outside. Static medium behind the counter, then cut to a close-up of his hands counting notes, then cut wide as he looks up at the door.`
+
+**Hard constraint:** durations are EVEN numbers from six — there is no 5s or 7s clip. There is NO reference endpoint at all, so identity references are unavailable; use MiniMax H3 or Kling when a character must hold across shots. Any sound not anchored to something in frame gets invented for you. And never write mood adjectives as sound: "tense atmosphere", "a sense of dread" and "ominous ambience" produce nothing usable — the fix is one more moving object in frame with a sound attached to it.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — mood adjectives standing in for sound produce nothing usable:
+- `tense atmosphere`, `a sense of dread`, `ominous ambience`, `eerie silence`
+- an unanchored sound: name the thing in frame it comes from, or cut it
+<!-- @banned:end -->
+
 LTX-2.5 generates picture and sound **in a single pass**, with a Gemma-4 12B text encoder reading
 one flowing paragraph. That single fact drives everything below: the prompt is not a shot
 description with audio bolted on, it is **a scene where the sound is load-bearing** — and

@@ -5,6 +5,47 @@ description: How to prompt Gemini Omni Flash (Google, via fal). Read before call
 
 # Gemini Omni Flash — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Gemini Omni Flash.** Two different jobs with OPPOSITE prompt rules, and getting them the wrong way round is the whole failure mode.
+
+**The five levers**
+1. **Editing: short prompt, ONE change, nothing else.** Google's own doc says so and a 2026-07-09 receipt confirms it — a long "keep every frame identical" preamble produced WORSE drift than two sentences.
+2. **Editing: always end with `Keep everything else the same.`** — the one documented preservation lever.
+
+3. **Editing: describe the EFFECT, never a real object as a metaphor.** "Candle-like flame" rendered a literal candle in the subject's hand.
+4. **Editing: no conditional timing cues.** "…when he calls it, as he walks…" hard-fails with `invalid_request`. Collapse to one continuous action; the model syncs to the footage's own motion.
+5. **Generation: the opposite — describe fully.** Subject, action, setting, `camera tracking alongside`, `overcast flat light`, tone. Audio is prompt-driven with no parameters: dialogue in quotes, sound in plain language — `rain patters on the tin roof`, `spray from tyres`, `a horn somewhere behind`.
+
+**Examples**
+- Edit: `Small magical flames appear on his fingertips when he snaps his fingers, and vanish when he blows on them. Keep everything else the same.`
+- Generate: `A courier in a yellow shell jacket weaves between stalled cars on a wet arterial road, camera tracking alongside at shoulder height. Overcast flat light, spray from tyres. Rain patters on car roofs, a horn somewhere behind.`
+
+**Hard constraint:** it is a CHEAP DRAFT seat for generation and the EDIT-fidelity winner for footage-synced VFX — never a hero generation shot. Expect a possible jitter or doubled speech beat in the last half second of an edit: trim the tail rather than burning a re-roll.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use in an EDIT prompt** (each one has a receipt above):
+- a long preservation preamble — it produces WORSE drift than `Keep everything else the same.`
+- a real object as a metaphor: `candle-like`, `flame-like`, `laser-like`
+- a conditional timing cue: `when he`, `as she`, `once they` — these hard-fail, they do not merely drift
+- harm-to-person framing: `ignite`, `catch fire`, `on fire` applied to a person trips the safety filter
+<!-- @banned:end -->
+
 Google's fast video generation + editing model ("Nano Banana Pro for video" in creator slang — a nickname; it is NOT the NB Pro image model). Carried on fal (`google/gemini-omni-flash*`). 720p only, 24fps, 3–10 second clips, 16:9 or 9:16. **Audio is native and included** — dialogue, SFX, and ambient generate WITH the video at no extra cost.
 
 ## Where it routes

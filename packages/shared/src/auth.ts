@@ -27,11 +27,23 @@ export interface AgentConnectionFile {
     port: number | null
     token: string | null
   }
+  /**
+   * The project `slates use` selected, filled into any op that takes
+   * `projectId` and was called without one.
+   *
+   * 🚨 CLI-OWNED, AND ONLY A DEFAULT. The desktop app owns the `desktop` half
+   * of this file and must never write here; an explicit `--projectId` always
+   * wins. It exists because every workspace op takes a UUID and an agent had to
+   * carry that UUID through the whole session by hand — which is exactly the
+   * kind of state a shell session is bad at holding.
+   */
+  defaultProjectId?: string | null
 }
 
 const EMPTY: AgentConnectionFile = {
   cloud: { token: null },
   desktop: { enabled: false, port: null, token: null },
+  defaultProjectId: null,
 }
 
 export function readConnection(): AgentConnectionFile {
@@ -45,10 +57,19 @@ export function readConnection(): AgentConnectionFile {
         port: parsed.desktop?.port ?? null,
         token: parsed.desktop?.token ?? null,
       },
+      defaultProjectId: parsed.defaultProjectId ?? null,
     }
   } catch {
     return { ...EMPTY, cloud: { ...EMPTY.cloud }, desktop: { ...EMPTY.desktop } }
   }
+}
+
+export function setDefaultProjectId(projectId: string | null): void {
+  writeConnection({ ...readConnection(), defaultProjectId: projectId })
+}
+
+export function readDefaultProjectId(): string | null {
+  return readConnection().defaultProjectId ?? null
 }
 
 export function writeConnection(data: AgentConnectionFile): void {

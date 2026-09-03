@@ -5,6 +5,45 @@ description: How to prompt Veo 3.1 (Google). Read before calling slates_generate
 
 # Veo 3.1 — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Veo 3.1.** Google's formula, in order: `[Cinematography] + [Subject] + [Action] + [Context] + [Style & Ambiance]`. Sweet spot 50-150 words; the official benchmark is about 50.
+
+**The five levers**
+1. **Open with the cinematography** — `Medium shot`, `low angle`, `aerial`, `dolly in`, `rack focus`, `vertigo effect`. Veo reads the first clause as the camera.
+2. **Texture words counter the AI-plastic look** — `fine skin pores`, `visible fabric weave`, `subtle contrast, no gloss or sharpening`. Name materials concretely: `charcoal cotton hoodie`, `matte concrete`, `silk lapel`.
+3. **Weight verbs stop floaty motion** — `trudges`, `drops heavily`, and a ground contact: `boots crunch on gravel`.
+4. **Terse voice direction only** — `says in a weary voice`, `whispers`, `mutters`. Veo is far less responsive to long voice blocks than Kling.
+5. **Always include an ambience line.** Without one the mix feels dead. `Soft office ambience.` `Wind on the open ridge.` And SFX always carries a cause: `SFX: thunder cracks in the distance`, never `SFX: thunder`.
+
+**Examples**
+- `Medium shot, a tired founder rubbing her temples in front of a bulky monitor in a cluttered office late at night. Harsh fluorescent overheads and the green glow of the screen. Fine skin pores, visible fabric weave on a charcoal cotton hoodie. Soft office ambience, a fan hum. Retro, slightly grainy.`
+- `Low angle, a farrier trudges across a wet yard carrying a shoeing box, boots crunching on gravel. Overcast north light, matte concrete and wet steel. Wind and distant livestock. He says in a weary voice, "One more and we're done." (no subtitles).`
+
+**Hard constraint:** `(no subtitles)` after EVERY dialogue line you do not want burned in as text. Negatives are NOUNS, not instructions — `wall, frame`, never `no walls`. And do not cross syntaxes: Seedance's `single continuous take` suppresses Veo's cuts, and Veo timestamps in a Seedance prompt cause drift.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** (each one is spelled out above):
+- `single continuous take` — Seedance's phrase; in a Veo prompt it suppresses the cuts you asked for
+- `no subtitles` is REQUIRED after dialogue, but instruction-shaped negatives are not: `no walls`, `no man-made structures`, `don't show` — negatives are NOUNS here
+- `SFX: thunder` and any label-only effect — every effect carries a cause and a distance
+<!-- @banned:end -->
+
 Google DeepMind's video model. Two tiers: `veo-3.1-fast` (cheaper, quick) and `veo-3.1-standard` (higher quality). 4k variants exist for both (4K video requires Slates Pro).
 
 **Native single-shot duration: 4, 6, or 8 seconds** — and **8s only** at 1080p or 4K, or whenever you attach reference images (that endpoint is 8s-fixed). 4s and 6s exist at 720p, text-to-video or single-start-frame only. Longer durations require chaining clips via Extend / last-frame reuse — quality degrades if naively requested past 8s in a single generation. Aspect ratio: **16:9 or 9:16** on the route Slates uses. `slates_generate_video` REFUSES anything outside these before submit and names the legal set — nothing is silently ignored or downgraded.

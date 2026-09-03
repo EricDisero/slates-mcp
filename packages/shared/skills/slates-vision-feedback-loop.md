@@ -94,7 +94,7 @@ When the **character** is the question, keep the location out of it: test on a p
 
 - Track total credits spent across the loop. Surface to the user every 3 iterations.
 - Stop after 3 failed iterations on the same prompt — escalate to the user with what you tried and what's not working. The slot machine never converges.
-- For high-cost generations (above ~17 credits), confirm before *every* attempt, not just the first.
+- For a high-cost generation — anything past the confirm gate in `slates-cost-discipline` — confirm before *every* attempt, not just the first.
 
 ## When to break the loop
 

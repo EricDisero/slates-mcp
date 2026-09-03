@@ -5,6 +5,44 @@ description: How to prompt Seed Audio 1.0 (ByteDance, via fal). Read before call
 
 # Seed Audio 1.0 — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Seed Audio 1.0.** One plain sentence describing a SCENE, and it returns dialogue, effects and ambience together in one pass. It is the only speech surface in Slates.
+
+**The five levers**
+1. **Write one sentence in plain language.** Describe the room and what is happening in it; the model casts and performs it.
+2. **Name the crowd size, the room size and the distance.** This is the highest-leverage single edit on any bed — unqualified nouns default BIG. "Tiny applause of two or three people at an open mic", not "applause".
+3. **Put the length in the prompt** and make it deliberate.
+4. **Dialogue is performed inside the scene** — write the line as spoken in the room, then re-roll until a take is right and lip-sync against it.
+5. **Describe sounds directly** — "one coffee machine hissing, cutlery somewhere behind the counter" — with the object, the action and where it is.
+
+**Examples**
+- `a diner at 2am, one coffee machine hissing, cutlery somewhere behind the counter, one man says quietly "you're late again". 15 seconds`
+- `nature soundscape, a wide open field, cicadas near, birds mid-distance, one loon far off across water. 20 seconds`
+
+**Hard constraint:** it has NO duration parameter — the length you request is written into the prompt AND is what you are billed, whatever comes back, so choose it deliberately. Kling's `SFX:` / `Ambient noise:` / `Background music:` labels have no parser here and measurably worsen the output. Shot language, camera moves and lighting are video-prompt words the model must ignore. It is not a music model and it cannot produce pixels.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — Kling video syntax has no parser here and measurably worsens the output:
+- `SFX`, `Ambient noise`, `Background music` as labels — describe the sounds directly
+- shot language: `wide shot`, `slow push in`, `warm tungsten` — camera and lighting words are video-prompt words the model has to ignore
+<!-- @banned:end -->
+
 ByteDance's one-pass audio scene model, carried on fal (`bytedance/seed-audio-1.0`). It generates dialogue, sound effects and ambience **together**, from a single plain sentence. 1–120 seconds. It is the default audio model in Slates and the workhorse for continuity beds.
 
 ## Where it routes

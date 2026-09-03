@@ -5,6 +5,44 @@ description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calli
 
 # Seedance 2.5 — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.
+
+**The five levers**
+1. **Timestamps work here** — integer seconds, and the model acts on them: `[0-4] she reads the letter. [4-9] she folds it and looks up.` 2.0 ignores exactly this syntax.
+2. **Length is the reason to be here** — takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0-6]`, `[6-12]`, `[12-18]`; do not hope for them.
+3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.
+4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.
+5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.
+
+**Examples**
+- `[0-6] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6-12] Medium, she stops as the driver's window comes down. [12-18] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`
+- `[0-10] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10-20] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`
+
+**Hard constraint:** it is the EXPENSIVE seat and it has NO 4K — 480p/720p/1080p only, and dearer than 2.0 at every resolution they share. It is a second seat, never an upgrade. Long takes multiply cost linearly: quote a 30-second take before you fire it.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** (2.5 reclassifies the task and fails a fresh generation on these):
+- `edit`, `extend`, `continue the video`, `same video but` — they make the provider read a fresh generation as an edit
+- `85mm`, `f/1.4`, `Portra 400` and any other lens, aperture, film-stock or camera-body token — image-model vocabulary, a Seedance anti-pattern on both seats
+<!-- @banned:end -->
+
 **Read `slates-prompting-seedance` first.** The prompt GRAMMAR is the same model family: the
 8-slot advanced formula, subject binding by `<Subject_N>@<Image_N>`, camera vocabulary,
 externalised emotion, inline constraint words, the anti-twin fix. None of it is restated here.

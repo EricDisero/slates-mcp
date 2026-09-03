@@ -5,6 +5,44 @@ description: How to set up lip-sync — Kling-only (dedicated lip-sync and avata
 
 # Lip-sync — setup guide
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Lip-sync (Kling only).** Two different flows with different inputs and different prices; every output is 5 seconds.
+
+**The five levers**
+1. **Pick `sourceType` deliberately** — `video` re-dubs an existing talking head (cheapest); `image` animates a still portrait (avatar-standard, then avatar-pro only on the final selected take).
+2. **The `prompt` on the avatar flows is SCENE CONTEXT, not motion direction.** Ambience, lighting, micro-expression: `Soft rim light`, `warm office`, `cool blue evening light through a window`, `gentle confident smile between sentences`, `focused intent expression`.
+3. **Clean the audio before uploading** — `noise-reduced`, `levelled`. Lip detection is sensitive, and a raw recording is the most common cause of a bad take.
+4. **Iterate on the SOURCE or the AUDIO, never on a refinement prompt** — there is not one. If the output is wrong, change the input.
+5. **Use avatar-standard for first-pass dialogue takes**, and switch to pro only once the line is locked. Facial fidelity is not visible until then.
+
+**Examples**
+- `Soft rim light, warm office, gentle confident smile between sentences.`
+- `Cool blue evening light through a window, focused intent expression.` (Or `.` — an empty prompt is fine when you have nothing to add.)
+
+**Hard constraint:** it is Kling-only and always 5 seconds. For a generated PERFORMANCE instead — head movement, gesture, delivery energy, with the dialogue as a native conditioning signal — that is a normal Seedance video generation with the clip attached as a video reference, not a mode of this tool. Real voice or a cloned voice for production; TTS is for scratch.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — the avatar prompt is scene context and motion verbs are ignored:
+- `turns her head`, `raises an eyebrow`, `hand gestures`, `nods`, `walks`
+- `reader_en_m-v1` — listed in fal's docs, returns "Voice id not found" in production
+<!-- @banned:end -->
+
 **This tool is Kling-only.** It wraps Kling's dedicated lip-sync and avatar endpoints; every entry is a real endpoint and every output is 5 seconds.
 
 | Flow | Source | Model | Cost | Use case |

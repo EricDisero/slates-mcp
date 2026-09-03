@@ -4,6 +4,23 @@
 
 # Nano Banana 2 — cinematic & photorealistic prompting
 
+<!-- @card:start -->
+**Card — Nano Banana 2 (Gemini 3.1 Flash Image).** Brief it like a creative director, not a tag list. Structure: `Film still from [director] [genre]. Shot on [camera] with [lens]. [Subject and action]. [3-5 specific visual details]. [Lighting — direction + quality]. [Color palette]. [Film stock]. [1-2 word tone].`
+
+**The five levers**
+1. **Named lens + aperture** beats "shallow depth of field" — `85mm f/1.4`, `135mm f/2.8` (the cheat code for skin), `Panavision anamorphic`, `400mm telephoto`.
+2. **Light by direction and quality**, never "good lighting" — `hard sidelight from a single window, deep falloff`, `overcast north light`, `practical tungsten spill`.
+3. **A named film stock or sensor** carries a whole palette — `Kodak Portra 400`, `Cinestill 800T`, `ARRI Alexa 65`.
+4. **Composition as a shot** — `low angle`, `aerial view`, `rule of thirds with the subject camera-left`, `foreground occlusion`.
+5. **Positive framing only.** Describe what is there. "Empty street", never "no cars"; "unstaged documentary photography", never "not anime".
+
+**Examples**
+- `Film still from a Denis Villeneuve thriller. Shot on ARRI Alexa 65, 85mm f/1.4. A woman in a charcoal wool coat stands at a rain-slick bus stop, breath visible. Hard sodium light from a single overhead lamp, deep falloff into blue night. Kodak Vision3 500T. Isolated.`
+- `Editorial still life on seamless bone paper. 100mm macro, f/8. A cracked ceramic bowl holding three figs. Soft north light from camera-left, one gentle shadow. Muted earth palette. Portra 400 grain. Quiet.`
+
+**Hard constraint:** there is no `negativePrompt` field. Suppress by reframing positively, or inline `without` / `free of`. Knowledge cutoff January 2025 — anything later needs reference images.
+<!-- @card:end -->
+
 Nano Banana 2 is **Gemini 3.1 Flash Image**. It is **not** Gemini 3 Pro Image; that is Nano Banana **Pro** (`nano-banana-pro`), a separate model with its own seat. NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
 
 Knowledge cutoff: January 2025. Anything after needs explicit reference images.

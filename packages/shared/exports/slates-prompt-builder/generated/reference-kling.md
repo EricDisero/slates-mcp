@@ -4,6 +4,28 @@
 
 # Kling V3.0 — prompting
 
+<!-- @card:start -->
+**Card — Kling V3.0.** The general default. Define the core subjects clearly at the START and keep those descriptions identical across shots. Up to 15s, up to 6 cuts, and the strongest image-to-video identity hold in the catalogue.
+
+**The five levers**
+1. **Dialogue in quotes** — `Character says, "exact words here"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: "I've seen this before."`
+2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.
+3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.
+4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.
+5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.
+
+**Examples**
+- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: "I've seen this before." SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`
+- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`
+
+**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.
+<!-- @card:end -->
+
+**Never use:**
+- `SFX: footsteps` and any label-only effect — physical-cause specificity or nothing
+- a pronoun or synonym for a speaker after the first introduction (`he`, `the agent`) — it causes voice drift; repeat the full label
+- `single continuous take` — Seedance's phrase, and it fights Kling's multi-shot
+
 Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, no audio), `kling-v3.0-pro` (higher visual quality, no audio), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
 
 Up to 15s. Multi-shot supported (up to 6 cuts in 15s total). Strong on image-to-video — preserves identity, layout, and text from the input image well.

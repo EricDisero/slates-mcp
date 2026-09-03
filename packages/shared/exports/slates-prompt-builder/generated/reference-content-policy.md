@@ -4,6 +4,12 @@
 
 # Content-policy-safe construction — read before any risk-surface prompt
 
+**Never use** — each one is a filter tripwire with a substitution in the table above:
+- `civilians in panic`, `crowds fleeing`, `blood`, `gore`, `corpse`
+- `ignite`, `catch fire`, `on fire` applied to a person — frame body-contact effects as magical or harmless VFX
+- `candle-like`, `flame-like` and any real object used as a metaphor for an effect
+- a real, named public figure
+
 Don't depict the harm — depict the energy, the aftermath, the threat, or the scale. Build the scene safe from the first word.
 
 Write scenes that hit full cinematic impact without ever *needing* to depict prohibited content. This is a craft move, not a compromise — the substitutions below usually read as more cinematic, not less, and they keep your generation from getting silently rejected or degraded by the model's filter. A standoff is more tense than a massacre; an evacuated city is eerier than a crowd in panic; a roar lands harder than a kill. Load this whenever a prompt involves conflict, creatures, crowds, destruction, weapons, or young characters.

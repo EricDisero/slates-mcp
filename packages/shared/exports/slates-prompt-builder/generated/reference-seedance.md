@@ -4,6 +4,23 @@
 
 # Seedance 2.0 — prompting
 
+<!-- @card:start -->
+**Card — Seedance 2.0.** Not copywriting — an ENGINEERING instruction to a spatial layer and a temporal layer: who, in what scene, doing what, how the camera moves, and in what order. Multi-beat work is a `Shot 1 / Shot 2 / Shot 3` storyboard.
+
+**The five levers**
+1. **Bind every subject to its reference** — `<Subject_1>@<Image_1>` — and keep the descriptions identical across shots. Unbound subjects are where twins come from.
+2. **Shot sizes and camera MOVES, not lens data** — `medium close-up`, `slow push in`, `handheld follow`, `whip pan`. One primary move per shot.
+3. **Externalise emotion as physical action.** Not "she is nervous": `she turns the ring on her finger twice, then stops`.
+4. **Use the image-quality slot vocabulary** for quality — `HD`, `rich details`, `cinematic texture`, `natural colors`, `soft lighting`. That is the officially sanctioned way to ask.
+5. **Constraints go INLINE**, led by the official templates — `keep it subtitle-free`, `do not generate a watermark`, `avoid jitter and bent limbs`, `avoid temporal flicker`.
+
+**Examples**
+- `Shot 1: medium shot, <Subject_1>@<Image_1> steps out of the freight lift into a wet loading bay, slow push in. Shot 2: close-up, she turns the ring on her finger twice and stops, handheld. Rich details, cinematic texture, natural colors. Keep it subtitle-free.`
+- `Single continuous take. Wide shot of a fishing skiff crossing a grey swell, camera tracks from the starboard rail. Spray hits the lens once. Soft lighting, natural colors, film-grain texture. Avoid jitter and bent limbs.`
+
+**Hard constraint:** NO timestamps — 2.0 ignores them and answers only to shot numbers (2.5 acts on them). No lens, aperture, film stock or camera body: that is image-model vocabulary and a Seedance anti-pattern. There is no negativePrompt field.
+<!-- @card:end -->
+
 ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
 > **How to read this file.**

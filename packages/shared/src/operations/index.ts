@@ -49,7 +49,17 @@ import {
 // no call to skip, no discretion. `bannedTokenWarning` then reports what the
 // submitted prompt actually contained, in the result, without blocking it.
 // Never hand-type one of these tokens here; edit the skill.
-import { describeBannedTokens, bannedTokenWarning } from '../prompts/banned-tokens.js'
+import {
+  describeBannedTokens, bannedTokenWarning, describeBannedTokensForSkill,
+} from '../prompts/banned-tokens.js'
+// 🚨 THE OTHER HALF OF THE SAME LESSON. The banned list is the NEGATIVE half and
+// it rides an op description. The CRAFT CARD is the POSITIVE half — the levers
+// that make a shot good rather than merely un-bad — and it rides the estimate
+// RESULT, which the doctrine already makes the agent call before generating.
+// Zero prefix bytes, present at the moment the model has just been named.
+import { describeCraftCard, craftCard } from '../prompts/craft-cards.js'
+// ONE captioning rule for a generated asset, shared with the desktop gallery.
+import { assetCaption } from '../prompts/asset-label.js'
 // 🚨 THE ONE ROLE LIST + the Shot shape, mirrored into the desktop. The op
 // surface DERIVES its per-role params from these rather than naming roles by
 // hand — a hand-typed bucket name is what `attachmentRoles` exists to kill.
@@ -66,10 +76,29 @@ import {
   CAMERA_MOVE_BUCKETS,
   SPEECH_RATE,
 } from '../prompts/shot-grammar.js'
+// Annotations, tiers and the ONE schema renderer. Declared next door so this
+// module never hand-sets a hint or a tier per op: `annotate()` derives all four
+// from the id and the lockstep check re-derives them from the transport verbs.
+import {
+  annotate, groupFor, tierFor, toolDefinitions, GROUP_SUMMARY, OPERATION_GROUPS,
+} from './surface.js'
 
 export interface OperationContext {
   cloud: () => SlatesCloudClient
   desktop: () => SlatesDesktopClient
+  /**
+   * Cancellation, propagated from the caller.
+   *
+   * 🚨 THIS IS WHAT MAKES "STOP" MEAN STOP. Escape in the desktop Studio Agent
+   * aborted the brain stream and marked the *remaining* tool calls cancelled,
+   * but the op already running got no signal at all — so a sequential batch
+   * (`slates_generate_from_shots`, the largest spender on the surface) kept
+   * firing generations after the user had cancelled. Ops that loop over items,
+   * or block on a long provider call, check it; everything else may ignore it.
+   *
+   * Optional so an older caller that does not pass one still type-checks.
+   */
+  signal?: AbortSignal
 }
 
 export function defaultContext(): OperationContext {
@@ -77,6 +106,19 @@ export function defaultContext(): OperationContext {
     cloud: () => new SlatesCloudClient(),
     desktop: () => new SlatesDesktopClient(),
   }
+}
+
+/** Thrown by an op that noticed `ctx.signal` had aborted mid-work. */
+export class OperationCancelledError extends Error {
+  code = 'OPERATION_CANCELLED'
+  constructor(detail?: string) {
+    super(`Cancelled by the user${detail ? ` — ${detail}` : ''}.`)
+  }
+}
+
+/** Throw if the caller has cancelled. Call between billable items, never inside one. */
+function throwIfCancelled(ctx: OperationContext, detail?: string): void {
+  if (ctx.signal?.aborted) throw new OperationCancelledError(detail)
 }
 
 export interface OperationResult {
@@ -115,7 +157,51 @@ export interface Operation<I> {
    * prefix bytes.
    */
   billable?: boolean
+  /**
+   * MCP tool annotations (spec 2025-06-18), emitted in ListTools.
+   *
+   * 🚨 THIS IS WHAT LETS A HOST TELL A READ FROM A DELETE. Without them a
+   * Claude Desktop or Cursor user is prompted for `slates_list_assets` exactly
+   * the way they are prompted for `slates_delete_project`, and the destructive
+   * ops get no extra warning — so every prompt looks the same and the user
+   * learns to click through all of them.
+   *
+   * Never hand-set: `annotate()` derives all four from the op id below, and
+   * `scripts/agent-surface-lockstep-check.mjs` re-derives them INDEPENDENTLY
+   * from the op's own transport verbs. A `readOnlyHint` on an op whose `run`
+   * body posts is a lie that lets a host auto-approve a mutation, so the check
+   * has to be able to catch it.
+   */
+  annotations?: OperationAnnotations
+  /**
+   * Which tier of the desktop tool surface this op belongs to.
+   *
+   * `core` is sent on every Studio Agent turn; `extended` is deferred behind
+   * `slates_load_tools` and appended to the tool list for the rest of the run
+   * once a group loads. The MCP server registers everything as before — hosts
+   * there do their own deferral (Claude Code defers stdio tool schemas through
+   * its tool search) and a stdio server has no run to append to.
+   *
+   * Defaults to `core` when absent, so a new op is visible until someone
+   * deliberately defers it.
+   */
+  tier?: OperationTier
+  /** The `slates_load_tools` group this op arrives in. Required on `extended`. */
+  group?: OperationGroup
 }
+
+/** MCP tool annotations. All four are declared on every op — a missing hint is
+ *  indistinguishable from `false` to a host, which is the wrong default for
+ *  `destructiveHint`. */
+export interface OperationAnnotations {
+  readOnlyHint: boolean
+  destructiveHint: boolean
+  idempotentHint: boolean
+  openWorldHint: boolean
+}
+
+export type OperationTier = 'core' | 'extended'
+export type OperationGroup = 'library' | 'timeline' | 'admin' | 'blender'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -146,8 +232,61 @@ function ok(data: unknown, text?: string): OperationResult {
 // the same credit value); balances the same. Read via creditCost(); display
 // via fmtCredits(). The confirm gate fires above CONFIRM_CREDITS (≈ the old
 // $0.50 gate at the 3¢/credit peg).
-const CONFIRM_CREDITS = 17
+export const CONFIRM_CREDITS = 17
 const CENTS_PER_CREDIT = 3 // peg: 1 credit = 3¢ billed = 2¢ COGS (mirror of slates-api)
+
+/**
+ * The desktop deviation guard's ceiling multiplier: the Studio Agent pauses and
+ * re-asks when projected generation spend exceeds the approved ledger by more
+ * than this factor.
+ *
+ * 🚨 EXPORTED BECAUSE THE NUMBER IS QUOTED DOWNSTREAM. `slates-cost-discipline`
+ * told the agent the threshold was 25% while `loop.ts` paused at 20% — a skill
+ * contradicting the code on the one number that decides whether a run stops.
+ * The skill now renders it from here through `_partials/thresholds.md`; the
+ * desktop loop imports it instead of declaring its own.
+ */
+export const DEVIATION_FACTOR = 1.2
+
+/**
+ * The confirm-gate sentence, rendered ONCE from CONFIRM_CREDITS.
+ *
+ * It was hand-typed three different ways for the same constant — "$0.50" on the
+ * image and video ops, "17 credits" on audio — so a rate change would have had
+ * to find three wordings. Byte-stable (a template over a literal), so the
+ * desktop's prompt-cached prefix is unaffected.
+ */
+const CONFIRM_GATE_SENTENCE =
+  `Cost above ${CONFIRM_CREDITS} credits returns requires_confirm — pass confirm=true after explicit user OK.`
+
+// Declared HERE, above every op, because `slates_estimate_generation_cost`
+// renders them into its `duration` description at MODULE LOAD — a const
+// declared below the first schema that reads it is a temporal-dead-zone
+// crash, not a lint nit (the same rule the VIDEO_MODELS block states).
+/**
+ * Per-surface bounds and defaults.
+ *
+ * 🚨 THESE FOUR NUMBERS PER SURFACE LIVE IN THREE REPOS. A change is a
+ * three-site edit, every time:
+ *   1. HERE (`audioCostKey`, the agent's pre-flight quote)
+ *   2. `slate/src/shared/pricing.ts` → MODEL_REGISTRY `audio.durationSeconds`
+ *      (min/max/default), read by `clampAudioDuration` + `audioCreditKey`
+ *   3. `slates-api/src/lib/audio-keys.ts` → the server's fail-closed bounds
+ * `slates-api/scripts/pricing-consistency-check.mjs` §4 asserts 1 and 2 agree
+ * at EVERY value including out-of-range ones; the gate check covers 3.
+ *
+ * The MINs used to be missing here, and the clamp floor was a hardcoded 1. That
+ * made `slates_estimate_generation_cost({model:'seed-audio', duration:2})`
+ * quote a real `seed-audio-2s` price for a generation the desktop would bill as
+ * 3s and the proxy would REJECT outright. Same for an omitted duration, which
+ * quoted `seed-audio-1s` against the desktop's `seed-audio-15s`.
+ */
+export const SEED_AUDIO_MIN_SECONDS = 3
+export const SEED_AUDIO_MAX_SECONDS = 120
+export const SEED_AUDIO_DEFAULT_SECONDS = 15
+export const ELEVEN_SFX_MIN_SECONDS = 1
+export const ELEVEN_SFX_MAX_SECONDS = 22
+export const ELEVEN_SFX_DEFAULT_SECONDS = 4
 
 function creditCost(m: { cost_credits?: number; cost_cents?: number } | undefined): number {
   if (!m) return 0
@@ -166,10 +305,11 @@ function creditsFromDollars(dollars: number): number {
   return cents <= 0 ? 0 : Math.max(1, Math.ceil(cents / CENTS_PER_CREDIT))
 }
 
-// Shared describe-text for the background flag on every generate_* op.
+// Shared describe-text for the background flag on every generate_* op. ONE
+// sentence: it is repeated verbatim on seven ops, so every word costs seven
+// times, and `slates_get_generation_status` explains the polling itself.
 const BACKGROUND_DESCRIBE =
-  'Submit and return immediately with generationId(s) instead of blocking until the file is saved. ' +
-  'Poll with slates_get_generation_status. Recommended for video (1-5 min renders).'
+  'Return generationId(s) immediately instead of blocking; poll slates_get_generation_status. Recommended for video.'
 
 // ── Vision QC pointers (the "quality-check with vision" rule, made structural) ──
 //
@@ -223,20 +363,43 @@ function backgroundSubmitted(
 
 // ── Workspace + identity ────────────────────────────────────────
 
-export const getWorkspaceState: Operation<{ projectId?: string }> = {
+export const getWorkspaceState: Operation<{ projectId?: string; limit?: number }> = {
   id: 'slates_get_workspace_state',
   description:
-    'Snapshot of the user\'s Slates workspace: projects list, optional active project detail. Call once at the start of a workflow to seed your understanding.',
-  input: z.object({ projectId: z.string().optional() }),
+    'Snapshot of the user\'s Slates workspace: the project list (most recent first) plus the active project in full when you name one. Call once at the start of a workflow to seed your understanding.',
+  input: z.object({
+    projectId: z.string().optional(),
+    limit: z.number().int().min(1).max(200).optional().describe('How many projects to list, newest first. Default 40.'),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     const { projects } = await desktop.get<{ projects: unknown[] }>('/agent/projects')
+    // 🚨 COMPACT ROWS, AND A CAP. This returned every project's FULL row — fine
+    // at fourteen projects and unbounded by construction, on the one op the
+    // doctrine tells the agent to call first in every session. The fields kept
+    // are the ones a routing decision actually uses; the full row is one
+    // slates_get_project away.
+    const limit = input.limit ?? 40
+    const rows = (projects ?? []) as Array<Record<string, unknown>>
+    const compact = rows.slice(0, limit).map((p) => ({
+      id: p.id,
+      name: p.name,
+      asset_count: p.assetCount ?? p.asset_count ?? undefined,
+      updated_at: p.updatedAt ?? p.updated_at ?? undefined,
+    }))
     let activeProject: unknown = undefined
     if (input.projectId) {
       const r = await desktop.get<{ project: unknown }>('/agent/projects/get', { id: input.projectId })
       activeProject = r.project
     }
-    return ok({ projects, activeProject })
+    return ok({
+      projects: compact,
+      project_count: rows.length,
+      ...(rows.length > compact.length
+        ? { truncated: `${rows.length - compact.length} more — raise limit or call slates_list_projects.` }
+        : {}),
+      activeProject,
+    })
   },
 }
 
@@ -483,11 +646,16 @@ export const estimateGenerationCost: Operation<{
     // hand-typed "Video 3-15" here was wrong the day seedance-2.5 (4-30s)
     // shipped, and "Seedance defaults to 1080p" was wrong for 2.5, which has no
     // 1080p at all.
+    // 🚨 THE PER-MODEL TABLES ARE NOT REPEATED HERE. `slates_generate_video`
+    // carries `describeDurations` and `describeVideoResolutions` and is always
+    // in context beside this op; a second copy is 1.2 KB of the same generated
+    // text on every turn, and it would go stale in exactly one direction — the
+    // one where someone edits a table and forgets there were two.
     duration: z.number().int().min(1).max(360).optional().describe(
-      `Seconds; cost scales linearly. Required with a video or audio base id. Video per model: ${describeDurations(VIDEO_MODELS)}. Audio: seed-audio 3-120 (⚠️ the requested duration IS the bill), eleven-sfx 1-22.`
+      `Seconds; cost scales linearly. Required with a video or audio base id. Per-model windows: see slates_generate_video's duration. Audio: seed-audio ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS} (⚠️ the requested duration IS the bill), eleven-sfx ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}.`
     ),
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
-      `Video only. Omitted, each model quotes at its own default. Per model: ${describeVideoResolutions(VIDEO_MODELS)}`
+      'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
     ),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k = gpt-image-2 1440p class).'),
     quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
@@ -506,9 +674,11 @@ export const estimateGenerationCost: Operation<{
     let key: string | null = byKey.has(input.model) ? input.model : null
     // 2) image base id + resolution (+ quality for gpt-image-2)
     if (!key) {
-      const img = (['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite'] as const).find(
-        (m) => m === input.model
-      )
+      // IMAGE_MODELS, never a second hand-typed copy: this list is declared
+      // below (a runtime read, so no temporal-dead-zone hazard) and is the same
+      // enum `slates_generate_image` accepts. Two copies is how the estimate op
+      // would quietly stop pricing the seventh image model.
+      const img = IMAGE_MODELS.find((m) => m === input.model)
       if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality ?? 'medium')
     }
     // 2a) audio base id → seconds. Both surfaces bill per second, so a
@@ -604,12 +774,25 @@ export const estimateGenerationCost: Operation<{
 
     const perCredits = key != null ? byKey.get(key) : undefined
     if (key == null || perCredits == null) {
+      // Every id in the error comes from the SSOT arrays. The image half was
+      // hand-typed and named three of six, so an agent that mis-spelled
+      // `gpt-image-2` was told the model did not exist.
       throw new Error(
-        `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | ${AUDIO_MODELS.join(' | ')} | nano-banana-2 | flux-2-max | seedream-5-lite) plus duration/resolution params, or use slates_list_available_models with a filter.`
+        `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | ${AUDIO_MODELS.join(' | ')} | ${IMAGE_MODELS.join(' | ')}) plus duration/resolution params, or use slates_list_available_models with a filter.`
       )
     }
     const qty = input.quantity ?? 1
     const totalCredits = perCredits * qty
+    // 🚨 THE CRAFT CARD RIDES THIS RESULT. Measured 2026-08-30: the never-use
+    // list inlined where the agent could not skip it moved compliance 0/8 →
+    // 30/32, while the same guidance behind `slates_get_prompting_guide` sat at
+    // 13% before AND after. This is that placement applied to the POSITIVE half.
+    // It is here rather than in a param description because a description is
+    // paid for on every turn of every session and read once — this is paid for
+    // only by the call that is about to use the model.
+    const skill = promptingSkillFor(input.model)
+    const card = describeCraftCard(skill)
+    const banned = describeBannedTokensForSkill(skill)
     return ok({
       model: input.model,
       cost_key: key,
@@ -617,7 +800,11 @@ export const estimateGenerationCost: Operation<{
       cost_per_credits: perCredits,
       total_credits: totalCredits,
       requires_confirm: totalCredits > CONFIRM_CREDITS,
-    }, `${input.model}${qty > 1 ? ` ×${qty}` : ''}: ${fmtCredits(totalCredits)} (${key}).`)
+      ...(card ? { craft_card: card, craft_card_skill: skill } : {}),
+      ...(banned ? { banned_tokens: banned } : {}),
+    }, `${input.model}${qty > 1 ? ` ×${qty}` : ''}: ${fmtCredits(totalCredits)} (${key}).` +
+      (card ? `\n\n--- HOW TO PROMPT ${input.model} ---\n${card}` : '') +
+      (banned ? `\n\n${banned}` : ''))
   },
 }
 
@@ -661,11 +848,17 @@ export const getProject: Operation<{ id: string }> = {
  * tool result). Every op that embeds asset lists uses this. */
 function compactAsset(a: unknown): Record<string, unknown> {
   const r = a as Record<string, unknown>
-  const prompt = typeof r.prompt === 'string' ? r.prompt : ''
   return {
     id: r.id,
     code: r.code ?? null,
-    label: r.label ?? (prompt ? prompt.slice(0, 40) : null),
+    // ONE captioning rule, shared with the desktop gallery — see
+    // prompts/asset-label.ts for why the first 40 characters of a prompt is not
+    // a label on reference-driven work.
+    label: assetCaption({
+      label: typeof r.label === 'string' ? r.label : null,
+      shotName: typeof r.shotName === 'string' ? r.shotName : null,
+      prompt: typeof r.prompt === 'string' ? r.prompt : null,
+    }),
     type: r.type,
     created_at: r.createdAt ?? r.created_at ?? undefined,
   }
@@ -1556,7 +1749,9 @@ export const generateImage: Operation<{
     // (it still described nano-banana-2-lite by a capability the param owns).
     `${describeRouting('image')}\n` +
     'Full table: the slates-model-selection skill. ' +
-    'Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use. ' +
+    'Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). ' +
+    CONFIRM_GATE_SENTENCE +
+    ' MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use. ' +
     // GENERATED from the skill file's own never-use list -- the one piece of
     // prompting doctrine that is ALWAYS in context, because the agent has
     // demonstrably skipped the call that would have taught it.
@@ -1671,7 +1866,7 @@ export const generateImage: Operation<{
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = creditCost(entry) * (input.count ?? 1)
-    // Confirm gate. Fires on cost > $0.50, AND (look-first, mirroring
+    // Confirm gate. Fires above CONFIRM_CREDITS, AND (look-first, mirroring
     // slates_generate_video) whenever reference assets are involved
     // regardless of cost — the LLM must see what it's referencing before
     // committing spend.
@@ -2305,31 +2500,6 @@ export const AUDIO_MODELS = ['seed-audio', 'eleven-sfx'] as const
 export type AudioModel = (typeof AUDIO_MODELS)[number]
 
 /**
- * Per-surface bounds and defaults.
- *
- * 🚨 THESE FOUR NUMBERS PER SURFACE LIVE IN THREE REPOS. A change is a
- * three-site edit, every time:
- *   1. HERE (`audioCostKey`, the agent's pre-flight quote)
- *   2. `slate/src/shared/pricing.ts` → MODEL_REGISTRY `audio.durationSeconds`
- *      (min/max/default), read by `clampAudioDuration` + `audioCreditKey`
- *   3. `slates-api/src/lib/audio-keys.ts` → the server's fail-closed bounds
- * `slates-api/scripts/pricing-consistency-check.mjs` §4 asserts 1 and 2 agree
- * at EVERY value including out-of-range ones; the gate check covers 3.
- *
- * The MINs used to be missing here, and the clamp floor was a hardcoded 1. That
- * made `slates_estimate_generation_cost({model:'seed-audio', duration:2})`
- * quote a real `seed-audio-2s` price for a generation the desktop would bill as
- * 3s and the proxy would REJECT outright. Same for an omitted duration, which
- * quoted `seed-audio-1s` against the desktop's `seed-audio-15s`.
- */
-export const SEED_AUDIO_MIN_SECONDS = 3
-export const SEED_AUDIO_MAX_SECONDS = 120
-export const SEED_AUDIO_DEFAULT_SECONDS = 15
-export const ELEVEN_SFX_MIN_SECONDS = 1
-export const ELEVEN_SFX_MAX_SECONDS = 22
-export const ELEVEN_SFX_DEFAULT_SECONDS = 4
-
-/**
  * Byte-for-byte the desktop's `clampAudioDuration` in slate/src/shared/pricing.ts,
  * INCLUDING the non-finite arm — that one matters: `Math.max(min, NaN)` is NaN,
  * so without it a NaN duration produces the key `seed-audio-NaNs` here while the
@@ -2508,24 +2678,29 @@ function spokenTextByAssetId(
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-// Maps a video model id to its bundled prompting skill (frontmatter `name:`),
-// so guidance text points at a skill that actually exists. Deriving the name
-// via model.split('-')[0] produced 'slates-prompting-kling' / '...-veo', which
-// match no file — only seedance happened to line up.
+// Maps a model id to its bundled prompting skill (frontmatter `name:`), so
+// guidance text points at a skill that actually exists.
+//
+// 🚨 ONE RESOLVER. This was a second hand-typed alias table beside
+// `resolveGuideTopic()`, and it had already fallen behind: it knew nothing
+// about LTX-2.5, so every LTX generation was told to read the cost skill
+// instead of its own guide. Delegate; the ordering traps (2.5 before seedance,
+// seed-audio before seedance, minimax before both) are solved once, there.
 function promptingSkillFor(model: string): string {
-  if (model.startsWith('kling')) return 'slates-prompting-kling-v3'
-  if (model.startsWith('veo')) return 'slates-prompting-veo-3'
-  // 2.5 BEFORE the generic seedance test — "seedance-2.5" also starts with
-  // "seedance", and falling through hands 2.0's guide to a model with different
-  // limits, a different resolution ladder and an extra task type.
-  if (model.startsWith('seedance-2.5')) return 'slates-prompting-seedance-2-5'
-  if (model.startsWith('seedance')) return 'slates-prompting-seedance'
-  if (model.startsWith('omni-flash')) return 'slates-prompting-omni-flash'
-  // ONE skill covers both H3 seats — the prompt grammar is identical and only
-  // the ladder and the reference transport differ — so a prefix is right here.
-  if (model.startsWith('minimax-h3')) return 'slates-prompting-minimax-h3'
-  return 'slates-cost-discipline'
+  return resolveGuideTopic(model) ?? 'slates-cost-discipline'
 }
+
+/**
+ * The per-model prompting guides for the whole video roster, DERIVED.
+ *
+ * `slates_generate_video`'s description hand-typed five of them and omitted
+ * `slates-prompting-ltx-2-5` for as long as LTX shipped — an agent reading the
+ * description could not learn the guide existed. A hand-typed index of a
+ * generated corpus is a stale index; it is only a matter of when.
+ */
+const VIDEO_MODEL_GUIDES = [
+  ...new Set(VIDEO_MODELS.map((m) => promptingSkillFor(m))),
+].join(' / ')
 
 export const generateVideo: Operation<{
   prompt: string
@@ -2562,7 +2737,11 @@ export const generateVideo: Operation<{
   id: 'slates_generate_video',
   billable: true,
   description:
-    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-kling-v3 / slates-prompting-veo-3 / slates-prompting-minimax-h3) — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Cost > $0.50 returns requires_confirm — pass confirm=true after explicit user OK. Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
+    'Generate video via Slates credits. REQUIRED before calling: read slates-model-selection (the routing doctrine), slates-cost-discipline, and the matching per-model prompting skill (' +
+    VIDEO_MODEL_GUIDES +
+    ') — video models prompt very differently; load them via slates_get_prompting_guide if no skill files are installed. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). ' +
+    CONFIRM_GATE_SENTENCE +
+    ' Image-to-video via firstFrameAssetId; first+last frames = Veo/Seedance only; ingredients via ingredientAssetIds (Kling Omni / Seedance). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
     // surfaces, so it survives an agent that skips slates_get_prompting_guide.
     describeBannedTokens('video'),
@@ -2599,41 +2778,48 @@ export const generateVideo: Operation<{
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
       `An unsupported resolution is REJECTED, never downgraded. Per model: ${describeVideoResolutions(VIDEO_MODELS)}. 4K video is Pro-only (the server returns PRO_REQUIRED for a base-tier account).`
     ),
-    firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video: asset UUID or badge code ("IMG-A8") — codes resolve against the project at call time, so a code the user just spoke is always safe to pass.'),
-    lastFrameAssetId: z.string().optional().describe('Ending frame (UUID or badge code). Veo and Seedance only. Pairs with firstFrameAssetId for guided transitions.'),
+    // 🚨 EVERY DESCRIPTION BELOW IS A CONSTRAINT OR A GENERATED TABLE — never
+    // craft, never rationale, never a worked example. This op is the single
+    // largest thing in the desktop's prompt-cached prefix (measured 15,357 of
+    // 112,114 bytes on 2026-09-02, 13.7%), and almost all of the excess was
+    // reasoning that belongs in slates-prompting-* where it is read once, on
+    // demand, by the one session that needs it. If you are about to explain
+    // WHY here, you are writing the skill in the wrong file.
+    firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video (UUID or badge code, resolved at call time).'),
+    lastFrameAssetId: z.string().optional().describe('Ending frame. Veo and Seedance only; pairs with firstFrameAssetId.'),
     ingredientAssetIds: z.array(z.string()).max(30).optional().describe(
       // Caps DERIVED from MODEL_CAPABILITIES — the hand-typed list omitted
       // kling-v3.0-omni-pro entirely and read as if 7 were an Omni Flash-only rule.
-      `Visual reference / ingredient assets (UUIDs or badge codes). Cap per model (combined across ingredient/character/environment/style params): ${describeReferenceImageCaps(VIDEO_MODELS)}. More is not better: 2-4 strong references beat both extremes, and past 4 reference PEOPLE output stability drops on Seedance regardless of the cap.`
+      `Visual reference / ingredient assets. Cap per model, combined across the ingredient/character/environment/style params: ${describeReferenceImageCaps(VIDEO_MODELS)}. 2-4 strong references beat both extremes.`
     ),
-    characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets (UUIDs or badge codes) — keeps a character consistent across the shot.'),
-    environmentAssetIds: z.array(z.string()).optional().describe('Environment reference assets (UUIDs or badge codes) — keeps a location/setting consistent across the shot.'),
-    styleAssetIds: z.array(z.string()).optional().describe('Style reference assets (UUIDs or badge codes) — locks the visual style of the shot.'),
-    videoReferenceAssetId: z.string().optional().describe('DEPRECATED — forwarded into videoReferenceAssetIds; prefer that for anything new. A single VIDEO asset (UUID or badge code) used as a reference. Kept working forever: installed CLI and MCP builds send this shape.'),
-    videoReferenceSeconds: z.number().optional().describe('DEPRECATED — the singular partner of videoReferenceSecondsEach. Required with videoReferenceAssetId: that clip\'s duration in seconds.'),
-    audioReferenceAssetId: z.string().optional().describe('DEPRECATED — forwarded into audioReferenceAssetIds; prefer that. A single AUDIO asset (UUID or badge code) used as a reference.'),
+    characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets — keeps a character consistent.'),
+    environmentAssetIds: z.array(z.string()).optional().describe('Environment references — keeps a location consistent.'),
+    styleAssetIds: z.array(z.string()).optional().describe('Style references — locks the look.'),
+    videoReferenceAssetId: z.string().optional().describe('DEPRECATED — use videoReferenceAssetIds. Kept working: shipped CLI/MCP builds send this shape.'),
+    videoReferenceSeconds: z.number().optional().describe('DEPRECATED — the singular partner of videoReferenceSecondsEach.'),
+    audioReferenceAssetId: z.string().optional().describe('DEPRECATED — use audioReferenceAssetIds. Carries no spoken text.'),
     // ── Multimodal references, the plural surface ──
     // The capacity sentences are DERIVED from MODEL_FACTS (see
     // multimodalRefSummary) rather than hand-typed, so a cap change in one
     // place cannot leave a stale number in a description an LLM reads.
     videoReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference VIDEOS (UUIDs or badge codes) read alongside the images and audio in the same generation — own-footage restyle, MOTION TRANSFER ("the character from image 1 performs the motion from video 1"), or dialogue conditioning. Cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; ignored elsewhere. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')} Billing switches to combined input+output seconds (the vref key) — pass videoReferenceSecondsEach so the quote is right. If any clip contains a human/AI character, pair with seedanceFace=true (the default Seedance route blocks people). Over the cap is REFUSED, never trimmed: a dropped clip would already have been priced in.`
+      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')} Billing switches to the vref key (input+output seconds) — pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
     ),
     videoReferenceSecondsEach: z.array(z.number()).optional().describe(
-      'REQUIRED with videoReferenceAssetIds, same order and length: each reference clip\'s duration in seconds (from the asset listing). Feeds the vref cost key — the bill is Σceil(each) + output seconds. The server re-derives this by probing every uploaded clip, so an understated value just gets corrected upward.'
+      'REQUIRED with videoReferenceAssetIds, same order and length: each clip\'s duration in seconds. Feeds the vref cost key; the server re-probes and corrects an understated value upward.'
     ),
     audioReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference AUDIO clips (UUIDs or badge codes) read alongside the images and video — e.g. lip-sync a character to a line ("the character in image 1 speaks the dialogue from audio 1"). Cited as "audio 1", "audio 2"… in the order given. No billing surcharge (Seedance audio is included). ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')}`
+      `Reference AUDIO, cited as "audio 1", "audio 2"… in the order given. No billing surcharge. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')}`
     ),
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
-      'STRONGLY RECOMMENDED whenever a reference clip contains SPEECH. Same order and length as audioReferenceAssetIds; use "" for a clip with no words (music, ambience, room tone). The model RE-TRANSCRIBES a supplied take rather than using it verbatim — a field test heard "an app called Slates" come back as "a map called Slates" — so the audio decides the VOICE, the ACCENT and the TIMING while only text decides the WORDS. Give the exact line here and it is quoted into the prompt beside the citation. Omit it and the words are a guess. Pairs with the plural audioReferenceAssetIds; the deprecated singular audioReferenceAssetId carries no text.'
+      'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'
     ),
     sound: z.boolean().optional().describe('Kling Omni / Veo / Seedance: enable audio generation. Default true.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Kling Omni only — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Kling Omni only — auto-generate background music.'),
-    seedanceFace: z.boolean().optional().describe('Seedance ONLY: set true when a reference/ingredient shows an AI-character\'s FACE. Faces are blocked on the default (cheaper) Seedance route, so this reroutes the gen to a face-capable provider at ~45% more (the cost key becomes seedance-2-face-*). Leave false/unset for faceless or object-only references. No effect on Kling/Veo. A REAL person\'s photo is rejected on this route — the failure message contains [REAL_FACE_DETECTED]; see seedanceRealFace.'),
-    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: the reference shows a REAL person (a photo of an actual human, not an AI character). Routes to the premium real-face provider (cost key seedance-2-realface-*, roughly 2x the AI-face price — quote it via slates_estimate_generation_cost first). REQUIRES realFaceConsent=true. Typical flow: a seedanceFace gen fails with [REAL_FACE_DETECTED] → ask the user to confirm consent + the higher price → retry with seedanceRealFace=true + realFaceConsent=true.'),
-    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: set true ONLY after the user has explicitly confirmed they hold the rights/consent to this person\'s likeness and it doesn\'t impersonate or misrepresent them. The generation is refused without it. Public figures/celebrities fail on every route.'),
+    seedanceFace: z.boolean().optional().describe('Seedance ONLY: a reference shows an AI CHARACTER\'s face. Faces are blocked on the default route, so this reroutes to a face-capable provider at ~45% more. A REAL person fails here with [REAL_FACE_DETECTED] — see seedanceRealFace.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. Premium route, roughly 2x the AI-face price — quote it first. REQUIRES realFaceConsent=true.'),
+    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every route.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the confirm gate (which fires for almost every video gen since they\'re expensive).'),
@@ -3015,7 +3201,7 @@ export const generateVideo: Operation<{
     const totalCents = creditCost(entry)
 
     // Pre-flight confirm gate. Fires when:
-    //   (a) cost > $0.50 (the cost gate), OR
+    //   (a) cost above CONFIRM_CREDITS (the cost gate), OR
     //   (b) any reference assets are involved (the look-first gate)
     // When references are present, the response inlines them as image
     // content blocks (and video keyframes for video refs) so the LLM
@@ -3200,7 +3386,9 @@ export const generateAudio: Operation<{
     'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Two surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s) and eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop). Which surface for which job: read the slates-model-selection skill. ' +
     '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. Choose it deliberately. ' +
     'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio and makes results worse. ' +
-    'projectId is REQUIRED (no headless path). Cost > 17 credits returns requires_confirm — pass confirm=true after explicit user OK. No skill files installed? Call slates_get_prompting_guide first.',
+    'projectId is REQUIRED (no headless path). ' +
+    CONFIRM_GATE_SENTENCE +
+    ' No skill files installed? Call slates_get_prompting_guide first.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the audio asset lands in. Required — the renderer refreshes live.'),
     model: z
@@ -3410,7 +3598,7 @@ export const generateLipSync: Operation<{
   id: 'slates_generate_lip_sync',
   billable: true,
   description:
-    'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip (~$0.11 / 5s); sourceType=image animates a still avatar (avatar-standard ~$0.42 / 5s; avatar-pro ~$0.86 / 5s). Audio from TTS (ttsText + ttsVoice) or an uploaded file. Always 5 seconds. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
+    'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Always 5 seconds. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
     sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
@@ -3554,12 +3742,13 @@ export const generateMotionTransfer: Operation<{
   id: 'slates_generate_motion_transfer',
   billable: true,
   description:
-    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std ($0.95 / 5s) or kling-mc-pro ($1.26 / 5s), structured skeleton/depth retargeting, always 5s. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. Both tiers hit the >$0.50 confirm gate.',
+    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, always 5s. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. ' +
+    CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
     sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Up to 30s.'),
     targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project.'),
-    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('kling-mc-std (~32 credits) general motion; kling-mc-pro (~42 credits) cleaner anatomy — default.'),
+    motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('kling-mc-std general motion; kling-mc-pro cleaner anatomy — default. Quote both with slates_estimate_generation_cost.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Optional refinement. Read slates-prompting-motion-transfer.'),
     klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing. "fal" (default) uses Slates credits.'),
@@ -3596,7 +3785,17 @@ export const generateMotionTransfer: Operation<{
         message:
           `Cost: ${fmtCredits(totalCents)} for 5s ${motionModel} (${costKey}). ` +
           `Transferring motion from ${source} onto ${target}. ` +
-          `Re-call with confirm=true after the user explicitly OKs the spend, or pick kling-mc-std to save ~10 credits. ` +
+          // The saving is READ from the registry, never guessed: "~10 credits"
+          // was hand-typed and is a rate change away from being a lie.
+          `Re-call with confirm=true after the user explicitly OKs the spend${
+            motionModel === 'kling-mc-pro'
+              ? (() => {
+                  const std = registry.models.find((m) => m.model === 'kling-mc-std-5s')
+                  const saving = std ? totalCents - creditCost(std) : 0
+                  return saving > 0 ? `, or pick kling-mc-std to save ${fmtCredits(saving)}` : ''
+                })()
+              : ''
+          }. ` +
           `When discussing with the user, refer to the assets by those codes — they'll match the gallery badges.`,
       })
     }
@@ -3680,7 +3879,13 @@ export const editVideo: Operation<{
   id: 'slates_edit_video',
   billable: true,
   description:
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default; 3–15s clips, 720–3840px, subject/style refs via elements), omni-flash-edit (Gemini Omni Flash; 3–10s clips, 720p output, PROMPT-ONLY — no refs, cheapest seat), or seedance-2.5-edit (4–30s clips — the ONLY engine that takes a clip over 15s; up to 1080p, seedanceFace:true for AI-character faces). Cost = per second of OUTPUT (≈ clip length, rounded UP to the next second): omni-flash-edit ≈ 19¢/s ≈ kling-v3.0-omni-edit ≈ 19¢/s, kling-v3.0-omni-pro-edit ≈ 25¢/s. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. seedance-2.5-edit is priced per second of output on the video-reference tier and bills roughly double a plain 2.5 generation of the same length, because every provider charges an edit on input + output seconds — always read the quote from the confirm gate rather than assuming. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default edit tool (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; prefer Seedance edit/relocate only for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
+    // 🚨 NO PRICES, NO HAND-TYPED WINDOWS. This description carried five dollar
+    // figures and three duration/resolution claims. The prices contradicted the
+    // agent's own REAL NUMBERS ONLY rule (it may not repeat a figure it cannot
+    // point to in a tool result) and go stale on the next rate change; the
+    // windows are owned by MODEL_CAPABILITIES and are generated below into the
+    // params that enforce them.
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default — subject/style refs via elements), omni-flash-edit (PROMPT-ONLY, no refs, the cheapest seat), or seedance-2.5-edit (the only engine that takes a clip over 15s; seedanceFace:true for AI-character faces). Clip-length and resolution windows per engine are on the `model` param. Cost is per second of OUTPUT (≈ clip length, rounded up), and an edit bills input + output seconds on every provider — read the quote from the confirm gate or slates_estimate_generation_cost, never from memory. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; Seedance edit/relocate for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
@@ -4728,22 +4933,44 @@ export const deleteFrame: Operation<{ frameId: string }> = {
 /** Role → its `string[]` param, GENERATED from the role list. Never hand-typed:
  *  `attachmentRoles`/`shot-spec` is the ONE role list, and a sixth role has to
  *  appear here without anyone remembering to add it. */
-const SHOT_REF_SHAPE = Object.fromEntries(
-  ORDERED_ATTACHMENT_ROLES.map((role) => [
-    role,
-    z
-      .array(z.string())
-      .optional()
-      .describe(`${ATTACHMENT_ROLE_DESCRIPTION[role]} UUIDs or badge codes ("IMG-A8").`),
-  ])
-) as { [K in OrderedAttachmentRole]: z.ZodOptional<z.ZodArray<z.ZodString>> }
+function shotRefShape(described: boolean): {
+  [K in OrderedAttachmentRole]: z.ZodOptional<z.ZodArray<z.ZodString>>
+} {
+  return Object.fromEntries(
+    ORDERED_ATTACHMENT_ROLES.map((role) => [
+      role,
+      described
+        ? z
+            .array(z.string())
+            .optional()
+            .describe(`${ATTACHMENT_ROLE_DESCRIPTION[role]} UUIDs or badge codes ("IMG-A8").`)
+        : z.array(z.string()).optional(),
+    ])
+  ) as { [K in OrderedAttachmentRole]: z.ZodOptional<z.ZodArray<z.ZodString>> }
+}
 
-const shotRefsSchema = z
-  .object(SHOT_REF_SHAPE)
+const SHOT_REFS_LEAD =
+  'Attachments by ROLE, ordered within each role. The role decides the sentence the model is told, so a subject reference and a plain one are not interchangeable.'
+
+const shotRefsSchema = z.object(shotRefShape(true)).optional().describe(SHOT_REFS_LEAD)
+
+/**
+ * 🚨 THE SAME SHAPE, DESCRIBED ONCE.
+ *
+ * `params`, `refs` and the script fields are identical across create / update /
+ * duplicate, and `zodToJsonSchema` inlines every description into all three —
+ * 2.7 KB of the same prose, three times, in the desktop's prompt-cached prefix
+ * on every turn. `slates_create_shot` is the op that documents the shape and it
+ * is always in context beside these; repeating the table here bought nothing
+ * but bytes. The Zod ENUMS stay on both, so enforcement is unchanged — only the
+ * prose is deduplicated.
+ */
+const SEE_CREATE_SHOT = 'Same shape as slates_create_shot — see it for what each field means. '
+
+const shotRefsSchemaTerse = z
+  .object(shotRefShape(false))
   .optional()
-  .describe(
-    'Attachments by ROLE, ordered within each role. The role decides the sentence the model is told, so a subject reference and a plain one are not interchangeable.'
-  )
+  .describe(SEE_CREATE_SHOT + SHOT_REFS_LEAD)
 
 // The full ratio vocabulary a Shot can hold — image OR video, because a Shot is
 // any generation. Per-model narrowing happens at create time for video (the same
@@ -4760,26 +4987,47 @@ const SHOT_ASPECT_RATIOS = [...new Set([...VIDEO_ASPECT_RATIOS, ...IMAGE_ASPECT_
 // The vocabulary is still ENFORCED (a Zod enum built from MODEL_CAPABILITIES),
 // and the per-model narrowing is enforced by `assertShotCapabilities` at save
 // time — which is stronger than prose, not weaker.
-const shotParamsSchema = z
-  .object({
-    aspectRatio: zEnum(SHOT_ASPECT_RATIOS).optional().describe(
+function shotParamsShape(described: boolean): z.ZodRawShape {
+  const d = <T extends z.ZodTypeAny>(node: T, text: string): T =>
+    (described ? node.describe(text) : node) as T
+  return {
+    aspectRatio: d(
+      zEnum(SHOT_ASPECT_RATIOS).optional(),
       'Validated against the chosen model when the Shot is saved — see slates_generate_video for the per-model sets.'
     ),
-    duration: z.number().int().min(1).max(360).optional().describe(
+    duration: d(
+      z.number().int().min(1).max(360).optional(),
       'Seconds — video or audio. Required before a video Shot can be priced or fired; validated against the model when saved.'
     ),
-    videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
+    videoResolution: d(
+      zEnum(VIDEO_RESOLUTIONS).optional(),
       'Validated against the chosen model when the Shot is saved.'
     ),
-    imageResolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image models only.'),
-    gptQuality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only.'),
-    imageQuantity: z.number().int().min(1).max(4).optional().describe('Image models only — how many to make per fire.'),
+    imageResolution: d(z.enum(['1k', '2k', '3k', '4k']).optional(), 'Image models only.'),
+    gptQuality: d(z.enum(['medium', 'high']).optional(), 'gpt-image-2 only.'),
+    imageQuantity: d(
+      z.number().int().min(1).max(4).optional(),
+      'Image models only — how many to make per fire.'
+    ),
     negativePrompt: z.string().optional(),
-    sound: z.boolean().optional().describe('Video models that co-generate audio.'),
-    seedanceFace: z.boolean().optional().describe('Seedance only — a reference shows an AI character\'s FACE; reroutes to a face-capable provider at ~45% more.'),
-    audioDurationSeconds: z.number().int().min(1).max(120).optional().describe('Audio lane. On seed-audio the requested duration IS the bill.'),
-  })
+    sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
+    seedanceFace: d(
+      z.boolean().optional(),
+      "Seedance only — a reference shows an AI character's FACE; reroutes to a face-capable provider at ~45% more."
+    ),
+    audioDurationSeconds: d(
+      z.number().int().min(1).max(120).optional(),
+      'Audio lane. On seed-audio the requested duration IS the bill.'
+    ),
+  }
+}
+
+const shotParamsSchema = z.object(shotParamsShape(true)).optional()
+
+const shotParamsSchemaTerse = z
+  .object(shotParamsShape(false))
   .optional()
+  .describe(SEE_CREATE_SHOT + 'Generation settings for the Shot.')
 
 /**
  * The script layer, as op params — GENERATED from `SCRIPT_FIELD_DESCRIPTION`.
@@ -4795,17 +5043,26 @@ const shotParamsSchema = z
  * is pre-existing: a multiShotSegment still prepends its own camera and
  * shotSize to its own segment prompt.
  */
-const SHOT_SCRIPT_SHAPE = Object.fromEntries(
-  SCRIPT_TEXT_FIELDS.map((field) => [
-    field,
-    z.string().max(2000).nullable().optional().describe(SCRIPT_FIELD_DESCRIPTION[field]),
-  ])
-) as { [K in ScriptTextField]: z.ZodOptional<z.ZodNullable<z.ZodString>> }
-
-const shotScriptSchema = {
-  ...SHOT_SCRIPT_SHAPE,
-  continues: z.boolean().optional().describe(SCRIPT_FIELD_DESCRIPTION.continues),
+function shotScriptShape(described: boolean): z.ZodRawShape {
+  const text = Object.fromEntries(
+    SCRIPT_TEXT_FIELDS.map((field) => [
+      field,
+      described
+        ? z.string().max(2000).nullable().optional().describe(SCRIPT_FIELD_DESCRIPTION[field])
+        : z.string().max(2000).nullable().optional(),
+    ])
+  ) as { [K in ScriptTextField]: z.ZodOptional<z.ZodNullable<z.ZodString>> }
+  return {
+    ...text,
+    continues: described
+      ? z.boolean().optional().describe(SCRIPT_FIELD_DESCRIPTION.continues)
+      : z.boolean().optional(),
+  }
 }
+
+const shotScriptSchema = shotScriptShape(true)
+/** Same fields, described on `slates_create_shot` only — see SEE_CREATE_SHOT. */
+const shotScriptSchemaTerse = shotScriptShape(false)
 
 /** The framing vocabulary an agent should know about — generated from the
  *  bucket lists so a seventh bucket cannot ship undescribed, and worded so it
@@ -5227,8 +5484,8 @@ export const updateShot: Operation<
     name: z.string().max(120).optional(),
     prompt: z.string().max(4000).optional(),
     model: z.string().optional(),
-    params: shotParamsSchema,
-    refs: shotRefsSchema,
+    params: shotParamsSchemaTerse,
+    refs: shotRefsSchemaTerse,
     firstFrameAssetId: z.string().optional(),
     lastFrameAssetId: z.string().optional(),
     audioRefSpokenText: z.array(z.string()).optional(),
@@ -5238,7 +5495,7 @@ export const updateShot: Operation<
     attachFrameId: z.string().uuid().optional().describe('Attach this Shot to a storyboard frame.'),
     detachFrameId: z.string().uuid().optional().describe('Detach it from a frame. The Shot itself survives.'),
     posterAssetId: z.string().nullable().optional().describe('Which reference represents this Shot as a thumbnail. Defaulted automatically (first frame, else the first image reference, else the newest take) — only set it to OVERRIDE, and pass null to go back to the default.'),
-    ...shotScriptSchema,
+    ...shotScriptSchemaTerse,
   }),
   async run(input, ctx) {
     const capErr = assertShotCapabilities(input.model, input.params)
@@ -5315,7 +5572,7 @@ export const duplicateShot: Operation<{
     name: z.string().max(120).optional().describe('Name for the copy (default: the original plus "copy").'),
     prompt: z.string().max(4000).optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
     model: z.string().optional().describe('Point the copy at a different model — the A/B lever. The prompt is NOT rewritten, and the copy records which model it was written for.'),
-    params: shotParamsSchema,
+    params: shotParamsSchemaTerse,
     frameId: z.string().uuid().nullable().optional().describe('Attach the copy to this frame. Omit to keep the original\'s frame; pass null to leave it unattached.'),
   }),
   async run(input, ctx) {
@@ -5787,15 +6044,24 @@ function describeGuideTopics(): string {
   )
 }
 
-export const getPromptingGuide: Operation<{ topic: string }> = {
+export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'full' }> = {
   id: 'slates_get_prompting_guide',
   description:
-    "Return the full markdown of a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id (e.g. 'veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2', 'nano-banana-2') which maps to the right guide. ALWAYS read 'slates-cost-discipline' plus the relevant model guide before your first generation in a session.",
+    // 🚨 NO "ALWAYS READ THIS FIRST" SENTENCE. It stood here for months and was
+    // MEASURED at 13% compliance before and after the enforcement work — pointer
+    // prose is the shape that does not move the agent. What replaced it is
+    // structural: the never-use list rides the generate ops' descriptions and
+    // the craft card rides the estimate result, so the facts arrive whether or
+    // not this op is ever called.
+    "Return a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id ('veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2', 'nano-banana-2'), which maps to the right guide. Reach for it when a card is not enough: the failure modes, the worked examples and the sources are only in the full text.",
   input: z.object({
     topic: z
       .string()
       .min(1)
       .describe(`Guide name, model id, or style name. ${describeGuideTopics()}`),
+    depth: z.enum(['card', 'full']).optional().describe(
+      '"card" returns just the levers block (a few hundred words — the same card slates_estimate_generation_cost already attached, so usually redundant). "full" (default) returns the whole guide, up to several thousand words.'
+    ),
   }),
   async run(input) {
     const resolved = resolveGuideTopic(input.topic)
@@ -5805,10 +6071,52 @@ export const getPromptingGuide: Operation<{ topic: string }> = {
         `Unknown guide topic: ${input.topic}. Valid topics: ${Object.keys(SKILLS).sort().join(', ')}`
       )
     }
+    if (input.depth === 'card') {
+      const card = describeCraftCard(resolved)
+      if (card) {
+        return { text: card, data: { topic: resolved, depth: 'card', bytes: Buffer.byteLength(card, 'utf8') } }
+      }
+      // No card on this guide — returning nothing would read as "no guidance",
+      // which is worse than a fall-through the result names.
+    }
     return {
       text: content,
-      data: { topic: resolved, bytes: Buffer.byteLength(content, 'utf8') },
+      data: { topic: resolved, depth: 'full', bytes: Buffer.byteLength(content, 'utf8') },
     }
+  },
+}
+
+/**
+ * The one op that changes what OTHER ops are visible.
+ *
+ * 🚨 IT EXISTS BECAUSE THE SURFACE IS 112 KB AND EVERY TURN PAYS FOR ALL OF IT.
+ * The desktop Studio Agent sends `core` plus this; a group arrives when the
+ * work needs it and stays for the rest of the run. On the MCP surface every op
+ * is registered up front (a stdio server has no run to append to), so this
+ * returns the same definitions as a plain listing — useful either way, since
+ * it is also how an agent asks "what else can you do".
+ */
+export const loadTools: Operation<{ group: OperationGroup }> = {
+  id: 'slates_load_tools',
+  description:
+    'Load a deferred group of tools for the rest of this session. The core surface is always present; these four groups are held back so every turn does not pay for the whole registry. ' +
+    (Object.entries(GROUP_SUMMARY) as Array<[OperationGroup, string]>)
+      .map(([g, s]) => `"${g}": ${s}`)
+      .join('. ') +
+    '. Call it the moment the work needs one of those — the tools arrive in the same turn\'s result and stay loaded. On MCP clients every tool is already registered and this just lists the group.',
+  input: z.object({
+    group: z.enum(['library', 'timeline', 'admin', 'blender']).describe('Which group to load.'),
+  }),
+  async run(input) {
+    const defs = toolDefinitions(
+      ALL_OPERATIONS.filter((op) => groupFor(op.id) === input.group),
+      { surface: 'mcp' }
+    )
+    return ok(
+      { group: input.group, tools: defs },
+      `Loaded the "${input.group}" group — ${defs.length} tool(s) now available:\n` +
+        defs.map((d) => `${d.name}: ${d.description.split(/(?<=\.)\s/)[0]}`).join('\n')
+    )
   },
 }
 
@@ -6084,13 +6392,17 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getShot as unknown as Operation<unknown>,
   generateFromShots as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
+  loadTools as unknown as Operation<unknown>,
   // ── Blender previs, LAST and deliberately ────────────────────────────
-  // This order is not cosmetic: `slate/src/main/studio-agent/ops.ts` maps this
-  // array straight into the Anthropic `tools` array, and that block sits inside
-  // the desktop Studio Agent's PROMPT-CACHED PREFIX. These six landed at the
-  // TOP, which put a third transport nobody without Blender can reach ahead of
-  // `slates_get_workspace_state` in every conversation the app has. They are a
-  // niche lane off the end of the surface, and the list should read that way.
+  // These six landed at the TOP once, which put a third transport nobody
+  // without Blender can reach ahead of `slates_get_workspace_state` in every
+  // conversation the app has. They are a niche lane off the end of the surface,
+  // and the list should read that way.
+  //
+  // ⚠️ POSITION NO LONGER CONTROLS COST. They are the `blender` tier group (see
+  // surface.ts), so the desktop does not send them at all until
+  // `slates_load_tools` asks for them. Order here is now the READING order on
+  // the MCP surface, which sends everything — still last, same reason.
   blenderStatus as unknown as Operation<unknown>,
   blenderExecute as unknown as Operation<unknown>,
   blenderScene as unknown as Operation<unknown>,
@@ -6098,3 +6410,42 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   blenderSearchDocs as unknown as Operation<unknown>,
   blenderRenderBlocking as unknown as Operation<unknown>,
 ]
+
+// ── Surface metadata, stamped once at load ──────────────────────
+//
+// 🚨 DERIVED, NEVER HAND-SET PER OP. Every op gets all four MCP annotations and
+// its tier here, from the rules in `surface.ts`, so a new op cannot ship
+// un-annotated (which a host reads as "not destructive") or accidentally
+// deferred. The lockstep check re-derives the hints INDEPENDENTLY from each
+// op's own transport verbs, so a read-only claim on an op that posts is caught
+// rather than trusted.
+for (const op of ALL_OPERATIONS) {
+  const mutable = op as {
+    id: string
+    billable?: boolean
+    annotations?: OperationAnnotations
+    tier?: OperationTier
+    group?: OperationGroup
+  }
+  mutable.annotations = annotate(mutable.id, mutable.billable)
+  mutable.tier = tierFor(mutable.id)
+  mutable.group = groupFor(mutable.id)
+}
+
+// A group naming an op that does not exist would silently defer nothing, and
+// the tool it meant to hold back would keep costing prefix bytes forever.
+{
+  const ids = new Set(ALL_OPERATIONS.map((o) => o.id))
+  for (const [group, members] of Object.entries(OPERATION_GROUPS)) {
+    for (const id of members) {
+      if (!ids.has(id)) {
+        throw new Error(
+          `[operations] OPERATION_GROUPS.${group} names "${id}", which is not in ALL_OPERATIONS. ` +
+            `Fix the id or drop the entry — a phantom member defers nothing.`
+        )
+      }
+    }
+  }
+}
+
+export { toolDefinitions, toolDefinition, groupFor, tierFor, OPERATION_GROUPS, GROUP_SUMMARY, type ToolDefinition } from './surface.js'

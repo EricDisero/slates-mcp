@@ -12,7 +12,7 @@ Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is 
 
 ## What it does
 
-The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. 64 tools total.
+The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->91<!-- /gen:tool-count --> tools total.
 
 Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
 
@@ -70,7 +70,9 @@ slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
 ```
 
-In Claude Code, the agent shells out to `slates run <op> --key value` instead of loading 64 tool schemas into context. The 15 bundled skills provide higher-level recipes — workflow skills (one-prompt film, direct-response ad, character turnaround, storyboard from script, vision feedback loop, edit-and-iterate), per-model prompting guides (Kling V3, Veo 3.1, Seedance 2.0, Nano Banana 2, FLUX.2 Max, Seedream 5 Lite, lip sync, motion transfer), and cost discipline.
+In Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->91<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
+
+The <!-- gen:skill-count -->33<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->18<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->15<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2<!-- /gen:audio-roster --> for audio.
 
 ## Architecture
 

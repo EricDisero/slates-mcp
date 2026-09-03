@@ -1,9 +1,23 @@
 ---
 name: slates-content-policy
-description: Content-policy-safe construction — build any scene safe from the first word so it hits full cinematic impact without depicting prohibited content (and without getting silently rejected or degraded by the model's filter). Read this before writing any prompt that involves conflict, creatures, crowds, destruction, weapons, or young characters. Mirror of @slatesvideo/shared/prompts content-policy fragment — SSOT: second-brain business/projects/slates/product/prompting-ssot.md.
+description: Read before writing any prompt involving conflict, creatures, crowds, destruction, weapons, or young characters. Builds the scene safe from the first word, so it hits full cinematic impact without depicting prohibited content — and without being silently rejected or degraded by the model's filter. Mirror of @slatesvideo/shared/prompts content-policy fragment — SSOT: second-brain business/projects/slates/product/prompting-ssot.md.
 ---
 
 # Content-policy-safe construction — read before any risk-surface prompt
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — each one is a filter tripwire with a substitution in the table above:
+- `civilians in panic`, `crowds fleeing`, `blood`, `gore`, `corpse`
+- `ignite`, `catch fire`, `on fire` applied to a person — frame body-contact effects as magical or harmless VFX
+- `candle-like`, `flame-like` and any real object used as a metaphor for an effect
+- a real, named public figure
+<!-- @banned:end -->
 
 Don't depict the harm — depict the energy, the aftermath, the threat, or the scale. Build the scene safe from the first word.
 

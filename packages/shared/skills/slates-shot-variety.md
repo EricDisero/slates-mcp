@@ -1,6 +1,6 @@
 ---
 name: slates-shot-variety
-description: Why AI-generated sequences start to look the same, and what to vary to stop it. Use when planning a set of shots, before firing a batch, when the variety counts on a shot list show one bucket dominating, or when a finished piece reads as flat, samey or repetitive despite each shot being individually fine.
+description: Use when planning a set of shots, before firing a batch, when the variety counts on a shot list show one bucket dominating, or when a finished piece reads as flat, samey or repetitive despite each shot being individually fine.
 ---
 
 # Shot variety — why it all starts to look the same

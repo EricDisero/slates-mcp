@@ -1,6 +1,6 @@
 ---
 name: slates-style-prompting
-description: Per-style prompting depth — how photoreal, anime, painterly, and 3d-render are prompted DIFFERENTLY on Seedance 2.0 vs Kling V3 vs Nano Banana 2, and the style-routing recipe (reference-first, styled start-frame → i2v). Load when the user asks for any visual style ("make it anime", "painterly look", "like a Pixar film") or when style consistency across shots matters.
+description: Use when the user asks for a visual style ("make it anime", "painterly look", "like a Pixar film"), or when a style has to hold across several shots. Covers how photoreal, anime, painterly and 3d-render are prompted DIFFERENTLY per model, and the style-routing recipe (reference-first, styled start-frame → i2v).
 ---
 
 # Per-style prompting (photoreal · anime · painterly · 3d-render)

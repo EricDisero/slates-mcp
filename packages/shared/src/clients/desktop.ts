@@ -163,6 +163,9 @@ export class SlatesDesktopClient {
         // keep the full url
       }
       const message = err instanceof Error ? err.message : String(err)
+      // The ROUTE is in the message. "slates-desktop request failed" told the
+      // caller nothing about which of thirty-odd routes died, and a blocking
+      // render and a project list fail very differently.
       throw new Error(`slates-desktop request to ${path} failed: ${message}`, { cause: err })
     }
   }

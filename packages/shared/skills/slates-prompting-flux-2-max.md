@@ -5,6 +5,45 @@ description: How to prompt FLUX.2 Max (Black Forest Labs image model). Read befo
 
 # FLUX.2 Max — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — FLUX.2 Max.** Word order is weight: it attends hardest to the start. Structure: `Subject + Action + Style + Context`, then secondary detail. Length 10-30 words for a concept test, 30-80 for most work, 80+ only for a genuinely complex scene.
+
+**The five levers**
+1. **Front-load the subject and the one action.** Anything after the first clause is a modifier, and it is read as one.
+2. **Name real gear** — `Shot on Hasselblad X2D, 80mm, f/2.8, natural light`, `Kodak Portra 400, natural grain`. This is the single biggest realism lever.
+3. **Era cues as a package** — `early digital camera, slight noise, flash photography, candid` reads 2000s; `film grain, warm cast, soft focus` reads 80s.
+4. **Bind every hex colour to an object.** `a #1B4D3E enamel mug` lands; an unbound colour does not.
+5. **For portraits add texture words** — `natural skin texture, realistic pores, subtle imperfections, soft diffused lighting`.
+
+**Examples**
+- `A chef plating in a steel kitchen pass. Shot on Hasselblad X2D, 80mm, f/2.8. Overhead fluorescents plus warm spill from the line. Natural skin texture, subtle imperfections. Muted steel and #7A3B2E copper.`
+- `An empty municipal pool at dusk, 35mm, deep focus, early digital camera with slight noise and flash falloff. Cracked #4A7C8C tiles. Candid, unstaged.`
+
+**Hard constraint:** no negative prompting. Every "no X" must be rewritten as the positive state — `no blur` becomes `sharp focus throughout`, `no people` becomes `empty scene`, `no harsh shadows` becomes `soft, diffused lighting`.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — there is no negative prompting, so each of these has a positive form:
+- `no blur` (say `sharp focus throughout`), `no people` (say `empty scene`), `no harsh shadows` (say `soft, diffused lighting`)
+- an unbound hex colour — bind it to an object or it lands inconsistently
+- `masterpiece`, `best quality`, `trending on artstation`, `8k`
+<!-- @banned:end -->
+
 Black Forest Labs' top image model, routed via fal.ai. In Slates: `slates_generate_image` with `model: flux-2-max` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). Strengths vs Nano Banana 2: photoreal texture, less censored, precise hex-color control, strong typography. Reference images route through FLUX's edit endpoint and carry a lower per-model cap than NB2's 14.
 
 ## Core structure — front-load what matters

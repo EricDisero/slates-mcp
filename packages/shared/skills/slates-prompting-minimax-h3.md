@@ -5,6 +5,45 @@ description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling sl
 
 # MiniMax H3 — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — MiniMax H3.** The only seat where audio is AUTHORED rather than toggled: dialogue, scene sound and score are three separate sections of the prompt, generated in one pass, and putting a sound in the wrong section drops or doubles it.
+
+**The five levers**
+1. **Write the three audio layers separately** — `Scene sound:` for what is in the room, `Score:` for what only the audience hears, and the dialogue quoted inline. Section decides attribution.
+2. **Quote dialogue and name the language** — `says in English`, `speaks in Spanish`. Eleven languages are stably supported; the language is part of the instruction, not an afterthought.
+3. **Declare the reference RELATIONSHIP**, which no other seat has: `kept whole`, `partly kept`, `transferred`, or `a loose echo`. An undeclared reference is a guess.
+4. **Give a beat of stillness before a line** — `sits still for a beat, then looks up`. The sync needs something to lock against; a character already mid-motion when the line starts drifts.
+5. **Describe the beat structure** — `waits`, `then speaks`, `under the last three seconds`. H3 is a timeline, so write one.
+
+**Examples**
+- `A woman sits still at a kitchen table for a beat, then looks up. She says in English, "You said Tuesday." Scene sound: a fridge hum, a spoon set down on formica. Score: none.`
+- `Two mechanics either side of an open bonnet. The younger one wipes his hands, waits, then speaks in Spanish, "No es el alternador." Scene sound: a socket wrench, a radio two bays over. Score: a low sustained cello under the last three seconds, audience only.`
+
+**Hard constraint:** the two seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` is capped at 768p, has NO reference endpoint at all (start and end frames still work), and costs MORE at the tier they share — it is a speed pick, never the cheap one. H3's top two resolution tiers are UPSCALES of the native render: judge at native. Reference images past the fifth are a paid dimension of the cost key — declare the count when quoting.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use:**
+- a sound written into the wrong audio section — it is dropped, doubled, or attributed to the wrong layer
+- `background music` as a bare instruction: the score is its own authored layer, audience-only, and it is named as such
+- an undeclared reference relationship — say kept whole, partly kept, transferred, or a loose echo
+<!-- @banned:end -->
+
 H3 is an **omni transformer**: it generates picture and sound in the same pass, at 24fps with
 32kHz stereo, 5–15 seconds, in 11 stably-supported languages (Arabic, Chinese, English, French,
 German, Italian, Japanese, Korean, Portuguese, Russian, Spanish). That single fact drives

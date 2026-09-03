@@ -12,19 +12,19 @@
     },
     {
       "path": "skills/slates-prompting-seedance.md",
-      "sha256": "c82ecbd6e169f74146e2553479bdc3115d550a332ee6ebb23a1068d6fe977d02"
+      "sha256": "46d1657b967e2b518bf350e4ad937b45ee0f8253c18d017f3df06ff8ec642244"
     },
     {
       "path": "skills/slates-prompting-kling-v3.md",
-      "sha256": "629b9490103a1a7961b584b7e125faa45375265dd941d8aae466cf6b195d5884"
+      "sha256": "81edd7b060648c97d914017101345b0f0e122660a2050389c80f58f24b48aa9c"
     },
     {
       "path": "skills/slates-prompting-nano-banana-2.md",
-      "sha256": "302c316ab7ce562a56db28ed480c4ed6bbffea1dd44ec468d122873b98491661"
+      "sha256": "824499adf1188cd86a84fff1de6a02311f87ffb4d1dda73ef46e813c7ef89000"
     },
     {
       "path": "skills/slates-content-policy.md",
-      "sha256": "ee5afd3e0d276d75c08b1747f551878be28d22151a369c969c55e58fda3f5710"
+      "sha256": "68566e6431864f075f6397013f040fb41e0559b19b11a15e860a4da80068a9a6"
     },
     {
       "path": "src/prompts/model-facts.ts",
@@ -44,29 +44,29 @@
     },
     {
       "path": "reference-seedance.md",
-      "bytes": 32558,
-      "sha256": "c206db40577838baaaf7bc27ce0adfb1e0feb275ed9a8aea5fed377a74f0dacf"
+      "bytes": 34423,
+      "sha256": "50c3f1fc54fa1229f3dcadb9e0af1a070e0fbfa4f42bfc024460762bb56d2a1b"
     },
     {
       "path": "reference-kling.md",
-      "bytes": 13592,
-      "sha256": "3689d7a285cc8845bc41c5ffbed7b727a43cd3c108a2a46b8028c3528ef44ed5"
+      "bytes": 15908,
+      "sha256": "99430d96af4461404bb55a6e56e1c3581a2cae817f0e337d0046cbee41dbb0bf"
     },
     {
       "path": "reference-nano-banana.md",
-      "bytes": 16437,
-      "sha256": "69fe636c780d6ddf9fe97e23b7d82d8961cac0037b985e3500a9485f295e211d"
+      "bytes": 18239,
+      "sha256": "7efcaed812a39ddb5a88ba6f7029f975640b5ccc166002d620324d214944125b"
     },
     {
       "path": "reference-content-policy.md",
-      "bytes": 6785,
-      "sha256": "4c0fe7cd7d3d6b854af6702133fd81a3338a5cb01f48e4a626165c4eb9667b06"
+      "bytes": 7169,
+      "sha256": "26439b2948313ee9eed10cbbe9e3ede60d53a453c41af96c3928840b0a4f6212"
     }
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 38089,
-    "sha256": "4abe20453ab78bf4193db69d14a21f0a328238fec0b7e7dcb75bcffec160daee",
+    "bytes": 40145,
+    "sha256": "69ddf61a8e056df58b27f9a0332d4f0a50506f0296d21ce00302a2bb0adfa209",
     "entries": [
       "SKILL.md",
       "reference-character.md",

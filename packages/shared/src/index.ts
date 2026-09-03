@@ -3,7 +3,19 @@ export { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type Model
 export { SlatesDesktopClient, type DesktopHealth } from './clients/desktop.js'
 export { SKILLS } from './skills/content.js'
 export * as operations from './operations/index.js'
-export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, defaultContext, type Operation, type OperationContext, type OperationResult } from './operations/index.js'
+export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, IMAGE_MODELS, defaultContext, OperationCancelledError, type Operation, type OperationContext, type OperationResult, type OperationAnnotations, type OperationTier, type OperationGroup } from './operations/index.js'
+// The spend thresholds the DESKTOP and the SKILLS both quote. `CONFIRM_CREDITS`
+// is the op-level confirm gate; `DEVIATION_FACTOR` is the Studio Agent's
+// re-ask multiplier, which lived only in `loop.ts` while `slates-cost-discipline`
+// told the agent a different number. One home, both readers.
+export { CONFIRM_CREDITS, DEVIATION_FACTOR } from './operations/index.js'
+// 🚨 THE ONE SCHEMA RENDERER + the tier/annotation tables. The desktop rendered
+// `$refStrategy:'none'` and the MCP server rendered `openApi3`, so surface
+// parity was proven of the ID SET and unproven of the BYTES. Both call this now.
+export {
+  toolDefinitions, toolDefinition, groupFor, tierFor,
+  OPERATION_GROUPS, GROUP_SUMMARY, type ToolDefinition,
+} from './operations/index.js'
 // Model routing/prompting facts — the SSOT the desktop Studio Agent system
 // prompt derives its MODEL ROUTING doctrine from (kind: image | video | audio,
 // default/premium/niche notes). Edit model-facts.ts, never prose copies.
@@ -55,8 +67,15 @@ export {
   // `bannedTokensFor` is internal to the module and stays there.
   BANNED_PROMPT_TOKENS, describeBannedTokens,
   findBannedTokens, bannedTokenWarning,
+  // Per-model lists — the 13 skills the two cross-model lists never covered.
+  bannedTokensForSkill, describeBannedTokensForSkill,
   type BannedToken, type BannedTokenScope,
 } from './prompts/banned-tokens.js'
+// 🚨 CRAFT CARDS — the POSITIVE half of the guide, extracted from the skills'
+// own `@card` blocks and delivered on the estimate result. The eval scorer reads
+// CRAFT_CARDS to build its lever vocabulary, so the assertion can never be
+// scored against a hand-retyped word list.
+export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, describeCraftCard } from './prompts/craft-cards.js'
 // Per-model prompting tips — the SSOT for the desktop "See prompting tips"
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'

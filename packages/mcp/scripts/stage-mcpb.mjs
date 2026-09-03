@@ -22,7 +22,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { join, dirname } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
@@ -86,6 +86,31 @@ execSync('npm install --omit=dev --no-audit --no-fund --no-package-lock --instal
 cpSync(join(pkgRoot, 'dist'), join(staging, 'dist'), { recursive: true })
 const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8'))
 manifest.version = pkg.version
+
+// 🚨 KEYWORDS AND THE ROSTER SENTENCE ARE GENERATED FROM MODEL_FACTS. The
+// hand-typed list omitted ltx, gpt-image, minimax-h3-max and seedream, and the
+// description named a 2026-07 roster — this file is what a Claude Desktop user
+// SEARCHES, so a missing keyword is a model nobody finds. Same rule as the
+// READMEs: never hand-type a fact the build already knows.
+{
+  const shared = await import(
+    pathToFileURL(join(pkgRoot, '..', 'shared', 'dist', 'index.js')).href
+  )
+  const { MODEL_FACTS, ALL_OPERATIONS, VIDEO_MODELS, IMAGE_MODELS } = shared
+  // One keyword per model FAMILY: the searchable half of the id, deduped and in
+  // registry order so the manifest is byte-stable across builds.
+  const family = (id) => id.replace(/[-.]\d.*$/, '').replace(/-(pro|std|lite|max|fast|standard)$/, '')
+  const modelKeywords = [...new Set([...VIDEO_MODELS, ...IMAGE_MODELS].map(family))]
+  const BASE = ['slates', 'ai-video', 'video-generation', 'image-generation', 'storyboard']
+  manifest.keywords = [...BASE, ...modelKeywords.filter((k) => !BASE.includes(k))]
+  const label = (id) => MODEL_FACTS.find((f) => f.id === id)?.label ?? id
+  manifest.description =
+    `Drive the Slates AI Video Creation Studio from your AI client: projects, characters, storyboards, ` +
+    `image and video generation, timeline assembly and MP4 export — files land on disk via the Slates ` +
+    `desktop app. ${ALL_OPERATIONS.length} tools. Video: ${VIDEO_MODELS.map(label).join(', ')}. ` +
+    `Images: ${IMAGE_MODELS.map(label).join(', ')}.`
+}
+
 writeFileSync(join(staging, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 
 console.log(`[stage-mcpb] staged at ${staging} (shared from ${tgzName})`)

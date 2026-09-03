@@ -25,3 +25,7 @@ export * from './environment-sheet.js'
 // desktop RENDERER imports the tips — the root barrel re-exports auth.js
 // (node:fs/os/path), which breaks browser bundling. `./prompts` stays Node-free.
 export * from './prompting-tips.js'
+// Asset captions — one rule for the op surface's compactAsset and the desktop
+// gallery. Also its own leaf subpath (`@slatesvideo/shared/asset-label`) for the
+// renderer, which cannot import the root barrel.
+export * from './asset-label.js'

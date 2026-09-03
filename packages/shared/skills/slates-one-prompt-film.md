@@ -1,6 +1,6 @@
 ---
 name: slates-one-prompt-film
-description: The full one-prompt-to-finished-film pipeline in Slates — script, project, characters, storyboard, frame images, video generation, timeline assembly, MP4 export. Use when the user gives one idea and wants a finished video out the other end - "make me a video about X", "turn this idea into an ad", "make a short film from this", "one prompt, finished film". This is the master recipe; other Slates skills are its sub-steps.
+description: Use when the user gives ONE idea and wants a finished video out the other end — "make me a video about X", "turn this idea into an ad", "make a short film from this". The full pipeline: script, project, characters, storyboard, frame images, video generation, timeline assembly, MP4 export. This is the master recipe; the other Slates skills are its sub-steps.
 ---
 
 # One prompt → finished film — Slates master pipeline

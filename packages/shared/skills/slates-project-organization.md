@@ -1,6 +1,6 @@
 ---
 name: slates-project-organization
-description: How a Slates project's assets are organized AND named — the asset short-code system (IMG-A12 / VID-V3 / AUD-S1 badges on every gallery card), folders for film STRUCTURE, the typed tabs for reusable references. Read when the user refers to an asset by code, asks what a code like IMG-A36 means, or when organizing/navigating a project.
+description: Use when the user names an asset by code ("use IMG-A36"), asks what a code means, or is organizing or navigating a project. Covers the asset short-code system (IMG-A12 / VID-V3 / AUD-S1 badges on every gallery card), folders for film STRUCTURE, and the typed tabs for reusable references.
 ---
 
 # Organizing a Slates project

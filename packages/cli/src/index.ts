@@ -11,6 +11,11 @@ import { runOp } from './commands/op.js'
 import { runInstallSkills } from './commands/install-skills.js'
 import { runMcp } from './commands/mcp.js'
 import { runSetup } from './commands/setup.js'
+import { runDoctor } from './commands/doctor.js'
+import { runUse } from './commands/use.js'
+import { runCompletion } from './commands/completion.js'
+import { printOpHelp } from './commands/op.js'
+import { EXIT } from './exit-codes.js'
 import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 
 // Slates CLI. The CLI mirrors the MCP tool surface as commands so Claude
@@ -83,10 +88,31 @@ program
   .action((opts) => runInstallSkills(opts))
 
 program
+  .command('doctor')
+  .description('Check every setup precondition at once — connection file, cloud token, desktop server and its capabilities, installed skills, MCP configs — and print the fix for each failure.')
+  .action(() => runDoctor())
+
+program
+  .command('use')
+  .description('Set the default project for this machine, by id or name. Ops that take projectId fill it when you omit one; an explicit --projectId always wins. No argument prints the current default; `slates use --clear` removes it.')
+  .argument('[project]', 'Project id or name')
+  .action((project: string | undefined) => runUse(project))
+
+program
+  .command('completion')
+  .description('Print a shell completion script for the 91 operation ids.')
+  .argument('[shell]', 'bash | zsh | pwsh')
+  .action((shell: string | undefined) => runCompletion(shell))
+
+program
   .command('run')
-  .description('Invoke a Slates operation by id (use `slates run --list` to see them).')
-  .option('--list', 'List all available operations', false)
-  .option('--json', 'Emit structured JSON ({text, data, images: [{mimeType, bytes}]}). Image binary is omitted — use the MCP server for inline image payloads.', false)
+  .description('Invoke a Slates operation by id. `slates run --list` lists them; `slates run <op> --help` prints that op\'s flags.')
+  .option('--list', 'List operation ids with a one-line summary', false)
+  .option('--full', 'With --list: print each op\'s complete description (large — 29 KB)', false)
+  .option('--json', 'Emit structured JSON ({text, data, images: [{mimeType, bytes}]}). Image binary is omitted — use --save-images to write the files.', false)
+  .option('--save-images <dir>', 'Write returned images into <dir> and print the paths')
+  .option('--input <json>', 'JSON object of inputs — the only way to pass a NESTED object (Shot params/refs, batch updates). Merged under explicit flags.')
+  .option('--input-file <path>', 'Same as --input, read from a file. Use this when your shell mangles quotes.')
   .allowUnknownOption()
   .passThroughOptions()
   .argument('[opId]', 'Operation id, e.g. slates_create_project')
@@ -94,16 +120,60 @@ program
   .action(async (opId: string | undefined, args: string[], options) => {
     // With passThroughOptions enabled, --json/--list AFTER the opId end
     // up in `args` instead of `options`. Detect both positions.
-    const jsonFlag = !!options.json || args.some((a) => a === '--json' || a.startsWith('--json='))
-    const listFlag = !!options.list || args.some((a) => a === '--list')
+    const flag = (name: string): boolean =>
+      args.some((a) => a === `--${name}` || a.startsWith(`--${name}=`))
+    const jsonFlag = !!options.json || flag('json')
+    const listFlag = !!options.list || flag('list')
+    const fullFlag = !!options.full || flag('full')
+    const valueOf = (name: string): string | undefined => {
+      const opt = options[name] as string | undefined
+      if (opt) return opt
+      const i = args.findIndex((a) => a === `--${name}`)
+      if (i !== -1) return args[i + 1]
+      const eq = args.find((a) => a.startsWith(`--${name}=`))
+      return eq ? eq.slice(name.length + 3) : undefined
+    }
+
+    const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
     if (listFlag || !opId) {
-      const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
+      // 🚨 IDS AND ONE SENTENCE, NOT 29 KB. `--list` printed every description
+      // in full — including the generated capability tables — and not one
+      // parameter name, so the one command that was supposed to teach the
+      // surface was unreadable and taught nothing. `--full` keeps the old
+      // output for anyone who wants it; `<op> --help` is what you actually want.
       for (const op of ops) {
-        console.log(`${op.id}\n  ${op.description}\n`)
+        if (fullFlag) {
+          console.log(`${op.id}\n  ${op.description}\n`)
+        } else {
+          console.log(`${op.id}  —  ${op.description.split(/(?<=\.)\s/)[0]}`)
+        }
+      }
+      if (!fullFlag) {
+        console.log(`\n${ops.length} operations. \`slates run <op> --help\` for one op's flags; --full for every description.`)
       }
       return
     }
-    await runOp({ opId, rawArgs: args, json: jsonFlag })
+
+    if (args.some((a) => a === '--help' || a === '-h')) {
+      const op = ops.find((o) => o.id === opId)
+      if (!op) {
+        console.error(`Unknown operation: ${opId}`)
+        process.exit(EXIT.ERROR)
+      }
+      printOpHelp(op)
+      return
+    }
+
+    await runOp({
+      opId,
+      rawArgs: [
+        ...args,
+        ...(options.input ? ['--input', options.input as string] : []),
+        ...(options.inputFile ? ['--input-file', options.inputFile as string] : []),
+      ],
+      json: jsonFlag,
+      saveImages: valueOf('save-images') ?? (options.saveImages as string | undefined),
+    })
   })
 
 // Hidden helper for skills that just need the cloud token.

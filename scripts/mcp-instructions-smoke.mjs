@@ -158,6 +158,91 @@ if (generateImage) {
   )
 }
 
+// ── the protocol surface, on the wire ──────────────────────────────────────
+//
+// Annotations, structured content, prompts and resources are all things the
+// SOURCE can claim and the WIRE can still not carry — a capability not
+// advertised in `initialize`, a handler registered under the wrong schema, a
+// field the SDK strips. The source-level check cannot see any of that, so this
+// reads each one back through a real client.
+{
+  const read = tools.find((t) => t.name === 'slates_list_assets')
+  const destroy = tools.find((t) => t.name === 'slates_delete_project')
+  const spend = tools.find((t) => t.name === 'slates_generate_video')
+  check(
+    'every tool carries MCP annotations',
+    tools.every((t) => t.annotations && typeof t.annotations.readOnlyHint === 'boolean'),
+    `${tools.filter((t) => !t.annotations).length} without`
+  )
+  check('a read is annotated readOnlyHint', read?.annotations?.readOnlyHint === true)
+  check(
+    'a delete is annotated destructiveHint and NOT readOnly',
+    destroy?.annotations?.destructiveHint === true && destroy?.annotations?.readOnlyHint === false
+  )
+  check('a billable op is annotated openWorldHint', spend?.annotations?.openWorldHint === true)
+  check(
+    'the ops with a stable result shape carry an outputSchema',
+    !!tools.find((t) => t.name === 'slates_estimate_generation_cost')?.outputSchema
+  )
+
+  const prompts = (await client.listPrompts()).prompts
+  check('the 33 bundled skills are exposed as MCP prompts', prompts.length >= 30, `${prompts.length}`)
+  const got = await client.getPrompt({ name: 'slates-cost-discipline' })
+  check(
+    'and a prompt returns the whole skill',
+    (got.messages?.[0]?.content?.text ?? '').includes('slates-cost-discipline')
+  )
+
+  const resources = (await client.listResources()).resources
+  check(
+    'the manual, capabilities and prices are exposed as resources',
+    ['slates://manual', 'slates://capabilities', 'slates://prices'].every((u) =>
+      resources.some((r) => r.uri === u)
+    ),
+    resources.map((r) => r.uri).join(', ')
+  )
+  const manual = await client.readResource({ uri: 'slates://manual' })
+  check(
+    'and reading one returns the doctrine',
+    (manual.contents?.[0]?.text ?? '').includes('## Hard rules')
+  )
+  const templates = (await client.listResourceTemplates()).resourceTemplates
+  check(
+    'the skill and shot-list resource templates are listed',
+    templates.some((t) => t.uriTemplate === 'slates://skill/{name}') &&
+      templates.some((t) => t.uriTemplate === 'slates://project/{projectId}/shots')
+  )
+
+  // Structured content: the same call as the enforcement round-trip above, read
+  // as DATA rather than parsed back out of prose.
+  const res = await client.callTool({
+    name: 'slates_generate_image',
+    arguments: { prompt: 'a quiet room' },
+  })
+  check(
+    'a tool result carries structuredContent beside the text',
+    res.structuredContent?.requires_clarification === true,
+    JSON.stringify(res.structuredContent ?? null).slice(0, 120)
+  )
+
+  // A Zod failure must arrive as readable lines, not Zod's issue JSON.
+  const bad = await client.callTool({
+    name: 'slates_generate_image',
+    arguments: { prompt: 'x', aspectRatio: '9:21' },
+  })
+  const badText = (bad.content ?? []).map((c) => c.text ?? '').join('\n')
+  check(
+    'a validation error is flattened to `field: message` lines',
+    bad.isError === true && /^aspectRatio: /m.test(badText),
+    badText.slice(0, 160)
+  )
+  check(
+    'and an enum failure prints the legal set',
+    /Legal values: /.test(badText),
+    badText.slice(0, 200)
+  )
+}
+
 await client.close()
 
 if (failures > 0) {

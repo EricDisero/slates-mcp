@@ -5,6 +5,45 @@ description: Prompting GPT Image 2 — the readable-text / character-sheet / sho
 
 # GPT Image 2 — sheets, grids, and text that actually reads
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — GPT Image 2.** The readable-text, ordered-panel and exact-placement engine, and (measured 2026-08-24 at `quality: high`) the photoreal front-runner for people. Structure: subject and action, then the exact copy in quotes, then layout, then light.
+
+**The five levers**
+1. **Quote every string that must render verbatim** — `the sign reads "OPEN 24 HOURS"`. Quoted strings render most reliably.
+2. **Font FEEL, never a font name** — `clean geometric sans, high contrast`, `hand-painted brush lettering`.
+3. **Order dense copy explicitly** — `Line 1: "..." Line 2: "..."`. It respects the ordering.
+4. **Name the layout as a grid** for sheets and panels — `a 3x2 grid of panels, reading left to right, equal gutters`.
+5. **Set `quality` deliberately.** `medium` is sharp text at a quarter of the price and is within a hair of `high` in blind tests; reach for `high` only when tiny type, dense diagrams or many labelled elements ARE the job.
+
+**Examples**
+- `A 2x3 character turnaround sheet on a neutral grey field, equal gutters, reading left to right: front, three-quarter, profile, back, three-quarter back, top. One woman, mid-30s, cropped dark hair, olive field jacket. Flat even studio light, no cast shadows. Small caption under each panel naming the angle.`
+- `Photoreal portrait, natural window light from camera-left, visible skin texture and pores, 85mm compression. A man in his 50s in a charcoal knit, half-smile, looking just past lens.`
+
+**Hard constraint:** keep total on-image text under about 30 words for perfect accuracy — beyond that it degrades, gracefully but really. It has its own content filter, distinct from Gemini's.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use:**
+- a font NAME — describe the feel (`clean geometric sans, high contrast`) instead
+- a reference role essay (`Reference image 1 is a photograph of a woman. Use that exact woman.`) — name the subject inline instead
+- `8k`, `masterpiece`, `best quality`, `highly detailed` — quality incantations do nothing here either
+<!-- @banned:end -->
+
 GPT Image 2's edge is **character-level text accuracy** (~99% on English), ordered panels, and exact element placement — the jobs where every other model garbles a word or shuffles a layout.
 
 🚨 **It is ALSO the photoreal front-runner, and this file said the opposite until 2026-08-24.** **Receipts:** Eric's direct call, plus a head-to-head on the Higgsfield rail where GPT Image 2 at `quality: high`, 2K beat both Nano Banana rails on skin realism for photoreal people — that result is why the whole AI-influencer ad lane generates its plates here. **Route photoreal to this model, not away from it.**

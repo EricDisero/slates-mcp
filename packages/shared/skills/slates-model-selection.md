@@ -105,8 +105,8 @@ Both tools are **Kling-only**. Every entry in them is a real Kling endpoint that
 
 | Job | Model | Why |
 |---|---|---|
-| **Default — a whole audio scene in one pass**: room tone, ambience beds, crowds, nature, layered dialogue + effects, spoken lines | **Seed Audio 1.0** (`seed-audio`) | One plain sentence in, a complete scene out. 1–120s. The continuity-bed workhorse and the only speech surface. |
-| **One effect that lands on a known frame**, or a seamless loop | **Sound Effects v2** (`eleven-sfx`) | The only surface with an exact duration control (0.5–22s) and a real loop mode. |
+| **Default — a whole audio scene in one pass**: room tone, ambience beds, crowds, nature, layered dialogue + effects, spoken lines | **Seed Audio 1.0** (`seed-audio`) | One plain sentence in, a complete scene out. The continuity-bed workhorse and the only speech surface. |
+| **One effect that lands on a known frame**, or a seamless loop | **Sound Effects v2** (`eleven-sfx`) | The only surface with an exact duration control and a real loop mode. |
 
 **There is no music model and no cast-voiceover model.** A song is imported (Slates reads audio files and puts them on the timeline), not generated. A line that has to be spoken is generated on Seed Audio and lip-synced against.
 

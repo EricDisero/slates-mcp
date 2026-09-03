@@ -5,6 +5,44 @@ description: How to prompt Seedream 5 Lite (ByteDance image model — the cheap 
 
 # Seedream 5 Lite — prompting
 
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Seedream 5 Lite.** The cheap volume seat: flat-priced at every resolution, which makes it the right default for storyboard passes, variant grids and look-dev. Structure, most important first: `Subject + Style + Composition + Lighting/Atmosphere + Technical`.
+
+**The five levers**
+1. **Lead with the subject.** Earlier words weigh more; close with the camera and technical detail.
+2. **Keep it 30-100 words.** Unlike models that reward verbosity, this one gets confused by very long prompts. Focused beats exhaustive.
+3. **Name the composition** — `symmetrical composition`, `rule of thirds`, `foreground detail with blurred background`, `overhead perspective`.
+4. **Name the light as a named condition** — `golden hour`, `dramatic side lighting`, `soft diffused light`, `moody low-key`, `bright high-key`.
+5. **Quote in-image text.** It takes quoted strings for posters and layouts, which is half of why it is the drafting seat.
+
+**Examples**
+- `Professional headshot of a female CEO, short blonde hair, confident expression, navy suit, neutral office background. Studio lighting, shallow depth of field, high-end corporate photography, shot on 85mm.`
+- `A rain-soaked night market stall, cinematic, rule of thirds with the vendor camera-right, foreground steam blurred, moody low-key lighting with practical neon, shot on 35mm.`
+
+**Hard constraint:** it is the DRAFTING seat, not the hero seat. Explore here, then re-run the winner on Nano Banana 2 or FLUX.2 Max for the locked shot.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use:**
+- `masterpiece`, `best quality`, `highly detailed`, `8k`, `award-winning` — quality incantations, not description
+- a prompt past about 100 words: this model gets confused by very long prompts, and focused beats exhaustive
+<!-- @banned:end -->
+
 ByteDance's Seedream image model, Lite tier, routed via fal.ai. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId — no headless path). **Flat-priced regardless of resolution** — the cheapest image model in Slates, which makes it the right default for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
 
 **When to pick it:** lots of frames cheap (storyboard passes, 3-4 variant exploration), posters/layouts with text, quick look-dev. Step up to NB2 or FLUX.2 Max for the locked hero shot.
