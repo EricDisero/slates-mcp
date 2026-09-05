@@ -166,26 +166,26 @@ SELECT creator, has_voiceover, duration_seconds, transcript
 `.trim()
 
 /** When the numbers below were last derived from the query above. */
-export const SPEECH_RATE_MEASURED_ON = '2026-08-31'
+export const SPEECH_RATE_MEASURED_ON = '2026-09-04'
 
 /**
  * 🔑 THE REGISTER SPLIT IS REAL AND MEASURED, which is why there is no single
  * number. Heinrich's performed, genre-acted reads run a median of 133 wpm;
- * AI Video Bootcamp's hard-sell direct response runs 167 — thirty-four words a
+ * AI Video Bootcamp's hard-sell direct response runs 166 — thirty-three words a
  * minute apart on the same runtime. A single point value would have been worse
  * than none.
  */
 export const SPEECH_RATE = {
   performed: { wpm: 133, n: 4, segment: "creator LIKE '%Heinrich%'" },
-  conversational: { wpm: 157, n: 71, segment: 'all rows with a transcript and a duration' },
-  direct_response: { wpm: 167, n: 21, segment: "creator LIKE '%AI Video Bootcamp%'" },
+  conversational: { wpm: 157, n: 73, segment: 'all rows with a transcript and a duration' },
+  direct_response: { wpm: 166, n: 22, segment: "creator LIKE '%AI Video Bootcamp%'" },
   /**
    * The fastest read in the whole corpus. **The fit check flags only ABOVE
    * this** — that is what "cannot fit at any plausible delivery" means. Not
    * 250, not p90: those are rates real ads actually hit, and flagging an
    * achievable read is exactly how a check gets ignored.
    */
-  ceiling: { wpm: 283, n: 71, segment: 'max over all rows' },
+  ceiling: { wpm: 283, n: 73, segment: 'max over all rows' },
 } as const satisfies Record<string, SpeechRate>
 
 export type SpeechRegister = Exclude<keyof typeof SPEECH_RATE, 'ceiling'>

@@ -34,6 +34,23 @@ export function buildEnvironmentEstablishingPrompt(userStyle?: string | null): s
   )
 }
 
+// ⚠️ STATUS: authored doctrine that currently reaches NO model. Adjudicated
+// 2026-09-04 (dead-code sweep §5 D1). Both constants below have zero consumers
+// anywhere in the workspace, and — unlike IMAGE_PROMPT_FORMULA, which was a
+// verbatim second copy of slates-prompting-nano-banana-2.md and was deleted —
+// nothing in skills/*.md or the craft cards carries this content. So it is a
+// capability gap, not a duplicate: deleting it would lose the only copy.
+//
+// The fix is NOT to wire a TS consumer. craft-cards.ts states the rule: "THE
+// CARD IS NEVER WRITTEN HERE… a card authored downstream is a second copy of
+// the skill that drifts from it." Environment plates have no skill of their own
+// yet (there is a Characters/Environments/Styles tab in the product, and a
+// slates-character-identity skill, but no environment counterpart). Wiring this
+// in means AUTHORING that skill section — a content + token-budget decision —
+// after which these two constants should be deleted, not kept alongside it.
+//
+// Until then: EDITING THE TEXT BELOW CHANGES NOTHING THAT SHIPS.
+
 /** Guidance shown to users/agents: prefer describing the environment in text. */
 export const ENVIRONMENT_DESCRIBE_FIRST =
   'Default to describing the environment in words and let the model build it to fit the shot. Generate an establishing plate only when a location must be locked exactly across shots. ' +

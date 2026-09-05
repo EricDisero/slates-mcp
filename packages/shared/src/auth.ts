@@ -5,7 +5,6 @@ import {
   readFileSync,
   writeFileSync,
   mkdirSync,
-  unlinkSync,
 } from 'node:fs'
 
 // Reads/writes ~/.slates/agent-connection.json — the single file the
@@ -87,10 +86,6 @@ export function setCloudToken(token: string | null): void {
 
 export function clearCloudToken(): void {
   setCloudToken(null)
-}
-
-export function deleteConnection(): void {
-  if (existsSync(CONNECTION_FILE)) unlinkSync(CONNECTION_FILE)
 }
 
 export class MissingCloudTokenError extends Error {

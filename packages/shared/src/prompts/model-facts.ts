@@ -376,10 +376,3 @@ export function getModelFact(id: string): ModelFact | undefined {
   return FACT_BY_ID.get(id)
 }
 
-/** The official NB2 / general image prompt formula (subject-first). */
-export const IMAGE_PROMPT_FORMULA =
-  '[Subject] + [Action] + [Location/context] + [Composition] + [Style]'
-
-/** The expanded cinematic/photoreal formula for NB2 start frames. */
-export const CINEMATIC_IMAGE_FORMULA =
-  'Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and action]. [3-5 specific visual details]. [LIGHTING — direction + quality]. [COLOR PALETTE]. [FILM STOCK or sensor language]. [1-2 word emotional tone].'

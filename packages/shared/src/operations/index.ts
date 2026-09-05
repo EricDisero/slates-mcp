@@ -5847,7 +5847,7 @@ export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean
         .map(
           (d) =>
             `  ! ${d.name || 'Untitled'}: ${d.missing ? 'references something that no longer exists' : ''}` +
-            `${d.unresolvedTokens?.length ? ` ${d.unresolvedTokens.join(', ')} match nothing saved` : ''}`
+            `${d.unresolvedTokens?.length ? ` ${d.unresolvedTokens.join(', ')} match nothing saved (sent as written, no reference attached)` : ''}`
         )
       return ok(
         {

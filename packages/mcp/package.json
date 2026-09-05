@@ -51,8 +51,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@slatesvideo/shared": "^0.6.3",
-    "zod": "^3.23.0",
-    "zod-to-json-schema": "^3.23.0"
+    "zod": "^3.23.0"
   },
   "devDependencies": {
     "@anthropic-ai/mcpb": "^2.1.2",

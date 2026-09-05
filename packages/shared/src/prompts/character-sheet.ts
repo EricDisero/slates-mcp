@@ -147,9 +147,6 @@ export const CHARACTER_SHEET_PANELS_DESC =
   'an invisible-mannequin presentation with just the face cropped out, ' +
   'and a full-body back view on the right with the head and hair fully visible'
 
-/** Panel identifiers, in sheet order. */
-export const BODY_POSE_LABELS = ['portrait', 'front', 'back'] as const
-
 // The sheet's style directive: a user transform REPLACES the inherit-source
 // instruction (so the model isn't told to both preserve the medium AND change
 // it); otherwise inherit the source medium.

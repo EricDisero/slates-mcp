@@ -93,13 +93,13 @@ export interface ComposedReferences {
    * Tokens written in the prompt that matched NO reference group, as authored
    * (`'#noir'`, `'@bob'`), first-appearance order, deduped case-insensitively.
    *
-   * 🚨 THIS FIELD EXISTS BECAUSE THE ALTERNATIVE IS A SILENT EDIT. A `#tag` with
-   * no matching style is DELETED from the text — a raw tag confuses every model,
-   * so removing it is right, but removing it without saying so changes what the
-   * user asked for behind their back. Prompt-transparency doctrine (slate
-   * `CLAUDE.md`) requires the surface to be able to say "this went nowhere", and
-   * this is the only record that the token was ever there. Callers that render a
-   * composed-prompt preview MUST surface it.
+   * 🚨 IT IS A REPORT, NOT A RECEIPT FOR A DELETION. These tokens are left in
+   * `prompt` EXACTLY as the user typed them (see step 2) — nothing is removed
+   * and nothing is humanised. What the field says is narrower and more useful:
+   * "no reference is attached for this word", which is the difference between a
+   * mistyped mention and a `@handle` you meant to typeset. Callers that render a
+   * composed-prompt preview SHOULD surface it — as a note, never as an error,
+   * because nothing has gone wrong.
    */
   unresolvedTokens: string[]
 }
@@ -131,14 +131,36 @@ function joinNums(nums: number[]): string {
   return `${nums.slice(0, -1).join(', ')} and ${nums[nums.length - 1]}`
 }
 
-// Humanize an unresolved @token to plain words (preserve the legacy cleanPrompt
-// fallback: @big_red → "Big Red", @forest3 → "Forest3"). Never send a raw token.
-function humanizeToken(raw: string): string {
-  return raw
-    .split(/[_-]/)
-    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : w))
-    .join(' ')
-}
+/**
+ * 🚨 A SIGIL IS A MENTION ONLY IF IT RESOLVES. Everything else is prose, and
+ * prose is not ours to edit.
+ *
+ * This grammar used to be `/([@#])([\w-]+)/g` with "unresolved" as a rewrite
+ * branch: an unknown `@word` was humanised (`@woodland.candle` → "Woodland" +
+ * ".candle") and an unknown `#word` was deleted outright. Both assumed anyone
+ * typing a sigil was reaching for OUR feature, so the app quietly rewrote the
+ * one thing the composer exists to protect — and it failed precisely where the
+ * literal characters matter most: a poster's `@handle`, an email address, a hex
+ * colour. That last one is not hypothetical: `#3a3a3c` was eaten out of every
+ * identity-sheet prompt for months (`reference-rules.ts`, 2026-07-30), which is
+ * the same bug wearing a different sigil.
+ *
+ * Two changes make the sigil safe to type:
+ *
+ * 1. THE GRAMMAR IS NARROW. A sigil only opens a token at a boundary, so
+ *    `eric@gmail.com` is never even a candidate, and a token may carry interior
+ *    dots, so `@woodland.candle` is ONE token rather than a mention with debris
+ *    stuck to it. Interior only — a trailing `.` stays with the sentence.
+ * 2. AN UNRESOLVED TOKEN IS RETURNED UNTOUCHED. A mention is a BINDING; when it
+ *    binds to nothing there is nothing to translate, so there is nothing to
+ *    rewrite. It is reported through `unresolvedTokens` and sent as written.
+ *
+ * There is deliberately NO escape syntax (`\@`, quoting). Making someone learn
+ * our grammar to opt OUT of a feature they never invoked is the shoehorn this
+ * change exists to remove — the sandbox rule from the root `CLAUDE.md`: a
+ * capability attaches to the primitive, it does not stand in the way of it.
+ */
+const TOKEN_RE = /(?<![\w.@#])([@#])([\w-]+(?:\.[\w-]+)*)/g
 
 /**
  * Compose the raw prompt (mentions intact) + an ORDERED list of reference groups
@@ -216,8 +238,9 @@ export function composeReferences(
   const matchedInPrompt = new Set<string>()
 
   // Every token that named nothing, recorded as authored and deduped by the
-  // same normalisation used for matching. This is what makes the deletion
-  // below reportable instead of silent — see ComposedReferences.unresolvedTokens.
+  // same normalisation used for matching. Nothing is removed on its account —
+  // it is the "no reference is attached for this word" report. See
+  // ComposedReferences.unresolvedTokens.
   const unresolvedTokens: string[] = []
   const unresolvedSeen = new Set<string>()
   const noteUnresolved = (sigil: string, tok: string): void => {
@@ -229,28 +252,28 @@ export function composeReferences(
 
   // First strip "in/with the style of #tag" phrases so the style reads as a
   // clean trailing clause, not a dangling preposition (legacy cleanPrompt
-  // behaviour). An UNRESOLVED token in that phrase is stripped too: leaving the
-  // preposition behind ("…a portrait in the style of") was the worse half of the
-  // silent edit — the tag vanished a step later anyway and the sentence was left
-  // broken. Stripped or not, the token is reported.
-  let body = rawPrompt.replace(/\s+(with|in)\s+the\s+style\s+of\s+([@#])([\w-]+)/gi, (_full, _prep, sigil, tok) => {
-    const g = byNorm.get(normToken(`${sigil}${tok}`))
-    if (g && g.kind === 'style') {
-      matchedInPrompt.add(normToken(`${sigil}${tok}`))
-      return ''
+  // behaviour). ONLY when the tag resolves: an unresolved one leaves the whole
+  // phrase exactly as authored and falls through to the token pass below, which
+  // reports it and sends it as written.
+  let body = rawPrompt.replace(
+    /\s+(with|in)\s+the\s+style\s+of\s+([@#])([\w-]+(?:\.[\w-]+)*)/gi,
+    (_full, _prep, sigil, tok) => {
+      const g = byNorm.get(normToken(`${sigil}${tok}`))
+      if (g && g.kind === 'style') {
+        matchedInPrompt.add(normToken(`${sigil}${tok}`))
+        return ''
+      }
+      return _full
     }
-    noteUnresolved(sigil, tok)
-    return ''
-  })
+  )
 
-  body = body.replace(/([@#])([\w-]+)/g, (_full, _sigil, tok: string) => {
+  body = body.replace(TOKEN_RE, (_full, _sigil: string, tok: string) => {
     const key = normToken(`${_sigil}${tok}`)
     const g = byNorm.get(key)
     if (!g) {
-      // Unresolved token. A #unknown vanishes; an @unknown humanizes to words.
-      // Both are edits the user never asked for, so both are reported.
+      // Not a mention — see TOKEN_RE. Reported, returned byte-identical.
       noteUnresolved(_sigil, tok)
-      return _sigil === '#' ? '' : humanizeToken(tok)
+      return _full
     }
     matchedInPrompt.add(key)
     if (g.kind === 'style') return '' // styles never inline — trailing clause only
