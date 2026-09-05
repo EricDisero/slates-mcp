@@ -191,14 +191,30 @@ Each one moved a fact to a single home and left a rebuild-and-publish obligation
     ordinary words and with each other across conventions, and a value bucketed WRONG is worse than
     one bucketed `other`: the whole claim of the check is that it is arithmetic you can verify by
     eye. `long-lens CU, other head blurred` is deliberately `other`.
-  - **🚨 `SPEECH_RATE` IS MEASURED, NOT CITED, AND IT DECAYS.** 71 ads from
-    `second-brain/.../ad-research.db`, each register carrying its `n`, the measurement date and the
-    query. `slate`'s `npm run check:shot-list` RE-DERIVES it from that corpus — a constant whose
-    query no longer reproduces it is STALE, not wrong; update the number and the `n` together. The
-    register split is real (performed 133 · conversational 157 · direct-response 167), which is why
-    a single point value would have been worse than none. The **ceiling** (283) is the fastest read
-    in the corpus and the fit check flags only ABOVE it: never "a bit long", because a check that
-    nags gets ignored.
+  - **🚨 `SPEECH_RATE` IS MEASURED, NOT CITED, AND IT DECAYS.** Each register carries its `n`,
+    the measurement date and the query. `slate`'s `npm run check:shot-list` RE-DERIVES it from
+    `second-brain/.../ad-research.db` — a constant whose query no longer reproduces it is STALE, not
+    wrong; update the number and the `n` together. The register split is real (performed 133 ·
+    conversational 159 · direct-response 169), which is why a single point value would have been
+    worse than none. **Read the numbers off `shot-grammar.ts`, never off this line** — it went stale
+    once already.
+  - **🚨 THE SAMPLE IS OPT-IN: only ads whose `speech_rate` column names a register count
+    (2026-09-04, Eric).** The query used to take every row carrying a transcript, which meant
+    **researching a new ad turned a Slates RELEASE BUILD red** — `predist` → `check:all` →
+    `check:shot-list` reads the vault, so two ads landing in the corpus blocked `npm run dist` on
+    work unrelated to the desktop app. Marketing research and shipping the app are now decoupled:
+    growth changes nothing until it is marked, so a red check is a deliberate act again. **The
+    checker SKIPS (loudly, never fails) when the column or the marks are absent** — a fresh clone
+    and an older vault must never be able to block a build. It also fixed three defects the
+    unfiltered query carried: wpm is words ÷ TOTAL runtime so silence read as slow speech (a 179s
+    row at 55 wpm, a 16s row at 26), `has_voiceover` was SELECTed and never filtered on (9 of 74
+    rows had none), and the register was a creator-name regex over free text with `conversational`
+    spanning the other two registers. Honest scale: the medians barely moved and the CEILING — the
+    only number that ever flags a line — is 283 under every definition tried. The coupling was the
+    bug, not the accuracy.
+  - **The ceiling is the only number that ever FLAGS.** It is the fastest read in the marked corpus,
+    and the fit check fires only ABOVE it — never "a bit long", because a check that nags gets
+    ignored.
 - **🔑 THE VARIETY COUNTS RIDE THE OP RESULT, NOT A SKILL.** `slates_list_shots` and
   `slates_get_storyboard_with_frames` return the distribution inline. Measured on the 2026-08-30
   eval harness: a rule inlined into an op moved compliance 0/8 → 30/32, while the same guidance

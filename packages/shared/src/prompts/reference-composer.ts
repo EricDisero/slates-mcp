@@ -163,6 +163,38 @@ function joinNums(nums: number[]): string {
 const TOKEN_RE = /(?<![\w.@#])([@#])([\w-]+(?:\.[\w-]+)*)/g
 
 /**
+ * 🚨 A HEX COLOUR IS NOT A TAG. `#000000` is to `#` what `eric@gmail.com` is to
+ * `@`: an everyday literal that happens to open with our sigil, written by
+ * someone who was not reaching for our feature at all.
+ *
+ * The TEXT was already safe — an unresolved token is returned byte-identical
+ * (see TOKEN_RE) — so what this guards is the REPORT. The `@` half of that
+ * grammar gets its everyday literal excluded for free, because an email's `@`
+ * sits after a word character and the boundary lookbehind kills it. A hex
+ * colour gets no such help: `#` at a word boundary is exactly how a real tag is
+ * written too, so `#000000` reaches `noteUnresolved` and a palette prompt
+ * ("pure black #000000 with #c8ff00 accents") comes back with every colour
+ * listed as *matching nothing saved* — an accusation about words that were
+ * never mentions. That is the asymmetry this closes, and it is the same
+ * complaint, in the same place, as `#3a3a3c` being eaten for months.
+ *
+ * 🚨 IT GATES THE REPORT, NOT THE GRAMMAR, and that is the whole design.
+ * `fade`, `cafe`, `dead`, `beef`, `decade` and `facade` are all valid hex
+ * digits AND plausible style names, so excluding hex shapes from TOKEN_RE would
+ * quietly stop `#fade` from attaching a style called "Fade" — trading a noisy
+ * note for a silent drop, which is the worse half of the trade every time.
+ * Resolution is checked first and always wins; only a token that binds to
+ * nothing ever reaches here.
+ *
+ * Lengths are CSS's: 3 (`#fff`), 4 (`#fff8`), 6 (`#c8ff00`), 8 (`#c8ff00ff`).
+ * `#1` and `#2026` are deliberately NOT covered — an ordinal is not a colour,
+ * and widening this to "anything numeric" would start swallowing tags.
+ */
+export function isHexColorToken(sigil: string, token: string): boolean {
+  return sigil === '#' && /^(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(token)
+}
+
+/**
  * Compose the raw prompt (mentions intact) + an ORDERED list of reference groups
  * into the named prompt text + ordered media the API receives. The group order
  * IS the send order — image numbers are assigned by walking the list, so the
@@ -244,6 +276,9 @@ export function composeReferences(
   const unresolvedTokens: string[] = []
   const unresolvedSeen = new Set<string>()
   const noteUnresolved = (sigil: string, tok: string): void => {
+    // A hex colour that binds to no style is a colour, not a mistyped tag.
+    // See isHexColorToken — the text is unchanged either way; this is the note.
+    if (isHexColorToken(sigil, tok)) return
     const key = normToken(`${sigil}${tok}`)
     if (unresolvedSeen.has(key)) return
     unresolvedSeen.add(key)

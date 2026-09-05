@@ -129,11 +129,38 @@ export function bucketLabel(bucket: ShotSizeBucket | CameraMoveBucket): string {
  * carries `transcript` and `duration_seconds` on every row and always did.
  *
  * ⚠️ IT IS A CORPUS STATISTIC, SO IT DECAYS AND MUST STAY RE-DERIVABLE.
- * `SPEECH_RATE_QUERY` below is the exact derivation. Re-run it when the corpus
- * grows meaningfully; a constant whose query no longer reproduces it is STALE,
- * not wrong — update the number and the `n` together. Same discipline as the
- * pSEO `verifiedOn` dates. What it must never become is a hand-typed figure
- * nobody can reproduce.
+ * `SPEECH_RATE_QUERY` below is the exact derivation; a constant whose query no
+ * longer reproduces it is STALE, not wrong — update the number and the `n`
+ * together. Same discipline as the pSEO `verifiedOn` dates. What it must never
+ * become is a hand-typed figure nobody can reproduce.
+ *
+ * 🚨 THE SAMPLE IS OPT-IN, AND THAT IS THE WHOLE POINT (2026-09-04, Eric).
+ * A row counts ONLY if its `speech_rate` column names a register. The query
+ * used to take every row carrying a transcript, which coupled two things that
+ * have no business touching: **researching a new ad turned a Slates RELEASE
+ * BUILD red.** `predist` → `check:all` → `check:shot-list` re-derives from the
+ * vault, so two ads landing in the corpus blocked `npm run dist` on work that
+ * had nothing to do with the desktop app. Opt-in decouples them — new research
+ * changes nothing until it is marked, so a red check is a deliberate act again
+ * rather than noise, and blocking on it is finally correct.
+ *
+ * Three things the old unfiltered query got wrong, all fixed by the mark:
+ * 1. **wpm is words ÷ TOTAL RUNTIME, not speaking time**, so a silence-heavy or
+ *    music-only ad reads as a slow talker. The corpus really held a 179s row at
+ *    55 wpm and a 16s row at 26 wpm. Nobody speaks at 26 wpm.
+ * 2. **`has_voiceover` was SELECTed and never filtered on** — 9 of the 74 rows
+ *    had no voiceover at all. (One row's value is the free text
+ *    `'yes (scripted dialogue/interviews)'`, so a naive boolean filter would
+ *    have dropped a real read as well.)
+ * 3. **The register was a creator-name regex on free text.** `%AI Video
+ *    Bootcamp%` happened to catch three different spellings of one person, and
+ *    `conversational` was the median over EVERYTHING — the other two registers
+ *    included. Each ad now names its own register and belongs to exactly one.
+ *
+ * Honest about the size of it: the medians barely moved (156 → 159) and the
+ * CEILING — the only number that ever flags a line — is 283 under every
+ * definition tried, because the fastest read was always a genuine voiceover
+ * row. The accuracy was never really the problem. The coupling was.
  */
 export interface SpeechRate {
   /** Words per minute. */
@@ -154,15 +181,15 @@ export interface SpeechRate {
 export const SPEECH_RATE_QUERY = `
 -- words-per-minute per ad, from second-brain/business/projects/slates/
 --   content-strategy/examples/ad-research.db
--- words = transcript.trim().split(/\\s+/).length   (applied to each row)
+-- words = transcript.trim().split(/\s+/).length   (applied to each row)
 -- wpm   = words / (duration_seconds / 60)
-SELECT creator, has_voiceover, duration_seconds, transcript
+SELECT id, speech_rate, duration_seconds, transcript
   FROM ads
- WHERE transcript IS NOT NULL AND TRIM(transcript) <> ''
+ WHERE speech_rate IS NOT NULL
+   AND transcript IS NOT NULL AND TRIM(transcript) <> ''
    AND duration_seconds IS NOT NULL AND duration_seconds > 0;
--- segments: ALL rows · has_voiceover · creator LIKE '%Heinrich%' (performed)
---           · creator LIKE '%AI Video Bootcamp%' (direct response)
--- statistic: median per segment; ceiling = max over ALL rows
+-- segments: speech_rate, which is one register per ad and never overlaps
+-- statistic: median per register; ceiling = max over every marked row
 `.trim()
 
 /** When the numbers below were last derived from the query above. */
@@ -170,22 +197,22 @@ export const SPEECH_RATE_MEASURED_ON = '2026-09-04'
 
 /**
  * 🔑 THE REGISTER SPLIT IS REAL AND MEASURED, which is why there is no single
- * number. Heinrich's performed, genre-acted reads run a median of 133 wpm;
- * AI Video Bootcamp's hard-sell direct response runs 166 — thirty-three words a
+ * number. the performed, genre-acted reads run a median of 133 wpm;
+ * the hard-sell direct response runs 169 — thirty-six words a
  * minute apart on the same runtime. A single point value would have been worse
  * than none.
  */
 export const SPEECH_RATE = {
-  performed: { wpm: 133, n: 4, segment: "creator LIKE '%Heinrich%'" },
-  conversational: { wpm: 157, n: 73, segment: 'all rows with a transcript and a duration' },
-  direct_response: { wpm: 166, n: 22, segment: "creator LIKE '%AI Video Bootcamp%'" },
+  performed: { wpm: 133, n: 4, segment: "speech_rate = 'performed'" },
+  conversational: { wpm: 159, n: 41, segment: "speech_rate = 'conversational'" },
+  direct_response: { wpm: 169, n: 20, segment: "speech_rate = 'direct_response'" },
   /**
    * The fastest read in the whole corpus. **The fit check flags only ABOVE
    * this** — that is what "cannot fit at any plausible delivery" means. Not
    * 250, not p90: those are rates real ads actually hit, and flagging an
    * achievable read is exactly how a check gets ignored.
    */
-  ceiling: { wpm: 283, n: 73, segment: 'max over all rows' },
+  ceiling: { wpm: 283, n: 65, segment: 'max over every marked row' },
 } as const satisfies Record<string, SpeechRate>
 
 export type SpeechRegister = Exclude<keyof typeof SPEECH_RATE, 'ceiling'>
@@ -218,7 +245,7 @@ export function countWords(line: string | null | undefined): number {
 
 /**
  * Does this line fit this cut? `false` ONLY when it cannot fit at ANY plausible
- * delivery — above the fastest read in 69+ real ads.
+ * delivery — above the fastest read in every ad marked for the sample.
  *
  * 🚨 THE CLAIM IS DELIBERATELY WEAK SO THE CITATION CAN BE WEAK. Never flag "a
  * bit long"; a check that nags gets ignored, and then it is worse than absent.
