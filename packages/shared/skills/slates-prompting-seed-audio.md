@@ -15,7 +15,7 @@ description: How to prompt Seed Audio 1.0 (ByteDance, via fal). Read before call
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Seed Audio 1.0.** One plain sentence describing a SCENE, and it returns dialogue, effects and ambience together in one pass. It is the only speech surface in Slates.
+**Card — Seed Audio 1.0.** One plain sentence describing a SCENE, and it returns dialogue, effects and ambience together in one pass. For ONE named voice saying ONE line, `inworld-tts-2` is the seat instead; this one renders the whole room.
 
 **The five levers**
 1. **Write one sentence in plain language.** Describe the room and what is happening in it; the model casts and performs it.

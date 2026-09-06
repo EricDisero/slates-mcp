@@ -79,3 +79,4 @@ export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, describeCraftCard } from '.
 // Per-model prompting tips — the SSOT for the desktop "See prompting tips"
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'
+export { SLATES_API_URL } from './api-url.js'

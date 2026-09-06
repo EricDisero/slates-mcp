@@ -288,6 +288,37 @@ export const ELEVEN_SFX_MIN_SECONDS = 1
 export const ELEVEN_SFX_MAX_SECONDS = 22
 export const ELEVEN_SFX_DEFAULT_SECONDS = 4
 
+// ── The TTS character bucket ────────────────────────────────────────────────
+//
+// TTS is the ONE audio surface that does not bill per second: speech length
+// falls out of the text, so there is no duration to charge for. It bills on a
+// bucket of CHARACTERS instead, and the bucket exists because of the minimum
+// billable floor rather than for tidiness.
+//
+// At $20.8/M characters and a 1.5× markup, a 200-character line is $0.006 of
+// basis — under `MIN_AUDIO_BILLABLE_DOLLARS` ($0.01), so it bills the floor.
+// The floor stops biting at 321 characters. A bucket SMALLER than that would be
+// entirely floor-bound (every bucket the same price, so the displayed rate stops
+// tracking cost and becomes a lie); a much LARGER one over-bills the short lines
+// this feature is mostly for. 250 splits that difference and divides 2,000
+// exactly, giving eight buckets and no ragged last one.
+//
+// 🚨 THE CAP IS READ FROM THE CAPABILITY SSOT, NEVER TYPED. 2,000 is the
+// vendor's MEASURED limit (the API rejects 2,001 by name), and this module
+// already imports MODEL_CAPABILITIES — so typing the number here would be a
+// second copy of a fact one file away, which is exactly what that SSOT exists
+// to delete. `getModelCapability` throws nothing on a miss, so the `??` would
+// hide a renamed model: assert instead, at module load, where it fails the
+// build rather than shipping a bucket ceiling of `undefined`.
+export const TTS_MODEL = 'inworld-tts-2' as const
+export const TTS_BUCKET_CHARS = 250
+export const TTS_MAX_CHARACTERS = (() => {
+  const max = getModelCapability(TTS_MODEL)?.maxCharacters
+  if (!max) throw new Error(`MODEL_CAPABILITIES['${TTS_MODEL}'] must declare maxCharacters`)
+  return max
+})()
+export const TTS_BUCKET_COUNT = TTS_MAX_CHARACTERS / TTS_BUCKET_CHARS // 8
+
 function creditCost(m: { cost_credits?: number; cost_cents?: number } | undefined): number {
   if (!m) return 0
   return m.cost_credits ?? m.cost_cents ?? 0
@@ -626,6 +657,9 @@ export const estimateGenerationCost: Operation<{
   model: string
   quantity?: number
   duration?: number
+  /** inworld-tts-2 only — the character count of the text, which is what it
+   *  bills on. That surface has no duration dimension at all. */
+  characters?: number
   /** The FULL union — the runtime Zod enum is generated from MODEL_CAPABILITIES
    *  and `assertVideoCapabilities` is the per-model narrowing authority. */
   videoResolution?: VideoResolution
@@ -652,7 +686,10 @@ export const estimateGenerationCost: Operation<{
     // text on every turn, and it would go stale in exactly one direction — the
     // one where someone edits a table and forgets there were two.
     duration: z.number().int().min(1).max(360).optional().describe(
-      `Seconds; cost scales linearly. Required with a video or audio base id. Per-model windows: see slates_generate_video's duration. Audio: seed-audio ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS} (⚠️ the requested duration IS the bill), eleven-sfx ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}.`
+      `Seconds; cost scales linearly. Required with a video or PER-SECOND audio base id. Per-model windows: see slates_generate_video's duration. Audio: seed-audio ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS} (⚠️ the requested duration IS the bill), eleven-sfx ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}. ⛔ NOT for ${TTS_MODEL} — pass \`characters\`.`
+    ),
+    characters: z.number().int().min(1).max(TTS_MAX_CHARACTERS).optional().describe(
+      `${TTS_MODEL} only — the LENGTH OF THE TEXT to speak (${TTS_BUCKET_CHARS}-char buckets).`
     ),
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
       'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
@@ -687,7 +724,27 @@ export const estimateGenerationCost: Operation<{
     //     a seedance spelling.
     if (!key && (AUDIO_MODELS as readonly string[]).includes(input.model)) {
       const m = input.model as AudioModel
-      if (!input.duration) {
+      // The TTS seat prices on CHARACTERS, so it leaves this per-second lane
+      // entirely. Asking for a duration here would quote a number that does not
+      // exist for it.
+      if (m === TTS_MODEL) {
+        if (!input.characters) {
+          return ok({
+            requires_clarification: true,
+            missing: ['characters'],
+            message: `${TTS_MODEL} bills per character, not per second — there is no duration to pass. Send the LENGTH OF THE TEXT to be spoken as \`characters\` (1-${TTS_MAX_CHARACTERS}).`,
+          })
+        }
+        if (input.characters > TTS_MAX_CHARACTERS) {
+          return ok({
+            requires_clarification: true,
+            missing: ['characters'],
+            message: `${TTS_MODEL} accepts up to ${TTS_MAX_CHARACTERS} characters in one take — ${input.characters} would be refused at generation time. Split the text and quote each line.`,
+          })
+        }
+        key = audioCostKey({ model: m, characters: input.characters })
+      }
+      if (!key && !input.duration) {
         return ok({
           requires_clarification: true,
           missing: ['duration'],
@@ -703,21 +760,27 @@ export const estimateGenerationCost: Operation<{
       // real 3s price and no hint that 2s is not a thing it can order. The
       // generate op gates the same way; the two must agree or the quote is a
       // promise the generation refuses to keep.
-      const audioBounds: Record<AudioModel, { min: number; max: number }> = {
+      // Only the PER-SECOND surfaces have duration bounds. Keyed by those two
+      // ids rather than by AudioModel so adding a third surface on a different
+      // unit is a compile error here instead of a silent `undefined` bounds
+      // lookup that would throw at quote time.
+      const audioBounds: Record<'seed-audio' | 'eleven-sfx', { min: number; max: number }> = {
         'seed-audio': { min: SEED_AUDIO_MIN_SECONDS, max: SEED_AUDIO_MAX_SECONDS },
         'eleven-sfx': { min: ELEVEN_SFX_MIN_SECONDS, max: ELEVEN_SFX_MAX_SECONDS },
       }
-      const bounds = audioBounds[m]
-      if (input.duration < bounds.min || input.duration > bounds.max) {
-        return ok({
-          requires_clarification: true,
-          missing: ['duration'],
-          message:
-            `${m} accepts ${bounds.min}-${bounds.max} seconds — ${input.duration}s is outside that range and would be refused at generation time. ` +
-            'Re-ask with a duration in range.',
-        })
+      if (!key && m !== TTS_MODEL && input.duration) {
+        const bounds = audioBounds[m]
+        if (input.duration < bounds.min || input.duration > bounds.max) {
+          return ok({
+            requires_clarification: true,
+            missing: ['duration'],
+            message:
+              `${m} accepts ${bounds.min}-${bounds.max} seconds — ${input.duration}s is outside that range and would be refused at generation time. ` +
+              'Re-ask with a duration in range.',
+          })
+        }
+        key = audioCostKey({ model: m, durationSeconds: input.duration })
       }
-      key = audioCostKey({ model: m, durationSeconds: input.duration })
     }
     // 2b) Kling O3 edit base id + duration (ceiled source-clip length)
     if (!key && (input.model === 'kling-v3.0-omni-edit' || input.model === 'kling-v3.0-omni-pro-edit')) {
@@ -2495,7 +2558,7 @@ export function seedanceEditCostKey(input: {
 // Exported: the exact `model` ids slates_generate_audio accepts — consumed
 // by the desktop Studio Agent system prompt (SSOT; never restate these ids
 // in prose that can drift). Mirrors VIDEO_MODELS for the third media type.
-export const AUDIO_MODELS = ['seed-audio', 'eleven-sfx'] as const
+export const AUDIO_MODELS = ['seed-audio', 'eleven-sfx', 'inworld-tts-2'] as const
 
 export type AudioModel = (typeof AUDIO_MODELS)[number]
 
@@ -2523,10 +2586,27 @@ function clampInt(value: number, min: number, max: number): number {
 // injects "... N seconds" into the prompt and bills seed-audio-{N}s, so
 // display == billing with no amendment to the pricing law. The server probes
 // the returned audio.duration afterwards and logs SEED AUDIO BILLING DRIFT.
+/**
+ * Characters → the billed bucket, byte-identical to the desktop's
+ * `clampTtsCharacters`. Rounds UP to the next 250 and clamps to [250, 2000].
+ *
+ * The non-finite arm matters for the same reason it does on the duration side:
+ * `Math.ceil(NaN)` is NaN, which would build the key `inworld-tts-2-NaNc` here
+ * while the desktop quotes the first bucket. Divergence at a value neither side
+ * can bill is still divergence.
+ */
+function clampTtsCharacters(value: number | undefined): number {
+  if (value == null || !Number.isFinite(value)) return TTS_BUCKET_CHARS
+  const buckets = Math.ceil(value / TTS_BUCKET_CHARS)
+  return Math.min(TTS_BUCKET_COUNT, Math.max(1, buckets)) * TTS_BUCKET_CHARS
+}
+
 export function audioCostKey(input: {
   model: AudioModel
   /** seed-audio + eleven-sfx: the REQUESTED duration in seconds (ceiled). */
   durationSeconds?: number
+  /** inworld-tts-2 ONLY: the character count of the text being spoken. */
+  characters?: number
 }): string {
   if (input.model === 'seed-audio') {
     // `?? default` before the clamp, not `?? 0` — the desktop resolves a missing
@@ -2548,6 +2628,11 @@ export function audioCostKey(input: {
       ELEVEN_SFX_DEFAULT_SECONDS
     )
     return `eleven-sfx-${secs}s`
+  }
+  if (input.model === TTS_MODEL) {
+    // `c` for characters, so the key can never be mistaken for a seconds key by
+    // the `-\d+s$` tests the proxy and the desktop both run.
+    return `${TTS_MODEL}-${clampTtsCharacters(input.characters)}c`
   }
   throw new Error(`Unknown audio model: ${input.model}`)
 }
@@ -3369,6 +3454,11 @@ export const generateAudio: Operation<{
   prompt: string
   durationSeconds?: number
   voice?: string
+  // inworld-tts-2 — EXACTLY ONE of these three says where the voice comes from:
+  // an existing voice, a clip to clone, or a description to build from.
+  voiceId?: string
+  voiceReferenceAssetId?: string
+  voiceDescription?: string
   speed?: number
   volume?: number
   pitch?: number
@@ -3383,9 +3473,9 @@ export const generateAudio: Operation<{
   id: 'slates_generate_audio',
   billable: true,
   description:
-    'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Two surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s) and eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop). Which surface for which job: read the slates-model-selection skill. ' +
+    'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Three surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s), eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop), and inworld-tts-2 (one named voice saying one line; the prompt IS the words, billed per character). Which surface for which job: read the slates-model-selection skill. ' +
     '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. Choose it deliberately. ' +
-    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio and makes results worse. ' +
+    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio and makes results worse. ' +
     'projectId is REQUIRED (no headless path). ' +
     CONFIRM_GATE_SENTENCE +
     ' No skill files installed? Call slates_get_prompting_guide first.',
@@ -3403,7 +3493,7 @@ export const generateAudio: Operation<{
       .min(1)
       .max(5000)
       .describe(
-        'seed-audio: ONE plain sentence describing the scene (no production jargon, no "SFX:" prefixes; name the crowd/room size). eleven-sfx: the effect described by its physical CAUSE ("heavy oak door slams shut in a stone hallway"), max 450 chars.'
+        'seed-audio: ONE plain sentence describing the scene (no production jargon, no "SFX:" prefixes; name the crowd/room size). eleven-sfx: the effect described by its physical CAUSE ("heavy oak door slams shut in a stone hallway"), max 450 chars. inworld-tts-2: THE WORDS TO SPEAK, verbatim, max ' + TTS_MAX_CHARACTERS + ' — its length is the bill.'
       ),
     durationSeconds: z
       .number()
@@ -3417,6 +3507,18 @@ export const generateAudio: Operation<{
       .describe(
         'seed-audio only — a preset voice id (e.g. "cedric_en_zh"). Leave unset to let the scene cast itself, which is usually right for background dialogue. Agent-facing only: there is no user-facing voice picker.'
       ),
+    voiceId: z
+      .string()
+      .optional()
+      .describe('inworld-tts-2 — the voice to speak in. One of these three is required there.'),
+    voiceReferenceAssetId: z
+      .string()
+      .optional()
+      .describe('inworld-tts-2 — clone the voice from this AUDIO asset (5-15s of one clean speaker).'),
+    voiceDescription: z
+      .string()
+      .optional()
+      .describe('inworld-tts-2 — build a voice from this description, for a character with no recording.'),
     speed: z.number().min(0.5).max(2).optional().describe('seed-audio only — 0.5-2.0. Reach for it when dialogue races or drags against picture.'),
     volume: z.number().min(0.5).max(2).optional().describe('seed-audio only — output gain, 0.5-2.0 (1 = unchanged). Prefer the timeline track fader for mix decisions; this is for when the model itself renders a scene too hot or too quiet.'),
     pitch: z.number().int().min(-12).max(12).optional().describe('seed-audio only — semitones. Small moves; ±3 is already a lot.'),
@@ -3439,14 +3541,56 @@ export const generateAudio: Operation<{
   }),
   run: async (input, ctx) => {
     // ── Per-surface clarification + constraint gates ──
-    const cfgDefaults: Record<AudioModel, number> = {
+    //
+    // `null` for the TTS seat is load-bearing rather than a placeholder: that
+    // surface has NO duration dimension at all (speech length falls out of the
+    // text), so there is no default that would be honest. A number here would
+    // flow into `audioCostKey` and quote a per-second price for a per-character
+    // generation.
+    const cfgDefaults: Record<AudioModel, number | null> = {
       'seed-audio': SEED_AUDIO_DEFAULT_SECONDS,
       'eleven-sfx': ELEVEN_SFX_DEFAULT_SECONDS,
+      'inworld-tts-2': null,
     }
-    const seconds = input.durationSeconds ?? cfgDefaults[input.model]
+    const seconds = input.durationSeconds ?? cfgDefaults[input.model] ?? undefined
+
+    if (input.model === TTS_MODEL) {
+      // The text IS the prompt on this surface — there is no separate field,
+      // because "the words that get spoken" and "what you asked for" are the
+      // same thing here. That also means the character count is knowable
+      // client-side, which is what makes the quote below exact.
+      if (input.prompt.length > TTS_MAX_CHARACTERS) {
+        throw new Error(
+          `${TTS_MODEL} accepts up to ${TTS_MAX_CHARACTERS} characters in one take — this text is ${input.prompt.length}. Split it into separate lines and generate each one.`
+        )
+      }
+      if (input.durationSeconds != null) {
+        throw new Error(
+          `${TTS_MODEL} has no duration parameter — speech length falls out of the text, and it bills per character. Drop durationSeconds.`
+        )
+      }
+      // EXACTLY ONE voice source. Zero is a clarification (the agent should ask
+      // who is speaking, not guess); two or more is an error, because the three
+      // paths are genuinely different generations and silently picking one would
+      // spend credits on a voice the caller did not ask for.
+      const voiceSources = [input.voiceId, input.voiceReferenceAssetId, input.voiceDescription]
+        .filter((v) => typeof v === 'string' && v.length > 0)
+      if (voiceSources.length === 0) {
+        return ok({
+          requires_clarification: true,
+          missing: ['voiceId'],
+          message: `${TTS_MODEL} needs a voice. Ask the user WHICH CHARACTER is speaking and pass that character's voice as voiceId — a voice is a field on a character, not a thing to pick at generation time. To make a NEW voice, pass voiceReferenceAssetId (a clip to clone) or voiceDescription (words, for a character with no recording).`,
+        })
+      }
+      if (voiceSources.length > 1) {
+        throw new Error(
+          `${TTS_MODEL} takes exactly one voice source — pass voiceId OR voiceReferenceAssetId OR voiceDescription, not ${voiceSources.length} of them.`
+        )
+      }
+    }
 
     if (input.model === 'seed-audio') {
-      if (seconds < SEED_AUDIO_MIN_SECONDS || seconds > SEED_AUDIO_MAX_SECONDS) {
+      if (seconds == null || seconds < SEED_AUDIO_MIN_SECONDS || seconds > SEED_AUDIO_MAX_SECONDS) {
         return ok({
           requires_clarification: true,
           missing: ['durationSeconds'],
@@ -3461,7 +3605,7 @@ export const generateAudio: Operation<{
     }
 
     if (input.model === 'eleven-sfx') {
-      if (seconds < ELEVEN_SFX_MIN_SECONDS || seconds > ELEVEN_SFX_MAX_SECONDS) {
+      if (seconds == null || seconds < ELEVEN_SFX_MIN_SECONDS || seconds > ELEVEN_SFX_MAX_SECONDS) {
         return ok({
           requires_clarification: true,
           missing: ['durationSeconds'],
@@ -3478,6 +3622,9 @@ export const generateAudio: Operation<{
     // ── Resolve asset refs at CALL time (UUIDs or badge codes) ──
     const refInputs: Array<{ ref: string; role: string }> = []
     for (const ref of input.audioReferenceAssetIds ?? []) refInputs.push({ ref, role: 'audio reference' })
+    // Resolved through the SAME resolver as every other asset ref, so a badge
+    // code ("AUD-S1") works here exactly as it does everywhere else.
+    if (input.voiceReferenceAssetId) refInputs.push({ ref: input.voiceReferenceAssetId, role: 'voice reference' })
     if (input.imageReferenceAssetId) refInputs.push({ ref: input.imageReferenceAssetId, role: 'image reference' })
     const resolvedRefs =
       refInputs.length > 0
@@ -3493,6 +3640,7 @@ export const generateAudio: Operation<{
     const costKey = audioCostKey({
       model: input.model,
       durationSeconds: seconds,
+      characters: input.model === TTS_MODEL ? input.prompt.length : undefined,
     })
     const entry = registry.models.find((m) => m.model === costKey)
     if (!entry) {
@@ -3537,6 +3685,9 @@ export const generateAudio: Operation<{
       prompt: input.prompt,
       durationSeconds: seconds,
       voice: input.voice,
+      voiceId: input.voiceId,
+      voiceReferenceAssetId: rid(input.voiceReferenceAssetId),
+      voiceDescription: input.voiceDescription,
       speed: input.speed,
       volume: input.volume,
       pitch: input.pitch,
@@ -5349,6 +5500,11 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
   // has none, so it falls back to the raw ones and is announced as a floor.
   const fires = (detail as Partial<ShotDetail>).firesWith
   if ((AUDIO_MODELS as readonly string[]).includes(model)) {
+    // The TTS seat prices on the TEXT, and a Shot carries no text field — so a
+    // Shot cannot be a TTS generation and cannot be quoted as one. Explicit,
+    // because the `!seconds` line below would also return null here and that
+    // would read as "duration missing" for a surface that has no duration.
+    if (model === TTS_MODEL) return null
     const seconds = fires?.audioDurationSeconds ?? p.audioDurationSeconds
     if (!seconds) return null
     return audioCostKey({ model: model as AudioModel, durationSeconds: seconds })
@@ -5969,18 +6125,32 @@ function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return 'slates-prompting-kling-v3'
   if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
-  // Audio — seed-audio BEFORE the seedance check: "seed-audio" also starts
-  // with "seed", and falling through would hand the video guide to the audio
-  // model (the exact class of aliasing bug this comment block warns about).
-  // Speech, dialogue and scratch VO all live on Seed Audio now — the TTS
-  // surface is gone, so "tts"/"voiceover" must NOT land on the ElevenLabs
-  // guide, which is SFX-only.
+  // Audio — the TTS seat FIRST, then seed-audio, then eleven-sfx.
+  //
+  // 🚨 "tts"/"voiceover" ROUTE HERE AGAIN (2026-09-05). They used to land on
+  // seed-audio because there was no TTS surface at all; there is one now, so
+  // leaving them there would hand a scene-renderer's guide to someone asking
+  // about speech. They must still never reach the ElevenLabs guide, which is
+  // SFX-only.
+  if (
+    t.startsWith('inworld') ||
+    t === 'tts' ||
+    t === 'text-to-speech' ||
+    t === 'text to speech' ||
+    t === 'voiceover' ||
+    t === 'voice'
+  ) {
+    return 'slates-prompting-inworld-tts'
+  }
+  // seed-audio BEFORE the seedance check: "seed-audio" also starts with "seed",
+  // and falling through would hand the video guide to the audio model (the
+  // exact class of aliasing bug this comment block warns about). `dialogue`
+  // stays here: dialogue inside a SCENE is what seed-audio is for, while a
+  // single voice saying a single line is the TTS seat above.
   if (
     t.startsWith('seed-audio') ||
     t === 'seed audio' ||
     t === 'audio' ||
-    t === 'tts' ||
-    t === 'voiceover' ||
     t === 'dialogue'
   ) {
     return 'slates-prompting-seed-audio'

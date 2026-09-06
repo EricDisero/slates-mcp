@@ -1,7 +1,8 @@
 import { setCloudToken } from '@slatesvideo/shared'
 import { promptInput } from '../util/prompt.js'
 
-const CLOUD_BASE_URL = process.env.SLATES_CLOUD_BASE_URL ?? 'https://slates-api.fly.dev'
+import { SLATES_API_URL } from '@slatesvideo/shared'
+const CLOUD_BASE_URL = process.env.SLATES_CLOUD_BASE_URL ?? SLATES_API_URL
 
 export interface LoginOptions {
   email?: string

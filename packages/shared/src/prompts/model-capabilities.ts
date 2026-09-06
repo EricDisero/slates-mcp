@@ -162,6 +162,39 @@ export interface VideoResolutionCapability {
 }
 
 /** Everything a model will ACCEPT. Capability only — never a price. */
+/**
+ * What a TEXT-TO-SPEECH surface accepts. Every number here was MEASURED against
+ * the live API on 2026-09-05, not read from documentation — the vendor's docs
+ * omit the rate limit entirely and its API accepts an unknown `audioEncoding`
+ * with a 200 rather than a 400, so anything taken on trust here is a guess that
+ * bills.
+ *
+ * 🚨 `clonesPerMinute` IS A PRODUCT CONSTRAINT, NOT A TUNING KNOB. The vendor
+ * rate-limits voice cloning WORKSPACE-WIDE (every Slates user shares our one
+ * key), so it caps how many people can mint a voice in the same minute across
+ * the whole product. It is surfaced here so the seat can say so in words rather
+ * than failing opaquely.
+ */
+export interface VoiceCloneCapability {
+  /** Reference-audio duration the clone endpoint accepts, in seconds. */
+  minSeconds: number
+  maxSeconds: number
+  /** Ceiling on ONE reference sample, in bytes. */
+  maxBytes: number
+  /** Container formats the clone endpoint decodes. */
+  formats: readonly string[]
+  /** Clone requests per minute, WORKSPACE-WIDE (measured: a 429 names the limit). */
+  clonesPerMinute: number
+  /**
+   * Stored custom voices the plan allows. The seat holds the steady-state count
+   * near ZERO by deleting each voice after it renders (mint → synthesize →
+   * delete), so this is the wall that argument exists to never reach.
+   */
+  maxStoredVoices: number
+  /** Bounds on the voice-DESIGN prompt, the path that needs no reference audio. */
+  designPromptChars: { min: number; max: number }
+}
+
 export interface ModelCapability {
   aspectRatios: AspectRatio[]
   /** Provider-keyed overrides. `fal` is the one that matters — see AGENT_ROUTE_PROVIDER. */
@@ -184,6 +217,16 @@ export interface ModelCapability {
   maxReferenceVideoSeconds?: number
   /** Combined seconds across every reference audio clip. */
   maxReferenceAudioSeconds?: number
+
+  // ── Text-to-speech ──
+  /**
+   * Max characters in ONE synthesis request. Present ⟺ the surface is TTS.
+   * This is the number the character BILLING BUCKET is sized against, so it
+   * must never be hand-typed downstream — `slate`'s registry spreads it in.
+   */
+  maxCharacters?: number
+  /** Reference-audio and voice-design spec. Present ⟺ the surface can clone. */
+  voiceClone?: VoiceCloneCapability
 }
 
 /**
@@ -601,12 +644,57 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   'eleven-sfx': {
     aspectRatios: [],
   },
+
+  // ── Text-to-speech ─────────────────────────────────────────────────────────
+  //
+  // The TTS seat. `maxCharacters` is the one number the billing bucket is sized
+  // against, and it is MEASURED: the API rejects 2,001 characters by name
+  // ("text length should not exceed 2000 characters"). Do not raise it from a
+  // docs page — raise it from a request that succeeds.
+  //
+  // ⚠️ NO `durationSeconds` HERE, and that is the shape of the surface rather
+  // than an omission: speech length falls out of the text, so this row bills on
+  // characters and has no duration dimension at all. Every derivation that
+  // switches on an audio surface must read the BILLING UNIT, never assume one.
+
+  'inworld-tts-2': {
+    aspectRatios: [],
+    maxCharacters: 2000,
+    voiceClone: {
+      // 5-15s of reference audio, ≤4 MB per sample — the vendor's documented
+      // spec, and a 12.6s / 555 KB sample cloned successfully against it.
+      minSeconds: 5,
+      maxSeconds: 15,
+      maxBytes: 4 * 1024 * 1024,
+      formats: ['wav', 'mp3', 'webm'],
+      // 🚨 MEASURED, and it appears in no documentation: the third clone inside
+      // one minute returned 429 "limit: 2, time window: m". This is workspace-
+      // wide, so it is shared across every Slates user.
+      clonesPerMinute: 2,
+      maxStoredVoices: 100,
+      // Measured: the design endpoint rejects a prompt outside these bounds by
+      // name ("design_prompt (Voice Description) must be between 7 and 1000").
+      designPromptChars: { min: 7, max: 1000 },
+    },
+  },
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export function getModelCapability(model: string): ModelCapability | undefined {
   return MODEL_CAPABILITIES[model]
+}
+
+/**
+ * The voice-cloning spec for a TTS surface, or undefined for anything else.
+ *
+ * Exists so the desktop reads the reference-audio bounds, the design-prompt
+ * bounds and the clone rate limit from HERE rather than retyping them into a
+ * form control. A control whose limit disagrees with the vendor's is a limit
+ * the user first meets AFTER pressing the button.
+ */
+export function voiceCloneFor(model: string): VoiceCloneCapability | undefined {
+  return MODEL_CAPABILITIES[model]?.voiceClone
 }
 
 /** Aspect ratios a model accepts, honouring the provider override. */

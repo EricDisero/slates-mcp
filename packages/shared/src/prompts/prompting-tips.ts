@@ -67,6 +67,7 @@ export type PromptingTipsKey =
   | 'nano-banana-lite'
   | 'seed-audio'
   | 'eleven-sfx'
+  | 'inworld-tts-2'
 
 const SEEDANCE: PromptingTipsEntry = {
   label: 'Seedance 2.0',
@@ -759,6 +760,64 @@ const LTX_2_5: PromptingTipsEntry = {
     'In image-to-video, do not cut away from the opening frame too early: you have paid for that frame, so let it play before the first move.',
   ],
 }
+const INWORLD_TTS: PromptingTipsEntry = {
+  label: 'Inworld TTS-2',
+  intro: [
+    'The voice seat: one named voice saying one line. Unlike every other surface in Slates, the prompt is not a description of what you want — it IS the words that get spoken, verbatim, and its length is what you are billed for.',
+    'A voice belongs to a character, the same way a face does. Build it once from a clip or a description, then send it lines.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Direction goes in SQUARE BRACKETS',
+        example: '\u2717 (quietly) I hope nobody notices\n\u2713 [whispering] I hope nobody notices',
+        note: 'Brackets are read as direction and never spoken. PARENTHESES ARE SPOKEN ALOUD \u2014 a parenthetical stage direction comes back with the narrator saying the word "quietly". This is the single easiest way to ruin a take.',
+        critical: true,
+      },
+      {
+        heading: 'Plain English inside the brackets',
+        example: '[very quiet] \u00b7 [very slow] \u00b7 [say excitedly] \u00b7 [whisper in a hushed style]',
+        note: 'It is natural-language steering across emotion, volume, pitch, speed, articulation and vocal style \u2014 not a fixed vocabulary. Write the direction the way you would say it to an actor.',
+      },
+      {
+        heading: 'Non-verbals are their own tags',
+        example: '[laugh] \u00b7 [sigh] \u00b7 [breathe] \u00b7 [cough] \u00b7 [yawn] \u00b7 [clear throat]',
+        note: 'They land inline, where they occur in the line.',
+      },
+      {
+        heading: 'A mistyped tag fails silently',
+        note: 'An instruction it does not recognise is still swallowed and still changes the delivery \u2014 it is never spoken and never errors. So a typo produces a strange read with no warning. If a take sounds off, suspect the tag before the voice.',
+        critical: true,
+      },
+    ],
+    [
+      {
+        heading: 'Tags persist until changed',
+        example: '[very slow] First line. Second line is still slow. [reset] Third is normal.',
+        note: 'A direction governs everything after it, across sentences. Use [reset] to return to a normal read rather than assuming the next sentence starts clean.',
+      },
+      {
+        heading: 'Punctuation is the timing',
+        example: 'Wait. Stop.  \u2260  Wait, stop.',
+        note: 'Full stops buy a beat; commas do not. Write the line the way it is said.',
+      },
+      {
+        heading: 'One line, one take',
+        note: 'Split a paragraph into separate generations so a bad clause costs one re-roll instead of the whole speech. Max 2,000 characters per take.',
+      },
+      {
+        heading: 'Spell out anything ambiguous',
+        example: 'twenty twenty-six \u00b7 Doctor Reyes',
+        note: 'Numbers, dates and abbreviations are read literally. Write them as they should sound.',
+      },
+      {
+        heading: 'Know its seat',
+        note: 'One voice, cleanly. Dialogue mixed with effects and room tone in one pass is Seed Audio; a single non-speech sound is Sound Effects.',
+      },
+    ],
+  ],
+}
+
 
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
@@ -773,8 +832,10 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'ltx-2-5': LTX_2_5,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
+
   'seed-audio': SEED_AUDIO,
   'eleven-sfx': ELEVEN_SFX,
+  'inworld-tts-2': INWORLD_TTS,
 }
 
 /** Null when no tips exist for the key — callers render an honest fallback. */

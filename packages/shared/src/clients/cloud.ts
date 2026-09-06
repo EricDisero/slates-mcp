@@ -1,6 +1,7 @@
 import { requireCloudToken } from '../auth.js'
 
-const FALLBACK_CLOUD_BASE_URL = 'https://slates-api.fly.dev'
+import { SLATES_API_URL } from '../api-url.js'
+const FALLBACK_CLOUD_BASE_URL = SLATES_API_URL
 
 // The slates_sk_ bearer is attached to every cloud request. SLATES_CLOUD_BASE_URL
 // may override the host for dev/staging, but ONLY over https (or http to

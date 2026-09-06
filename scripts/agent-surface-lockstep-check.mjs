@@ -708,6 +708,43 @@ function zodDescriptions(op) {
   return out
 }
 
+// ── 9. uncalled desktop routes ─────────────────────────────────────────────
+// Every `r.add('METHOD', '/agent/...')` in slate's agent route files has a caller:
+// an op in the shared operations index, or code elsewhere in slate. A route with
+// none is dead surface that still ships, still needs auth review, and still
+// reads as capability in the docs. Six were found that way on 2026-09-05.
+{
+  const CHECK = '9 uncalled-routes'
+  const routesDir = join(desktopRoot, 'src', 'main', 'agent')
+  if (!existsSync(routesDir)) {
+    warn(`${CHECK}: slate not on disk beside slates-mcp; skipped`)
+  } else {
+    const { readdirSync } = await import('node:fs')
+    const routeFiles = readdirSync(routesDir).filter((n) => /^routes.*\.ts$/.test(n)).map((n) => join(routesDir, n))
+    const routes = new Map()
+    for (const f of routeFiles) {
+      const src = readFileSync(f, 'utf8')
+      for (const m of src.matchAll(/r\.add\(\s*'(GET|POST|PUT|DELETE)'\s*,\s*'([^']+)'/g)) routes.set(m[2], f)
+    }
+    const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
+    const called = new Set()
+    for (const m of opsSrc.matchAll(/desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs)) called.add(m[1])
+    // callers inside slate itself, outside the route files
+    const walk = (dir, out = []) => {
+      for (const n of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, n.name)
+        if (n.isDirectory()) { if (n.name !== 'node_modules') walk(p, out) }
+        else if (/\.(ts|tsx)$/.test(n.name) && !routeFiles.includes(p)) out.push(p)
+      }
+      return out
+    }
+    const slateSrc = walk(join(desktopRoot, 'src')).map((f) => readFileSync(f, 'utf8')).join('\n')
+    const dead = [...routes.keys()].filter((path) => !called.has(path) && !slateSrc.includes(`'${path}'`) && !slateSrc.includes(`"${path}"`) && !slateSrc.includes('`' + path))
+    if (dead.length) fail(CHECK, `${dead.length} desktop route(s) with no caller in the ops index or in slate: ${dead.join(', ')}`)
+    else pass(CHECK, `${routes.size} desktop routes, every one called by an op or by slate itself`)
+  }
+}
+
 // ── report ──────────────────────────────────────────────────────────────────
 for (const w of warnings) console.warn(`  !!  skipped: ${w}`)
 if (failures.length > 0) {

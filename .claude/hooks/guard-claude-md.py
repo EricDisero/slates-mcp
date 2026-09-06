@@ -1,7 +1,11 @@
 #!/usr/bin/env python
-"""PostToolUse hook -- keep slates-mcp/CLAUDE.md under its cap, automatically.
+"""PostToolUse hook -- keep this repo's CLAUDE.md under its cap, automatically.
 
-  CLAUDE.md    2,000 words, pay-to-add ramp at 1,500
+CANONICAL COPY: second-brain/tools/repo-checks/guard-claude-md.py. Installed per repo by
+second-brain/tools/install_repo_checks.py, which stamps the cap block below; the vault
+lint fails when a repo copy drifts from the canonical file. Edit it there, never here.
+
+  CLAUDE.md    3,500 words, pay-to-add ramp at 3,000
 
 Anthropic's memory documentation targets a CLAUDE.md under 200 lines; past that a
 file "consumes more context and reduces adherence". This one loads in full, in every

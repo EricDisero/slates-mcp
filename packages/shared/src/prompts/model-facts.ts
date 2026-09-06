@@ -348,6 +348,14 @@ export const MODEL_FACTS: ModelFact[] = [
     ...caps('eleven-sfx'),
     notes: 'ONE-SHOT SOUND EFFECT with an EXACT duration — route here for a single hit that must land on a frame (door slam, whoosh, impact, UI blip) or for a seamless loop. AUDIO-ONLY. For layered scenes with dialogue or room tone, seed-audio does it in one pass instead.',
   },
+  {
+    id: 'inworld-tts-2',
+    route: 'generate',
+    label: 'Inworld Realtime TTS-2',
+    kind: 'audio',
+    ...caps('inworld-tts-2'),
+    notes: 'THE VOICE SEAT — one named voice saying one line, billed per CHARACTER not per second. Route here when WHO is speaking matters. NOT scene audio — that is seed-audio; a single effect is eleven-sfx.',
+  },
 ]
 
 const FACT_BY_ID = new Map(MODEL_FACTS.map((m) => [m.id, m]))
