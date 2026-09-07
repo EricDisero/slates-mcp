@@ -28,7 +28,7 @@ description: How to set up lip-sync — Kling-only (dedicated lip-sync and avata
 - `Soft rim light, warm office, gentle confident smile between sentences.`
 - `Cool blue evening light through a window, focused intent expression.` (Or `.` — an empty prompt is fine when you have nothing to add.)
 
-**Hard constraint:** it is Kling-only and always 5 seconds. For a generated PERFORMANCE instead — head movement, gesture, delivery energy, with the dialogue as a native conditioning signal — that is a normal Seedance video generation with the clip attached as a video reference, not a mode of this tool. Real voice or a cloned voice for production; TTS is for scratch.
+**Hard constraint:** it is Kling-only and always 5 seconds. For a generated PERFORMANCE instead — head movement, gesture, delivery energy, with the dialogue as a native conditioning signal — that is a normal Seedance video generation with the clip attached as a video reference, not a mode of this tool. A real recording, or a cloned/cast voice rendered on `inworld-tts-2`, for production; this tool's built-in TTS is for scratch.
 <!-- @card:end -->
 
 <!-- @banned:start -->

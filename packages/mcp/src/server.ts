@@ -41,7 +41,7 @@ import {
 // 2026-09-02 this file used exactly one MCP feature — tools — so a host had no
 // way to tell `slates_list_assets` from `slates_delete_project` (no
 // annotations), no way to read a result as data (no structured content), no way
-// to offer the 33 skills in its own picker (no prompts), no way to attach the
+// to offer the bundled skills in its own picker (no prompts), no way to attach the
 // capability table as context (no resources), and no way to show a render's
 // progress (no progress notifications). All five are in the 2025-06-18 spec and
 // all five are now used. Adding one is not decoration: each removes a reason
@@ -75,7 +75,7 @@ const server = new Server(
   {
     capabilities: {
       tools: {},
-      // The 33 bundled skills, offered in the host's own picker rather than
+      // Every bundled skill, offered in the host's own picker rather than
       // only through a tool call the model has to decide to make.
       prompts: {},
       // Stable documents a client can attach as context instead of spending a
@@ -359,7 +359,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   }
 })
 
-// ── Prompts: the 33 bundled skills ──────────────────────────────────────────
+// ── Prompts: every bundled skill ──────────────────────────────────────────
 //
 // This is exactly what MCP prompts are for, and the only path before now was a
 // tool call the model had to decide to make — measured at 13% compliance. As a

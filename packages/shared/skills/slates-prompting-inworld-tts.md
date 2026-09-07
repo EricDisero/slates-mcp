@@ -31,7 +31,7 @@ A reference carries WHO is speaking: timbre, pitch, accent, age, vowel shape. It
 
 **Route elsewhere when:** the scene needs dialogue mixed with effects and room tone in one pass (`seed-audio`), or it is a single non-speech sound (`eleven-sfx`). This surface makes ONE voice saying ONE thing, cleanly.
 
-**Hard constraints:** no duration parameter — length falls out of the text. Max 2000 characters per take. Every generation needs a voice; a voice is a field on a CHARACTER, not a per-generation pick.
+**Hard constraints:** no duration parameter — length falls out of the text. Max 2000 characters per take. Exactly one voice source: the character's voice clip as `voiceReferenceAssetId` (speak AS the character), `voiceDescription`, or a preset `voiceId`.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -95,7 +95,7 @@ The eight dimensions the model steers on, with a working example of each:
 Non-verbals sit inline where they happen: `[laugh]`, `[sigh]`, `[cough]`,
 `[breathe]`, `[yawn]`, `[clear throat]`.
 
-### Three rules that are not obvious
+### Four rules that are not obvious
 
 1. 🚨 **A tag it does not recognise is still consumed, and still changes the read.**
    `[zzzqqq]` is not spoken and does not error — it produces a different, arbitrary
@@ -129,6 +129,14 @@ So the ideal reference is boring: one person, close to a microphone, no music, n
 
 - *"I cloned my podcast intro and it doesn't sound like me."* The intro had music under it. The model averaged the music into the identity. Re-clone from a clean stretch.
 - *"I want the line to sound like it's coming through a car radio."* Clone the clean voice, then EQ and process the returned clip on the timeline. A radio-sounding reference makes a worse voice, not a radio effect.
+
+## Getting the voice onto the call
+
+A voice is a field on a CHARACTER — an audio clip, the `voiceAssetId` on the row `slates_list_characters` returns. Exactly one source per call:
+
+- **Speak AS a character:** `voiceReferenceAssetId: <its voiceAssetId>`. The seat clones the clip for that take and discards the vendor voice afterwards, so there is nothing to reconcile — but cloning shares a ceiling of two new voices a minute across every Slates user, so a run of lines in one cloned voice pauses between takes rather than failing. Send each line once; do not re-send one that already came back.
+- **A character with no recording:** `voiceDescription` (7–1000 characters of words). Attach the returned clip with `slates_update_character` (`voiceAssetId`) so every later line reuses it instead of designing a new voice each time.
+- **A preset:** `voiceId` is a vendor voice id from the desktop's voice bench shelf. It is not a character id and not an asset id, and an agent rarely holds one.
 
 ## Consent
 

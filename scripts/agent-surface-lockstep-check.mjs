@@ -708,27 +708,46 @@ function zodDescriptions(op) {
   return out
 }
 
-// ── 9. uncalled desktop routes ─────────────────────────────────────────────
-// Every `r.add('METHOD', '/agent/...')` in slate's agent route files has a caller:
-// an op in the shared operations index, or code elsewhere in slate. A route with
-// none is dead surface that still ships, still needs auth review, and still
-// reads as capability in the docs. Six were found that way on 2026-09-05.
+// ── 9. desktop routes ↔ callers, BOTH directions ───────────────────────────
+// (a) Every `r.add('METHOD', '/agent/...')` in slate's agent route files has a
+//     caller: an op in the shared operations index, code elsewhere in slate, or
+//     a trailing `// legacy: <who>` marker naming the PUBLISHED client that
+//     still calls it (a `.mcpb` install is frozen at install time, so "no op
+//     calls it today" is not "nothing calls it"). A route with none is dead
+//     surface that still ships, still needs auth review, and still reads as
+//     capability in the docs. Seven were found that way on 2026-09-05.
+// (b) Every route an op calls EXISTS in slate. This is the direction users
+//     feel: the same sweep deleted `/agent/environments/generate-plate`, which
+//     `slates_generate_environment_plate` in the published package still
+//     called — a 404 on every install until it was restored.
 {
-  const CHECK = '9 uncalled-routes'
+  const CHECK = '9 routes<->callers'
   const routesDir = join(desktopRoot, 'src', 'main', 'agent')
   if (!existsSync(routesDir)) {
     warn(`${CHECK}: slate not on disk beside slates-mcp; skipped`)
   } else {
     const { readdirSync } = await import('node:fs')
     const routeFiles = readdirSync(routesDir).filter((n) => /^routes.*\.ts$/.test(n)).map((n) => join(routesDir, n))
-    const routes = new Map()
+    const routes = new Map() // path -> file
+    const legacy = new Map() // path -> who still calls it
     for (const f of routeFiles) {
       const src = readFileSync(f, 'utf8')
-      for (const m of src.matchAll(/r\.add\(\s*'(GET|POST|PUT|DELETE)'\s*,\s*'([^']+)'/g)) routes.set(m[2], f)
+      // `[^\r\n]`, not `[^\n]`: slate's route files are CRLF on Windows, and a
+      // trailing `\r` would keep the `legacy:` tag below from matching `$`.
+      for (const m of src.matchAll(/r\.add\(\s*'(GET|POST|PUT|DELETE)'\s*,\s*'([^']+)'[^\r\n]*/g)) {
+        routes.set(m[2], f)
+        const tag = /\/\/\s*legacy:\s*(.+)$/.exec(m[0])
+        if (tag) legacy.set(m[2], tag[1].trim())
+      }
     }
     const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
     const called = new Set()
-    for (const m of opsSrc.matchAll(/desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs)) called.add(m[1])
+    for (const m of opsSrc.matchAll(/desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs)) {
+      // A templated path cannot be matched against a static route table; none
+      // exist today, and one would be reported here rather than skipped.
+      if (m[1].includes('${')) fail(CHECK, `op calls a templated desktop path this check cannot resolve: ${m[1]}`)
+      else called.add(m[1])
+    }
     // callers inside slate itself, outside the route files
     const walk = (dir, out = []) => {
       for (const n of readdirSync(dir, { withFileTypes: true })) {
@@ -739,9 +758,33 @@ function zodDescriptions(op) {
       return out
     }
     const slateSrc = walk(join(desktopRoot, 'src')).map((f) => readFileSync(f, 'utf8')).join('\n')
-    const dead = [...routes.keys()].filter((path) => !called.has(path) && !slateSrc.includes(`'${path}'`) && !slateSrc.includes(`"${path}"`) && !slateSrc.includes('`' + path))
-    if (dead.length) fail(CHECK, `${dead.length} desktop route(s) with no caller in the ops index or in slate: ${dead.join(', ')}`)
-    else pass(CHECK, `${routes.size} desktop routes, every one called by an op or by slate itself`)
+    const dead = [...routes.keys()].filter((path) => !called.has(path) && !legacy.has(path) && !slateSrc.includes(`'${path}'`) && !slateSrc.includes(`"${path}"`) && !slateSrc.includes('`' + path))
+    const missing = [...called].filter((path) => !routes.has(path))
+    if (dead.length) fail(CHECK, `${dead.length} desktop route(s) with no caller in the ops index or in slate, and no legacy marker: ${dead.join(', ')}`)
+    if (missing.length) fail(CHECK, `${missing.length} route(s) called by an op but not registered in slate — a 404 on every install: ${missing.join(', ')}`)
+    if (!dead.length && !missing.length) {
+      pass(CHECK, `${routes.size} desktop routes, every one called (${legacy.size} legacy alias${legacy.size === 1 ? '' : 'es'} kept for published clients), and every op-called route exists`)
+    }
+  }
+}
+
+// ── 10. the API host, mirrored exactly once ────────────────────────────────
+// `SLATES_API_URL` is the one literal for the production host. The desktop
+// cannot import it into `src/shared/constants.ts` — that file is bundled into
+// the renderer, and the package barrel reaches node built-ins — so it carries a
+// mirror that must stay byte-equal. A drifted host is a login that quietly goes
+// to the wrong API.
+{
+  const CHECK = '10 api-host-mirror'
+  const constantsFile = join(desktopRoot, 'src', 'shared', 'constants.ts')
+  if (!existsSync(constantsFile)) {
+    warn(`${CHECK}: slate not on disk beside slates-mcp; skipped`)
+  } else {
+    const { SLATES_API_URL } = await import(pathToFileURL(join(sharedRoot, 'dist', 'api-url.js')).href)
+    const m = /export const PROD_API_URL = '([^']+)'/.exec(readFileSync(constantsFile, 'utf8'))
+    if (!m) fail(CHECK, 'slate/src/shared/constants.ts no longer declares PROD_API_URL as a string literal')
+    else if (m[1] !== SLATES_API_URL) fail(CHECK, `slate PROD_API_URL '${m[1]}' ≠ shared SLATES_API_URL '${SLATES_API_URL}'`)
+    else pass(CHECK, `slate mirrors SLATES_API_URL (${SLATES_API_URL})`)
   }
 }
 

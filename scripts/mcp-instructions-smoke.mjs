@@ -20,7 +20,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const serverPath = join(here, '..', 'packages', 'mcp', 'dist', 'server.js')
@@ -186,7 +186,12 @@ if (generateImage) {
   )
 
   const prompts = (await client.listPrompts()).prompts
-  check('the 33 bundled skills are exposed as MCP prompts', prompts.length >= 30, `${prompts.length}`)
+  // Derived, not typed: the server exposes every embedded skill, so the
+  // expected count is whatever the built package holds (a hand-typed "33" sat
+  // here for a month after the corpus reached 34).
+  const { SKILLS } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  const skillCount = Object.keys(SKILLS).length
+  check('every bundled skill is exposed as an MCP prompt', prompts.length === skillCount, `${prompts.length} of ${skillCount}`)
   const got = await client.getPrompt({ name: 'slates-cost-discipline' })
   check(
     'and a prompt returns the whole skill',

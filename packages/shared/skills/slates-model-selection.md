@@ -105,10 +105,11 @@ Both tools are **Kling-only**. Every entry in them is a real Kling endpoint that
 
 | Job | Model | Why |
 |---|---|---|
-| **Default — a whole audio scene in one pass**: room tone, ambience beds, crowds, nature, layered dialogue + effects, spoken lines | **Seed Audio 1.0** (`seed-audio`) | One plain sentence in, a complete scene out. The continuity-bed workhorse and the only speech surface. |
+| **Default — a whole audio scene in one pass**: room tone, ambience beds, crowds, nature, layered dialogue + effects, spoken lines inside a scene | **Seed Audio 1.0** (`seed-audio`) | One plain sentence in, a complete scene out. The continuity-bed workhorse; dialogue is performed inside the room, not cast. |
+| **One named voice saying one line** — a character's own voice, a narrator, a clean VO to lip-sync against | **Inworld TTS-2** (`inworld-tts-2`) | The prompt IS the words, spoken verbatim and billed per character. Voice = the character's clip (cloned for the take), a description, or a preset. No room tone — mix it on the timeline. |
 | **One effect that lands on a known frame**, or a seamless loop | **Sound Effects v2** (`eleven-sfx`) | The only surface with an exact duration control and a real loop mode. |
 
-**There is no music model and no cast-voiceover model.** A song is imported (Slates reads audio files and puts them on the timeline), not generated. A line that has to be spoken is generated on Seed Audio and lip-synced against.
+**There is no music model.** A song is imported (Slates reads audio files and puts them on the timeline), not generated. A line that has to be spoken in a SPECIFIC voice is generated on Inworld TTS-2 and lip-synced against; a line that belongs to a scene is performed by Seed Audio inside it.
 
 ### Named audio escalation triggers
 

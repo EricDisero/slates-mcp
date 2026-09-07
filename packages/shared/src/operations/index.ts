@@ -318,6 +318,14 @@ export const TTS_MAX_CHARACTERS = (() => {
   return max
 })()
 export const TTS_BUCKET_COUNT = TTS_MAX_CHARACTERS / TTS_BUCKET_CHARS // 8
+/** The seat's cloning spec — reference-clip bounds, the design-prompt bounds
+ *  and the workspace-wide clone rate — read from the SSOT for the same reason
+ *  as the cap: every number in it was MEASURED and lives in exactly one row. */
+export const TTS_VOICE_CLONE = (() => {
+  const spec = getModelCapability(TTS_MODEL)?.voiceClone
+  if (!spec) throw new Error(`MODEL_CAPABILITIES['${TTS_MODEL}'] must declare voiceClone`)
+  return spec
+})()
 
 function creditCost(m: { cost_credits?: number; cost_cents?: number } | undefined): number {
   if (!m) return 0
@@ -3455,7 +3463,10 @@ export const generateAudio: Operation<{
   durationSeconds?: number
   voice?: string
   // inworld-tts-2 — EXACTLY ONE of these three says where the voice comes from:
-  // an existing voice, a clip to clone, or a description to build from.
+  // a vendor preset id, a clip to clone, or a description to build from. A
+  // CHARACTER's voice is a clip (`voiceAssetId` on the character row), so
+  // "speak as Sarah" is `voiceReferenceAssetId: sarah.voiceAssetId` — never
+  // `voiceId`, which the vendor would look up as one of its own voices.
   voiceId?: string
   voiceReferenceAssetId?: string
   voiceDescription?: string
@@ -3473,10 +3484,12 @@ export const generateAudio: Operation<{
   id: 'slates_generate_audio',
   billable: true,
   description:
-    'Generate AUDIO via Slates credits — the third media type, saved as a project asset you can drop on an audio track. Three surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, 3-120s), eleven-sfx (ONE effect with an exact 1-22s duration, or a seamless loop), and inworld-tts-2 (one named voice saying one line; the prompt IS the words, billed per character). Which surface for which job: read the slates-model-selection skill. ' +
-    '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. Choose it deliberately. ' +
-    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio and makes results worse. ' +
-    'projectId is REQUIRED (no headless path). ' +
+    // The duration windows are DERIVED — the same constants `durationSeconds`
+    // and the estimate op quote — so this sentence cannot drift from them.
+    `Generate AUDIO via Slates credits, saved as a project asset. Three surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS}s), eleven-sfx (ONE effect with an exact ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}s duration, or a seamless loop), and ${TTS_MODEL} (one named voice saying one line; the prompt IS the words, billed per character). Which surface for which job: read the slates-model-selection skill. ` +
+    '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. ' +
+    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio. ' +
+    'projectId is REQUIRED. ' +
     CONFIRM_GATE_SENTENCE +
     ' No skill files installed? Call slates_get_prompting_guide first.',
   input: z.object({
@@ -3499,28 +3512,30 @@ export const generateAudio: Operation<{
       .number()
       .optional()
       .describe(
-        'seed-audio 3-120 (default 15) — ⚠️ THIS IS THE BILL: it is appended to the prompt and charged regardless of the returned length. eleven-sfx 1-22 (default 4) — always sent explicitly so the per-second charge is deterministic.'
+        `seed-audio ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS} (default ${SEED_AUDIO_DEFAULT_SECONDS}) — ⚠️ THIS IS THE BILL: appended to the prompt and charged whatever comes back. eleven-sfx ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS} (default ${ELEVEN_SFX_DEFAULT_SECONDS}) — always sent explicitly so the per-second charge is deterministic. Not for ${TTS_MODEL}.`
       ),
     voice: z
       .string()
       .optional()
       .describe(
-        'seed-audio only — a preset voice id (e.g. "cedric_en_zh"). Leave unset to let the scene cast itself, which is usually right for background dialogue. Agent-facing only: there is no user-facing voice picker.'
+        'seed-audio only — a preset voice id (e.g. "cedric_en_zh"). Leave unset to let the scene cast itself. Agent-facing only.'
       ),
     voiceId: z
       .string()
       .optional()
-      .describe('inworld-tts-2 — the voice to speak in. One of these three is required there.'),
+      .describe(`${TTS_MODEL} — a vendor PRESET voice id (the desktop voice-bench shelf), not a character or asset id. Exactly one voice source is required.`),
     voiceReferenceAssetId: z
       .string()
       .optional()
-      .describe('inworld-tts-2 — clone the voice from this AUDIO asset (5-15s of one clean speaker).'),
+      .describe(`${TTS_MODEL} — clone this AUDIO asset's voice for the take (${TTS_VOICE_CLONE.minSeconds}-${TTS_VOICE_CLONE.maxSeconds}s, one clean speaker). To speak AS a character pass its voiceAssetId. Cloning: ${TTS_VOICE_CLONE.clonesPerMinute} new voices/min across all of Slates; a burst waits.`),
     voiceDescription: z
       .string()
+      .min(TTS_VOICE_CLONE.designPromptChars.min)
+      .max(TTS_VOICE_CLONE.designPromptChars.max)
       .optional()
-      .describe('inworld-tts-2 — build a voice from this description, for a character with no recording.'),
+      .describe(`${TTS_MODEL} — a voice from words (${TTS_VOICE_CLONE.designPromptChars.min}-${TTS_VOICE_CLONE.designPromptChars.max} chars) for a character with no recording; keep it via slates_update_character voiceAssetId.`),
     speed: z.number().min(0.5).max(2).optional().describe('seed-audio only — 0.5-2.0. Reach for it when dialogue races or drags against picture.'),
-    volume: z.number().min(0.5).max(2).optional().describe('seed-audio only — output gain, 0.5-2.0 (1 = unchanged). Prefer the timeline track fader for mix decisions; this is for when the model itself renders a scene too hot or too quiet.'),
+    volume: z.number().min(0.5).max(2).optional().describe('seed-audio only — output gain, 0.5-2.0 (1 = unchanged). Prefer the timeline fader for mix decisions.'),
     pitch: z.number().int().min(-12).max(12).optional().describe('seed-audio only — semitones. Small moves; ±3 is already a lot.'),
     multilingual: z.boolean().optional().describe('seed-audio only — better non-English / mixed-language handling.'),
     loop: z.boolean().optional().describe('eleven-sfx only — produce a seamless loop (rain, engine hum, crowd murmur).'),
@@ -3530,7 +3545,7 @@ export const generateAudio: Operation<{
       .max(3)
       .optional()
       .describe(
-        'seed-audio only — up to 3 AUDIO assets (UUIDs or badge codes like "AUD-S1"), each ≤30s, referenced in the prompt as @Audio1-@Audio3 ("match the room tone of @Audio1"). MUTUALLY EXCLUSIVE with imageReferenceAssetId — the API rejects both.'
+        'seed-audio only — up to 3 AUDIO assets (UUIDs or badge codes like "AUD-S1"), each ≤30s, referenced in the prompt as @Audio1-@Audio3 ("match the room tone of @Audio1"). MUTUALLY EXCLUSIVE with imageReferenceAssetId.'
       ),
     imageReferenceAssetId: z
       .string()
@@ -3579,7 +3594,7 @@ export const generateAudio: Operation<{
         return ok({
           requires_clarification: true,
           missing: ['voiceId'],
-          message: `${TTS_MODEL} needs a voice. Ask the user WHICH CHARACTER is speaking and pass that character's voice as voiceId — a voice is a field on a character, not a thing to pick at generation time. To make a NEW voice, pass voiceReferenceAssetId (a clip to clone) or voiceDescription (words, for a character with no recording).`,
+          message: `${TTS_MODEL} needs a voice. Ask the user WHICH CHARACTER is speaking, read that character's voiceAssetId (slates_list_characters) and pass it as voiceReferenceAssetId — a voice is a clip on a character, not a thing to pick at generation time. A character with no voice yet: pass voiceDescription (words) or voiceReferenceAssetId (any clean clip of one speaker), then attach the result with slates_update_character so the next line reuses it. voiceId is only for a vendor preset id from the desktop's voice bench.`,
         })
       }
       if (voiceSources.length > 1) {
@@ -4762,21 +4777,38 @@ export const updateCharacter: Operation<{
   name?: string
   description?: string
   style?: string
+  voiceAssetId?: string | null
 }> = {
   id: 'slates_update_character',
   description:
-    'Update a character\'s name, description, or style. Use slates_set_character_identity_asset for its canonical image.',
+    'Update a character\'s name, description, style, or voice. Use slates_set_character_identity_asset for its canonical image.',
   input: z.object({
     characterId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
     style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
+    // Agent parity for the voice bench's "Use": the desktop route has taken
+    // this since 2026-08-28; the op never exposed it, so an agent could render
+    // a voice and had no way to keep it on the character.
+    voiceAssetId: z
+      .string()
+      .uuid()
+      .nullable()
+      .optional()
+      .describe("The AUDIO asset that is this character's voice (what inworld-tts-2 clones for its lines); null detaches, the clip stays."),
   }),
   async run(input, ctx) {
     return ok(
       await ctx.desktop().post('/agent/characters/update', {
         id: input.characterId,
-        data: { name: input.name, description: input.description, style: input.style },
+        data: {
+          name: input.name,
+          description: input.description,
+          style: input.style,
+          // Sent only when given: the route treats presence as intent, and an
+          // explicit null is the detach.
+          ...(input.voiceAssetId !== undefined ? { voiceAssetId: input.voiceAssetId } : {}),
+        },
       })
     )
   },

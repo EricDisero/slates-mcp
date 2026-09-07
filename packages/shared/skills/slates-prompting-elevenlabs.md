@@ -28,7 +28,7 @@ description: How to prompt ElevenLabs Sound Effects v2 in Slates. Read before ca
 - `A heavy oak door slams shut in a stone hallway, brief reverberant tail.` (1.5s)
 - `Steady rain on a tin awning, no thunder, no wind gusts, seamless loop.` (18s)
 
-**Hard constraint:** it is billed per second and the duration is never left for the model to pick — that would make the charge non-deterministic. It is NOT a speech surface: dialogue, narration and scratch VO are Seed Audio, which casts and performs the line inside the scene.
+**Hard constraint:** it is billed per second and the duration is never left for the model to pick — that would make the charge non-deterministic. It is NOT a speech surface: a line in a specific voice is `inworld-tts-2`, and dialogue inside a scene is Seed Audio, which casts and performs the line in the room.
 <!-- @card:end -->
 
 <!-- @banned:start -->
