@@ -15,6 +15,7 @@ import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type Model
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
+import { appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
 import {
@@ -371,7 +372,7 @@ const VIDEO_REVIEW_POINTER =
   'describing how it looks. A quality claim you cannot point to a tool result for is a REAL NUMBERS ONLY violation.'
 const BACKGROUND_REVIEW_POINTER =
   'When it completes, look at it before you describe it — slates_get_asset_image for images, ' +
-  'slates_get_asset_video_frames for video.'
+  'slates_get_asset_video_frames for video. For audio, audition the saved file; metadata alone does not establish voice similarity or delivery quality.'
 // The image saved, but reading it back off disk failed (best-effort fetch). The
 // agent has an asset and NO pixels, which is the one state where a quality
 // claim would be pure invention — so this branch has to say so rather than
@@ -6157,7 +6158,7 @@ export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean
             // something to try again spends credits before anyone notices.
             `\n${failedLines.join('\n')}\nThese were NOT retried. Read each error, fix the Shot, and re-fire only what you meant to.`
           : '') +
-        ` ${VIDEO_REVIEW_POINTER}`
+        ` ${BACKGROUND_REVIEW_POINTER}`
     )
   },
 }
@@ -6321,9 +6322,10 @@ function describeGuideTopics(): string {
   )
 }
 
-export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'full' }> = {
+export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'full'; query?: string }> = {
   id: 'slates_get_prompting_guide',
   description:
+    'For app help and exact UI instructions use topic "app-manual" with a query such as "voice recording". This returns the canonical product manual, shared by every agent surface. ' +
     // 🚨 NO "ALWAYS READ THIS FIRST" SENTENCE. It stood here for months and was
     // MEASURED at 13% compliance before and after the enforcement work — pointer
     // prose is the shape that does not move the agent. What replaced it is
@@ -6332,6 +6334,7 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
     // not this op is ever called.
     "Return a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id ('veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2', 'nano-banana-2'), which maps to the right guide. Reach for it when a card is not enough: the failure modes, the worked examples and the sources are only in the full text.",
   input: z.object({
+    query: z.string().max(200).optional().describe('For app-manual: keywords to retrieve relevant UI sections. Omit for the entire manual.'),
     topic: z
       .string()
       .min(1)
@@ -6341,6 +6344,10 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
     ),
   }),
   async run(input) {
+    if (input.topic.trim().toLowerCase() === 'app-manual') {
+      const content = appManualSections(input.query)
+      return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8') } }
+    }
     const resolved = resolveGuideTopic(input.topic)
     const content = resolved ? SKILLS[resolved] : undefined
     if (!resolved || content === undefined) {

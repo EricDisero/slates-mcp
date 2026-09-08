@@ -21,6 +21,7 @@ import {
   MODEL_FACTS,
   SlatesCloudClient,
   buildAgentDoctrine,
+  APP_MANUAL,
   defaultContext,
   toolDefinitions,
   type Operation,
@@ -407,8 +408,8 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => ({
   resources: [
     {
       uri: MANUAL_URI,
-      name: 'Slates agent manual',
-      description: 'The working method, the hard rules and the guide index — the same doctrine this server sends as instructions.',
+      name: 'Slates app manual',
+      description: 'The canonical product manual: exact controls, navigation and app behavior, bundled for offline use.',
       mimeType: 'text/markdown',
     },
     {
@@ -474,7 +475,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   const uri = request.params.uri
   const text = async (): Promise<string> => {
     if (uri === MANUAL_URI) {
-      return `${instructions}\n\n---\n\nFull product manual: https://slates.video/slates-reference.md`
+      return APP_MANUAL
     }
     if (uri === CAPABILITIES_URI) return renderCapabilities()
     if (uri === PRICES_URI) {

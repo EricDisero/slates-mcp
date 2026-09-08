@@ -208,8 +208,8 @@ if (generateImage) {
   )
   const manual = await client.readResource({ uri: 'slates://manual' })
   check(
-    'and reading one returns the doctrine',
-    (manual.contents?.[0]?.text ?? '').includes('## Hard rules')
+    'and reading one returns the actual product manual',
+    (manual.contents?.[0]?.text ?? '').includes('### Generate Audio')
   )
   const templates = (await client.listResourceTemplates()).resourceTemplates
   check(

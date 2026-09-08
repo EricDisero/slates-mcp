@@ -250,7 +250,7 @@ export interface ShotSpec {
 export const SCRIPT_FIELD_DESCRIPTION = {
   speaker: 'Speaker: character id, bare name (including a new character), or "VO". Null when silent.',
   line: 'Words spoken verbatim; no camera or scene instructions.',
-  delivery: 'How it is said, e.g. "(flat, exhausted)".',
+  delivery: 'Optional performance note. Leave null unless a specific direction is needed; do not fill every line with stock adjectives. Not sent to TTS: put supported inline cues in the spoken text using the selected model\'s prompting guide.',
   action: 'Screenplay action covering everyone in frame.',
   prop: 'The readable object carrying the beat.',
   shotSize: 'Free-text framing, e.g. "wide" or "long-lens CU, other head blurred"; bucketed only for variety counts.',

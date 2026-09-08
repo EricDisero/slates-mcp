@@ -80,3 +80,4 @@ export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, describeCraftCard } from '.
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'
 export { SLATES_API_URL } from './api-url.js'
+export { APP_MANUAL, appManualSections } from './manual/index.js'
