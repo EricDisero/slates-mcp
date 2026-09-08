@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-inworld-tts
-description: How to use Inworld Realtime TTS-2, the VOICE seat. Read before calling slates_generate_audio with model inworld-tts-2. Speech in a SPECIFIC voice, billed per character - the prompt is the words spoken, verbatim, max 2000. Covers the identity-versus-acoustics rule (what a reference clip does and does not carry), how to write a line so it is performed rather than read, when to reach for seed-audio instead, and the voice-consent rule.
+description: How to use Inworld Realtime TTS-2, the VOICE seat. Read before calling slates_generate_audio with model inworld-tts-2. Speech in a SPECIFIC voice, billed per character - the prompt is the words spoken, verbatim. Covers the identity-versus-acoustics rule (what a reference clip does and does not carry), how to write a line so it is performed rather than read, when to reach for seed-audio instead, and the voice-consent rule.
 ---
 
 # Inworld Realtime TTS-2 — the voice seat
@@ -13,11 +13,11 @@ description: How to use Inworld Realtime TTS-2, the VOICE seat. Read before call
      skip. Keep it under 2,400 characters (the build fails above that) and keep
      the rationale and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Inworld TTS-2.** Speech in a SPECIFIC voice. The prompt is the words spoken, verbatim — not a description of them. Max 2000 characters, and the length of the text is the bill.
+**Card — Inworld TTS-2.** Speech in a SPECIFIC voice. The prompt is the words spoken, verbatim — not a description of them. Text length determines the bill.
 
 **IDENTITY, NOT ACOUSTICS — the rule that decides whether cloning works**
 A reference carries WHO is speaking: timbre, pitch, accent, age, vowel shape. It does NOT carry WHERE they are — room tone, distance, phone EQ, reverb and mic character are *acoustics*, and this model reproduces the identity while discarding the room. So:
-1. **A noisy reference does not give a noisy read — it gives a WORSE identity.** Music, a second speaker or heavy reverb corrupt what is being extracted. Feed it the cleanest 5–15 seconds of one person you have.
+1. **A noisy reference does not give a noisy read — it gives a WORSE identity.** Music, a second speaker or heavy reverb corrupt what is being extracted. Use a clean single-speaker recording.
 2. **You cannot get "on a payphone" by cloning a payphone recording.** Acoustics come from the MIX, or from `seed-audio` which renders a room.
 
 **DIRECTION GOES IN SQUARE BRACKETS. PARENTHESES ARE SPOKEN ALOUD.** `[whispering] I hope nobody notices` is whispered; `(quietly) I hope nobody notices` says the word "quietly" out loud. Verified by ear — the easiest way to ruin a take.
@@ -31,7 +31,7 @@ A reference carries WHO is speaking: timbre, pitch, accent, age, vowel shape. It
 
 **Route elsewhere when:** the scene needs dialogue mixed with effects and room tone in one pass (`seed-audio`), or it is a single non-speech sound (`eleven-sfx`). This surface makes ONE voice saying ONE thing, cleanly.
 
-**Hard constraints:** no duration parameter — length falls out of the text. Max 2000 characters per take. Exactly one voice source: the character's voice clip as `voiceReferenceAssetId` (speak AS the character), `voiceDescription`, or a preset `voiceId`.
+**Hard constraints:** no duration parameter — length falls out of the text. Exactly one voice source: a preset `voiceId` from `slates_list_voices`, a clip as `voiceReferenceAssetId` (a character's voice clip to speak AS the character, or any clean clip of one speaker), or `voiceDescription`.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -132,11 +132,11 @@ So the ideal reference is boring: one person, close to a microphone, no music, n
 
 ## Getting the voice onto the call
 
-A voice is a field on a CHARACTER — an audio clip, the `voiceAssetId` on the row `slates_list_characters` returns. Exactly one source per call:
+Exactly one source per call, and none of them requires a character to exist first:
 
-- **Speak AS a character:** `voiceReferenceAssetId: <its voiceAssetId>`. The seat clones the clip for that take and discards the vendor voice afterwards, so there is nothing to reconcile — but cloning shares a ceiling of two new voices a minute across every Slates user, so a run of lines in one cloned voice pauses between takes rather than failing. Send each line once; do not re-send one that already came back.
-- **A character with no recording:** `voiceDescription` (7–1000 characters of words). Attach the returned clip with `slates_update_character` (`voiceAssetId`) so every later line reuses it instead of designing a new voice each time.
-- **A preset:** `voiceId` is a vendor voice id from the desktop's voice bench shelf. It is not a character id and not an asset id, and an agent rarely holds one.
+- **A preset:** `slates_list_voices` lists stock voices with gender, age, accent and tags — filter by any of them, or search the descriptions ("gravelly", "narration"). Pass the chosen `voiceId`. Presets clone nothing, so they are the fastest path and avoid the clone-creation rate ceiling.
+- **Speak AS a character:** `voiceReferenceAssetId: <its voiceAssetId>` (the clip on the row `slates_list_characters` returns). The seat clones the clip for that take and discards the vendor voice afterwards, so there is nothing to reconcile — but cloning shares a ceiling of two new voices a minute across every Slates user, so a run of lines in one cloned voice pauses between takes rather than failing. Send each line once; do not re-send one that already came back. Any other clean clip of one speaker works the same way.
+- **A voice with no recording:** `voiceDescription` (7–1000 characters of words). If it will be used again, keep the returned clip on a character with `slates_update_character` (`voiceAssetId`) so later lines clone the same clip instead of designing a new voice each time — a convenience, never a requirement.
 
 ## Consent
 
@@ -171,4 +171,4 @@ The vote was three hundred and twelve to eighty-nine. It carried at four minutes
 ```
 
 Every word of that is spoken aloud — **including the parenthetical**, which is the
-trap: it looks like a stage direction and is treated as dialogue. Describe the voice when you are BUILDING one (the character's voice bench takes a description); once the voice exists, send only the words.
+trap: it looks like a stage direction and is treated as dialogue. Describe the voice when you are CHOOSING one (`voiceDescription`, or the desktop's voice picker); the prompt is only ever the words.

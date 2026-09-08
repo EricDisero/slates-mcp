@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli && node scripts/agent-surface-lockstep-check.mjs && node scripts/mcp-instructions-smoke.mjs && node scripts/render-readmes.mjs --check && node scripts/env-example-check.mjs",
+    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli && node scripts/agent-surface-lockstep-check.mjs && node scripts/mcp-instructions-smoke.mjs && node scripts/shot-voice-check.mjs && node scripts/render-readmes.mjs --check && node scripts/env-example-check.mjs",
     "check:agent-surface": "node scripts/agent-surface-lockstep-check.mjs",
     "check:mcp-instructions": "node scripts/mcp-instructions-smoke.mjs",
     "sync-partials": "npm run sync-partials -w packages/shared",

@@ -119,6 +119,15 @@ export interface ShotParams {
   audioLoop?: boolean
   audioPromptInfluence?: number
   audioMultilingual?: boolean
+  /**
+   * The VOICE a text-to-speech Shot speaks in — exactly one of the three, the
+   * same three `slates_generate_audio` takes. A Shot that carried the words but
+   * not the voice would fire in whatever voice happened to be on the bar, which
+   * is not the recipe that was saved.
+   */
+  voiceId?: string
+  voiceReferenceAssetId?: string
+  voiceDescription?: string
 }
 
 /** Prompt-owned identity — the entities the prompt text NAMES. */
@@ -239,18 +248,14 @@ export interface ShotSpec {
  * same failure as a column nothing renders.
  */
 export const SCRIPT_FIELD_DESCRIPTION = {
-  speaker:
-    'Who says the line — a character id, a bare name (a character that does not exist yet is fine), or "VO". Null for a shot with no words.',
-  line: 'What is SAID, verbatim. Never camera, scene or prompt language — this is the half a person reads aloud.',
-  delivery: 'The parenthetical: how it is said. "(flat, exhausted)"',
-  action: 'What happens in the shot, screenplay-style. One line covering everyone in frame.',
-  prop: 'The one readable object carrying the beat.',
-  shotSize:
-    'Framing, in your own words — "wide", "long-lens CU, other head blurred". FREE TEXT: it is bucketed for the variety count and never rejected or rewritten.',
-  camera:
-    'Camera move, in your own words — "slow push in", "through the rearview, eyes only". FREE TEXT, same rule as shotSize.',
-  continues:
-    'True when this row\'s line runs on from the previous row\'s — one sentence split across two cuts. The signature VO move; set it deliberately.',
+  speaker: 'Speaker: character id, bare name (including a new character), or "VO". Null when silent.',
+  line: 'Words spoken verbatim; no camera or scene instructions.',
+  delivery: 'How it is said, e.g. "(flat, exhausted)".',
+  action: 'Screenplay action covering everyone in frame.',
+  prop: 'The readable object carrying the beat.',
+  shotSize: 'Free-text framing, e.g. "wide" or "long-lens CU, other head blurred"; bucketed only for variety counts.',
+  camera: 'Free-text camera move, e.g. "slow push in"; never rejected or rewritten.',
+  continues: 'True when this line continues the previous row: one sentence across two cuts.',
 } as const satisfies Record<ScriptField, string>
 
 /** The script fields, as a list. Sorted from the description map so the two
@@ -370,11 +375,23 @@ const str = (v: unknown): string | null => (typeof v === 'string' && v.length > 
 const strArray = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.length > 0) : []
 
+/** The mutually exclusive TTS source fields, shared by readers and patch merging. */
+export const VOICE_SOURCE_FIELDS = ['voiceId', 'voiceReferenceAssetId', 'voiceDescription'] as const
+
+/** Setting a voice replaces the previous source; unrelated parameter edits preserve it. */
+export function mergeShotParams(existing: ShotParams, patch: Record<string, unknown>): ShotParams {
+  const next = { ...existing }
+  if (VOICE_SOURCE_FIELDS.some((k) => typeof patch[k] === 'string' && patch[k].trim())) {
+    for (const k of VOICE_SOURCE_FIELDS) delete next[k]
+  }
+  return readParams({ ...next, ...patch })
+}
+
 function readParams(v: unknown): ShotParams {
   if (!v || typeof v !== 'object') return {}
   const raw = v as Record<string, unknown>
   const out: ShotParams = {}
-  const s = (k: 'aspectRatio' | 'imageResolution' | 'videoResolution' | 'quality' | 'audioLanguage' | 'audioAccent' | 'negativePrompt'): void => {
+  const s = (k: 'aspectRatio' | 'imageResolution' | 'videoResolution' | 'quality' | 'audioLanguage' | 'audioAccent' | 'negativePrompt' | 'voiceId' | 'voiceReferenceAssetId' | 'voiceDescription'): void => {
     if (typeof raw[k] === 'string') out[k] = raw[k] as string
   }
   const n = (k: 'duration' | 'imageQuantity' | 'audioDurationSeconds' | 'audioPromptInfluence'): void => {
@@ -385,6 +402,7 @@ function readParams(v: unknown): ShotParams {
   }
   s('aspectRatio'); s('imageResolution'); s('videoResolution'); s('quality')
   s('audioLanguage'); s('audioAccent'); s('negativePrompt')
+  s('voiceId'); s('voiceReferenceAssetId'); s('voiceDescription')
   n('duration'); n('imageQuantity'); n('audioDurationSeconds'); n('audioPromptInfluence')
   b('sound'); b('generateMusic'); b('seedanceFace'); b('multiShot'); b('audioLoop'); b('audioMultilingual')
   if (raw.gptQuality === 'medium' || raw.gptQuality === 'high') out.gptQuality = raw.gptQuality
@@ -472,6 +490,7 @@ export function shotAssetIds(spec: ShotSpec): string[] {
   for (const role of ORDERED_ATTACHMENT_ROLES) ids.push(...spec.refs[role])
   if (spec.firstFrameAssetId) ids.push(spec.firstFrameAssetId)
   if (spec.lastFrameAssetId) ids.push(spec.lastFrameAssetId)
+  if (spec.params.voiceReferenceAssetId) ids.push(spec.params.voiceReferenceAssetId)
   return [...new Set(ids.filter(Boolean))]
 }
 

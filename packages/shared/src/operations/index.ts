@@ -70,6 +70,7 @@ import {
   SCRIPT_TEXT_FIELDS,
   type OrderedAttachmentRole,
   type ScriptTextField,
+  type ShotParams,
 } from '../prompts/shot-spec.js'
 import {
   SHOT_SIZE_BUCKETS,
@@ -3454,6 +3455,74 @@ export const generateVideo: Operation<{
   },
 }
 
+// ── The preset voice shelf ──────────────────────────────────────
+
+/**
+ * AGENT PARITY for the voice picker. The desktop browses stock voices by
+ * gender, accent and age and plays each one; until this op the agent could
+ * only pass a `voiceId` it had no way to discover. Disk reads on the desktop,
+ * never a vendor call — browsing is free on every surface.
+ */
+export const listVoices: Operation<{ gender?: string; accent?: string; age?: string; query?: string }> = {
+  id: 'slates_list_voices',
+  description: `Browse ${TTS_MODEL} preset voices. Pass a returned voiceId to slates_generate_audio. Filters AND together.`,
+  input: z.object({
+    gender: z.string().optional().describe('male | female'),
+    accent: z.string().optional().describe('Region ("GB") or languageCode ("en-GB"); available accents come from the shelf.'),
+    age: z.string().optional().describe('young | middle_aged | elderly'),
+    query: z.string().optional().describe('Free text over name, description, tags.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('voices', 'the preset voice shelf')
+    const shelf = await desktop.get<{
+      available: boolean
+      line: string
+      voices: Array<{
+        voiceId: string
+        displayName: string
+        description: string
+        tags: string[]
+        gender: string
+        ageGroup: string
+        languageCode: string
+      }>
+    }>('/agent/voices')
+    if (!shelf.available) {
+      return ok({ available: false, voices: [], message: 'This desktop build shipped without the preset shelf.' })
+    }
+    const terms = (input.query ?? '').toLowerCase().split(/\s+/).filter(Boolean)
+    const region = input.accent?.includes('-') ? input.accent.split('-')[1] : input.accent
+    const voices = shelf.voices
+      .filter((v) => !input.gender || v.gender === input.gender)
+      .filter((v) => !region || v.languageCode.split('-')[1]?.toUpperCase() === region.toUpperCase())
+      .filter((v) => !input.age || v.ageGroup === input.age)
+      .filter((v) => {
+        if (terms.length === 0) return true
+        const hay = [v.displayName, v.description, v.gender, v.ageGroup, v.languageCode, ...(v.tags ?? [])]
+          .join(' ')
+          .toLowerCase()
+        return terms.every((t) => hay.includes(t))
+      })
+      .map(({ voiceId, displayName, description, tags, gender, ageGroup, languageCode }) => ({
+        voiceId,
+        displayName,
+        description,
+        tags,
+        gender,
+        ageGroup,
+        languageCode,
+      }))
+    return ok({
+      available: true,
+      line: shelf.line,
+      count: voices.length,
+      voices,
+      next: `Pass a voiceId to slates_generate_audio (model ${TTS_MODEL}) as voiceId. To keep one on a character for reuse, generate a clip with it and set slates_update_character voiceAssetId.`,
+    })
+  },
+}
+
 // ── Generate audio ──────────────────────────────────────────────
 
 export const generateAudio: Operation<{
@@ -3484,12 +3553,9 @@ export const generateAudio: Operation<{
   id: 'slates_generate_audio',
   billable: true,
   description:
-    // The duration windows are DERIVED — the same constants `durationSeconds`
-    // and the estimate op quote — so this sentence cannot drift from them.
-    `Generate AUDIO via Slates credits, saved as a project asset. Three surfaces: seed-audio (default; a whole audio SCENE — dialogue + SFX + ambience — from one plain sentence, ${SEED_AUDIO_MIN_SECONDS}-${SEED_AUDIO_MAX_SECONDS}s), eleven-sfx (ONE effect with an exact ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}s duration, or a seamless loop), and ${TTS_MODEL} (one named voice saying one line; the prompt IS the words, billed per character). Which surface for which job: read the slates-model-selection skill. ` +
-    '🚨 seed-audio has NO duration parameter — the length you pass is written INTO THE PROMPT and is what the user is BILLED, whatever comes back. ' +
-    'REQUIRED before calling: read slates-cost-discipline and the matching prompting skill (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts). Kling\'s "SFX:" / "Ambient noise:" prompt syntax does NOT transfer to seed-audio. ' +
-    'projectId is REQUIRED. ' +
+    `Generate project audio using credits. Choose the surface via the model routing below. ` +
+    'Read slates-cost-discipline and the matching prompting skill first (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts). ' +
+    'Seed Audio bills the requested duration, which is appended to the prompt regardless of output length. Kling "SFX:" / "Ambient noise:" syntax does not transfer. ' +
     CONFIRM_GATE_SENTENCE +
     ' No skill files installed? Call slates_get_prompting_guide first.',
   input: z.object({
@@ -3523,7 +3589,7 @@ export const generateAudio: Operation<{
     voiceId: z
       .string()
       .optional()
-      .describe(`${TTS_MODEL} — a vendor PRESET voice id (the desktop voice-bench shelf), not a character or asset id. Exactly one voice source is required.`),
+      .describe(`${TTS_MODEL} — a preset voiceId from slates_list_voices, not a character or asset id. Exactly one voice source is required.`),
     voiceReferenceAssetId: z
       .string()
       .optional()
@@ -3594,7 +3660,7 @@ export const generateAudio: Operation<{
         return ok({
           requires_clarification: true,
           missing: ['voiceId'],
-          message: `${TTS_MODEL} needs a voice. Ask the user WHICH CHARACTER is speaking, read that character's voiceAssetId (slates_list_characters) and pass it as voiceReferenceAssetId — a voice is a clip on a character, not a thing to pick at generation time. A character with no voice yet: pass voiceDescription (words) or voiceReferenceAssetId (any clean clip of one speaker), then attach the result with slates_update_character so the next line reuses it. voiceId is only for a vendor preset id from the desktop's voice bench.`,
+          message: `${TTS_MODEL} needs a voice — exactly one of three. Speaking AS a character: pass its voiceAssetId (slates_list_characters) as voiceReferenceAssetId. A stock voice: slates_list_voices lists presets by gender, accent and age; pass one's voiceId. No recording of the voice: voiceDescription (words), or voiceReferenceAssetId with any clean clip of one speaker. A voice worth reusing can be kept on a character with slates_update_character, but nothing requires that — ask the user which they want only when the request does not say.`,
         })
       }
       if (voiceSources.length > 1) {
@@ -4787,9 +4853,9 @@ export const updateCharacter: Operation<{
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
     style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
-    // Agent parity for the voice bench's "Use": the desktop route has taken
-    // this since 2026-08-28; the op never exposed it, so an agent could render
-    // a voice and had no way to keep it on the character.
+    // Agent parity for the character card's voice slot: the desktop route has
+    // taken this since 2026-08-28; the op never exposed it, so an agent could
+    // render a voice and had no way to keep it on the character.
     voiceAssetId: z
       .string()
       .uuid()
@@ -5176,11 +5242,11 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
   return {
     aspectRatio: d(
       zEnum(SHOT_ASPECT_RATIOS).optional(),
-      'Validated against the chosen model when the Shot is saved — see slates_generate_video for the per-model sets.'
+      'Validated against the model; see slates_generate_video.'
     ),
     duration: d(
       z.number().int().min(1).max(360).optional(),
-      'Seconds — video or audio. Required before a video Shot can be priced or fired; validated against the model when saved.'
+      'Seconds for video or duration-based audio; TTS uses text length.'
     ),
     videoResolution: d(
       zEnum(VIDEO_RESOLUTIONS).optional(),
@@ -5202,6 +5268,11 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
       z.number().int().min(1).max(120).optional(),
       'Audio lane. On seed-audio the requested duration IS the bill.'
     ),
+    // The TTS voice — the same three fields slates_generate_audio takes, so a
+    // Shot is the audio call, serialized. Exactly one of them, enforced at fire.
+    voiceId: d(z.string().optional(), `${TTS_MODEL}: preset voiceId (slates_list_voices).`),
+    voiceReferenceAssetId: d(z.string().optional(), `${TTS_MODEL}: audio asset to clone.`),
+    voiceDescription: d(z.string().optional(), `${TTS_MODEL}: the voice in words.`),
   }
 }
 
@@ -5221,10 +5292,7 @@ const shotParamsSchemaTerse = z
  * ship a field with no explanation — the same failure as a column nothing
  * renders.
  *
- * 🚨 AND NONE OF THEM IS SENT TO A MODEL. They are a planning and counting
- * surface; the prompt is the only thing the request carries. The one exception
- * is pre-existing: a multiShotSegment still prepends its own camera and
- * shotSize to its own segment prompt.
+ * Script fields supply prompt prose when no authored prompt exists (shot-spec.ts).
  */
 function shotScriptShape(described: boolean): z.ZodRawShape {
   const text = Object.fromEntries(
@@ -5290,18 +5358,11 @@ interface ShotOpRefs {
   styleIds?: string[]
 }
 
-interface ShotOpParams {
-  aspectRatio?: AspectRatio
-  duration?: number
-  videoResolution?: VideoResolution
-  imageResolution?: '1k' | '2k' | '3k' | '4k'
-  gptQuality?: 'medium' | 'high'
-  imageQuantity?: number
-  negativePrompt?: string
-  sound?: boolean
-  seedanceFace?: boolean
-  audioDurationSeconds?: number
-}
+type ShotOpParams = Pick<ShotParams,
+  'aspectRatio' | 'duration' | 'videoResolution' | 'imageResolution' | 'gptQuality' |
+  'imageQuantity' | 'negativePrompt' | 'sound' | 'seedanceFace' | 'audioDurationSeconds' |
+  'voiceId' | 'voiceReferenceAssetId' | 'voiceDescription'
+> & { aspectRatio?: AspectRatio; videoResolution?: VideoResolution; imageResolution?: '1k' | '2k' | '3k' | '4k' }
 
 /**
  * The `params` half of a spec patch — ONLY the keys the caller actually named.
@@ -5353,13 +5414,14 @@ function checkSpokenTextAlignment(input: ShotOpRefs): OperationResult | null {
 
 /** Every asset reference a Shot input carries, flat, for one `resolveAssetRefs`
  *  pass. Derived from the role list so a new role resolves badge codes too. */
-function shotRefInputs(input: ShotOpRefs): Array<{ ref: string; role: string }> {
+function shotRefInputs(input: ShotOpRefs & { params?: ShotOpParams }): Array<{ ref: string; role: string }> {
   const out: Array<{ ref: string; role: string }> = []
   for (const role of ORDERED_ATTACHMENT_ROLES) {
     for (const r of input.refs?.[role] ?? []) out.push({ ref: r, role })
   }
   if (input.firstFrameAssetId) out.push({ ref: input.firstFrameAssetId, role: 'first frame' })
   if (input.lastFrameAssetId) out.push({ ref: input.lastFrameAssetId, role: 'last frame' })
+  if (input.params?.voiceReferenceAssetId) out.push({ ref: input.params.voiceReferenceAssetId, role: 'voice reference' })
   return out
 }
 
@@ -5400,7 +5462,10 @@ async function buildShotSpecInput(
       // later diverges from it and the desktop card says so — the prompt is
       // never rewritten (that is prompt enhancement, deleted 2026-08-01).
       authoredFor: input.model ?? null,
-      params: shotParamsPatch(input.params),
+      params: {
+        ...shotParamsPatch(input.params),
+        ...(input.params?.voiceReferenceAssetId ? { voiceReferenceAssetId: rid(input.params.voiceReferenceAssetId) } : {}),
+      },
       mentions: {
         characterIds: input.characterIds ?? [],
         environmentIds: input.environmentIds ?? [],
@@ -5498,6 +5563,7 @@ interface VarietyReport {
 
 /** What `/agent/shots/get` returns: the summary PLUS the composition. */
 interface ShotDetail extends ShotSummary {
+  projectId: string
   composedPrompt: string
   references: Array<{ kind: string; number: number; durationSeconds: number | null }>
   missing: unknown
@@ -5532,11 +5598,11 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
   // has none, so it falls back to the raw ones and is announced as a floor.
   const fires = (detail as Partial<ShotDetail>).firesWith
   if ((AUDIO_MODELS as readonly string[]).includes(model)) {
-    // The TTS seat prices on the TEXT, and a Shot carries no text field — so a
-    // Shot cannot be a TTS generation and cannot be quoted as one. Explicit,
-    // because the `!seconds` line below would also return null here and that
-    // would read as "duration missing" for a surface that has no duration.
-    if (model === TTS_MODEL) return null
+    if (model === TTS_MODEL) {
+      const text = (detail as Partial<ShotDetail>).composedPrompt ?? (detail.rawPrompt.trim() || detail.line?.trim() || '')
+      if (!text || text.length > TTS_MAX_CHARACTERS) return null
+      return audioCostKey({ model, characters: text.length })
+    }
     const seconds = fires?.audioDurationSeconds ?? p.audioDurationSeconds
     if (!seconds) return null
     return audioCostKey({ model: model as AudioModel, durationSeconds: seconds })
@@ -5773,7 +5839,16 @@ export const duplicateShot: Operation<{
     const spec: Record<string, unknown> = {}
     if (input.prompt !== undefined) spec.prompt = input.prompt
     if (input.model !== undefined) spec.model = input.model
-    if (input.params !== undefined) spec.params = shotParamsPatch(input.params)
+    if (input.params !== undefined) {
+      const voiceRef = input.params.voiceReferenceAssetId
+      if (voiceRef && !UUID_RE.test(voiceRef)) {
+        const { shot } = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
+        const built = await buildShotSpecInput(ctx, shot.projectId, { params: input.params })
+        spec.params = built.spec.params
+      } else {
+        spec.params = shotParamsPatch(input.params)
+      }
+    }
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/duplicate', {
       id: input.shotId,
       name: input.name,
@@ -6539,6 +6614,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   generateImage as unknown as Operation<unknown>,
   generateVideo as unknown as Operation<unknown>,
   generateAudio as unknown as Operation<unknown>,
+  listVoices as unknown as Operation<unknown>,
   generateLipSync as unknown as Operation<unknown>,
   generateMotionTransfer as unknown as Operation<unknown>,
   editVideo as unknown as Operation<unknown>,

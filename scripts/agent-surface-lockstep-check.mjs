@@ -590,9 +590,12 @@ console.log('agent-surface-lockstep-check')
 // routing doctrine or deferring generation ops behind a fifth group — both of
 // which are product decisions, not tidying. Raise these deliberately, with a
 // reason, and never to make a red build green.
+//
+// The ceiling includes the core preset-listing op and Shot voice fields.
+// Keep headroom by trimming repeated guidance; do not raise it for routine edits.
 {
   const CHECK = '7 surface-budget'
-  const CORE_CEILING = 68_000
+  const CORE_CEILING = 69_000
   const PER_OP_CEILING = 14_000
   const core = toolDefinitions(ALL_OPERATIONS, { surface: 'desktop' })
   const bytes = (d) => Buffer.byteLength(d.name + d.description + JSON.stringify(d.inputSchema), 'utf8')
