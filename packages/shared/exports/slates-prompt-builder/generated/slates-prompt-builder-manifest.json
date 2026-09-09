@@ -8,11 +8,11 @@
     },
     {
       "path": "skills/slates-character-identity.md",
-      "sha256": "52191db058ada8096297e97958268548b352a5f81739d1bfd01da340867f2d35"
+      "sha256": "87ede794637553db0074dd64ea9a9cb27bfc3afda52fdc6489702d81e7f94b53"
     },
     {
       "path": "skills/slates-prompting-seedance.md",
-      "sha256": "46d1657b967e2b518bf350e4ad937b45ee0f8253c18d017f3df06ff8ec642244"
+      "sha256": "3f2d1f02096169a34da80a1f8a4ef70fb1b22d3dfc8f95cfbb40be908fc7e031"
     },
     {
       "path": "skills/slates-prompting-kling-v3.md",
@@ -20,7 +20,7 @@
     },
     {
       "path": "skills/slates-prompting-nano-banana-2.md",
-      "sha256": "824499adf1188cd86a84fff1de6a02311f87ffb4d1dda73ef46e813c7ef89000"
+      "sha256": "9b746abb7bb3726e39d054a704e9a71f699e365e27e40ced14bca06f922f8a24"
     },
     {
       "path": "skills/slates-content-policy.md",
@@ -28,7 +28,7 @@
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "b098e77bc1c8574f826be80ca701aa024920f31a7b51a3c15c7f03d59e573fc5"
+      "sha256": "63d6709c85d2f11d4244e46bd1a595094f1cf7066e2ac69c8a2b46783e4dc4b6"
     }
   ],
   "outputs": [
@@ -39,13 +39,13 @@
     },
     {
       "path": "reference-character.md",
-      "bytes": 10081,
-      "sha256": "7dd5b693f3095b6678106c1a41c1303d57b3d7a30da0eeffc867fc5000fd6c74"
+      "bytes": 10249,
+      "sha256": "75853dcf6b793df82924bf96bee1795b0a33014bb8cc8a2d18543455c0232761"
     },
     {
       "path": "reference-seedance.md",
-      "bytes": 34423,
-      "sha256": "50c3f1fc54fa1229f3dcadb9e0af1a070e0fbfa4f42bfc024460762bb56d2a1b"
+      "bytes": 35043,
+      "sha256": "de7e38a0e54b5c244c2c6be62b74fff0298d1ebf08a77727cc14b093a7487b34"
     },
     {
       "path": "reference-kling.md",
@@ -65,8 +65,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 40145,
-    "sha256": "69ddf61a8e056df58b27f9a0332d4f0a50506f0296d21ce00302a2bb0adfa209",
+    "bytes": 40497,
+    "sha256": "6289a7827816f38fa6cf6c9afe8c6a0d9efa865861a4e732170a40b584edc8a7",
     "entries": [
       "SKILL.md",
       "reference-character.md",

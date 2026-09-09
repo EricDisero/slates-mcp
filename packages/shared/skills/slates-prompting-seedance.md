@@ -34,7 +34,7 @@ description: How to prompt Seedance 2.0 (ByteDance video model). Read before cal
 ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
 > **How to read this file.**
-> **[official :NNNN]** — ByteDance's own BytePlus ModelArk prompting guide, line `NNNN` of the archived doc dump (`research/seedance-2-modelark-docs.md`). Receipt-grade; treat as law.
+> **[official :NNNN]** — ByteDance's own BytePlus ModelArk prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
 > **[community]** — third-party guides and our own field notes. Useful, but an `[official]` block always wins.
 > **[slates]** — how the Slates app composes or bills this; not ByteDance doctrine.
 >
@@ -238,8 +238,10 @@ Cite each by type and index, in the order they were attached — `image 1`, `vid
 
 ```
 Marcus (image 1) performs the motion from video 1, in the workshop from image 2,
-speaking the line in audio 1. Preserve his identity, appearance and outfit.
+using the voice timbre from audio 1. Preserve his identity, appearance and outfit.
 ```
+
+🚨 **SAY WHAT AN AUDIO REFERENCE IS FOR.** It can mean music, dialogue, voice, tone or timbre — five roles on one attachment — so an unroled clip falls back to **dialogue**: the model re-transcribes it and speaks ITS words. A real take came back as *"a map called Slates"* for *"an app called Slates"*. Name it as the voice timbre and the clip carries the voice while the prompt carries the words. ByteDance's own sentence: *"Image 1 depicts the protagonist John and uses the voice timbre from Audio 1."* Bind each speaker in a sentence, never by attachment order — position carries nothing.
 <!-- slates-only -->
 **Attaching a clip is NOT the same as editing it.** "Add as reference" puts it in the composer alongside everything else and wipes nothing; "Edit with AI" makes the clip the canvas and clears the tray for a fresh instruction. Two different jobs, two different menu entries — never infer one from the other.
 
@@ -426,7 +428,7 @@ Stability phrases that help:
 ## Sources
 
 **Official (authoritative):**
-- BytePlus ModelArk — Seedance 2.0 prompting guide, archived at `research/seedance-2-modelark-docs.md` (all `:NNNN` refs above)
+- BytePlus ModelArk — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
 
 **Community (secondary):**
 - [fal.ai — How to Use Seedance 2.0](https://fal.ai/learn/tools/how-to-use-seedance-2-0)

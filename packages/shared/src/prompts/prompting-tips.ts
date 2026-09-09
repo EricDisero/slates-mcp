@@ -122,8 +122,14 @@ const SEEDANCE: PromptingTipsEntry = {
       },
       {
         heading: 'Images, clips and audio in ONE generation',
-        example: 'Marcus (image 1) performs the motion from video 1, speaking the line in audio 1.',
-        note: 'Attaching a clip does NOT mean "edit this clip". A video or audio attachment is a REFERENCE, numbered in the rail exactly like an image, and it sits alongside your images in the same generation — the composer cites them as "image N", "video N", "audio N", in rail order, and shows you the exact sentence before you press Generate. Reorder the tiles to change what those numbers mean. To actually rewrite a clip, use Edit with AI instead — that is a different, deliberate choice.',
+        example: 'Marcus (image 1) performs the motion from video 1 and uses the voice timbre from audio 1.',
+        note: 'Attaching a clip does NOT mean "edit this clip". A video or audio attachment is a REFERENCE, numbered in the rail exactly like an image, and it sits alongside your images in the same generation — the composer cites them as "image N", "video N", "audio N", in rail order, and shows you the exact sentence before you press Generate. Reorder the tiles to change what those numbers mean. To actually rewrite a clip, use Edit with AI instead — that is a different, deliberate choice. EACH MODALITY IS NUMBERED SEPARATELY, from 1 — two images and one clip are "image 1", "image 2" and "video 1", never a single running count, so an audio reference is "audio 1" no matter how many images sit in front of it.',
+        critical: true,
+      },
+      {
+        heading: 'Give a character a voice',
+        example: 'Sarah (image 1) uses the voice timbre from audio 1. She says, "We open in ten minutes."',
+        note: 'An audio reference can mean five different things to Seedance — music, dialogue, voice, tone or timbre — so SAY WHICH. Name it as the voice timbre and the clip supplies the voice while your prompt supplies the words; leave it unroled and the model falls back to dialogue, re-transcribes the clip and speaks ITS words instead (a real take came back as "a map called Slates" for "an app called Slates"). Bind each speaker in a sentence rather than by attachment order — position carries nothing: "Images 1-2 are Character 1 and correspond to Audio 1; Images 3-4 are Character 2 and correspond to Audio 2." Verbatim from ByteDance. Audio-alone works on 2.5; on 2.0 pair it with at least one image or video.',
         critical: true,
       },
       {
@@ -668,7 +674,7 @@ const MINIMAX_H3: PromptingTipsEntry = {
       {
         heading: 'Cite references by number',
         example: 'Marcus (image 1) walks into the workshop (image 2)...',
-        note: `H3 takes references as typed slots and expects plain numbered prose — image 1, video 1, audio 1. Do not hand-write angle-bracket tags. ${PARTIALS['reference-tips-short']}`,
+        note: `H3 takes references as typed slots and expects plain numbered prose — image 1, video 1, audio 1, each modality counted separately from 1. fal's own prompt-field description: "Refer to reference assets by their modality and order in the reference lists: Image 1, Image 2, Video 1, Audio 1, and so on." Do not hand-write angle-bracket tags — MiniMax's guides use \`<Subject N>\` / \`<Audio N>\` as DOCUMENTATION notation and typing them puts literal brackets in the prompt. An audio reference binds as a voice timbre to a named speaker, the same primitive Seedance uses. ${PARTIALS['reference-tips-short']}`,
       },
       {
         heading: 'Say how much of a reference survives',

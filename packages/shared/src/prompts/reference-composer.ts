@@ -219,6 +219,20 @@ export function composeReferences(
   opts: ComposeOptions = {}
 ): ComposedReferences {
   // ── 1. Assign global numbers by walking the list in order ──
+  //
+  // 🚨 ONE COUNTER PER MODALITY, EACH STARTING AT 1 — never a single running
+  // count across the attachments. `audio 1` is the first AUDIO, however many
+  // images precede it. This is the vendors' scheme, not a convenience:
+  // BytePlus states it ("The numbering should correspond to the upload order of
+  // the assets, such as Image 1 / Video 1 / Audio 1") and PROVES it in a mixed
+  // example that numbers two audios 1 and 2 behind four images — a global
+  // counter would make them 5 and 6. fal says the same for MiniMax H3 in its
+  // own prompt-field description. Receipts and line refs:
+  // second-brain/business/projects/slates/research/model-prompting-research.md
+  // § 2026-09-09 Multimodal reference GRAMMAR.
+  //
+  // Collapsing these into one counter would renumber every citation the prompt
+  // makes, silently — the model would be told "audio 1" about an image.
   let imageNum = opts.startImageNumber ?? 0
   let videoNum = opts.startVideoNumber ?? 0
   let audioNum = opts.startAudioNumber ?? 0

@@ -35,7 +35,25 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 
 // ── Version. Bump this deliberately; it lands in the public filename. ──
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.0';
+// PATCH bump 2026-09-09 (house default; a minor/major needs Eric's word).
+// v1.1.0's zip had gone four weeks stale: it advertised three skills that had
+// been deleted and omitted eleven that exist, including the GPT Image 2.5
+// prompting guide that replaced GPT Image 2's. Rebuilding at the SAME version
+// would leave two different zips both calling themselves v1.1.0, which is what
+// the lockstep gate refuses — correctly. Bumping makes the change visible.
+// ✅ UPLOADED AND LIVE 2026-09-09. The zip is on Tigris (200) and both copies of
+// SKILLS_PACK_DOWNLOAD_URL — slates-web/src/app/lib/pricing.ts and
+// slates-api/src/routes/webhooks.ts — now point at it. v1.1.0 is deliberately
+// LEFT UP: its URL is in the receipt email of everyone who bought before this,
+// and a paid download must never 404 (PROTECTED_PREFIXES in the upload script
+// refuses to prune it). Ordering, always: upload, then move the URLs.
+//
+// Rebuilt in place at 1.1.1 twice on 2026-09-09 — once for the GPT Image 2.5
+// swap, once after the reference cap, transparent backgrounds and corrected size
+// bounds landed. Rebuilding at the same version is refused for a PUBLISHED zip,
+// but neither rebuild had been uploaded yet, so there was no second file to
+// disagree with and no reason to burn a version number.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.1';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = join(root, 'pack-skills');

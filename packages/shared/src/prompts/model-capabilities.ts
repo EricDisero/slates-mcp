@@ -268,10 +268,50 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxRefImages: 14,
   },
 
-  'gpt-image-2': {
-    // FIVE, not ten. The op's flat enum offered eleven for every image model.
+  // `gpt-image-2` WAS HERE AND IS DELIBERATELY GONE (retired 2026-09-09).
+  //
+  // An earlier pass kept the row so that a Shot saved before the swap could
+  // still resolve its caps by stored id. That was the wrong fix and the
+  // desktop refuses it: `pricing.ts` throws at MODULE LOAD for any capability
+  // row with no MODEL_REGISTRY entry, because an orphan row makes THIS op
+  // advertise, validate and quote a model the desktop can no longer render —
+  // the agent passes every gate and then hits 'Unsupported model' at the
+  // handler.
+  //
+  // Old Shots are handled where they are READ instead: `migrateGptImageModel`
+  // in slate/src/shared/pricing.ts rewrites the stored id to Flare inside
+  // `transform` (slate/src/main/storage/shots.ts), the one place a DB row
+  // becomes a Shot. That is strictly better than keeping the row — the Shot
+  // comes back FIREABLE on a live model, rather than merely openable on a dead
+  // one. Do not re-add this row to make a stale id resolve; migrate it.
+
+  // GPT Image 2.5 — 16 references, which IS fal's documented ceiling rather
+  // than a number of ours: `image_urls` carries `maxItems: 16` on both 2.5
+  // endpoints AND on both gpt-image-2 endpoints (schema, read 2026-09-09,
+  // ripped verbatim to second-brain/business/projects/slates/research/
+  // fal-gpt-image-2-5-openapi-schemas.md).
+  //
+  // 🚨 IT WAS 10 UNTIL 2026-09-09, AND 10 WAS NEVER ANYBODY'S LIMIT. The
+  // comment here used to call it "the 10-reference ceiling ... unchanged by the
+  // version bump", which reads as a verified fal constraint and was not one —
+  // nobody had checked. Six reference slots were being given away, worst on
+  // Sunburst, whose entire reason for shipping is multi-reference edit work.
+  // Raised by Eric 2026-09-09 ("did we go completely full-on with all of the
+  // options on fal?").
+  //
+  // The five aspect ratios ARE a product choice; fal takes any custom size
+  // inside its own bounds (see GPT_IMAGE_25_SIZES in slate/src/shared/
+  // pricing.ts). Two SLATES caps sit outside this file and are not model
+  // limits either: the MCP's 4,000-character prompt against fal's 32,000, and
+  // image quantity, which is a fan-out and has no provider ceiling at all.
+  'gpt-image-2-5-flare': {
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
-    maxRefImages: 10,
+    maxRefImages: 16,
+  },
+
+  'gpt-image-2-5-sunburst': {
+    aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+    maxRefImages: 16,
   },
 
   'flux-2-max': {
@@ -525,6 +565,17 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'minimax-h3-max': {
     aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
+    // 🚨 ZERO, DECLARED — not omitted. `minimax/h3-max/reference-to-video`
+    // returns 404, so there is no transport for a reference of any modality.
+    // Leaving this undeclared does NOT mean "none": `getMaxRefImages` falls
+    // back to `?? 3` for the ingredients mode, which handed this row three
+    // reference slots it cannot send. Measured 2026-09-09 — a pinned image on
+    // an h3-max generation was accepted by the composer, dropped in transit,
+    // and the model rendered the prompt text alone, returning a different
+    // person than the reference. Frames (start/end) remain the ONLY image
+    // transport on this seat.
+    maxIngredientImages: 0,
+    maxRefImages: 0,
     // 480p/768p ONLY — fal's post-train of the open weights, and the 2K
     // upscaler was never open-sourced. Declaring the shorter ladder here IS the
     // whole Max-seat mechanism: `assertVideoCapabilities` refuses 2K/4K on this

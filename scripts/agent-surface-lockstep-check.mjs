@@ -593,9 +593,23 @@ console.log('agent-surface-lockstep-check')
 //
 // The ceiling includes the core preset-listing op and Shot voice fields.
 // Keep headroom by trimming repeated guidance; do not raise it for routine edits.
+//
+// 2026-09-09: 69,000 -> 69,500, and this one IS a review decision rather than
+// an accident. A schema audit found four fal fields we had never shipped on
+// GPT Image (`background`, and the real ceilings behind num_images /
+// image_urls / prompt length); surfacing `backgroundMode` on generate + edit,
+// and `gptBackground` on the Shot params, costs ~740 B of enum schema and
+// describe text that a capability genuinely needs.
+//
+// ~1,000 B of repeated guidance was cut FIRST and stays cut — duplicated
+// reference-cap prose, a doubled 'call slates_get_prompting_guide' line, and
+// two routing notes that had drifted wordy. The raise buys back only the
+// headroom that cut created, so the next edit is not forced to pay for this
+// one. It was green at 68,994 before the raise: this is not a red build being
+// made green, it is a 6-byte margin being made honest.
 {
   const CHECK = '7 surface-budget'
-  const CORE_CEILING = 69_000
+  const CORE_CEILING = 69_500
   const PER_OP_CEILING = 14_000
   const core = toolDefinitions(ALL_OPERATIONS, { surface: 'desktop' })
   const bytes = (d) => Buffer.byteLength(d.name + d.description + JSON.stringify(d.inputSchema), 'utf8')

@@ -78,6 +78,16 @@
 //      without the absence clause. If that happens, the fix is a
 //      model-conditional phrasing, not restoring the 422.
 //
+//      2026-09-09 — THE MODEL IT WAS MEASURED ON IS RETIRED; THE RULE IS NOT.
+//      GPT Image 2.5 replaced gpt-image-2 in the picker. The 422 above was
+//      measured on gpt-image-2 and that wording is left exactly as recorded,
+//      because a receipt names what was actually tested. What carries over is
+//      the MECHANISM, not the measurement: the classifier belongs to OpenAI,
+//      not to a model version, so phrase exclusions as framing on 2.5 too.
+//      ⚠️ INHERITED, NOT RE-MEASURED — nobody has re-run the 422 on Flare or
+//      Sunburst. If one of them accepts the absence clause, that is a new
+//      receipt to write down, not a reason to delete this one.
+//
 //      2026-07-30 (b) — THE GENRE ANCHOR HAS TO BE SCOPED TO THE FACE, and
 //      this one cost real generations. "an invisible-mannequin presentation
 //      WHERE THE CLOTHING HOLDS ITS OWN SHAPE" is the e-commerce genre stated

@@ -140,11 +140,13 @@ Eight plates in eight different rooms, all carrying *"shot on a phone at arm's l
 
 ## PHASE 4 — THE PLATES. One per beat.
 
-`slates_generate_image`, model `gpt-image-2`, `quality: high`, vertical `9:16`. **Fire concurrently — 8 slots run at once; serial calls waste the day.** Pass `projectId` so every plate lands in the gallery where you can see it.
+`slates_generate_image`, model `gpt-image-2-5-sunburst`, `quality: max`, vertical `9:16`. **Fire concurrently — 8 slots run at once; serial calls waste the day.** Pass `projectId` so every plate lands in the gallery where you can see it.
 
-**GPT Image 2 is the rail for photoreal people.** Head-to-head against the alternatives it is the one that returns photographic rather than plastic skin. Routing detail: `slates-model-selection`.
+**Why that seat and that rung.** `max` because the 2026-08-24 photoreal result was measured at GPT Image 2's `high`, which is `max` here — the ladder was renamed, not repriced. **Sunburst** because these plates are finals and OpenAI routes quality to Sunburst: Flare's quality is only *comparable to* GPT Image 2, while Sunburst is documented higher. Same price, so the only cost is latency, and you are firing eight in parallel anyway. Use **Flare** while you are still exploring wardrobe, room or framing, then re-fire the chosen direction on Sunburst. ⚠️ Reasoned from OpenAI's positioning, not measured — if you A/B one plate, write the answer into `slates-prompting-gpt-image-2-5`.
 
-### 🚨 GPT Image 2 routes references through its EDIT endpoint
+**GPT Image is the rail for photoreal people.** Head-to-head against the alternatives it is the one that returns photographic rather than plastic skin. Routing detail: `slates-model-selection`.
+
+### 🚨 GPT Image 2.5 routes references through its EDIT endpoint
 
 Two consequences, both of which waste a generation:
 

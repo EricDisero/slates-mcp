@@ -350,7 +350,7 @@ function creditsFromDollars(dollars: number): number {
 // sentence: it is repeated verbatim on seven ops, so every word costs seven
 // times, and `slates_get_generation_status` explains the polling itself.
 const BACKGROUND_DESCRIBE =
-  'Return generationId(s) immediately instead of blocking; poll slates_get_generation_status. Recommended for video.'
+  'Return generationId(s) now instead of blocking; poll slates_get_generation_status. Recommended for video.'
 
 // ── Vision QC pointers (the "quality-check with vision" rule, made structural) ──
 //
@@ -674,7 +674,8 @@ export const estimateGenerationCost: Operation<{
    *  and `assertVideoCapabilities` is the per-model narrowing authority. */
   videoResolution?: VideoResolution
   resolution?: '1k' | '2k' | '3k' | '4k'
-  quality?: 'medium' | 'high'
+  quality?: GptQualityId
+  aspectRatio?: string
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
@@ -704,8 +705,9 @@ export const estimateGenerationCost: Operation<{
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
       'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
     ),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k = gpt-image-2 1440p class).'),
-    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k: GPT Image/seedream-5-lite).'),
+    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image tier; default high.'),
+    aspectRatio: z.string().optional().describe('Image only. 1:1/4:3/3:4 cost more than 16:9.'),
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
     seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
@@ -719,14 +721,20 @@ export const estimateGenerationCost: Operation<{
 
     // 1) exact registry cost key
     let key: string | null = byKey.has(input.model) ? input.model : null
-    // 2) image base id + resolution (+ quality for gpt-image-2)
+    // 2) image base id + resolution (+ quality for GPT Image 2.5)
     if (!key) {
       // IMAGE_MODELS, never a second hand-typed copy: this list is declared
       // below (a runtime read, so no temporal-dead-zone hazard) and is the same
       // enum `slates_generate_image` accepts. Two copies is how the estimate op
       // would quietly stop pricing the seventh image model.
       const img = IMAGE_MODELS.find((m) => m === input.model)
-      if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality ?? 'medium')
+      // ⚙ NO INLINE DEFAULT. `imageCostKey`'s own parameter default is the ONE
+      // home for the fallback tier, and `pricing-consistency-check.mjs` pins it
+      // to the desktop's. This line read `?? 'medium'` while every generate path
+      // billed `high`, so the op the doctrine tells agents to call before every
+      // generation quoted 1 cr for a 2 cr job. Four separate copies of one
+      // default is what made that possible; there are now none.
+      if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality, input.aspectRatio)
     }
     // 2a) audio base id → seconds. Both surfaces bill per second, so a
     //     duration is always required. Runs BEFORE the video resolver: it is
@@ -849,7 +857,7 @@ export const estimateGenerationCost: Operation<{
     if (key == null || perCredits == null) {
       // Every id in the error comes from the SSOT arrays. The image half was
       // hand-typed and named three of six, so an agent that mis-spelled
-      // `gpt-image-2` was told the model did not exist.
+      // `gpt-image-2-5-flare` was told the model did not exist.
       throw new Error(
         `Unknown model: ${input.model}. Pass a base id (${VIDEO_MODELS.join(' | ')} | ${AUDIO_MODELS.join(' | ')} | ${IMAGE_MODELS.join(' | ')}) plus duration/resolution params, or use slates_list_available_models with a filter.`
       )
@@ -1457,7 +1465,7 @@ export const generateCharacterIdentity: Operation<{
   projectId: string
   baseAssetId: string
   userNotes?: string
-  model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2'
+  model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst'
 }> = {
   id: 'slates_generate_character_identity',
   billable: true,
@@ -1469,11 +1477,22 @@ export const generateCharacterIdentity: Operation<{
     baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from.'),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
-      .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2'])
+      .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
       .optional()
       .describe('Image model for the sheet. Omit for the default (nano-banana-2). Exists so the layout-vs-face tradeoff can be tested with comparison gens — do not switch without a receipt.'),
   }),
   async run(input, ctx) {
+    // 🚨 THE ROSTER GATE, WHICH THIS OP NEVER HAD. Its `model` enum offers
+    // seats an older desktop does not know, and the handler resolves an unknown
+    // id by falling back to the Google/Banana path — so the op would quote one
+    // model's price and generate another, silently. Same failure `generateImage`
+    // and `editImage` gate against; this op was simply missed when the gate was
+    // introduced, and the 2.5 swap is what makes it reachable in practice.
+    if (isGptImageModel(input.model)) {
+      await ctx.desktop().requireCapability('image-models-v3', `${input.model} character identity`)
+    } else if (input.model === 'nano-banana-pro' || input.model === 'nano-banana-2-lite') {
+      await ctx.desktop().requireCapability('image-models-v2', `${input.model} character identity`)
+    }
     return ok(
       await ctx.desktop().post('/agent/characters/generate-identity', {
         characterId: input.characterId,
@@ -1752,19 +1771,66 @@ export type ImageModelId =
   | 'nano-banana-2'
   | 'nano-banana-2-lite'
   | 'nano-banana-pro'
-  | 'gpt-image-2'
+  | 'gpt-image-2-5-flare'
+  | 'gpt-image-2-5-sunburst'
   | 'flux-2-max'
   | 'seedream-5-lite'
 
 /** The exact `model` ids `slates_generate_image` accepts. */
+/**
+ * The image models whose ladder includes the 3k (1440p) class — a MIRROR of
+ * `imageResolutions` in slate's MODEL_REGISTRY, which this package cannot read.
+ * Exported so `pricing-consistency-check.mjs` can prove the mirror still
+ * matches; without that proof a model that gains 3k in the registry just goes
+ * quietly unreachable through the op.
+ */
+export const THREE_K_IMAGE_MODELS = [
+  'gpt-image-2-5-flare',
+  'gpt-image-2-5-sunburst',
+  'seedream-5-lite',
+] as const satisfies readonly ImageModelId[]
+
 export const IMAGE_MODELS = [
   'nano-banana-2',
   'nano-banana-2-lite',
   'nano-banana-pro',
-  'gpt-image-2',
+  'gpt-image-2-5-flare',
+  'gpt-image-2-5-sunburst',
   'flux-2-max',
   'seedream-5-lite',
 ] as const satisfies readonly ImageModelId[]
+
+/** True for either GPT Image 2.5 seat. Flare and Sunburst differ in latency
+ *  and routing advice, never in pricing shape or param surface. */
+export function isGptImageModel(model: string | undefined): boolean {
+  return model === 'gpt-image-2-5-flare' || model === 'gpt-image-2-5-sunburst'
+}
+
+/**
+ * GPT Image 2.5's quality ladder — the full enum fal accepts, all five rungs
+ * exposed (Eric, 2026-09-09).
+ *
+ * 🚨 THE NAMES MOVED BETWEEN VERSIONS AND THE STRINGS DID NOT. GPT Image 2's
+ * `medium` is this model's `high`, and its `high` is this model's `max` — same
+ * money, one rung of renaming. An untranslated value still validates and still
+ * bills correctly for what it names; it just names a materially cheaper tier.
+ * That is why the op DEFAULTS to `high` rather than `medium`: `high` is the
+ * picture the old default bought.
+ */
+export type GptQualityId = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+/**
+ * GPT Image's alpha switch — fal's `background` field.
+ *
+ * 🚨 EXPOSED AS `backgroundMode`, NOT `background`, ON EVERY OP. These ops
+ * already carry a `background: boolean` meaning "run asynchronously and poll",
+ * and that boolean got here first. One word, two unrelated meanings, is how an
+ * agent ends up asking for a transparent PNG and getting a job id.
+ *
+ * Costs nothing: fal prices GPT Image on size × quality alone, so this is not
+ * part of any cost key. `auto` is fal's default and ours.
+ */
+export type GptBackgroundId = 'auto' | 'transparent' | 'opaque'
 
 /**
  * The aspect ratios an image generation can carry — the UNION over what these
@@ -1772,7 +1838,7 @@ export const IMAGE_MODELS = [
  * value no model accepts. It used to be a hand-typed eleven-value list whose
  * `9:21` exists in ZERO models; that phantom is gone by construction.
  *
- * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. `gpt-image-2` takes five of these
+ * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. GPT Image 2.5 takes five of these
  * ten and the other five would be accepted here. The image param surface has
  * not been audited (aspect ratios, resolution classes, per-model reference
  * caps) — that audit is the named follow-up in
@@ -1785,18 +1851,45 @@ const IMAGE_ASPECT_RATIOS = aspectRatioUnion(IMAGE_MODELS)
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
 // in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
 // videoCostKey): NB2/NB Pro price per resolution, FLUX.2 Max prices per
-// resolution (1k is the bare key), NB2 Lite/Seedream are flat, GPT Image 2 is
-// quality × resolution-class (med|high; low deliberately not exposed).
-function imageCostKey(
+// resolution (1k is the bare key), NB2 Lite/Seedream are flat, GPT Image 2.5 is
+// quality × resolution-class over ALL FIVE exposed tiers.
+//
+// 🚨 THE KEY SUFFIX IS `med` WHILE THE WIRE VALUE IS `medium` — the one
+// tier name that differs between fal's enum and our cost keys, inherited from
+// GPT Image 2 (`gpt-image-2-med-4k`). `gptKeyTier` is that whole translation,
+// and it must stay byte-identical to `gptKeyTier` in
+// slate/src/shared/pricing.ts — pricing-consistency-check.mjs enforces it.
+function gptKeyTier(quality: GptQualityId): string {
+  return quality === 'medium' ? 'med' : quality
+}
+
+// 🚨 THE ASPECT RATIO IS PART OF THE PRICE ON GPT IMAGE. fal bills image
+// OUTPUT TOKENS and the count tracks the frame's SHAPE — metered 2026-09-09,
+// 4:3/3:4 cost ~4/3 of the class rate and 1:1 ~16/9 of it. Quoting one price
+// for every aspect sold 1:1 below cost at `high` and above. Byte-identical to
+// `gptKeyAspect` in slate/src/shared/pricing.ts; pricing-consistency-check
+// proves it key by key. 16:9 and 9:16 keep the bare key they always had.
+function gptKeyAspect(aspectRatio?: string): string {
+  if (aspectRatio === '1:1') return '-sq'
+  if (aspectRatio === '4:3' || aspectRatio === '3:4') return '-43'
+  return ''
+}
+
+// EXPORTED for the same reason `videoCostKey` is: `pricing-consistency-check.mjs`
+// imports it and asserts, key by key, that it equals the desktop's
+// `imageCreditKey`. Before that check existed the byte-match was a comment and
+// a hope — the two are in different repos and nothing compared them.
+export function imageCostKey(
   model: ImageModelId,
   resolution: '1k' | '2k' | '3k' | '4k',
-  quality: 'medium' | 'high' = 'medium'
+  quality: GptQualityId = 'high',
+  aspectRatio?: string
 ): string {
   if (model === 'flux-2-max') return resolution === '1k' ? 'flux-2-max' : `flux-2-max-${resolution}`
   if (model === 'seedream-5-lite') return 'seedream-5-lite'
   if (model === 'nano-banana-2-lite') return 'nano-banana-2-lite'
   if (model === 'nano-banana-pro') return `nano-banana-pro-${resolution}`
-  if (model === 'gpt-image-2') return `gpt-image-2-${quality === 'high' ? 'high' : 'med'}-${resolution}`
+  if (isGptImageModel(model)) return `${model}-${gptKeyTier(quality)}-${resolution}${gptKeyAspect(aspectRatio)}`
   return `nano-banana-2-${resolution}`
 }
 
@@ -1806,7 +1899,8 @@ export const generateImage: Operation<{
   projectId?: string
   resolution?: '1k' | '2k' | '3k' | '4k'
   aspectRatio?: AspectRatio
-  quality?: 'medium' | 'high'
+  quality?: GptQualityId
+  backgroundMode?: GptBackgroundId
   count?: number
   referenceImageUrls?: string[]
   referenceAssetIds?: string[]
@@ -1822,9 +1916,9 @@ export const generateImage: Operation<{
     // (it still described nano-banana-2-lite by a capability the param owns).
     `${describeRouting('image')}\n` +
     'Full table: the slates-model-selection skill. ' +
-    'Pass projectId to save into a Slates project (recommended — asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). ' +
+    'Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). REQUIRED before calling: read the slates-cost-discipline skill (and the model\'s slates-prompting-* skill). You MUST pass aspectRatio and resolution explicitly (the server returns requires_clarification when missing — defaults waste credits). ' +
     CONFIRM_GATE_SENTENCE +
-    ' MCP/CLI generation always charges credits. No skill files installed? Call slates_get_prompting_guide with the model\'s topic (and \'slates-cost-discipline\') before first use. ' +
+    ' MCP/CLI generation always charges credits. No skills installed? Call slates_get_prompting_guide with the model\'s topic and \'slates-cost-discipline\' first. ' +
     // GENERATED from the skill file's own never-use list -- the one piece of
     // prompting doctrine that is ALWAYS in context, because the agent has
     // demonstrably skipped the call that would have taught it.
@@ -1833,14 +1927,15 @@ export const generateImage: Operation<{
     prompt: z.string().min(1).max(4000),
     model: zEnum(IMAGE_MODELS).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Pick deliberately: 1k drafts, 2k hero shots, 4k print/final. nano-banana-2-lite is 1k-only. gpt-image-2 classes: 1k=1024², 2k=1080p, 3k=1440p, 4k=2160p (3k is gpt-image-2 only). Never default this.'),
-    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only. medium (default) = sharp text, fast, the value seat; high = max text precision + reasoning at ~4× the price. Ignored by other models.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('1k drafts, 2k hero, 4k final. nano-banana-2-lite: 1k only. GPT Image classes 1024²/1080p/1440p/2160p. Never default this.'),
+    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image only. UNEVEN ladder: max=4× high, xhigh~1.8×. medium drafts; default high.'),
+    backgroundMode: z.enum(['auto', 'transparent', 'opaque']).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
-      `Pick deliberately from the use case. Cinematic → 16:9. TikTok/Reels/Story → 9:16. IG square → 1:1. Ultra-wide → 21:9. Ask the user when ambiguous. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
+      `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
-    count: z.number().int().min(1).max(4).optional(),
-    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no-projectId) nano-banana-2 only: up to 14 ref URLs. For projectId runs, upload refs with slates_upload_reference_image first. Always label each image\'s role in the prompt text.'),
-    referenceAssetIds: z.array(z.string()).max(14).optional().describe("Project assets to use as reference/ingredient images — asset UUIDs or badge codes (\"IMG-A8\"); codes resolve against the project at call time. Requires projectId. For nano-banana-2 up to 14 refs; FLUX/Seedream route to their edit endpoints with lower per-model caps. Label each reference's role in the prompt text."),
+    count: z.number().int().min(1).max(10).optional().describe('Up to 10 with projectId; headless caps at 4.'),
+    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
+    referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
   }),
@@ -1872,13 +1967,24 @@ export const generateImage: Operation<{
     }
     const resolution = input.resolution
     const imageModel = input.model ?? 'nano-banana-2'
-    // The '3k' class exists only on gpt-image-2 (2560×1440); other models
-    // would mis-key the registry lookup.
-    if (resolution === '3k' && imageModel !== 'gpt-image-2') {
+    // 🚨 SEEDREAM HAS A 3k CLASS TOO, AND THIS GUARD USED TO DENY IT.
+    // It read `!== 'gpt-image-2'` and rejected every other model at 3k — but
+    // `seedream-5-lite` declares ['2k','3k','4k'] in the desktop registry and
+    // has a real `seedream-5-lite` cost key, so the op was refusing a request
+    // the desktop would have served. Pre-existing; found by the 2026-09-09
+    // audit, not introduced by the 2.5 swap.
+    //
+    // The ladder itself is owned by MODEL_REGISTRY in slate/src/shared/pricing.ts
+    // and is not readable from here, so THREE_K_IMAGE_MODELS is a MIRROR — declared
+    // and exported below so `pricing-consistency-check.mjs` compares it against
+    // the desktop registry's own `imageResolutions`. It used to be an inline
+    // literal with a comment admitting nothing checked it, which is how it came
+    // to deny `seedream-5-lite` a class the desktop had always served.
+    if (resolution === '3k' && !(THREE_K_IMAGE_MODELS as readonly string[]).includes(imageModel)) {
       return ok({
         requires_clarification: true,
         missing: ['resolution'],
-        message: `3k (1440p) is a gpt-image-2 resolution class — pick 1k/2k/4k for ${imageModel}.`,
+        message: `3k (1440p) exists on ${THREE_K_IMAGE_MODELS.join(', ')} — pick 1k/2k/4k for ${imageModel}.`,
       })
     }
     // Only nano-banana-2 has a headless path — everything else routes through
@@ -1911,6 +2017,19 @@ export const generateImage: Operation<{
           'background=true routes through the desktop generation pipeline (so slates_get_generation_status can poll it) — pass a projectId, or drop background for a blocking headless run.',
       })
     }
+    // 🚨 THE HEADLESS PATH ASKS FAL FOR A BATCH, so a provider ceiling binds
+    // here and nowhere else. It is nano-banana-2 only, and Nano Banana's
+    // `num_images` maximum is 4 (fal schema, 2026-09-09). Refused rather than
+    // clamped: a silent clamp would make four images against a request for ten
+    // and read to the caller as a partial failure it should retry.
+    if (!input.projectId && (input.count ?? 1) > 4) {
+      return ok({
+        requires_clarification: true,
+        missing: ['projectId'],
+        message:
+          'count above 4 needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at 4; with a projectId the desktop fires them as separate generations and the limit is 10.',
+      })
+    }
     let refEcho = ''
     if (referenceAssetIds.length > 0) {
       await ctx.desktop().requireCapability('image-references', 'reference images on image generation')
@@ -1927,13 +2046,19 @@ export const generateImage: Operation<{
     // New-roster models need a desktop that knows them — an older desktop's
     // allowlist would silently fall back to nano-banana-2 while we quote the
     // new model's price.
-    if (
+    if (input.projectId && isGptImageModel(imageModel)) {
+      // 🚨 v3, NOT v2. GPT Image 2.5 landed 2026-09-09 with new ids and a
+      // five-rung ladder; a desktop that only knows v2 has neither, so it would
+      // fall back to nano-banana-2 while this op quotes a 2.5 price — precisely
+      // the failure the gate was built to stop. Reusing v2 reintroduces it.
+      await ctx.desktop().requireCapability('image-models-v3', `${imageModel} generation`)
+    } else if (
       input.projectId &&
-      (imageModel === 'gpt-image-2' || imageModel === 'nano-banana-pro' || imageModel === 'nano-banana-2-lite')
+      (imageModel === 'nano-banana-pro' || imageModel === 'nano-banana-2-lite')
     ) {
       await ctx.desktop().requireCapability('image-models-v2', `${imageModel} generation`)
     }
-    const costKey = imageCostKey(imageModel, resolution, input.quality ?? 'medium')
+    const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1')
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
@@ -2015,7 +2140,7 @@ export const generateImage: Operation<{
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
-        ...(imageModel === 'gpt-image-2' ? { gptQuality: input.quality ?? 'medium' } : {}),
+        ...(isGptImageModel(imageModel) ? { gptQuality: input.quality, gptBackground: input.backgroundMode } : {}),
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         background: input.background,
       })
@@ -2123,6 +2248,13 @@ export const generateImage: Operation<{
       params: {
         prompt: input.prompt,
         aspect_ratio: input.aspectRatio ?? '1:1',
+        // 🚨 THE HEADLESS PATH IS THE ONE PLACE WE ASK FAL FOR A BATCH, so it
+        // is the one place a provider's own `num_images` ceiling binds — and
+        // Nano Banana's is 4 (fal schema, read 2026-09-09), against the op's
+        // limit of 10. Everything else fans out through the desktop as N
+        // separate single-image generations, where no batch ceiling exists.
+        // Guarded above rather than clamped here: silently making 4 when 10
+        // were asked for would bill 4 and look like a partial failure.
         num_images: input.count ?? 1,
         ...(hasReferenceImages
           ? { image_urls: input.referenceImageUrls }
@@ -2209,10 +2341,11 @@ export const editImage: Operation<{
   projectId: string
   sourceAssetId: string
   prompt: string
-  editModel?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2' | 'flux-2-max' | 'seedream-5-lite'
+  editModel?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst' | 'flux-2-max' | 'seedream-5-lite'
   referenceAssetIds?: string[]
   resolution?: '1k' | '2k' | '3k' | '4k'
-  quality?: 'medium' | 'high'
+  quality?: GptQualityId
+  backgroundMode?: GptBackgroundId
   aspectRatio?: string
   confirm?: boolean
   background?: boolean
@@ -2220,15 +2353,16 @@ export const editImage: Operation<{
   id: 'slates_edit_image',
   billable: true,
   description:
-    'Surgically edit an existing image asset with a text instruction (e.g. \'remove the lamppost\', \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The edited result is saved as a NEW asset in the project (prompt prefixed \'[Edit]\'); the source is untouched. Default model nano-banana-2 (only model that also accepts referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
+    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model nano-banana-2 (only model that also accepts referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
   input: z.object({
     projectId: z.string().uuid(),
-    sourceAssetId: z.string().uuid().describe('Image asset to edit. Must already exist in the project.'),
-    prompt: z.string().min(1).max(4000).describe('The edit instruction — describe the change, not the whole image.'),
-    editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2', 'flux-2-max', 'seedream-5-lite']).optional(),
-    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana family only: extra reference images (NB Pro takes up to 13, NB2 Lite up to 3).'),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k (1440p class) is gpt-image-2 only; nano-banana-2-lite is 1k only.'),
-    quality: z.enum(['medium', 'high']).optional().describe('gpt-image-2 only — quality tier (default medium).'),
+    sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
+    prompt: z.string().min(1).max(4000).describe('The change, not the whole image.'),
+    editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'flux-2-max', 'seedream-5-lite']).optional(),
+    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana only (NB Pro 13, NB2 Lite 3).'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
+    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image tier; default high.'),
+    backgroundMode: z.enum(['auto', 'transparent', 'opaque']).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -2241,17 +2375,22 @@ export const editImage: Operation<{
     }
     const editModel = input.editModel ?? 'nano-banana-2'
     const resolution = input.resolution ?? (editModel === 'nano-banana-2-lite' ? '1k' : '2k')
-    if (
-      (editModel === 'gpt-image-2' || editModel === 'nano-banana-pro' || editModel === 'nano-banana-2-lite')
-    ) {
+    if (isGptImageModel(editModel)) {
+      // 🚨 v3, LIKE generateImage — this site was missed once already.
+      // A pre-2.5 desktop advertises v2, so gating the 2.5 seats on v2 lets it
+      // through; `isFalImageModel` is then false for these ids on that build and
+      // handleEditImage falls through to the nano-banana path — NB2 output billed
+      // at a quoted 2.5 price. Exactly the bug the gate exists to stop.
+      await desktop.requireCapability('image-models-v3', `${editModel} editing`)
+    } else if (editModel === 'nano-banana-pro' || editModel === 'nano-banana-2-lite') {
       await desktop.requireCapability('image-models-v2', `${editModel} editing`)
     }
-    // Nano-Banana family + GPT Image 2 edits charge the same key as gen;
+    // Nano-Banana family + GPT Image 2.5 edits charge the same key as gen;
     // FLUX / Seedream route to dedicated edit endpoints priced under '-edit' keys.
     const costKey =
       editModel === 'flux-2-max' || editModel === 'seedream-5-lite'
         ? `${imageCostKey(editModel, resolution)}-edit`
-        : imageCostKey(editModel, resolution, input.quality ?? 'medium')
+        : imageCostKey(editModel, resolution, input.quality, input.aspectRatio)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey)
@@ -2287,7 +2426,7 @@ export const editImage: Operation<{
       editModel,
       referenceAssetIds: input.referenceAssetIds,
       resolution,
-      ...(editModel === 'gpt-image-2' ? { gptQuality: input.quality ?? 'medium' } : {}),
+      ...(isGptImageModel(editModel) ? { gptQuality: input.quality, gptBackground: input.backgroundMode } : {}),
       aspectRatio: input.aspectRatio,
       background: input.background,
     })
@@ -5251,19 +5390,17 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
     ),
     videoResolution: d(
       zEnum(VIDEO_RESOLUTIONS).optional(),
-      'Validated against the chosen model when the Shot is saved.'
+      'Validated against the model when the Shot is saved.'
     ),
     imageResolution: d(z.enum(['1k', '2k', '3k', '4k']).optional(), 'Image models only.'),
-    gptQuality: d(z.enum(['medium', 'high']).optional(), 'gpt-image-2 only.'),
-    imageQuantity: d(
-      z.number().int().min(1).max(4).optional(),
-      'Image models only — how many to make per fire.'
-    ),
+    gptQuality: d(z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(), 'GPT Image 2.5 only.'),
+    gptBackground: d(z.enum(['auto', 'transparent', 'opaque']).optional(), 'GPT Image only.'),
+    imageQuantity: d(z.number().int().min(1).max(10).optional(), 'Image models only.'),
     negativePrompt: z.string().optional(),
     sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
     seedanceFace: d(
       z.boolean().optional(),
-      "Seedance only — a reference shows an AI character's FACE; reroutes to a face-capable provider at ~45% more."
+      "Seedance only — a reference shows an AI character's FACE; reroutes to a face-capable provider, ~45% more."
     ),
     audioDurationSeconds: d(
       z.number().int().min(1).max(120).optional(),
@@ -5634,7 +5771,14 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
       model as ImageModelId,
       ((fires?.imageResolution ?? p.imageResolution) as '1k' | '2k' | '3k' | '4k' | undefined) ??
         (model === 'nano-banana-2-lite' ? '1k' : '2k'),
-      p.gptQuality ?? 'medium'
+      // No inline default — see the note at the estimate op. Firing a Shot with
+      // no stored tier lands on `high` via the desktop's `normalizeGptQuality`,
+      // and `imageCostKey`'s parameter default is pinned to match it.
+      p.gptQuality,
+      // The aspect the Shot will fire at — on GPT Image it moves the key, so
+      // quoting without it under-prices every square Shot. `fires` carries
+      // only the clamped resolution/duration axes, never the aspect.
+      p.aspectRatio
     )
   }
   return null
@@ -6209,7 +6353,7 @@ function resolveGuideTopic(topic: string): string | null {
     return 'slates-model-selection'
   }
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
-  if (t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2'
+  if (t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-5'
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('veo')) return 'slates-prompting-veo-3'
@@ -6302,7 +6446,7 @@ function resolveGuideTopic(topic: string): string | null {
  * The guide index, GENERATED from SKILLS.
  *
  * The list here was hand-typed and had drifted to 25 of 32 names — the prompting
- * guides for GPT Image 2, MiniMax H3, LTX-2.5, Seedance 2.5 and Omni Flash were
+ * guides for GPT Image, MiniMax H3, LTX-2.5, Seedance 2.5 and Omni Flash were
  * all missing, so an agent reading this description could not learn they exist.
  * A hand-typed index of a generated corpus is a stale index; it is only a matter
  * of when.

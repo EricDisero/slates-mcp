@@ -42,7 +42,8 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['shots', 'Shots — the whole shot-list surface'],
   ['background-generation', 'background: true on any generate op'],
   ['image-references', 'reference images on image generation'],
-  ['image-models-v2', 'gpt-image-2 / nano-banana-pro / nano-banana-2-lite'],
+  ['image-models-v2', 'nano-banana-pro / nano-banana-2-lite'],
+  ['image-models-v3', 'gpt-image-2-5-flare / gpt-image-2-5-sunburst (five quality tiers)'],
 ]
 
 export async function runDoctor(): Promise<void> {

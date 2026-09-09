@@ -93,8 +93,15 @@ export interface ShotParams {
   imageResolution?: string
   videoResolution?: string
   quality?: string
-  /** gpt-image-2's tier. Always sent explicitly: fal's own default is `high`. */
-  gptQuality?: 'medium' | 'high'
+  /** GPT Image 2.5's tier. Always sent explicitly: fal's own default is
+   *  `high`, which is the third of five rungs, not the top of two. */
+  gptQuality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  /** GPT Image's alpha switch. `auto` is fal's default and ours; `transparent`
+   *  asks for a real alpha channel rather than a painted backdrop. Costs
+   *  nothing — fal prices this family on size × quality only, so it is NOT a
+   *  cost-key segment. Named `gptBackground` because `background` already
+   *  means "generate asynchronously" on every op that carries a Shot. */
+  gptBackground?: 'auto' | 'transparent' | 'opaque'
   duration?: number
   imageQuantity?: number
   gridMode?: 'off' | '2x2' | '3x3'
@@ -405,7 +412,26 @@ function readParams(v: unknown): ShotParams {
   s('voiceId'); s('voiceReferenceAssetId'); s('voiceDescription')
   n('duration'); n('imageQuantity'); n('audioDurationSeconds'); n('audioPromptInfluence')
   b('sound'); b('generateMusic'); b('seedanceFace'); b('multiShot'); b('audioLoop'); b('audioMultilingual')
-  if (raw.gptQuality === 'medium' || raw.gptQuality === 'high') out.gptQuality = raw.gptQuality
+  // Shape validation only. The pre-2026-09-09 tier MIGRATION deliberately does
+  // NOT live here: this file is a dependency-free leaf, and the migration's
+  // SSOT is `migrateGptQuality` in slate/src/shared/pricing.ts, applied in
+  // `transform` (slate/src/main/storage/shots.ts) — the one place a DB row
+  // becomes a `Shot`. NOT in `resolveShotSpec`: by the time a spec reaches that
+  // function its gate value (`gpt-image-2`) has already been rewritten, so a
+  // copy there could never fire. A stored value outside the union is dropped
+  // exactly as before — it just has five legal names now instead of two.
+  if (
+    raw.gptQuality === 'low' ||
+    raw.gptQuality === 'medium' ||
+    raw.gptQuality === 'high' ||
+    raw.gptQuality === 'xhigh' ||
+    raw.gptQuality === 'max'
+  ) {
+    out.gptQuality = raw.gptQuality
+  }
+  if (raw.gptBackground === 'auto' || raw.gptBackground === 'transparent' || raw.gptBackground === 'opaque') {
+    out.gptBackground = raw.gptBackground
+  }
   if (raw.gridMode === 'off' || raw.gridMode === '2x2' || raw.gridMode === '3x3') out.gridMode = raw.gridMode
   if (Array.isArray(raw.multiShotSegments)) {
     out.multiShotSegments = raw.multiShotSegments as ShotParams['multiShotSegments']

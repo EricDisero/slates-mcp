@@ -253,13 +253,55 @@ renumbers the citations. Write the prompt against those numbers:
 
 ```
 Marcus (image 1) performs the motion from video 1 in the workshop from image 2,
-speaking the line in audio 1. Preserve his identity, appearance and outfit.
+using the voice timbre from audio 1. Preserve his identity, appearance and outfit.
 ```
+
+🚨 **SAY WHAT AN AUDIO REFERENCE IS FOR.** It can mean music, dialogue, voice, tone or timbre — five roles on one attachment — so an unroled clip falls back to **dialogue**: the model re-transcribes it and speaks ITS words. A real take came back as *"a map called Slates"* for *"an app called Slates"*. Name it as the voice timbre and the clip carries the voice while the prompt carries the words. ByteDance's own sentence: *"Image 1 depicts the protagonist John and uses the voice timbre from Audio 1."* Bind each speaker in a sentence, never by attachment order — position carries nothing.
 
 Frames and reference media stay mutually exclusive, in every combination — the reference endpoint
 has no first/last-frame parameters at all, so this is a shape mismatch rather than a preference.
 
 ---
+
+## Sound: four bracket types, and they are the vendor's syntax
+
+ByteDance's 2.5 API tutorial states this as a **prompt rule**, not a suggestion — verbatim: *"Use
+special characters to distinguish sounds: `()` for music, `<>` for sound effects, `{}` for dialogue,
+and `【】` for subtitles. For non-Chinese dialogue, it is recommended to specify the language before
+the dialogue."*
+
+```
+She sets the cup down {English: "We open in ten minutes."} <ceramic clink on wood>
+(low piano, unhurried)
+```
+
+- `()` **music** · `<>` **sound effects** · `{}` **dialogue** · `【】` **on-screen subtitles**
+- **Name the language before non-Chinese dialogue.** `{English: "..."}`.
+- Unbracketed sound description still works — this is a disambiguator, not a required wrapper. Reach
+  for it when one sentence carries more than one kind of sound and you need the model to tell them
+  apart, which is exactly where an unmarked prompt puts a line of dialogue into the score.
+
+⚠️ **These four are SEEDANCE 2.5's.** MiniMax H3 has its own three-layer scheme (body / soundscape /
+score) and its angle brackets are documentation notation that must never be typed. Do not carry
+either grammar onto the other model.
+
+## Say what a reference is NOT for
+
+The same rule adds a half nobody uses: *"Specify what each asset provides, such as appearance,
+action, or timbre, **and what should not be referenced**."* Negative scoping is a first-class part of
+the citation, not a fallback — *"use her face and wardrobe from image 1, not its lighting or
+background"* is a stronger instruction than naming the positive alone, because an unscoped reference
+brings its whole frame with it.
+
+🚨 **The vendor writes `@Image 1`; Slates writes `image 1`, and that difference is deliberate.**
+BytePlus's API tutorial says *"Use `@Image 1`, `@Video 1`, and `@Audio 1`"*, while its own 2.5 prompt
+guide states the bare form (`Image 1 / Video 1 / Audio 1`) in the one normative sentence it has.
+**Two first-party docs, two forms** — the disagreement is recorded, not resolved, in
+`second-brain/business/projects/slates/research/model-prompting-research.md`. What settles it FOR US
+is neither: **`@` is a reference-token sigil in the Slates prompt composer, and an unresolved one is
+silently deleted from the prompt before it is sent.** Typing `@Image 1` here does not produce
+`@Image 1`, it produces nothing. The bare form is confirmed working on both models. Never hand-type
+the sigil.
 
 ## Seedance 2.5 Edit (`slates_edit_video`, `model: 'seedance-2.5-edit'`)
 

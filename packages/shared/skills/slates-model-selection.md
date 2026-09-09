@@ -9,7 +9,7 @@ Pick the model FIRST, deliberately, before writing a prompt or quoting a plan. M
 
 ## 🔑 The meta-rule — above the table
 
-The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni Flash, Seedream 5 Lite, GPT Image 2 all landed recently) — **a table rots; a rule doesn't.** When the tables and this rule disagree, or when a model appears that the tables don't cover, run the rule:
+The tables below are a snapshot. This roster churns constantly (NB2 Lite, Omni Flash, Seedream 5 Lite, GPT Image 2.5 all landed recently) — **a table rots; a rule doesn't.** When the tables and this rule disagree, or when a model appears that the tables don't cover, run the rule:
 
 > **Name ONE must-preserve requirement for the shot.** Not a vibe — the single thing that, if it breaks, makes the shot unusable: this face stays this face · the fluid behaves like fluid · the text stays legible · the take stays one unbroken move.
 >
@@ -88,16 +88,18 @@ Both tools are **Kling-only**. Every entry in them is a real Kling endpoint that
 
 **Video models (Kling, Seedance, Veo) cannot generate standalone images — ever.** A "premium hero reference image" is still an image job: it routes to an image model below, never to Seedance.
 
-- **Default: Nano Banana 2** — best reference handling (14 refs), best legible text, the standard start-frame generator.
+- **Default: Nano Banana 2** — strongest reference HANDLING (14 refs; GPT Image now takes more, at 16, but Banana is still the one that holds many subjects coherently), best legible text, the standard start-frame generator.
 - **NB2 Lite** — the fast/draft seat: ~half NB2's price, ~2.7× faster, 1K only. Route iteration volume and drafts here; finals go back to NB2 full (2K/4K).
 - **Nano Banana Pro** — the hero-frame/typography ceiling (~2× NB2). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs — feed it a full subject library.
-- **GPT Image 2** — readable text / panels / UI king: character sheets, shot grids, diagrams, text-bearing panels. **Also the photoreal front-runner (Eric, 2026-08-24)** — at `quality: high` it beat both Nano Banana rails head-to-head on skin realism, which is why the AI-influencer ad lane generates every plate here. Medium is the value seat (half NB2's price at 1080p); **high is the seat for photoreal skin and for text precision**. 4K at both tiers is API-only — even paid ChatGPT can't render it.
+- **GPT Image 2.5** — two seats, `gpt-image-2-5-flare` and `gpt-image-2-5-sunburst`, **same price**. Readable text / panels / UI king: character sheets, shot grids, diagrams, text-bearing panels. **Also the photoreal front-runner (Eric, 2026-08-24)** — it beat both Nano Banana rails head-to-head on skin realism, which is why the AI-influencer ad lane generates every plate on this line. **The seat split is SPEED vs QUALITY, not generate vs edit** (OpenAI's own rule): Flare is the small, fast model with quality *comparable to* GPT Image 2 — drafts, exploration, volume; Sunburst is OpenAI's *most capable* image model, higher quality than GPT Image 2, deliberately slower — finals, hero frames, photoreal, and multi-reference edits, where its lead is widest. **Explore on Flare, finish on Sunburst.** Five quality tiers, cheapest first — `low` (layout checks only), `medium` (drafts), **`high` (the default)**, `xhigh`, `max` (the top). Uneven: `max` is 4× `high`, `xhigh` only ~1.8× it. **16 reference images**, the schema ceiling. **Transparent backgrounds** via `backgroundMode` — free, and the only image family that offers them.
+
+  🚨 **The tier names moved when 2.5 replaced GPT Image 2, and the strings did not.** GPT Image 2's `medium` is 2.5's `high`; its `high` is 2.5's `max` — same money, one rung of renaming. The 2026-08-24 photoreal result was measured at GPT Image 2 `high`, so **the tier that reproduces it is `max`**. Nobody has re-run it on 2.5; the ranking is inherited, not re-measured.
 - **FLUX.2 Max** — photoreal texture, hex-color binding, typography, less censored.
 - **Seedream 5 Lite** — uncensored + any-resolution flat price; volume exploration when the Gemini filter is in the way.
 
-**Split rule of thumb:** readable text / panels / UI **and photoreal people** → GPT Image 2 (`high` for photoreal); edit-heavy work, or anything needing the 14-reference ceiling → the Banana line; drafts → NB2 Lite; uncensored or odd resolutions → Seedream/FLUX.
+**Split rule of thumb:** readable text / panels / UI → GPT Image 2.5 (Flare to explore, Sunburst to finish); **photoreal people, finals and hero frames → Sunburst at `max`** — the 2026-08-24 result was measured at GPT Image 2's `high`, which is `max` here, and Flare only *matches* GPT Image 2 while Sunburst exceeds it; multi-reference edits where several references must all survive into one frame → Sunburst; edit-heavy work → the Banana line; drafts → GPT Image 2.5 Flare at `medium`, which now undercuts NB2 Lite on both price and resolution; uncensored or odd resolutions → Seedream/FLUX.
 
-⚠️ **This line said the opposite until 2026-08-24** — it sent photoreal *away* from GPT Image 2 on reputation, which is the exact failure § The meta-rule above warns about. Re-run the evidence test when the roster moves.
+⚠️ **This line said the opposite until 2026-08-24** — it sent photoreal *away* from GPT Image on reputation, which is the exact failure § The meta-rule above warns about. Re-run the evidence test when the roster moves. It moved again on 2026-09-09, and the ranking was carried across rather than re-measured — exactly what the meta-rule says not to trust. Treat it as a starting hypothesis for 2.5, not a receipt. **The seat choice above is likewise reasoned from OpenAI's positioning, not measured:** run Flare-`max` against Sunburst-`max` on one plate and write the answer into `slates-prompting-gpt-image-2-5`.
 
 ## Audio routing
 

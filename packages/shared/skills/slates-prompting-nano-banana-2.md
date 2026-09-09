@@ -219,5 +219,5 @@ Everything in this skill applies to the whole Nano Banana family; two variants t
 - **nano-banana-pro** — the hero-frame/typography ceiling (~2× NB2, 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs — it takes a full subject library in one call.
 
 <!-- slates-only -->
-Routing between them (and vs GPT Image 2 / FLUX / Seedream): `slates-model-selection`.
+Routing between them (and vs GPT Image 2.5 / FLUX / Seedream): `slates-model-selection`.
 <!-- /slates-only -->

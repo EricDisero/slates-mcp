@@ -58,9 +58,9 @@ This is a **cost** rule as much as a craft rule: a 1080p/10s premium video gener
 ### Per-model accents — check the one you actually used
 
 - **Nano Banana Pro** (`nano-banana-pro`) — ruler-straight symmetry, everything parallel and square, flat even light, pretty but staged/stock, textures reading as 3D render rather than photograph. **It hyperbolizes every edit**: ask for graffiti on one wall and the whole location gets tagged.
-- **GPT Image 2** (`gpt-image-2`) — microcontrast to the ceiling, hard halos on every edge, no depth or bokeh, white balance pulled warm until the frame yellows, plastic licked-smooth materials. Worst tell: **one sickly texture pattern laid over the entire frame**.
+- **GPT Image** (`gpt-image-2-5-flare`, `gpt-image-2-5-sunburst`) — microcontrast to the ceiling, hard halos on every edge, no depth or bokeh, white balance pulled warm until the frame yellows, plastic licked-smooth materials. Worst tell: **one sickly texture pattern laid over the entire frame**. ⚠️ Catalogued on `gpt-image-2`, which 2.5 replaced on 2026-09-09 — an accent is a per-model observation, so treat this as a prior to check rather than a finding, and correct it here the first time a 2.5 frame disagrees.
 
-> ⚠️ These are accents for **`nano-banana-pro`** and **`gpt-image-2`** specifically. `nano-banana-2` is a **different model** (Gemini 3.1 Flash Image vs NB Pro's Gemini 3 Pro Image) and we have **no evidence** about its accent. Do not inherit one — say nothing rather than warn about a failure mode you can't substantiate.
+> ⚠️ These are accents for **`nano-banana-pro`** and the **GPT Image** line specifically. `nano-banana-2` is a **different model** (Gemini 3.1 Flash Image vs NB Pro's Gemini 3 Pro Image) and we have **no evidence** about its accent. Do not inherit one — say nothing rather than warn about a failure mode you can't substantiate. That caution applies to the GPT Image entry above too: it was measured on `gpt-image-2`, not on either 2.5 seat.
 
 ## Where the fault lives — triage before you change anything
 
