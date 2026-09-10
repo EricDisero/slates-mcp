@@ -522,9 +522,12 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   //
   // Every value below is READ OFF fal's live OpenAPI, fetched 2026-08-27:
   //   minimax/h3/{text-to-video,image-to-video,reference-to-video}
-  //   minimax/h3-max/{text-to-video,image-to-video}
-  // `minimax/h3-max/reference-to-video` returns 404 — it does not exist, which
-  // is why the Max row declares no reference capacity at all.
+  //   minimax/h3-max/{text-to-video,image-to-video,reference-to-video}
+  // 🚨 CORRECTED 2026-09-09: `minimax/h3-max/reference-to-video` DOES exist —
+  // 9 images, 3 videos, 3 audio. The earlier note here said it 404s; the schema
+  // had never been read. Both rows now declare the full omni-reference set, and
+  // every cap on the Max row was re-read on the Max endpoint rather than copied
+  // down from the base row.
   //
   // 🚨 NEVER PREFIX-MATCH THESE TWO IDS. `minimax-h3-max` starts with
   // `minimax-h3`, so any `startsWith('minimax-h3')` swallows the Max row into
@@ -565,31 +568,38 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'minimax-h3-max': {
     aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
-    // 🚨 ZERO, DECLARED — not omitted. `minimax/h3-max/reference-to-video`
-    // returns 404, so there is no transport for a reference of any modality.
-    // Leaving this undeclared does NOT mean "none": `getMaxRefImages` falls
-    // back to `?? 3` for the ingredients mode, which handed this row three
-    // reference slots it cannot send. Measured 2026-09-09 — a pinned image on
-    // an h3-max generation was accepted by the composer, dropped in transit,
-    // and the model rendered the prompt text alone, returning a different
-    // person than the reference. Frames (start/end) remain the ONLY image
-    // transport on this seat.
-    maxIngredientImages: 0,
-    maxRefImages: 0,
-    // 480p/768p ONLY — fal's post-train of the open weights, and the 2K
-    // upscaler was never open-sourced. Declaring the shorter ladder here IS the
-    // whole Max-seat mechanism: `assertVideoCapabilities` refuses 2K/4K on this
-    // id, the desktop picker renders only what this entry declares, and the
-    // agent's Zod enum stays the union while the per-model guard narrows.
-    // Anything shaped like "disable the higher tiers when Max is selected" is
-    // re-implementing a guard that already exists.
-    videoResolution: { options: ['480p', '768p'], default: '768p' },
+    // 🚨 REFERENCES LANDED 2026-09-09, AFTER A FALSE CLAIM WAS RETIRED. This row
+    // shipped from v1.5.5 declaring zero reference capacity because a comment
+    // asserted `minimax/h3-max/reference-to-video` "returns 404". It does not.
+    // Nobody had read the schema. The rip is at
+    // second-brain/business/projects/slates/provider-docs/fal-minimax-h3-openapi-schemas.md
+    //
+    // Caps verbatim from that endpoint's schema: reference_image_urls maxItems
+    // 9, reference_video_urls maxItems 3, reference_audio_urls maxItems 3, and
+    // in all three descriptions: "Reference images, videos, and audio clips
+    // must add up to at most 12 files."
+    //
+    // These MATCH the base row exactly — and they were re-read on this endpoint
+    // rather than copied across, because "same as the row above" is the tell
+    // this whole file exists to delete.
+    maxIngredientImages: 9,
+    maxReferenceVideos: 3,
+    maxReferenceAudio: 3,
+    maxReferenceFilesTotal: 12,
+    // "2-15 seconds each, combined duration at most 15 seconds" on BOTH media
+    // arms — quoted off this endpoint, not inherited.
+    maxReferenceVideoSeconds: 15,
+    maxReferenceAudioSeconds: 15,
+    // 1080P IS REAL ON THIS ROW and was missing until 2026-09-09. The schema's
+    // resolution enum is ["480P","768P","1080P"] on all three h3-max endpoints.
+    // 2K/4K genuinely are absent: the H3-Regenerate-2K upscaler is API-only and
+    // is not in the open weights fal self-hosts, which is the actual mechanism
+    // behind the shorter ladder — 1080p was never part of that story.
+    //
+    // DEFAULT stays 768p: it is the tier the model natively generates, and
+    // 1080p is a 2x price step ($0.160/s against $0.080/s).
+    videoResolution: { options: ['480p', '768p', '1080p'], default: '768p' },
     duration: { min: 5, max: 15, mode: 'continuous' },
-    // NO reference caps, deliberately: fal publishes text-to-video and
-    // image-to-video for h3-max and NOTHING else (reference-to-video 404s), so
-    // there is no transport for a reference of any modality. A cap declared
-    // above what the handler sends is a SILENT DROP — the exact failure
-    // `seedance-2.5-edit` shipped with. Absent means the composer refuses.
   },
 
   // ── LTX-2.5 (both seats on fal — added 2026-08-29) ─────────────────────────

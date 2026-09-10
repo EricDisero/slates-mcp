@@ -577,7 +577,8 @@ const VIDEO_RESOLUTION_VOCAB = VIDEO_RESOLUTIONS
 // fal charges $0.080 per reference image PAST THE FIRST FIVE on
 // `minimax/h3/reference-to-video`, and nowhere else — not on image-to-video
 // start/end frames (those are FL2VA inputs, not Ref2VA references), and not on
-// h3-max, which has no reference endpoint at all. Left unmodelled it inverts
+// image-to-video start/end frames on either row. The two rows charge DIFFERENT
+// amounts per image — base $0.08 past five, Max $0.02 past four. Left unmodelled it inverts
 // the margin: a 10s 768p clip earns $0.30 and four extra images cost $0.32.
 //
 // `/proxy/generate` resolves ONE key to ONE integer, so a surcharge has to live
@@ -592,6 +593,13 @@ const VIDEO_RESOLUTION_VOCAB = VIDEO_RESOLUTIONS
 const MINIMAX_MODELS = new Set<string>(['minimax-h3', 'minimax-h3-max'])
 /** Reference images fal does not charge for. */
 const MINIMAX_FREE_REF_IMAGES = 5
+/** Per-row free allowance. The Max row's is FOUR — fal prices its references by
+ *  token (4,096 free) against the base row's per-image five, so this is a
+ *  different unit, not a different number. Exact-id, never a prefix. */
+const MINIMAX_FREE_REF_IMAGES_BY_MODEL: Record<string, number> = {
+  'minimax-h3': 5,
+  'minimax-h3-max': 4,
+}
 
 /**
  * The LTX-2.5 pair. A SET, not a prefix test — `ltx-2-5-pro` starts with
@@ -630,7 +638,8 @@ function minimaxRefSurchargeCount(model: string, referenceImages?: number): numb
   const cap = getModelCapability(model)?.maxIngredientImages ?? 0
   const n = Math.floor(referenceImages ?? 0)
   if (!Number.isFinite(n) || n <= 0) return 0
-  return Math.max(0, Math.min(n, cap) - MINIMAX_FREE_REF_IMAGES)
+  const free = MINIMAX_FREE_REF_IMAGES_BY_MODEL[model] ?? MINIMAX_FREE_REF_IMAGES
+  return Math.max(0, Math.min(n, cap) - free)
 }
 
 /** The exact `model` ids `slates_edit_video` accepts. Edit rows are deliberately
@@ -712,7 +721,7 @@ export const estimateGenerationCost: Operation<{
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
     seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
     referenceImages: z.number().int().min(0).optional().describe(
-      `minimax-h3 only — how many reference IMAGES the generation will carry. The first ${MINIMAX_FREE_REF_IMAGES} are free and each one after that is a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. Ignored by every other model — including minimax-h3-max, which has no reference endpoint (its start/end frames are free and are not reference images).`
+      `MiniMax H3 rows only — how many reference IMAGES the generation will carry. Each image past the row's free allowance is a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. The allowances differ: minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}. Ignored by every other model. Start/end frames are free on both rows and are not reference images.`
     ),
   }),
   async run(input, ctx) {
@@ -2814,7 +2823,9 @@ function resolveVideoModel(raw: string): {
   // to a TOTAL before anything can re-surcharge it.
   const ref = /-ref(\d+)\b/.exec(s)
   if (ref) {
-    out!.referenceImages = MINIMAX_FREE_REF_IMAGES + parseInt(ref[1], 10)
+    out!.referenceImages =
+      (MINIMAX_FREE_REF_IMAGES_BY_MODEL[out!.model as string] ?? MINIMAX_FREE_REF_IMAGES) +
+      parseInt(ref[1], 10)
     s = s.replace(/-ref(\d+)\b/, '')
   }
   // The RESOLUTION vocabulary is GENERATED from MODEL_CAPABILITIES — the
@@ -3193,7 +3204,8 @@ export const generateVideo: Operation<{
     // capability SSOT; only the endpoint SHAPE is stated here, because it is
     // not a number the registry models: fal publishes text-to-video,
     // image-to-video and reference-to-video for `minimax/h3`, and only the
-    // first two for `minimax/h3-max` (its reference-to-video 404s). The
+    // all three for `minimax/h3-max` as well (corrected 2026-09-09 — its
+    // reference-to-video was wrongly believed to 404). The
     // reference endpoint has no frame parameters at all, so frames and
     // references are mutually exclusive — a shape mismatch, not a preference.
     if (MINIMAX_MODELS.has(input.model)) {
@@ -3228,7 +3240,7 @@ export const generateVideo: Operation<{
         return ok({
           requires_clarification: true,
           missing: [],
-          message: `${input.model} takes at most ${maxImages} reference images combined (you passed ${refImages}). Trim the list — and note the first ${MINIMAX_FREE_REF_IMAGES} are free while each one after that adds a paid dimension to the cost key.`,
+          message: `${input.model} takes at most ${maxImages} reference images combined (you passed ${refImages}). Trim the list — and note the first ${MINIMAX_FREE_REF_IMAGES_BY_MODEL[input.model as string] ?? MINIMAX_FREE_REF_IMAGES} are free while each one after that adds a paid dimension to the cost key.`,
         })
       }
       if ((input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0) > maxVideos) {

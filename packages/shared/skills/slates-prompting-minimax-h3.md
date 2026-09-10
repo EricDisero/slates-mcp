@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-minimax-h3
-description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling slates_generate_video with model minimax-h3 or minimax-h3-max. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, capped at 768p, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it still animates start and end frames, but it has no reference-to-video endpoint, so the omni-reference set is base-H3 only. Two hazards live here: reference images past the fifth cost 4 credits each on the base row, and audio written into the wrong section is dropped or duplicated.
+description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling slates_generate_video with model minimax-h3 or minimax-h3-max. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, capped at 768p, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it animates start and end frames AND takes the same 9+3+3 omni-reference set (corrected 2026-09-09), so the seats differ on ladder and price, not on what they accept. Two hazards live here: reference images past the free allowance are billed (5 free then +4 credits on base H3; 4 free then +1 on Max), and audio written into the wrong section is dropped or duplicated.
 ---
 
 # MiniMax H3 — prompting
@@ -28,7 +28,7 @@ description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling sl
 - `A woman sits still at a kitchen table for a beat, then looks up. She says in English, "You said Tuesday." Scene sound: a fridge hum, a spoon set down on formica. Score: none.`
 - `Two mechanics either side of an open bonnet. The younger one wipes his hands, waits, then speaks in Spanish, "No es el alternador." Scene sound: a socket wrench, a radio two bays over. Score: a low sustained cello under the last three seconds, audience only.`
 
-**Hard constraint:** the two seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` is capped at 768p, has NO reference endpoint at all (start and end frames still work), and costs MORE at the tier they share — it is a speed pick, never the cheap one. H3's top two resolution tiers are UPSCALES of the native render: judge at native. Reference images past the fifth are a paid dimension of the cost key — declare the count when quoting.
+**Hard constraint:** the two seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` tops out at 1080p rather than 4K, takes the same 9+3+3 references, and costs MORE at the tier they share — it is a speed pick, never the cheap one. H3's top two resolution tiers are UPSCALES of the native render: judge at native. Reference images past the free allowance are a paid dimension of the cost key (5 free on base, 4 on Max) — declare the count when quoting.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -55,8 +55,8 @@ endpoint accepts:
 
 | | `minimax-h3` | `minimax-h3-max` |
 |---|---|---|
-| Resolution | 480p / 768p / **2K / 4K** | 480p / 768p |
-| References | 9 images + 3 video + 3 audio (12 files) | **none — no reference endpoint exists.** Frames still work; see the row below |
+| Resolution | 480p / 768p / **2K / 4K** | 480p / 768p / **1080p** |
+| References | 9 images + 3 video + 3 audio (12 files) | 9 images + 3 video + 3 audio (12 files) |
 | Frames | start and/or end | start and/or end |
 | Price at 768p | **$0.060/s** | $0.080/s |
 | Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) |
@@ -70,6 +70,12 @@ paying for; route to base H3 for anything needing resolution, references, or the
 **12x**, queue to finished file. fal advertises "under 3 seconds"; the literal claim did not hold at
 4.8s wall-clock, but the order of magnitude did. For iteration loops and client-present work that gap
 is the entire reason the seat exists.
+
+🚨 **Max's known weakness: colour banding in low light (Eric, 2026-09-09).** Certain shots —
+especially dark or low-key ones — come back with low-bitrate-looking banding across gradients (skies,
+walls, shadow falloff). It is the one place the seat visibly gives something up. If a shot is dark
+and gradient-heavy, either light it up in the prompt or route to base H3 at 768p; do not fix it by
+reaching for 2K, which adds its own artifacting on top.
 
 ---
 
@@ -186,8 +192,8 @@ original wording preserved exactly: *A red neon sign reading "Open Late" glows a
 
 ## References — H3's real differentiator is the declared RELATIONSHIP
 
-*(Base `minimax-h3` only. `minimax-h3-max` has no reference endpoint — Slates refuses references
-on that row rather than dropping them silently.)*
+*(BOTH rows. `minimax-h3-max` gained the reference set on 2026-09-09; its free allowance is
+FOUR images rather than the base row's five.)*
 
 <!-- @inject:references-read-literally -->
 > **The general law: the model reads a reference literally.**
@@ -254,10 +260,13 @@ exactly and say so.
 **An audio reference cannot travel alone** — H3 refuses a reference set that is audio only. Pair it
 with at least one image or video reference.
 
-### 💸 Reference images past the fifth cost 4 credits each
+### 💸 Reference images past the free allowance are billed — and the two rows differ
 
-The first **5** reference images are free. Each additional image — the model takes **9** — adds
-**4 credits** to the generation, at every resolution and every length. Four extra images on a 10s
+On `minimax-h3` the first **5** are free and each additional image adds **4 credits**. On
+`minimax-h3-max` the first **4** are free and each additional image adds **1 credit** — fal prices
+Max's references by token rather than per image, and Slates normalises every Max reference to
+1024x1024 so that per-image number is exact. Both rows take **9** images, at every resolution and
+every length. Four extra images on a 10s
 768p clip add 16 credits to a 30-credit generation: **more than half again**, for references that
 often make the output worse rather than better (see the 2–4 rule above).
 
@@ -291,7 +300,9 @@ dropping one side.
 | `minimax-h3` · 2K · 10s | 65 |
 | `minimax-h3` · 4K · 10s | 80 |
 | `minimax-h3-max` · 768p · 10s | 40 |
-| every reference image past the fifth | **+4** |
+| `minimax-h3-max` · 1080p · 10s | 80 |
+| `minimax-h3` — every reference image past the **fifth** | **+4** |
+| `minimax-h3-max` — every reference image past the **fourth** | **+1** |
 
 **768p is the default for a reason.** It is the tier the model natively generates.
 
@@ -302,8 +313,13 @@ cannot add information.
 
 **In our own test (2026-08-27, same prompt, same seed) the 2K pass came back with MORE artifacting
 than the 768p original it was built from**, while costing 33 credits for a 5-second take against 15,
-and taking nearly twice as long to return. One shot, so treat it as a warning rather than a law —
-but the mechanism explains it, and the burden of proof is on 2K.
+and taking nearly twice as long to return.
+
+🚨 **Confirmed independently (Eric, 2026-09-09): 2K and 4K carry visible AI noise artifacting and
+"just look bad".** That is now TWO separate observations, months apart, pointing the same way — it is
+no longer a single-shot warning. The tiers stay available because a delivery spec sometimes demands
+the pixels, but **do not route to 2K/4K for quality**: you are paying more, waiting longer, and
+adding artifacts to a 768p render. Upscale in post from a clean 768p master instead.
 
 **So: generate at 768p and judge it at 768p.** Reach for 2K or 4K only when a delivery spec demands
 the pixels, and expect to be paying for size rather than quality — a post-production upscale from a
