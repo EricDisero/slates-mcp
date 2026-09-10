@@ -56,7 +56,21 @@ export interface ReferenceGroup {
   /** Display + citation name: 'Marcus' | 'the cafe' | 'noir'. Used verbatim. */
   name: string
   kind: ReferenceKind
-  /** A group can carry several images for workflows that genuinely need them. */
+  /**
+   * A group can carry several images for workflows that genuinely need them.
+   *
+   * 🚨 A `character` GROUP MAY ALSO CARRY ONE `audio` MEDIUM — that character's
+   * assigned VOICE (2026-09-09). It is the same idea as the identity image, on
+   * the other axis of identity: the mention attaches what the character IS, and
+   * a voice is part of that. The audio takes its number from the audio counter,
+   * so adding one renumbers no image, and it is cited INLINE beside her name
+   * ("Sarah (image 1, voice timbre from audio 1)") rather than as the neutral
+   * `audio-ref` sentence — step 3e holds the receipt for why that is legal.
+   *
+   * A character group with a voice and NO identity image is a real state, not a
+   * defect: `voice-without-photo` is legal on any model that reads audio alone
+   * (Seedance 2.5). It cites no image and the timbre line carries the binding.
+   */
   media: ReferenceMedia[]
   /**
    * What is SAID in this group's reference audio, typed by the user.
@@ -123,6 +137,24 @@ function isFreeRefImageKind(kind: ReferenceKind): boolean {
 function citeImages(nums: number[]): string {
   const noun = nums.length === 1 ? 'image' : 'images'
   return `${noun} ${joinNums(nums)}`
+}
+
+/**
+ * "voice timbre from audio 1" — a character's VOICE, cited inline beside her
+ * name (lowercase, for inline use, exactly like `citeImages`).
+ *
+ * 🚨 THE ROLE WORDS ARE THE LOAD-BEARING HALF, not decoration. A bare
+ * "(image 1, audio 1)" would be the UNROLED state: BytePlus's capability table
+ * gives an audio reference five possible jobs — "music, dialogue, voice, tone,
+ * or timbre" — and an unroled clip falls back to DIALOGUE, so the model
+ * transcribes it and speaks ITS words instead of the prompt's. That is the
+ * shipped defect where a supplied take came back as "a map called Slates" for
+ * "an app called Slates" (2026-08-28). "voice timbre" is the vendor's own
+ * phrase for the half we want: the sound of her, not her words.
+ */
+function citeVoice(nums: number[]): string {
+  const noun = nums.length === 1 ? 'audio' : 'audios'
+  return `voice timbre from ${noun} ${joinNums(nums)}`
 }
 
 function joinNums(nums: number[]): string {
@@ -257,7 +289,12 @@ export function composeReferences(
         videoNum += 1
         videoNums.push(videoNum)
         orderedVideoPaths.push(m.path)
-      } else if (m.mediaKind === 'audio' && g.kind === 'audio-ref') {
+      } else if (m.mediaKind === 'audio' && (g.kind === 'audio-ref' || g.kind === 'character')) {
+        // ONE audio counter across hand-attached clips and a CHARACTER'S VOICE,
+        // for the same reason the video counter is shared: the two are the same
+        // numbered space on the wire, and a second counter would emit two
+        // "Audio 1"s the moment a request carried both. Which SENTENCE names
+        // the clip is what differs (step 3 vs step 3e), never the number.
         audioNum += 1
         audioNums.push(audioNum)
         orderedAudioPaths.push(m.path)
@@ -328,7 +365,28 @@ export function composeReferences(
     if (g.kind === 'style') return '' // styles never inline — trailing clause only
     if (!seenFirst.has(key)) {
       seenFirst.add(key)
-      return `${g.name} (${citeImages(g.imageNums)})`
+      // 🚨 ONE BINDING SITE PER ENTITY, CARRYING EVERY MEDIUM SHE OWNS
+      // (2026-09-09). The mention attaches her face AND her voice, so both are
+      // cited where her name appears rather than one inline and the other in a
+      // preamble sentence above the user's own words. That split was the first
+      // shape this shipped in, and it read backwards: a two-speaker prompt made
+      // you hold two name→audio mappings in your head before you reached the
+      // sentence, and a character with a voice and no photo said her name twice
+      // while citing nothing.
+      //
+      // It is also closer to the vendor, not further. BytePlus's binding
+      // example is ONE sentence covering both media — "Image 1 depicts the
+      // protagonist John and uses the voice timbre from Audio 1." — and the
+      // preamble form had already split it in half.
+      //
+      // 🚨 EMPTY MEANS OMITTED, NEVER AN EMPTY PARENTHESIS. A voice-only
+      // character has no `imageNums` and `citeImages([])` would compose the
+      // literal "images " — a citation pointing at nothing, inside the one
+      // function whose whole job is that citations point at what is sent.
+      const cites: string[] = []
+      if (g.imageNums.length > 0) cites.push(citeImages(g.imageNums))
+      if (g.audioNums.length > 0) cites.push(citeVoice(g.audioNums))
+      return cites.length > 0 ? `${g.name} (${cites.join(', ')})` : g.name
     }
     return g.name
   })
@@ -361,26 +419,6 @@ export function composeReferences(
       const noun = g.videoNums.length === 1 ? 'Video' : 'Videos'
       const tail = g.videoNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
       topKeys.push(`${noun} ${joinNums(g.videoNums)} ${tail}`)
-    }
-  }
-
-  // Reference audio ("Audio 1 is a provided reference."), plus THE WORDS when
-  // the user has typed them — see ReferenceGroup.spokenText for why the words
-  // have to travel as text as well as audio.
-  for (const g of numbered) {
-    if (g.kind === 'audio-ref' && g.audioNums.length > 0) {
-      const noun = g.audioNums.length === 1 ? 'Audio' : 'Audios'
-      const tail = g.audioNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
-      topKeys.push(`${noun} ${joinNums(g.audioNums)} ${tail}`)
-      // Trimmed, never rewritten: the words between the quotes are the user's
-      // exactly as typed. The delimiters are CURLY on purpose — a straight
-      // quote inside the user's own line then sits beside them without
-      // colliding, so nothing has to be escaped and nothing is edited.
-      const spoken = (g.spokenText ?? '').trim()
-      if (spoken) {
-        const lower = g.audioNums.length === 1 ? 'audio' : 'audios'
-        topKeys.push(`The words spoken in ${lower} ${joinNums(g.audioNums)} are exactly: “${spoken}”`)
-      }
     }
   }
 
@@ -422,6 +460,105 @@ export function composeReferences(
       }
     }
   }
+
+  // ── Every AUDIO line, in one pass, in audio-NUMBER order ────────────────
+  //
+  // 🚨 AFTER the subject lines, deliberately. A key line that names a subject
+  // ("Image 1 is Marcus.") has to come before a line that gives that subject's
+  // media a job, or the prompt describes a voice before it says whose face it
+  // belongs to. Binding is carried by the SENTENCE rather than by adjacency —
+  // the vendor states that outright — so nothing on the wire depends on this;
+  // what depends on it is whether the composed preview can be read top to
+  // bottom, and that preview is the surface the transparency invariant rests
+  // on.
+  //
+  // 🚨 ONE LOOP OVER THE GROUPS, NOT ONE LOOP PER KIND, AND THAT IS THE WHOLE
+  // POINT OF ITS SHAPE. There are two audio sentences — a hand-attached clip's
+  // neutral "Audio N is a provided reference." and a character's roled
+  // "Sarah uses the voice timbre from Audio N." — and they draw their numbers
+  // from the SAME counter walking THIS list. Emitting them in two passes
+  // printed them in kind order instead of number order, so a request with two
+  // voices and one room-tone clip opened with "Audio 3 is a provided
+  // reference." and named Audio 1 and Audio 2 after it. Nothing was wrong on
+  // the wire — binding is carried by the sentence, not by adjacency, which the
+  // vendor states outright — but a prompt that counts backwards is a prompt
+  // nobody can proofread, and the composed preview is the surface the whole
+  // transparency invariant rests on. One pass over `numbered` IS number order,
+  // because the numbers were assigned by the same walk.
+  for (const g of numbered) {
+    if (g.audioNums.length === 0) continue
+    const noun = g.audioNums.length === 1 ? 'Audio' : 'Audios'
+    if (g.kind === 'character') {
+      // A CHARACTER'S VOICE. When her token appears in the prompt the binding
+      // rides INLINE on her name (step 2) and there is nothing to say up here.
+      // This is the same duality her IMAGE already has — "Sarah (image 1)"
+      // inline versus "Image 1 is Sarah." when the prompt never names her — so
+      // it is the existing pattern rather than a second grammar.
+      //
+      // Emitted from THIS pass, not from a block of its own, so it keeps its
+      // place in audio-NUMBER order among the neutral lines. See the header.
+      const namedInPrompt = g.token && matchedInPrompt.has(normToken(g.token))
+      if (!namedInPrompt) {
+        topKeys.push(`${g.name} uses the ${citeVoice(g.audioNums)}.`)
+      }
+      continue
+    }
+    if (g.kind !== 'audio-ref') continue
+    // A clip the user dragged on declared no role, so it keeps the neutral
+    // line, plus THE WORDS when the user has typed them — see
+    // ReferenceGroup.spokenText for why the words have to travel as text as
+    // well as audio.
+    const tail = g.audioNums.length === 1 ? 'is a provided reference.' : 'are provided references.'
+    topKeys.push(`${noun} ${joinNums(g.audioNums)} ${tail}`)
+    // Trimmed, never rewritten: the words between the quotes are the user's
+    // exactly as typed. The delimiters are CURLY on purpose — a straight
+    // quote inside the user's own line then sits beside them without
+    // colliding, so nothing has to be escaped and nothing is edited.
+    const spoken = (g.spokenText ?? '').trim()
+    if (spoken) {
+      const lower = g.audioNums.length === 1 ? 'audio' : 'audios'
+      topKeys.push(`The words spoken in ${lower} ${joinNums(g.audioNums)} are exactly: “${spoken}”`)
+    }
+  }
+
+
+  // ── 3e. WHY A CHARACTER'S VOICE GETS A ROLE AT ALL (2026-09-09) ──────────
+  //
+  // The binding itself is composed INLINE beside her name (step 2), or as a
+  // fallback line in the audio pass above when the prompt never names her.
+  // This is the receipt for why composing a role is legal at all.
+  //
+  // 🚨 AUDIO IS THE ONE MODALITY WHERE THE NEUTRAL LINE UNDER-SPECIFIES, and
+  // this is the sentence that closes it. An image is definitionally a
+  // reference and a video has two possible roles, so both are settled by a
+  // neutral line. An audio attachment has FIVE — BytePlus's own capability
+  // table lists "music, dialogue, voice, tone, or timbre" — so
+  // "Audio 1 is a provided reference." distinguishes a clip from nothing while
+  // leaving four roles open, and an unroled clip falls back to DIALOGUE: the
+  // model re-transcribes it and speaks ITS words. That is the shipped defect
+  // where a supplied take came back as "a map called Slates" for "an app
+  // called Slates" (2026-08-28).
+  //
+  // The wording is the vendor's, not ours. BytePlus's own binding sentence is
+  // "Image 1 depicts the protagonist John and uses the voice timbre from
+  // Audio 1."; MiniMax builds the same primitive into H3's notation
+  // ("<Audio 1> is the voice-timbre reference for <Subject 1>"). Two vendors,
+  // independently. The DIALOGUE therefore comes from the prompt and the clip
+  // carries only the voice — receipts and line refs:
+  // second-brain/business/projects/slates/research/model-prompting-research.md
+  // § 2026-09-09 Multimodal reference GRAMMAR, facts 2 and 3.
+  //
+  // 🚨 IT IS LEGAL COMPOSITION ONLY BECAUSE THE ROLE WAS DECLARED. Assigning a
+  // voice to a character IS the declaration; a clip dragged onto the rail is
+  // not, and keeps the neutral line above. Inferring a role nobody declared
+  // stays forbidden (`slate/.claude/rules/prompt-surface.md`).
+  //
+  // The citation is lowercase (`voice timbre from audio 1`) like every other
+  // inline citation this composer emits. An earlier draft capitalised it to
+  // match the vendor's example verbatim, which left a single capitalised
+  // `Audio 1` sitting mid-sentence among lowercase `image 1`s; moving the
+  // binding inline removed the reason for the exception along with the
+  // exception.
 
   // ── 4. Style trailing clause (one, at the end — style reads best last) ──
   const styleNums: number[] = []

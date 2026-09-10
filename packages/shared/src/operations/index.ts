@@ -1,3 +1,4 @@
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -689,10 +690,12 @@ export const estimateGenerationCost: Operation<{
   seedanceFace?: boolean
   seedanceRealFace?: boolean
   referenceImages?: number
+  videoRefSeconds?: number
+  audioRefSeconds?: number
 }> = {
   id: 'slates_estimate_generation_cost',
   description:
-    'Pre-flight cost estimate. Call before any generate_* op so the user sees "this will cost N credits" up front. Takes the SAME base model ids as the generate ops (video: "seedance-2" + duration + videoResolution; image: "nano-banana-2" + resolution) — exact registry cost keys also work. Pairs with the confirm gate.',
+    'Quote credits before any generate_* op. Accepts the same base model ids and parameters as generation, or an exact registry cost key. Pairs with the confirm gate.',
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
@@ -715,11 +718,13 @@ export const estimateGenerationCost: Operation<{
       'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
     ),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k: GPT Image/seedream-5-lite).'),
-    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image tier; default high.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image tier; default high.'),
     aspectRatio: z.string().optional().describe('Image only. 1:1/4:3/3:4 cost more than 16:9.'),
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
     seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
+    videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
+    audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, including attached character voices.'),
     referenceImages: z.number().int().min(0).optional().describe(
       `MiniMax H3 rows only — how many reference IMAGES the generation will carry. Each image past the row's free allowance is a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. The allowances differ: minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}. Ignored by every other model. Start/end frames are free on both rows and are not reference images.`
     ),
@@ -858,10 +863,12 @@ export const estimateGenerationCost: Operation<{
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
           seedanceRealFace: input.seedanceRealFace,
           referenceImages: input.referenceImages ?? resolved.referenceImages,
+          videoRefSeconds: input.videoRefSeconds, audioRefSeconds: input.audioRefSeconds,
         })
       }
     }
 
+    await loadDynamicPrice(ctx, byKey, key)
     const perCredits = key != null ? byKey.get(key) : undefined
     if (key == null || perCredits == null) {
       // Every id in the error comes from the SSOT arrays. The image half was
@@ -1786,18 +1793,10 @@ export type ImageModelId =
   | 'seedream-5-lite'
 
 /** The exact `model` ids `slates_generate_image` accepts. */
-/**
- * The image models whose ladder includes the 3k (1440p) class — a MIRROR of
- * `imageResolutions` in slate's MODEL_REGISTRY, which this package cannot read.
- * Exported so `pricing-consistency-check.mjs` can prove the mirror still
- * matches; without that proof a model that gains 3k in the registry just goes
- * quietly unreachable through the op.
- */
-export const THREE_K_IMAGE_MODELS = [
-  'gpt-image-2-5-flare',
-  'gpt-image-2-5-sunburst',
-  'seedream-5-lite',
-] as const satisfies readonly ImageModelId[]
+/** Derived compatibility export for callers enumerating the 3k ladder. */
+export const THREE_K_IMAGE_MODELS = Object.keys(MODEL_CAPABILITIES).filter(
+  (id) => MODEL_CAPABILITIES[id].imageResolutions?.includes('3k')
+)
 
 export const IMAGE_MODELS = [
   'nano-banana-2',
@@ -1826,7 +1825,7 @@ export function isGptImageModel(model: string | undefined): boolean {
  * That is why the op DEFAULTS to `high` rather than `medium`: `high` is the
  * picture the old default bought.
  */
-export type GptQualityId = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type GptQualityId = GptQuality
 
 /**
  * GPT Image's alpha switch — fal's `background` field.
@@ -1839,7 +1838,7 @@ export type GptQualityId = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
  * Costs nothing: fal prices GPT Image on size × quality alone, so this is not
  * part of any cost key. `auto` is fal's default and ours.
  */
-export type GptBackgroundId = 'auto' | 'transparent' | 'opaque'
+export type GptBackgroundId = GptBackground
 
 /**
  * The aspect ratios an image generation can carry — the UNION over what these
@@ -1937,8 +1936,8 @@ export const generateImage: Operation<{
     model: zEnum(IMAGE_MODELS).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('1k drafts, 2k hero, 4k final. nano-banana-2-lite: 1k only. GPT Image classes 1024²/1080p/1440p/2160p. Never default this.'),
-    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image only. UNEVEN ladder: max=4× high, xhigh~1.8×. medium drafts; default high.'),
-    backgroundMode: z.enum(['auto', 'transparent', 'opaque']).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image only. UNEVEN ladder: max=4× high, xhigh~1.8×. medium drafts; default high.'),
+    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
@@ -1976,25 +1975,10 @@ export const generateImage: Operation<{
     }
     const resolution = input.resolution
     const imageModel = input.model ?? 'nano-banana-2'
-    // 🚨 SEEDREAM HAS A 3k CLASS TOO, AND THIS GUARD USED TO DENY IT.
-    // It read `!== 'gpt-image-2'` and rejected every other model at 3k — but
-    // `seedream-5-lite` declares ['2k','3k','4k'] in the desktop registry and
-    // has a real `seedream-5-lite` cost key, so the op was refusing a request
-    // the desktop would have served. Pre-existing; found by the 2026-09-09
-    // audit, not introduced by the 2.5 swap.
-    //
-    // The ladder itself is owned by MODEL_REGISTRY in slate/src/shared/pricing.ts
-    // and is not readable from here, so THREE_K_IMAGE_MODELS is a MIRROR — declared
-    // and exported below so `pricing-consistency-check.mjs` compares it against
-    // the desktop registry's own `imageResolutions`. It used to be an inline
-    // literal with a comment admitting nothing checked it, which is how it came
-    // to deny `seedream-5-lite` a class the desktop had always served.
-    if (resolution === '3k' && !(THREE_K_IMAGE_MODELS as readonly string[]).includes(imageModel)) {
-      return ok({
-        requires_clarification: true,
-        missing: ['resolution'],
-        message: `3k (1440p) exists on ${THREE_K_IMAGE_MODELS.join(', ')} — pick 1k/2k/4k for ${imageModel}.`,
-      })
+    const resolutions = MODEL_CAPABILITIES[imageModel]?.imageResolutions ?? []
+    if (resolution && !resolutions.includes(resolution)) {
+      return ok({ requires_clarification: true, missing: ['resolution'],
+        message: `${imageModel} accepts ${resolutions.join(', ')}.` })
     }
     // Only nano-banana-2 has a headless path — everything else routes through
     // the desktop generation pipeline, which needs a project.
@@ -2070,7 +2054,8 @@ export const generateImage: Operation<{
     const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1')
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = creditCost(entry) * (input.count ?? 1)
     // Confirm gate. Fires above CONFIRM_CREDITS, AND (look-first, mirroring
@@ -2370,8 +2355,8 @@ export const editImage: Operation<{
     editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'flux-2-max', 'seedream-5-lite']).optional(),
     referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana only (NB Pro 13, NB2 Lite 3).'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
-    quality: z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional().describe('GPT Image tier; default high.'),
-    backgroundMode: z.enum(['auto', 'transparent', 'opaque']).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image tier; default high.'),
+    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -2402,7 +2387,8 @@ export const editImage: Operation<{
         : imageCostKey(editModel, resolution, input.quality, input.aspectRatio)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = creditCost(entry)
 
@@ -2590,11 +2576,17 @@ export function videoCostKey(input: {
    *  reference-heavy call and the quote under-reports what the proxy bills
    *  (which it re-derives from the request itself). */
   referenceImages?: number
+  audioRefSeconds?: number
 }): string {
   // EXACT-ID MAP, NEVER A PREFIX: 'minimax-h3-max' starts with 'minimax-h3'.
   // Mirrors minimaxCreditKey() in slate/src/shared/pricing.ts.
   if (MINIMAX_MODELS.has(input.model)) {
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
+    if (input.model === 'minimax-h3-max') {
+      const tokens = minimaxMaxReferenceTokens({ imagePixels: (input.referenceImages ?? 0) * MINIMAX_MAX_REFERENCE.normalizedImageEdge ** 2,
+        videoSeconds: input.videoRefSeconds ?? 0, audioSeconds: input.audioRefSeconds ?? 0, resolution: res ?? '' })
+      return `${input.model}-${res}-${input.duration}s${tokens ? `-rt${tokens}` : ''}`
+    }
     const k = minimaxRefSurchargeCount(input.model, input.referenceImages)
     return `${input.model}-${res}-${input.duration}s${k > 0 ? `-ref${k}` : ''}`
   }
@@ -3402,7 +3394,9 @@ export const generateVideo: Operation<{
     }
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const costKey = videoCostKey({
+    const costKey = input.model === 'minimax-h3-max'
+      ? (await ctx.desktop().get<{ costKey: string }>('/agent/generation/video-quote', { request: JSON.stringify(input) })).costKey
+      : videoCostKey({
       model: input.model as VideoModel,
       duration: input.duration,
       videoResolution: input.videoResolution,
@@ -3435,7 +3429,8 @@ export const generateVideo: Operation<{
           'Real-person generation needs consent: confirm with the user that they hold the rights/consent to this likeness, then retry with realFaceConsent=true.',
       })
     }
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) {
       throw new Error(
         `Model variant not in registry: ${costKey}. ` +
@@ -3875,7 +3870,8 @@ export const generateAudio: Operation<{
       durationSeconds: seconds,
       characters: input.model === TTS_MODEL ? input.prompt.length : undefined,
     })
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) {
       throw new Error(
         `Audio variant not in registry: ${costKey}. Available audio models: ${AUDIO_MODELS.join(' | ')}.`
@@ -4025,7 +4021,8 @@ export const generateLipSync: Operation<{
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
     const totalCents = creditCost(entry)
 
@@ -4145,7 +4142,8 @@ export const generateMotionTransfer: Operation<{
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
     const totalCents = creditCost(entry)
 
@@ -4368,7 +4366,8 @@ export const editVideo: Operation<{
 
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey)
+    const entry = registry.models.find((m) => m.model === costKey) ??
+      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
     const totalCents = creditCost(entry)
 
@@ -5405,8 +5404,9 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
       'Validated against the model when the Shot is saved.'
     ),
     imageResolution: d(z.enum(['1k', '2k', '3k', '4k']).optional(), 'Image models only.'),
-    gptQuality: d(z.enum(['low', 'medium', 'high', 'xhigh', 'max']).optional(), 'GPT Image 2.5 only.'),
-    gptBackground: d(z.enum(['auto', 'transparent', 'opaque']).optional(), 'GPT Image only.'),
+    gptQuality: d(z.enum(GPT_QUALITY_TIERS).optional(), 'GPT Image 2.5 only.'),
+    gptBackground: d(z.enum(GPT_BACKGROUNDS).optional(), 'GPT Image only.'),
+    detachedVoiceCharacterIds: z.array(z.string()).optional().describe('Character voices removed from this recipe.'),
     imageQuantity: d(z.number().int().min(1).max(10).optional(), 'Image models only.'),
     negativePrompt: z.string().optional(),
     sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
@@ -5760,7 +5760,7 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
   if ((VIDEO_MODELS as readonly string[]).includes(model)) {
     const duration = fires?.duration ?? p.duration
     if (!duration) return null
-    const billed = (d: number): number => (d > 0 ? Math.ceil(d - 0.05) : 0)
+    const billed = (d: number): number => model === 'minimax-h3-max' ? Math.max(0, d) : (d > 0 ? Math.ceil(d - 0.05) : 0)
     return videoCostKey({
       model: model as VideoModel,
       duration,
@@ -5773,6 +5773,7 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
       // of these read 0 there. That is why a listing quote is announced as a
       // floor and `slates_get_shot` is the exact one.
       referenceImages: (detail.references ?? []).filter((r) => r.kind === 'image').length,
+      audioRefSeconds: (detail.references ?? []).filter((r) => r.kind === 'audio').reduce((n, r) => n + (r.durationSeconds ?? 0), 0),
       videoRefSeconds: (detail.references ?? [])
         .filter((r) => r.kind === 'video')
         .reduce((n, r) => n + billed(r.durationSeconds ?? 0), 0),
@@ -5794,6 +5795,13 @@ function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references
     )
   }
   return null
+}
+
+/** Dynamic reference keys are priced by the same server calculator that debits them. */
+async function loadDynamicPrice(ctx: OperationContext, byKey: Map<string, number>, key: string | null): Promise<void> {
+  if (!key || byKey.has(key)) return
+  const response = await ctx.cloud().get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(key)}`)
+  for (const row of response.models) byKey.set(row.model, creditCost(row))
 }
 
 /** Credits for one Shot, and how many generations it fires.
@@ -6088,6 +6096,7 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
     // auditing.
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
     const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    for (const row of rows) await loadDynamicPrice(ctx, byKey, shotCostKey(row))
     let total = 0
     let unpriced = 0
     const shots = rows.map((s) => {
@@ -6143,6 +6152,7 @@ export const getShot: Operation<{ shotId: string }> = {
     const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
     const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    await loadDynamicPrice(ctx, byKey, shotCostKey(r.shot))
     const q = shotQuote(r.shot, byKey)
     return ok(
       { ...r.shot, cost_key: q.key, credits: q.credits },
@@ -6244,6 +6254,7 @@ export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean
     }
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
     const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    await Promise.all(details.map((d) => loadDynamicPrice(ctx, byKey, shotCostKey(d))))
     const quotes = details.map((d) => ({ detail: d, ...shotQuote(d, byKey) }))
     const total = quotes.reduce((n, q) => n + q.credits, 0)
     const largest = quotes.reduce((m, q) => (q.credits > m ? q.credits : m), 0)

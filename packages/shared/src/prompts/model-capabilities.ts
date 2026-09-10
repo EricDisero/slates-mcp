@@ -195,7 +195,52 @@ export interface VoiceCloneCapability {
   designPromptChars: { min: number; max: number }
 }
 
+export const GPT_QUALITY_TIERS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+export type GptQuality = (typeof GPT_QUALITY_TIERS)[number]
+export const GPT_BACKGROUNDS = ['auto', 'transparent', 'opaque'] as const
+export type GptBackground = (typeof GPT_BACKGROUNDS)[number]
+export type ImageResolution = '1k' | '2k' | '3k' | '4k'
+
+// Product output sizes; schema bounds and metering receipt live in the GPT harvest.
+export const GPT_IMAGE_25_SIZES: Record<string, Record<string, { width: number; height: number }>> = {
+  '1k': {
+    '1:1': { width: 1024, height: 1024 },
+    '16:9': { width: 1360, height: 768 },
+    '9:16': { width: 768, height: 1360 },
+    '4:3': { width: 1168, height: 880 },
+    '3:4': { width: 880, height: 1168 },
+  },
+  '2k': {
+    '1:1': { width: 1440, height: 1440 },
+    '16:9': { width: 1920, height: 1080 },
+    '9:16': { width: 1080, height: 1920 },
+    '4:3': { width: 1664, height: 1248 },
+    '3:4': { width: 1248, height: 1664 },
+  },
+  '3k': {
+    '1:1': { width: 1920, height: 1920 },
+    '16:9': { width: 2560, height: 1440 },
+    '9:16': { width: 1440, height: 2560 },
+    '4:3': { width: 2224, height: 1664 },
+    '3:4': { width: 1664, height: 2224 },
+  },
+  '4k': {
+    // 1:1 and 16:9 sit EXACTLY on the 8,294,400 ceiling — 3840×2160 is one of
+    // fal's own priced sizes, so the bound is inclusive. 4:3 / 3:4 are the two
+    // that had to move; see the constraint note above.
+    '1:1': { width: 2880, height: 2880 },
+    '16:9': { width: 3840, height: 2160 },
+    '9:16': { width: 2160, height: 3840 },
+    '4:3': { width: 3264, height: 2448 },
+    '3:4': { width: 2448, height: 3264 },
+  },
+}
+
 export interface ModelCapability {
+  imageResolutions?: ImageResolution[]
+  /** Per-file reference-audio bounds, independently of the combined cap. */
+  referenceVideoDuration?: { min: number; max: number }
+  referenceAudioDuration?: { min: number; max: number }
   aspectRatios: AspectRatio[]
   /** Provider-keyed overrides. `fal` is the one that matters — see AGENT_ROUTE_PROVIDER. */
   providerAspectRatios?: Record<string, AspectRatio[]>
@@ -254,16 +299,19 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // ── Image models ───────────────────────────────────────────────────────────
 
   'nano-banana-2': {
+    imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 14,
   },
 
   'nano-banana-2-lite': {
+    imageResolutions: ['1k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 4, // fal edit endpoint caps input images at 4
   },
 
   'nano-banana-pro': {
+    imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 14,
   },
@@ -305,21 +353,25 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // limits either: the MCP's 4,000-character prompt against fal's 32,000, and
   // image quantity, which is a fan-out and has no provider ceiling at all.
   'gpt-image-2-5-flare': {
+    imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
     maxRefImages: 16,
   },
 
   'gpt-image-2-5-sunburst': {
+    imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
     maxRefImages: 16,
   },
 
   'flux-2-max': {
+    imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 4,
   },
 
   'seedream-5-lite': {
+    imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 10,
   },
@@ -535,6 +587,9 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // tier they share. Every lookup downstream is an exact-id map, not a prefix.
 
   'minimax-h3': {
+    // fal reference-to-video schema, 2026-09-09: each audio clip is 2-15s.
+    referenceAudioDuration: { min: 2, max: 15 },
+    referenceVideoDuration: { min: 2, max: 15 },
     aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
     // The full ladder. 480p/768p are NATIVE generation modes; 2K and 4K upscale
     // a 768p base result through H3-Regenerate-2K, which is API-only and not in
@@ -567,6 +622,9 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'minimax-h3-max': {
+    // fal reference-to-video schema, 2026-09-09: each audio clip is 2-15s.
+    referenceAudioDuration: { min: 2, max: 15 },
+    referenceVideoDuration: { min: 2, max: 15 },
     aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
     // 🚨 REFERENCES LANDED 2026-09-09, AFTER A FALSE CLAIM WAS RETIRED. This row
     // shipped from v1.5.5 declaring zero reference capacity because a comment
@@ -590,15 +648,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // arms — quoted off this endpoint, not inherited.
     maxReferenceVideoSeconds: 15,
     maxReferenceAudioSeconds: 15,
-    // 1080P IS REAL ON THIS ROW and was missing until 2026-09-09. The schema's
-    // resolution enum is ["480P","768P","1080P"] on all three h3-max endpoints.
-    // 2K/4K genuinely are absent: the H3-Regenerate-2K upscaler is API-only and
-    // is not in the open weights fal self-hosts, which is the actual mechanism
-    // behind the shorter ladder — 1080p was never part of that story.
-    //
-    // DEFAULT stays 768p: it is the tier the model natively generates, and
-    // 1080p is a 2x price step ($0.160/s against $0.080/s).
-    videoResolution: { options: ['480p', '768p', '1080p'], default: '768p' },
+    videoResolution: { options: ['480p', '768p'], default: '768p' },
     duration: { min: 5, max: 15, mode: 'continuous' },
   },
 
@@ -983,4 +1033,31 @@ export function describeReferenceImageCaps(models: readonly string[]): string {
     if (n == null) return ''
     return n === 0 ? '0 (prompt + source clip only)' : String(n)
   })
+}
+
+/** H3 Max reference accounting, fal's worked tables read 2026-09-09.
+ * https://fal.ai/models/minimax/h3-max/reference-to-video
+ * 1080p video-reference pricing is unpublished; never infer it from output rates.
+ */
+export const MINIMAX_MAX_REFERENCE = {
+  freeTokens: 4096,
+  imagePixelsPerToken: 1024,
+  normalizedImageEdge: 1024,
+  audioTokensPerSecond: 80,
+  videoTokensPerSecond: { '480p': 2886, '768p': 7459.2 } as Partial<Record<VideoResolution, number>>,
+} as const
+
+export function minimaxMaxReferenceTokens(input: {
+  imagePixels: number; videoSeconds: number; audioSeconds: number; resolution: string
+}): number {
+  const rate = MINIMAX_MAX_REFERENCE.videoTokensPerSecond[input.resolution as VideoResolution]
+  if (input.videoSeconds > 0 && rate === undefined) {
+    throw new Error(`H3 Max video-reference pricing is unavailable at ${input.resolution}; choose a priced resolution.`)
+  }
+  for (const n of [input.imagePixels, input.videoSeconds, input.audioSeconds]) {
+    if (!Number.isFinite(n) || n < 0) throw new Error('Reference metadata must be finite and nonnegative')
+  }
+  return Math.max(0, Math.ceil(input.imagePixels / MINIMAX_MAX_REFERENCE.imagePixelsPerToken +
+    input.videoSeconds * (rate ?? 0) + input.audioSeconds * MINIMAX_MAX_REFERENCE.audioTokensPerSecond -
+    MINIMAX_MAX_REFERENCE.freeTokens))
 }

@@ -1,3 +1,4 @@
+import { GPT_BACKGROUNDS, type GptQuality, type GptBackground } from './model-capabilities.js'
 // The Shot — the prompt bar, serialized.
 //
 // THE PRINCIPLE: a generation's full recipe already exists (the desktop writes
@@ -95,13 +96,15 @@ export interface ShotParams {
   quality?: string
   /** GPT Image 2.5's tier. Always sent explicitly: fal's own default is
    *  `high`, which is the third of five rungs, not the top of two. */
-  gptQuality?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+  gptQuality?: GptQuality
   /** GPT Image's alpha switch. `auto` is fal's default and ours; `transparent`
    *  asks for a real alpha channel rather than a painted backdrop. Costs
    *  nothing — fal prices this family on size × quality only, so it is NOT a
    *  cost-key segment. Named `gptBackground` because `background` already
    *  means "generate asynchronously" on every op that carries a Shot. */
-  gptBackground?: 'auto' | 'transparent' | 'opaque'
+  gptBackground?: GptBackground
+  /** Character voices explicitly removed from this recipe. */
+  detachedVoiceCharacterIds?: string[]
   duration?: number
   imageQuantity?: number
   gridMode?: 'off' | '2x2' | '3x3'
@@ -429,8 +432,11 @@ function readParams(v: unknown): ShotParams {
   ) {
     out.gptQuality = raw.gptQuality
   }
-  if (raw.gptBackground === 'auto' || raw.gptBackground === 'transparent' || raw.gptBackground === 'opaque') {
-    out.gptBackground = raw.gptBackground
+  if (Array.isArray(raw.detachedVoiceCharacterIds)) {
+    out.detachedVoiceCharacterIds = strArray(raw.detachedVoiceCharacterIds)
+  }
+  if ((GPT_BACKGROUNDS as readonly unknown[]).includes(raw.gptBackground)) {
+    out.gptBackground = raw.gptBackground as GptBackground
   }
   if (raw.gridMode === 'off' || raw.gridMode === '2x2' || raw.gridMode === '3x3') out.gridMode = raw.gridMode
   if (Array.isArray(raw.multiShotSegments)) {
