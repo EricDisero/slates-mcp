@@ -2242,6 +2242,17 @@ export const generateImage: Operation<{
       params: {
         prompt: input.prompt,
         aspect_ratio: input.aspectRatio ?? '1:1',
+        // 🚨 THE RESOLUTION HAS TO BE ON THE WIRE, BECAUSE IT IS IN THE KEY.
+        // `imageCostKey` above bills `nano-banana-2-{resolution}`, and until
+        // 2026-09-10 this body omitted the field entirely — so fal rendered at
+        // its own default while we charged for whatever rung the caller asked
+        // for. The enum is fal's (`1K`/`2K`/`4K`), the same one the desktop's
+        // `buildFalNB2Request` sends, and the proxy now recovers the rung from it
+        // rather than trusting the key (`lib/fal-image-keys.ts`).
+        // `3k` cannot reach here — the capability guard above refuses a rung
+        // nano-banana-2 does not declare — so the map is deliberately partial
+        // rather than carrying a rung this model has no key for.
+        resolution: ({ '1k': '1K', '2k': '2K', '4k': '4K' } as Record<string, string>)[resolution] ?? '2K',
         // 🚨 THE HEADLESS PATH IS THE ONE PLACE WE ASK FAL FOR A BATCH, so it
         // is the one place a provider's own `num_images` ceiling binds — and
         // Nano Banana's is 4 (fal schema, read 2026-09-09), against the op's
@@ -2249,6 +2260,9 @@ export const generateImage: Operation<{
         // separate single-image generations, where no batch ceiling exists.
         // Guarded above rather than clamped here: silently making 4 when 10
         // were asked for would bill 4 and look like a partial failure.
+        //
+        // The proxy bills this COUNT (it multiplies the single-image key by it),
+        // which is what the confirm gate above has always quoted.
         num_images: input.count ?? 1,
         ...(hasReferenceImages
           ? { image_urls: input.referenceImageUrls }

@@ -236,8 +236,88 @@ export const GPT_IMAGE_25_SIZES: Record<string, Record<string, { width: number; 
   },
 }
 
+/**
+ * fal's named ~1MP presets per aspect ratio, with custom dims where fal has no
+ * preset. The `1k` rung of every non-GPT image model resolves through this.
+ */
+export const FAL_1MP_SIZES: Record<string, string | { width: number; height: number }> = {
+  '1:1': 'square_hd',
+  '4:3': 'landscape_4_3',
+  '3:4': 'portrait_4_3',
+  '16:9': 'landscape_16_9',
+  '9:16': 'portrait_16_9',
+  '2:3': { width: 832, height: 1248 },
+  '3:2': { width: 1248, height: 832 },
+  '4:5': { width: 896, height: 1120 },
+  '5:4': { width: 1120, height: 896 },
+  '21:9': { width: 1344, height: 576 },
+}
+
+/** Pixel dims for a megapixel target at an aspect ratio, rounded to multiples of 8. */
+export function computeFalDimensions(aspectRatio: string, targetMP: number): { width: number; height: number } {
+  const parts = aspectRatio.split(':').map(Number)
+  const w = parts[0] || 16
+  const h = parts[1] || 9
+  const ratio = w / h
+  const targetPixels = targetMP * 1_000_000
+  return {
+    width: Math.round(Math.sqrt(targetPixels * ratio) / 8) * 8,
+    height: Math.round(Math.sqrt(targetPixels / ratio) / 8) * 8,
+  }
+}
+
+/**
+ * The `image_size` a non-GPT fal image request carries, for one model × aspect ×
+ * resolution rung.
+ *
+ * 🚨 THIS IS A BILLING INPUT, WHICH IS WHY IT LIVES HERE (moved out of
+ * slate/src/main/api/fal.ts, 2026-09-10). The resolution rung is a segment of
+ * every image cost key, and nothing in the REQUEST names it — fal is told pixel
+ * dimensions, not "2k". The proxy therefore recovers the rung by running this
+ * function over the model's declared `imageResolutions` × `aspectRatios` and
+ * matching the body's `image_size`, exactly as it recovers a GPT Image rung from
+ * `GPT_IMAGE_25_SIZES`. A second copy of this arithmetic would mean the desktop
+ * and the server could disagree about what a request is worth, silently.
+ *
+ * GPT Image does NOT come through here — that family carries explicit pixel
+ * classes in `GPT_IMAGE_25_SIZES` and an explicit `quality` rung.
+ */
+export function falImageSize(
+  model: string,
+  aspectRatio?: string,
+  resolution?: string
+): string | { width: number; height: number } {
+  const ar = aspectRatio || '16:9'
+  const isSeedream5 = model === 'seedream-5-lite'
+  const res = resolution || (isSeedream5 ? '2k' : '1k')
+
+  // 1K (~1MP): fal's named presets, or small custom dims where there is none.
+  if (res === '1k') {
+    return FAL_1MP_SIZES[ar] || 'landscape_16_9'
+  }
+  // Seedream 5 Lite: custom dims must be ≥3.69MP (2560×1440) and ≤9.44MP
+  // (3072×3072), so its three rungs target 4 / 7 / 9 MP — all inside that band.
+  if (isSeedream5) {
+    if (res === '4k') return computeFalDimensions(ar, 9)
+    return res === '3k' ? computeFalDimensions(ar, 7) : computeFalDimensions(ar, 4)
+  }
+  if (res === '2k') return computeFalDimensions(ar, 2)
+  return computeFalDimensions(ar, 4)
+}
+
 export interface ModelCapability {
   imageResolutions?: ImageResolution[]
+  /**
+   * Images ONE request may ask the provider for in a single batch.
+   *
+   * 🚨 ABSENT MEANS ONE, AND THAT IS A BILLING BOUND, NOT A HINT. A cost key
+   * prices a single image, so a request that returns N images has to be charged
+   * N times — the proxy multiplies the debit by the batch size and refuses a
+   * batch larger than this (`slates-api/src/lib/fal-image-keys.ts`). Only a model
+   * with a READ provider ceiling gets a number here; everything else fans out as
+   * separate generations, which is what the desktop does for every model.
+   */
+  maxBatchImages?: number
   /** Per-file reference-audio bounds, independently of the combined cap. */
   referenceVideoDuration?: { min: number; max: number }
   referenceAudioDuration?: { min: number; max: number }
@@ -300,6 +380,11 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'nano-banana-2': {
     imageResolutions: ['1k', '2k', '4k'],
+    // fal's nano-banana-2 schema caps `num_images` at 4 (read 2026-09-09). This
+    // is the ONLY model that batches: the MCP's headless path (no projectId) asks
+    // fal for one batch, and every other route — desktop and agent alike — fires
+    // N separate single-image generations. The proxy bills the batch size.
+    maxBatchImages: 4,
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 14,
   },
