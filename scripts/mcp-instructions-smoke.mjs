@@ -188,6 +188,29 @@ if (generateImage) {
     'the ops with a stable result shape carry an outputSchema',
     !!tools.find((t) => t.name === 'slates_estimate_generation_cost')?.outputSchema
   )
+  // An outputSchema a result can violate fails the WHOLE tool client-side, and
+  // nothing in-repo exercises it: the status schema shipped non-nullable on
+  // 2026-09-02 and rejected every poll until a user reported it. Replay the
+  // op's own null-bearing shapes through the validator clients use (ajv,
+  // via the SDK). Keep these literals in step with the op's `ok({...})`.
+  {
+    const { default: Ajv } = await import('ajv')
+    const ajv = new Ajv({ strict: false })
+    const statusSchema = tools.find((t) => t.name === 'slates_get_generation_status')?.outputSchema
+    const payloads = [
+      { status: 'processing', cost_credits: null, error: null, model: 'seedance-2.5', completed_at: null, asset: null },
+      { status: 'completed', cost_credits: 12, error: null, model: 'minimax-h3', completed_at: '2026-09-14 10:31:00', asset: { id: 'a', code: 'A-1', file_path: 'x.mp4' } },
+      { status: 'failed', cost_credits: null, error: 'provider refused', model: 'seedance-2.5', completed_at: '2026-09-14 10:31:00', asset: null },
+      { found: false, status: 'unknown', note: 'row not inserted yet' },
+    ]
+    for (const p of payloads) {
+      check(
+        `slates_get_generation_status outputSchema admits a ${p.status} result`,
+        !!statusSchema && ajv.validate(statusSchema, p),
+        ajv.errorsText(ajv.errors)
+      )
+    }
+  }
 
   const prompts = (await client.listPrompts()).prompts
   // Derived, not typed: the server exposes every embedded skill, so the

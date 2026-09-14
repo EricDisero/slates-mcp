@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/mcp-server",
-  "version": "0.5.20",
+  "version": "0.5.21",
   "description": "MCP server for the Slates desktop app. Your AI agent (ChatGPT via Codex, Claude, Cursor, or another local MCP client) drives a local AI video studio: projects, characters, storyboards, image and video generation. Files land on disk.",
   "license": "MIT",
   "type": "module",

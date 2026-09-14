@@ -144,13 +144,20 @@ const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
       message: { type: 'string' },
     },
   },
+  // 🚨 The op returns `error: null` and `asset: null` on every in-flight poll
+  // and `error: null` on every success; clients validate against this schema,
+  // so non-nullable types here rejected EVERY status call (user report
+  // 2026-09-14, twelve days after the schema shipped). 'unknown' is the
+  // desktop's not-found answer. mcp-instructions-smoke replays these payloads.
   slates_get_generation_status: {
     type: 'object',
     properties: {
-      status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'] },
-      error: { type: 'string' },
-      asset: { type: 'object' },
-      cost_credits: { type: 'number' },
+      status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'unknown'] },
+      error: { type: ['string', 'null'] },
+      asset: { type: ['object', 'null'] },
+      cost_credits: { type: ['number', 'null'] },
+      model: { type: 'string' },
+      completed_at: { type: ['string', 'null'] },
     },
   },
   slates_get_credit_balance: {
