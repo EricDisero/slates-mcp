@@ -229,8 +229,13 @@ console.log('agent-surface-lockstep-check')
 {
   const CHECK = '2 mcp-instructions'
   const server = readFileSync(mcpServerPath, 'utf8')
-  if (!/const instructions = buildAgentDoctrine\(\{ surface: 'mcp' \}\)/.test(server)) {
-    fail(CHECK, `${mcpServerPath}: \`instructions\` is not built from buildAgentDoctrine({ surface: 'mcp' }).`)
+  // Either the bare doctrine, or the 2026-09-13 composed form: the running
+  // version line, the optional update notice, then the doctrine — nothing else
+  // may be joined in, so the array's other members are pinned by name.
+  const composed =
+    /const instructions = \[\n\s*`Slates MCP server v\$\{pkg\.version\} \(\$\{PKG_NAME\}\)\.`,\n\s*updateAdvice,\n\s*buildAgentDoctrine\(\{ surface: 'mcp' \}\),\n\]/
+  if (!/const instructions = buildAgentDoctrine\(\{ surface: 'mcp' \}\)/.test(server) && !composed.test(server)) {
+    fail(CHECK, `${mcpServerPath}: \`instructions\` is not built from buildAgentDoctrine({ surface: 'mcp' }) (bare, or the version-line + updateAdvice + doctrine array).`)
   }
   // `instructions` must reach the constructor. The capabilities object grew
   // (prompts, resources, logging), so the anchor is the field, not the literal.

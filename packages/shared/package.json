@@ -1,6 +1,6 @@
 {
   "name": "@slatesvideo/shared",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "description": "Shared operations layer for the Slates MCP server and CLI: auth, cloud/desktop clients, and the single tool surface both consume. Most users want @slatesvideo/mcp-server or @slatesvideo/cli instead.",
   "license": "MIT",
   "type": "module",
@@ -43,7 +43,7 @@
     "sync-partials": "node scripts/sync-partials.mjs",
     "build-prompt-builder": "node scripts/build-prompt-builder.mjs",
     "check-prompt-builder": "node scripts/build-prompt-builder.mjs --check",
-    "build": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check",
+    "build": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check && node scripts/update-check-check.mjs",
     "typecheck": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
     "prepublishOnly": "npm run build",
     "render-partials": "node scripts/render-capability-partials.mjs"

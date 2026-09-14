@@ -1,11 +1,21 @@
 # @slatesvideo/mcp-server
 
-MCP server for the [Slates](https://slates.video) desktop app. Your AI agent (Claude, Cursor, or any MCP client) drives a local video studio: it creates projects, builds characters and storyboards, generates images and videos, and organizes assets. Files land on disk, and the Slates app updates live as the agent works.
+MCP server for the [Slates](https://slates.video) desktop app. Your AI agent (ChatGPT via Codex, Claude, Cursor, or another local MCP client) drives a local video studio: it creates projects, builds characters and storyboards, generates images and videos, and organizes assets. Files land on disk, and the Slates app updates live as the agent works.
 
 ## Requirements
 
 - The Slates desktop app, installed and running. Get it at [slates.video](https://slates.video).
 - Node.js 18 or newer.
+
+## ChatGPT via Codex
+
+Sign in to the local Codex app or CLI with your ChatGPT account, keep Slates open on the same computer, and run:
+
+```bash
+codex mcp add slates -- npx -y @slatesvideo/mcp-server
+```
+
+Restart Codex to load the tools. A regular ChatGPT web chat does not connect to this local stdio server. [Full connection guide](https://slates.video/docs/connect-claude).
 
 ## Claude Desktop
 
@@ -37,7 +47,7 @@ One command:
 claude mcp add slates -- npx -y @slatesvideo/mcp-server
 ```
 
-Tip: with Claude Code you can skip the MCP server entirely and use the CLI instead (`npm i -g @slatesvideo/cli`), which keeps the tool schemas out of your context window. See [@slatesvideo/cli](https://www.npmjs.com/package/@slatesvideo/cli).
+Tip: with Codex or Claude Code you can skip the MCP server entirely and use the CLI instead (`npm i -g @slatesvideo/cli`), which keeps the tool schemas out of your context window. See [@slatesvideo/cli](https://www.npmjs.com/package/@slatesvideo/cli).
 
 ## Cursor
 

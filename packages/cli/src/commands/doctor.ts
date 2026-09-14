@@ -10,6 +10,8 @@ import {
   SKILLS,
   type SlatesUserInfo,
   type DesktopHealth,
+  refreshLatestVersion,
+  compareVersions,
 } from '@slatesvideo/shared'
 import { EXIT } from '../exit-codes.js'
 
@@ -178,10 +180,24 @@ export async function runDoctor(): Promise<void> {
     fix: 'Run `slates mcp --write` (or `slates setup`), then restart the client.',
   })
 
-  // ── Report ──
+  // ── Package version ──
   const version = JSON.parse(
     readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json'), 'utf8')
   ) as { version: string }
+  const latest = await refreshLatestVersion('@slatesvideo/cli')
+  const behind = latest !== null && compareVersions(version.version, latest) < 0
+  checks.push({
+    name: 'CLI version',
+    ok: !behind,
+    detail: latest === null
+      ? `v${version.version} installed; registry unreachable, could not compare`
+      : behind
+        ? `v${version.version} installed, v${latest} published`
+        : `v${version.version} is the latest`,
+    fix: 'Run `npm i -g @slatesvideo/cli@latest`, then `slates install-skills` to refresh skill files.',
+  })
+
+  // ── Report ──
   console.log(`slates doctor — CLI v${version.version}\n`)
   for (const c of checks) {
     console.log(`${c.ok ? '  ok  ' : '  ✗   '}${c.name}: ${c.detail}`)

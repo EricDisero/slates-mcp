@@ -24,6 +24,9 @@ import {
   APP_MANUAL,
   defaultContext,
   toolDefinitions,
+  cachedLatestVersion,
+  refreshLatestVersion,
+  updateNotice,
   type Operation,
 } from '@slatesvideo/shared'
 
@@ -69,7 +72,22 @@ const pkg = JSON.parse(
 // + hard rules + guide index and leaves the long-form skills to
 // slates_get_prompting_guide. scripts/agent-surface-lockstep-check.mjs pins the
 // byte count so growth is a review decision, not an accident.
-const instructions = buildAgentDoctrine({ surface: 'mcp' })
+const PKG_NAME = '@slatesvideo/mcp-server'
+// The first line names the running version so an agent can answer "what
+// version am I on"; the notice appears only when the on-disk cache (refreshed
+// in main(), for the NEXT launch) says a newer package is published. Read the
+// design note in @slatesvideo/shared update-check.ts before changing either.
+const updateAdvice = updateNotice(
+  PKG_NAME,
+  pkg.version,
+  cachedLatestVersion(PKG_NAME),
+  'Newer models and parameters are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client (Claude Desktop, Codex, Cursor) so npx fetches the new version; if it was installed globally, run `npm i -g @slatesvideo/mcp-server@latest` first.'
+)
+const instructions = [
+  `Slates MCP server v${pkg.version} (${PKG_NAME}).`,
+  updateAdvice,
+  buildAgentDoctrine({ surface: 'mcp' }),
+].filter((part): part is string => !!part).join('\n\n')
 
 const server = new Server(
   { name: 'slates-studio', version: pkg.version },
@@ -522,8 +540,11 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 async function main(): Promise<void> {
   const transport = new StdioServerTransport()
   await server.connect(transport)
+  if (updateAdvice) console.error(`[slates-mcp] ${updateAdvice}`)
+  // Background refresh; the result is read by the next launch, never awaited.
+  void refreshLatestVersion(PKG_NAME)
   console.error(
-    `[slates-mcp] server started, ${ops.length} tools registered, ` +
+    `[slates-mcp] server started, v${pkg.version}, ${ops.length} tools registered, ` +
       `${SKILL_NAMES.length} skills as prompts, 3 resources + 2 templates, ` +
       `${instructions.length} chars of agent doctrine sent as instructions`
   )

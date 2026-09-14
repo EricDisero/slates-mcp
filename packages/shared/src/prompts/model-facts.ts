@@ -40,6 +40,33 @@ export interface ModelFact {
    * only while that substring is unique, which is how isOmniFlashModel broke.
    */
   route: 'generate' | 'edit'
+  /**
+   * Where this seat sits in the routing story, as DATA rather than as a word
+   * inside `notes`. `default` is the seat an agent (or a web page) reaches for
+   * when nothing about the shot argues otherwise: exactly ONE per kind per
+   * route, asserted at module load below. `specialist` is picked for a named
+   * reason the notes give (premium, speed, volume, audio, cheapest, edit fidelity).
+   * `niche` is never the default and never headlines; the notes say why.
+   *
+   * WHY A FIELD: "DEFAULT" lived only as a word inside notes. The 2026-08-10
+   * Seedance 2.5 commit wrote "the DEFAULT video model" into Seedance 2.0's note
+   * meaning the default SEEDANCE seat (a bare "seedance" resolves to 2.0), and for
+   * a month two rows read as the default while the routing doctrine then in force
+   * (Eric, 2026-07-03: Kling 3.0 the general-purpose default, Seedance the premium
+   * escalation) never changed. The marketing site meanwhile headlined Veo, a
+   * `niche` row, because no check could read a tier out of prose. The tier is
+   * DATA now; the notes describe, they do not rank.
+   *
+   * CURRENT DOCTRINE (Eric, 2026-09-13, superseding 2026-07-03): SEEDANCE 2.5 IS
+   * THE DEFAULT VIDEO MODEL, in the app picker and in agent routing — "it's the
+   * best in the world". 2.0 is the specialist for native 4K and for the same
+   * resolution cheaper; Kling is the specialist for cost-effective start-frame,
+   * performance and lip-sync work and the only engine behind Motion Transfer and
+   * Lip Sync. Recorded in the vault's prompting-ssot.md the same day. Changing the
+   * default again lands there first, then here, then in slates-model-selection.md. slates-web reads this to order its model lineup
+   * and to fail its build when a niche seat is named more often than the default.
+   */
+  tier: 'default' | 'specialist' | 'niche'
   // ── Reference caps — DERIVED, never typed. See `caps()` below. ──
   /** Max reference images (image models) — null if not applicable. */
   maxRefImages: number | null
@@ -112,13 +139,13 @@ export function multimodalRefSummary(id: string): string {
   const a = f.maxReferenceAudio ?? 0
   if (v === 0 && a === 0) return ''
   const parts: string[] = []
-  if (v > 0) parts.push(`${v} reference video${v === 1 ? '' : 's'} (${f.maxReferenceVideoSeconds}s combined)`)
-  if (a > 0) parts.push(`${a} reference audio clip${a === 1 ? '' : 's'} (${f.maxReferenceAudioSeconds}s combined)`)
-  const total = f.maxReferenceFilesTotal ? `, ${f.maxReferenceFilesTotal} files max across all modalities` : ''
+  if (v > 0) parts.push(`${v} video${v === 1 ? '' : 's'} (${f.maxReferenceVideoSeconds}s total)`)
+  if (a > 0) parts.push(`${a} audio clip${a === 1 ? '' : 's'} (${f.maxReferenceAudioSeconds}s total)`)
+  const total = f.maxReferenceFilesTotal ? `, ${f.maxReferenceFilesTotal} files max` : ''
   const companion = f.audioRefNeedsCompanion
-    ? ' Audio needs at least one image or video reference alongside it.'
-    : ' Audio-only references are allowed.'
-  return `${f.label}: up to ${parts.join(' and ')}${total}.${companion}`
+    ? '; audio needs an image or video alongside.'
+    : '; audio-only is allowed.'
+  return `${f.label}: up to ${parts.join(' + ')}${total}${companion}`
 }
 
 /**
@@ -168,6 +195,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2',
     route: 'generate',
+    tier: 'default',
     // Gemini 3.1 FLASH Image — verified against the runtime slug map in
     // slate/src/main/api/google.ts. Nano Banana PRO is a different model
     // (gemini-3-pro-image-preview); do not conflate them.
@@ -180,6 +208,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2-lite',
     route: 'generate',
+    tier: 'specialist',
     label: 'Nano Banana 2 Lite',
     kind: 'image',
     ...caps('nano-banana-2-lite'),
@@ -188,6 +217,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-pro',
     route: 'generate',
+    tier: 'specialist',
     label: 'Nano Banana Pro',
     kind: 'image',
     ...caps('nano-banana-pro'),
@@ -196,6 +226,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'gpt-image-2-5-flare',
     route: 'generate',
+    tier: 'specialist',
     label: 'GPT Image 2.5 Flare',
     kind: 'image',
     ...caps('gpt-image-2-5-flare'),
@@ -204,6 +235,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'gpt-image-2-5-sunburst',
     route: 'generate',
+    tier: 'specialist',
     label: 'GPT Image 2.5 Sunburst',
     kind: 'image',
     ...caps('gpt-image-2-5-sunburst'),
@@ -212,6 +244,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'flux-2-max',
     route: 'generate',
+    tier: 'specialist',
     label: 'FLUX.2 Max',
     kind: 'image',
     ...caps('flux-2-max'),
@@ -220,6 +253,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'seedream-5-lite',
     route: 'generate',
+    tier: 'specialist',
     label: 'Seedream 5 Lite',
     kind: 'image',
     ...caps('seedream-5-lite'),
@@ -228,25 +262,28 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'seedance-2',
     route: 'generate',
+    tier: 'specialist',
     label: 'Seedance 2.0',
     kind: 'video',
     ...caps('seedance-2'),
     audioRefNeedsCompanion: true,
-    notes: 'PREMIUM video tier and the DEFAULT video model — route here the moment physics, effects, destruction or scale matter, and for hero shots. VIDEO-ONLY. Strong image-to-video and own-footage restyle. 4K is Pro-gated (base accounts get PRO_REQUIRED). Stays the default over 2.5: it is the only Seedance with native 4K and it is cheaper at every tier the two share.',
+    notes: 'THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare "seedance" still resolves here for older CLIs that expect 4K.',
   },
   {
     id: 'seedance-2.5',
     route: 'generate',
+    tier: 'default',
     label: 'Seedance 2.5',
     kind: 'video',
     ...caps('seedance-2.5'),
     // No companion requirement — audio-only references are one of the things
     // the second seat actually buys.
-    notes: 'A SECOND SEAT NEXT TO 2.0, NOT AN UPGRADE — and the dearer one at every tier they share. Pick 2.5 when the shot needs LENGTH, MANY references, an AUDIO-ONLY reference, TIMED BEATS, or tighter prompt adherence; pick 2.0 for 4K and for the same resolution cheaper. VIDEO-ONLY. Timestamp grammar, and the edit/extend words that make the provider reclassify a fresh generation and fail it, are in slates-prompting-seedance-2-5.',
+    notes: 'DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. No 4K, and dearer than 2.0 at every shared resolution: go to 2.0 for 4K or the same resolution cheaper. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.',
   },
   {
     id: 'seedance-2.5-edit',
     route: 'edit',
+    tier: 'specialist',
     label: 'Seedance 2.5 Edit',
     kind: 'video',
     // 0 ingredients: prompt + source clip only on slates_edit_video.
@@ -256,15 +293,17 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'kling-v3',
     route: 'generate',
+    tier: 'specialist',
     label: 'Kling 3.0',
     kind: 'video',
     // Family-level fact — caps are identical across std/pro/omni/omni-pro.
     ...caps('kling-v3.0-std'),
-    notes: 'DEFAULT general-purpose video model — cost-effective, strong start-frame adherence (identity, layout, text), acting, dialogue, lip-sync, and the widest aspect-ratio set. Escalate to Seedance for physics. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.',
+    notes: 'THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue, lip-sync and the widest aspect-ratio set; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.',
   },
   {
     id: 'kling-v3-edit',
     route: 'edit',
+    tier: 'specialist',
     label: 'Kling O3 Video Edit',
     kind: 'video',
     // Family-level fact; 4 = combined subject elements + style refs per edit.
@@ -274,15 +313,17 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'veo-3.1',
     route: 'generate',
+    tier: 'niche',
     label: 'Veo 3.1',
     kind: 'video',
     // Family-level fact — fast and standard declare the same caps.
     ...caps('veo-3.1-fast'),
-    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one pass, and the narrowest aspect-ratio and duration sets in the catalogue are acceptable. Otherwise Kling (default) or Seedance (physics/premium) win.',
+    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one pass, and the narrowest aspect-ratio and duration sets in the catalogue are acceptable. Otherwise Seedance 2.5 (the default) or Kling (cost-effective performance) win.',
   },
   {
     id: 'omni-flash',
     route: 'generate',
+    tier: 'specialist',
     label: 'Gemini Omni Flash',
     kind: 'video',
     // 7 ref2v image_urls — mirrors Google's own reference limit.
@@ -292,6 +333,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'omni-flash-edit',
     route: 'edit',
+    tier: 'default',
     label: 'Omni Flash Edit',
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
@@ -301,6 +343,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'minimax-h3',
     route: 'generate',
+    tier: 'specialist',
     label: 'MiniMax H3',
     kind: 'video',
     ...caps('minimax-h3'),
@@ -313,16 +356,24 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'minimax-h3-max',
     route: 'generate',
+    tier: 'specialist',
     label: 'MiniMax H3 Max',
     kind: 'video',
-    // No reference caps: fal publishes no reference-to-video endpoint for this
-    // row, so `caps()` returns nulls and the composer refuses references.
+    // References landed 2026-09-09 when the "h3-max/reference-to-video returns
+    // 404" claim was retired against the fetched schema (caps come from
+    // model-capabilities.ts; the rip is second-brain/business/projects/slates/
+    // provider-docs/fal-minimax-h3-openapi-schemas.md, section 6).
     ...caps('minimax-h3-max'),
-    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It gives up the upper resolution tiers and the REFERENCE endpoint, so the omni-reference set is base-H3 only — but it still animates start and end frames, which is one of the two things it is FOR. Never describe this row as taking no image input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
+    // Quoted off THAT endpoint's reference_audio_urls description, not copied
+    // from the base row: "Audio cannot be the only reference input; provide at
+    // least one reference image or video with it."
+    audioRefNeedsCompanion: true,
+    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It gives up the upper resolution tiers. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call: its reference endpoint has no start/end-frame fields, where base H3\'s does. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
   },
   {
     id: 'ltx-2-5',
     route: 'generate',
+    tier: 'specialist',
     label: 'LTX-2.5',
     kind: 'video',
     // No reference caps: fal publishes text-to-video and image-to-video for LTX
@@ -334,6 +385,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'ltx-2-5-pro',
     route: 'generate',
+    tier: 'specialist',
     label: 'LTX-2.5 Pro',
     kind: 'video',
     ...caps('ltx-2-5-pro'),
@@ -342,6 +394,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'seed-audio',
     route: 'generate',
+    tier: 'default',
     label: 'Seed Audio 1.0',
     kind: 'audio',
     // ONE image XOR up to 3 audio clips — the two inputs are mutually exclusive.
@@ -351,6 +404,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'eleven-sfx',
     route: 'generate',
+    tier: 'specialist',
     label: 'ElevenLabs Sound Effects v2',
     kind: 'audio',
     ...caps('eleven-sfx'),
@@ -359,12 +413,32 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'inworld-tts-2',
     route: 'generate',
+    tier: 'specialist',
     label: 'Inworld Realtime TTS-2',
     kind: 'audio',
     ...caps('inworld-tts-2'),
     notes: 'THE VOICE SEAT — one named voice saying one line, billed per CHARACTER not per second. Route here when WHO is speaking matters. NOT scene audio — that is seed-audio; a single effect is eleven-sfx.',
   },
 ]
+
+/**
+ * One default per lane, asserted where the data is declared. Two rows both
+ * reading "DEFAULT" is exactly the drift `tier` exists to make impossible, and
+ * a lane with no default leaves an agent (and slates-web) nothing to lead with.
+ */
+for (const kind of ['image', 'video', 'audio'] as const) {
+  for (const route of ['generate', 'edit'] as const) {
+    const lane = MODEL_FACTS.filter((f) => f.kind === kind && f.route === route)
+    if (lane.length === 0) continue
+    const defaults = lane.filter((f) => f.tier === 'default').map((f) => f.id)
+    if (defaults.length !== 1) {
+      throw new Error(
+        `MODEL_FACTS: ${kind}/${route} must have exactly one tier: 'default' row, found ${defaults.length}` +
+          (defaults.length ? ` (${defaults.join(', ')})` : '')
+      )
+    }
+  }
+}
 
 const FACT_BY_ID = new Map(MODEL_FACTS.map((m) => [m.id, m]))
 

@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance-2-5
-description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is a SECOND SEAT next to 2.0, not an upgrade — it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up native 4K and costs more than 2.0 at every resolution they share. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap that comes with 30-second takes.
+description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is the DEFAULT video model (Eric, 2026-09-13) — against 2.0 it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up native 4K and costs more than 2.0 at every resolution they share. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap that comes with 30-second takes.
 ---
 
 # Seedance 2.5 — prompting
@@ -28,7 +28,7 @@ description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calli
 - `[0-6] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6-12] Medium, she stops as the driver's window comes down. [12-18] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`
 - `[0-10] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10-20] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`
 
-**Hard constraint:** it is the EXPENSIVE seat and it has NO 4K — 480p/720p/1080p only, and dearer than 2.0 at every resolution they share. It is a second seat, never an upgrade. Long takes multiply cost linearly: quote a 30-second take before you fire it.
+**Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -70,11 +70,10 @@ So 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:
 | **Timestamps in the prompt** | **✗ — ignored; shot numbers only** | **✓ — integer seconds, acted on** |
 | Multi-view image as ONE subject reference | ✗ (not recommended) | **✓ (up to 5 subjects)** |
 | Video edit as its own task type | ✗ | **✓ (`seedance-2.5-edit`)** |
-| Default video model | **yes** | no |
+| Default video model | no | **yes** (since 2026-09-13) |
 
-**Route to 2.5 when the shot needs LENGTH, MANY REFERENCES, or an audio-only reference.
-Route to 2.0 when resolution matters at all** — which, for anything a client will see full-screen,
-is most of the time.
+**2.5 is the default. Route to 2.0 for 4K delivery, or when the same resolution has to be
+cheaper** — its 720p is $0.15/s against 2.5's $0.231/s.
 
 ---
 

@@ -156,7 +156,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
   ...SEEDANCE,
   label: 'Seedance 2.5',
   intro: [
-    'Seedance 2.5 is a SECOND SEAT next to 2.0, not an upgrade of it. It buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 4K. It runs at 480p, 720p or 1080p, and it costs more than 2.0 at every tier they share, so pick 2.0 when you want the same resolution cheaper or you want 4K.',
+    'Seedance 2.5 is the default video model. Against 2.0 it buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 4K. It runs at 480p, 720p or 1080p, and it costs more than 2.0 at every tier they share, so pick 2.0 when you want the same resolution cheaper or you want 4K.',
     "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
@@ -394,7 +394,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
       },
       {
         heading: 'Know its seat',
-        note: 'Cheap drafts, iteration volume, and audio-in-one-gen at low cost. For hero shots, Kling 3.0 (general default) or Seedance 2.0 (premium/physics) still win.',
+        note: 'Cheap drafts, iteration volume, and audio-in-one-gen at low cost. For hero shots, Seedance 2.5 (the default) or Seedance 2.0 (4K, cheaper) still win.',
       },
     ],
   ],

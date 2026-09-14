@@ -513,11 +513,11 @@ export const VIDEO_MODELS = [
   'veo-3.1-fast',
   'veo-3.1-standard',
   'seedance-2',
-  // Seedance 2.5 is a SECOND SEAT, not a replacement: 30s takes, 30 image
-  // references, audio-only references, up to 1080p (2026-08-24) — but no 4K,
-  // and dearer than 2.0 at every shared tier, so 2.0 stays the default. Its
-  // EDIT row is not here; edit models live on slates_edit_video, same as the
-  // Kling and Omni Flash ones.
+  // Seedance 2.5 is the DEFAULT video model (Eric, 2026-09-13): 30s takes, 30
+  // image references, audio-only references, up to 1080p (2026-08-24). 2.0 stays
+  // beside it as the 4K seat, cheaper at every shared tier. 2.5's EDIT row is
+  // not here; edit models live on slates_edit_video, same as the Kling and Omni
+  // Flash ones.
   'seedance-2.5',
   'omni-flash',
   // MiniMax H3, two seats in one family (2026-08-27). Base H3 is the AUTHORED-
@@ -2866,9 +2866,10 @@ function resolveVideoModel(raw: string): {
     'kling-v3.0-omni-pro': 'kling-v3.0-omni',
     'seedance-2.0': 'seedance-2',
     'seedance-2-0': 'seedance-2',
-    // ⚠️ The 2.5 spellings must resolve to 2.5, and the BARE `seedance` must keep
-    // resolving to 2.0 — 2.0 is the default video model and holds 1080p/4K, which
-    // 2.5 does not have at all.
+    // ⚠️ The 2.5 spellings must resolve to 2.5, and the BARE `seedance` keeps
+    // resolving to 2.0: every published CLI and MCP build that sends it expects
+    // the 4K seat, and 2.5 rejects 4K. The default video model is 2.5 (tier in
+    // MODEL_FACTS, 2026-09-13); an agent names it as `seedance-2.5`.
     'seedance-2.5': 'seedance-2.5',
     'seedance-25': 'seedance-2.5',
     'seedance-2-5': 'seedance-2.5',
@@ -3054,13 +3055,13 @@ export const generateVideo: Operation<{
     // multimodalRefSummary) rather than hand-typed, so a cap change in one
     // place cannot leave a stale number in a description an LLM reads.
     videoReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')} Billing switches to the vref key (input+output seconds) — pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
+      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. Billing switches to the vref key (input+output seconds) — pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
     ),
     videoReferenceSecondsEach: z.array(z.number()).optional().describe(
       'REQUIRED with videoReferenceAssetIds, same order and length: each clip\'s duration in seconds. Feeds the vref cost key; the server re-probes and corrects an understated value upward.'
     ),
     audioReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference AUDIO, cited as "audio 1", "audio 2"… in the order given. No billing surcharge. ${multimodalRefSummary('seedance-2')} ${multimodalRefSummary('seedance-2.5')}`
+      `Reference AUDIO, cited as "audio 1", "audio 2"… in the order given. ${multimodalRefModels().join(' / ')} only. No billing surcharge. ${multimodalRefModels().map(multimodalRefSummary).join(' ')}`
     ),
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
       'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'

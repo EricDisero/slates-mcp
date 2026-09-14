@@ -81,3 +81,6 @@ export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, describeCraftCard } from '.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'
 export { SLATES_API_URL } from './api-url.js'
 export { APP_MANUAL, appManualSections } from './manual/index.js'
+// Version handshake: the two published entry points tell the agent and the
+// terminal when a newer package is out. See update-check.ts for the design.
+export { UPDATE_CACHE_FILE, compareVersions, cachedLatestVersion, refreshLatestVersion, updateNotice } from './update-check.js'

@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readConnection, setCloudToken, clearCloudToken } from '@slatesvideo/shared'
+import { readConnection, setCloudToken, clearCloudToken, refreshLatestVersion, updateNotice } from '@slatesvideo/shared'
 import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
@@ -43,12 +43,26 @@ const pkg = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
 ) as { version: string }
 
+const CLI_PKG_NAME = '@slatesvideo/cli'
+
 const program = new Command()
 program
   .name('slates')
   .description('Slates CLI — drive AI Video Creation Studio from your terminal.')
   .version(pkg.version)
   .enablePositionalOptions()
+  // Version handshake: one bounded registry lookup an hour, cached in
+  // ~/.slates/update-check.json, printed to STDERR so JSON on stdout stays
+  // clean and an agent driving the CLI still sees it. Fail-silent offline.
+  .hook('preAction', async () => {
+    const notice = updateNotice(
+      CLI_PKG_NAME,
+      pkg.version,
+      await refreshLatestVersion(CLI_PKG_NAME),
+      'Run `npm i -g @slatesvideo/cli@latest` (or invoke it as `npx @slatesvideo/cli@latest`), then `slates install-skills` if you use skill files.'
+    )
+    if (notice) console.error(`slates: ${notice}`)
+  })
 
 program
   .command('login')

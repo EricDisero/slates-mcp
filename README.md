@@ -1,6 +1,6 @@
 # slates-mcp
 
-MCP server + CLI + skills package for [Slates](https://slates.video) — drive the AI Video Creation Studio from Claude Code, Cursor, Claude Desktop, Codex, or any MCP-capable client.
+MCP server + CLI + skills package for [Slates](https://slates.video) — drive the AI Video Creation Studio from ChatGPT via Codex, Claude Code, Cursor, Claude Desktop, or another local MCP client.
 
 This monorepo publishes two installable packages, plus their shared core:
 
@@ -31,9 +31,17 @@ That's it. Both the CLI and the MCP auto-discover the connection file. No env va
 
 ## Using it
 
-### MCP server (Claude / Cursor / Claude Desktop / Codex)
+### MCP server (ChatGPT via Codex / Claude / Cursor)
 
-Add to your MCP config:
+For **ChatGPT users**, sign in to the local Codex app or CLI with your ChatGPT account. With Slates open on the same computer, run:
+
+```bash
+codex mcp add slates -- npx -y @slatesvideo/mcp-server
+```
+
+Restart Codex. This connects local Codex; a regular ChatGPT web chat does not connect to this stdio server. [Connection guide](https://slates.video/docs/connect-claude).
+
+For **Claude Desktop or Cursor**, add to your MCP config:
 
 ```json
 {
@@ -50,9 +58,9 @@ Restart your client. Slates tools appear in the tool palette.
 
 **Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → Agent Control → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients and writes their config. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
 
-### CLI (Claude Code, terminal scripts)
+### CLI (Codex, Claude Code, terminal scripts)
 
-**Fastest path — one command** wires the MCP config into every detected client, installs the skills, and points you at the account-connect step:
+**Fastest path — one command** wires the MCP config into supported detected clients, installs the skills, and points you at the account-connect step:
 
 ```bash
 npx -y @slatesvideo/cli setup
@@ -70,7 +78,7 @@ slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
 ```
 
-In Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->92<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
+In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->92<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
 
 The <!-- gen:skill-count -->34<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->18<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
 

@@ -57,6 +57,10 @@ check(
   'the server sends `instructions` at all',
   typeof instructions === 'string' && instructions.length > 0
 )
+check(
+  'instructions open with the running server version (so an agent can answer "what version")',
+  typeof instructions === 'string' && /^Slates MCP server v\d+\.\d+\.\d+ \(@slatesvideo\/mcp-server\)\./.test(instructions)
+)
 
 if (typeof instructions === 'string') {
   // The spine. If a fork ever ate one of these, an MCP client would be briefed
@@ -246,6 +250,34 @@ if (generateImage) {
     /Legal values: /.test(badText),
     badText.slice(0, 200)
   )
+}
+
+
+// ── Update notice: a home dir whose cache says a newer package is published ──
+// Spawned with HOME/USERPROFILE pointed at a temp dir so the real ~/.slates is
+// never touched. The cache file is what refreshLatestVersion writes.
+{
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const home = mkdtempSync(join(tmpdir(), 'slates-smoke-home-'))
+  mkdirSync(join(home, '.slates'), { recursive: true })
+  writeFileSync(
+    join(home, '.slates', 'update-check.json'),
+    JSON.stringify({ '@slatesvideo/mcp-server': { latest: '99.0.0', checkedAt: Date.now() } })
+  )
+  const staleTransport = new StdioClientTransport({
+    command: process.execPath,
+    args: [serverPath],
+    stderr: 'pipe',
+    env: { ...process.env, HOME: home, USERPROFILE: home },
+  })
+  const staleClient = new Client({ name: 'slates-instructions-smoke-stale', version: '1.0.0' })
+  await staleClient.connect(staleTransport)
+  const stale = staleClient.getInstructions() ?? ''
+  check('a behind server puts UPDATE AVAILABLE in its instructions', stale.includes('UPDATE AVAILABLE'))
+  check('the notice tells the agent to have the user restart the client', /quit and reopen the MCP client/.test(stale))
+  check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
+  await staleClient.close()
 }
 
 await client.close()

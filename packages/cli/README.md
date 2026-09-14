@@ -1,6 +1,6 @@
 # @slatesvideo/cli
 
-The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Claude Code shell out to it instead of loading <!-- gen:tool-count -->92<!-- /gen:tool-count --> tool schemas into context.
+The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->92<!-- /gen:tool-count --> tool schemas into context.
 
 ## Install
 

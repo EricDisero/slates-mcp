@@ -16,6 +16,7 @@ import {
 } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { strToU8, unzipSync, zipSync } from 'fflate'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -408,4 +409,16 @@ if (checkOnly) {
   }
   for (const [name, value] of expected) writeFileSync(join(generatedDir, name), bytesOf(value))
   console.log(`[prompt-builder] wrote ${rendered.size} markdown files, manifest, and ${archiveName}`)
+  // The vault's lead-magnet mirror is a copy of this folder and has no other
+  // writer. When the second hop was a separate command in another repo it was
+  // skipped every time (drift found by the vault lint on 2026-09-03, -10, -13),
+  // so the generator runs it. Absent vault (CI, another machine): nothing to do.
+  const vaultSync = join(pkgRoot, '..', '..', '..', '..', 'second-brain', 'tools', 'sync_slates_prompt_builder.py')
+  if (existsSync(vaultSync)) {
+    const result = spawnSync('python', ['-B', vaultSync], { stdio: 'inherit', windowsHide: true })
+    if (result.status !== 0) {
+      console.error('[prompt-builder] vault mirror sync failed; run it by hand: python tools/sync_slates_prompt_builder.py')
+      process.exit(1)
+    }
+  }
 }
