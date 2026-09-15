@@ -1,0 +1,2 @@
+<!-- consumer:ts -->
+Two routes: describe a new frame, or change a frame you own. For a new scene, name references where you use them, write the look reference's grade and imperfections in plain words, then describe one light system, visible exposure, lens plus effect, every garment and a closed foreground. Use only what the shot needs. For your own plate, sheet, photo, footage or Blender render, say only what changes and what stays. Never use a released film frame as the edit base; use it as an art-direction brief for a new scene.

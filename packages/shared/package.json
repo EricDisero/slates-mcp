@@ -30,6 +30,10 @@
     "./asset-label": {
       "types": "./dist/prompts/asset-label.d.ts",
       "default": "./dist/prompts/asset-label.js"
+    },
+    "./model-facts": {
+      "types": "./dist/prompts/model-facts.d.ts",
+      "default": "./dist/prompts/model-facts.js"
     }
   },
   "files": [
@@ -45,7 +49,7 @@
     "check-prompt-builder": "node scripts/build-prompt-builder.mjs --check",
     "build": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check && node scripts/update-check-check.mjs",
     "typecheck": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm run build && node ../../scripts/cinematic-catalogue-check.mjs && node ../../scripts/prompt-control-check.mjs",
     "render-partials": "node scripts/render-capability-partials.mjs"
   },
   "repository": {

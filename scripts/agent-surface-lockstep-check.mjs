@@ -178,7 +178,7 @@ console.log('agent-surface-lockstep-check')
   const dupes = opIds.filter((id, i) => opIds.indexOf(id) !== i)
   if (dupes.length > 0) fail(CHECK, `duplicate op ids in ALL_OPERATIONS: ${dupes.join(', ')}`)
 
-  const server = readFileSync(mcpServerPath, 'utf8')
+  const server = readFileSync(mcpServerPath, 'utf8').replace(/\r\n/g, '\n')
   // The MCP tool list must be ALL_OPERATIONS and nothing else.
   if (!/const ops = ALL_OPERATIONS as readonly Operation<unknown>\[\]/.test(server)) {
     fail(CHECK, `${mcpServerPath}: the tool list is no longer \`ALL_OPERATIONS\` — parity is unprovable.`)
@@ -188,7 +188,7 @@ console.log('agent-surface-lockstep-check')
   if (!/const TOOLS = toolDefinitions\(ops, \{ surface: 'mcp' \}\)/.test(server)) {
     fail(CHECK, `${mcpServerPath}: ListTools no longer renders through the shared \`toolDefinitions()\` — a surface-private tool or a divergent schema can now hide here.`)
   }
-  if (!/tools: TOOLS\.map\(/.test(server)) {
+  if (!/tools: TOOLS\.filter\([\s\S]*?\.map\(/.test(server)) {
     fail(CHECK, `${mcpServerPath}: ListTools no longer maps every rendered definition.`)
   }
 
@@ -228,7 +228,7 @@ console.log('agent-surface-lockstep-check')
 // ── 2. MCP INSTRUCTIONS ─────────────────────────────────────────────────────
 {
   const CHECK = '2 mcp-instructions'
-  const server = readFileSync(mcpServerPath, 'utf8')
+  const server = readFileSync(mcpServerPath, 'utf8').replace(/\r\n/g, '\n')
   // Either the bare doctrine, or the 2026-09-13 composed form: the running
   // version line, the optional update notice, then the doctrine — nothing else
   // may be joined in, so the array's other members are pinned by name.
@@ -245,7 +245,7 @@ console.log('agent-surface-lockstep-check')
   // The four protocol capabilities the 2026-09-02 review found unused. Each one
   // removes a reason the host has to route something through the model.
   for (const cap of ['tools', 'prompts', 'resources', 'logging']) {
-    if (!new RegExp(`\\n\\s*${cap}: \\{\\}`).test(server)) {
+    if (!new RegExp(`\\n\\s*${cap}: \\{`).test(server)) {
       fail(CHECK, `${mcpServerPath}: the \`${cap}\` capability is no longer advertised.`)
     }
   }
@@ -330,77 +330,19 @@ console.log('agent-surface-lockstep-check')
   }
 }
 
-// ── 4. BANNED TOKENS ARE REAL AND REACH THE OPS ─────────────────────────────
+// ── 4. MODEL-SCOPED WARNINGS ────────────────────────────────────────────────
 {
   const CHECK = '4 banned-tokens'
-  if (BANNED_PROMPT_TOKENS.length === 0) {
-    fail(CHECK, 'BANNED_PROMPT_TOKENS is empty — the "load the guide" enforcement is off.')
-  }
-  const FENCE_RE = /<!--\s*@banned:start\s*-->([\s\S]*?)<!--\s*@banned:end\s*-->/g
-  const fencedBySkill = new Map()
-  for (const { skill } of BANNED_PROMPT_TOKENS) {
-    if (fencedBySkill.has(skill)) continue
-    const file = join(skillsDir, `${skill}.md`)
-    if (!existsSync(file)) {
-      fail(CHECK, `${skill}.md does not exist, but tokens are being generated from it.`)
-      fencedBySkill.set(skill, '')
-      continue
-    }
-    const md = readFileSync(file, 'utf8')
-    let body = ''
-    let m
-    FENCE_RE.lastIndex = 0
-    while ((m = FENCE_RE.exec(md)) !== null) body += m[1]
-    if (body.trim() === '') {
-      fail(
-        CHECK,
-        `${skill}.md has no @banned:start/@banned:end block. The op description is GENERATED ` +
-          `from it — restore the markers rather than hand-typing the list downstream.`
-      )
-    }
-    fencedBySkill.set(skill, body)
-  }
-  for (const { token, skill } of BANNED_PROMPT_TOKENS) {
-    const body = fencedBySkill.get(skill) ?? ''
-    if (!body.includes('`' + token + '`')) {
-      fail(
-        CHECK,
-        `token "${token}" is inlined into an op description but no longer appears backticked ` +
-          `inside ${skill}.md's @banned block — the generated list is stale.`
-      )
+  const { findBannedTokens } = await import('../packages/shared/dist/prompts/banned-tokens.js')
+  if (findBannedTokens('photorealistic cinematic', 'image', 'slates-prompting-gpt-image-2-5').length) fail(CHECK, 'Sunburst inherited another model’s warnings')
+  if (findBannedTokens('photorealistic cinematic', 'image', 'slates-prompting-nano-banana-2').length !== 2) fail(CHECK, 'Nano Banana warnings no longer reach its own calls')
+  for (const skill of Object.keys(SKILLS).filter((s) => s.startsWith('slates-prompting-'))) {
+    for (const entry of bannedTokensForSkill(skill)) {
+      if (!SKILLS[skill].includes('`' + entry.token + '`')) fail(CHECK, `${skill}: warning is not derived from the skill`)
     }
   }
-  // …and the generated list must actually be IN the description. This is the
-  // half that makes the enforcement structural: an op description is always in
-  // context on both surfaces, so a token that reached it cannot be skipped.
-  const byOp = [
-    ['slates_generate_image', 'image'],
-    ['slates_generate_video', 'video'],
-  ]
-  for (const [opId, scope] of byOp) {
-    const op = ALL_OPERATIONS.find((o) => o.id === opId)
-    if (!op) {
-      fail(CHECK, `${opId} is not in ALL_OPERATIONS.`)
-      continue
-    }
-    const generated = describeBannedTokens(scope)
-    if (generated === '') {
-      fail(CHECK, `describeBannedTokens('${scope}') is empty — nothing reaches ${opId}'s description.`)
-      continue
-    }
-    if (!op.description.includes(generated)) {
-      fail(
-        CHECK,
-        `${opId}'s description does not contain the generated ${scope} never-use list. ` +
-          `Append \`describeBannedTokens('${scope}')\` to it — never hand-type the tokens.`
-      )
-    }
-  }
-  if (!failures.some((f) => f.startsWith(`[${CHECK}]`))) {
-    pass(CHECK, `${BANNED_PROMPT_TOKENS.length} tokens, all traced to a skill and inlined into an op`)
-  }
+  if (!failures.some((f) => f.startsWith(`[${CHECK}]`))) pass(CHECK, 'model-specific lists; no borrowed modality blacklist')
 }
-
 
 // ── 5. ROUTING PURITY ───────────────────────────────────────────────────────
 //
@@ -614,7 +556,7 @@ console.log('agent-surface-lockstep-check')
 // made green, it is a 6-byte margin being made honest.
 {
   const CHECK = '7 surface-budget'
-  const CORE_CEILING = 69_500
+  const CORE_CEILING = 11_000
   const PER_OP_CEILING = 14_000
   const core = toolDefinitions(ALL_OPERATIONS, { surface: 'desktop' })
   const bytes = (d) => Buffer.byteLength(d.name + d.description + JSON.stringify(d.inputSchema), 'utf8')
@@ -637,8 +579,9 @@ console.log('agent-surface-lockstep-check')
   if (!loader) fail(CHECK, 'slates_load_tools is not in ALL_OPERATIONS — every extended op is unreachable from the desktop.')
   if (loader && loader.tier !== 'core') fail(CHECK, 'slates_load_tools is not itself core — nothing could ever load a group.')
   for (const op of ALL_OPERATIONS) {
-    if (op.tier === 'extended' && !op.group) {
-      fail(CHECK, `${op.id} is extended but names no group — it is deferred with no way to load it.`)
+    if (op.tier === 'extended') {
+      const loaded = await loader.run({ names: [op.id] })
+      if (!loaded.data?.tools?.some((t) => t.name === op.id)) fail(CHECK, `${op.id} cannot be loaded by name`)
     }
   }
   if (!failures.some((f) => f.startsWith(`[${CHECK}]`))) {

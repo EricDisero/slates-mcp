@@ -61,7 +61,7 @@ function extractCard(skill: string, content: string): string | null {
     throw new Error(
       `[craft-cards] ${skill}.md's @card block is ${body.length} chars, over the ` +
         `${CRAFT_CARD_CEILING} ceiling. A card rides EVERY estimate result for that model — ` +
-        `move the overflow into the body of the skill, which slates_get_prompting_guide returns whole.`
+        `move the overflow into the body of the skill, retrieved with slates_get_prompting_guide depth: full.`
     )
   }
   return body
@@ -88,5 +88,5 @@ export function craftCard(skill: string): string | null {
 export function describeCraftCard(skill: string): string {
   const card = craftCard(skill)
   if (!card) return ''
-  return `${card}\n\nFull guide (examples, failure modes, sources): slates_get_prompting_guide("${skill}").`
+  return `${card}\n\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: "${skill}", depth: "full"}); use query for one section.`
 }

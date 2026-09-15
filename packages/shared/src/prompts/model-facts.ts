@@ -62,8 +62,14 @@ export interface ModelFact {
    * best in the world". 2.0 is the specialist for native 4K and for the same
    * resolution cheaper; Kling is the specialist for cost-effective start-frame,
    * performance and lip-sync work and the only engine behind Motion Transfer and
-   * Lip Sync. Recorded in the vault's prompting-ssot.md the same day. Changing the
-   * default again lands there first, then here, then in slates-model-selection.md. slates-web reads this to order its model lineup
+   * Lip Sync. Recorded in the vault's prompting-ssot.md the same day.
+   *
+   * IMAGE (Eric, 2026-09-15): GPT IMAGE 2.5 SUNBURST IS THE DEFAULT IMAGE MODEL, at
+   * `high` and 3k, in agent routing as it has been in the app picker since
+   * 2026-09-09. Nano Banana 2 keeps the only headless path, so an image call
+   * with no project still runs there. Changing the
+   * default lives in this tier field; quality/resolution live in model-capabilities.ts.
+   * Consumers and generated skill partials derive them. slates-web reads this to order its model lineup
    * and to fail its build when a niche seat is named more often than the default.
    */
   tier: 'default' | 'specialist' | 'niche'
@@ -195,7 +201,7 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2',
     route: 'generate',
-    tier: 'default',
+    tier: 'specialist',
     // Gemini 3.1 FLASH Image — verified against the runtime slug map in
     // slate/src/main/api/google.ts. Nano Banana PRO is a different model
     // (gemini-3-pro-image-preview); do not conflate them.
@@ -203,7 +209,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'image',
     // 14 = 10 object-fidelity + 4 character-consistency; the categories don't trade.
     ...caps('nano-banana-2'),
-    notes: 'DEFAULT image model and the all-rounder — route here unless another seat\'s speciality is the point. Best start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images.',
+    notes: 'The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, and the start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images.',
   },
   {
     id: 'nano-banana-2-lite',
@@ -235,11 +241,11 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'gpt-image-2-5-sunburst',
     route: 'generate',
-    tier: 'specialist',
+    tier: 'default',
     label: 'GPT Image 2.5 Sunburst',
     kind: 'image',
     ...caps('gpt-image-2-5-sunburst'),
-    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here whenever quality outranks speed: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Not for drafts; you pay latency on every frame. Explore on Flare, finish on Sunburst.',
+    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Explore on Flare, finish on Sunburst.',
   },
   {
     id: 'flux-2-max',
@@ -438,6 +444,18 @@ for (const kind of ['image', 'video', 'audio'] as const) {
       )
     }
   }
+}
+
+/**
+ * The one `default` seat for a kind on the generate route, READ from `tier`.
+ * Anything that needs "the default image model" calls this instead of naming
+ * one: the op surface and slates-web both hand-typed nano-banana-2 for six days
+ * after the app picker moved to Sunburst.
+ */
+export function defaultModelFor(kind: ModelFact['kind']): string {
+  const fact = MODEL_FACTS.find((f) => f.kind === kind && f.route === 'generate' && f.tier === 'default')
+  if (!fact) throw new Error(`MODEL_FACTS: no default ${kind} seat on the generate route`)
+  return fact.id
 }
 
 const FACT_BY_ID = new Map(MODEL_FACTS.map((m) => [m.id, m]))

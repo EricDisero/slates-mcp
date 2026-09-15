@@ -25,7 +25,7 @@
  *      dist-pack/pack-manifest.json   ← what the lockstep gate reads
  */
 
-import { readFileSync, writeFileSync, readdirSync, mkdirSync, rmSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -53,7 +53,8 @@ const root = resolve(here, '..');
 // bounds landed. Rebuilding at the same version is refused for a PUBLISHED zip,
 // but neither rebuild had been uploaded yet, so there was no second file to
 // disagree with and no reason to burn a version number.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.1';
+// 2026-09-15 local candidate: updated prompting corpus. Not uploaded or released.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.2';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = join(root, 'pack-skills');
@@ -290,7 +291,7 @@ const zip = buildZip(entries);
 const hash = createHash('sha256').update(zip).digest('hex').slice(0, 16);
 const filename = `agentic-skills-pack-v${PACK_VERSION}-${hash}.zip`;
 
-rmSync(OUT_DIR, { recursive: true, force: true });
+// Keep existing artifacts: published receipt URLs and previous local builds remain reviewable.
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, filename), zip);
 

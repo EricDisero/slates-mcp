@@ -40,7 +40,7 @@ description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calli
 <!-- /slates-only -->
 **Never use** (2.5 reclassifies the task and fails a fresh generation on these):
 - `edit`, `extend`, `continue the video`, `same video but` — they make the provider read a fresh generation as an edit
-- `85mm`, `f/1.4`, `Portra 400` and any other lens, aperture, film-stock or camera-body token — image-model vocabulary, a Seedance anti-pattern on both seats
+- `f/1.4`, `Portra 400` and any other aperture or film-stock token, or a stacked list of gear — image-model vocabulary. The 2.5 guide's own example names one camera body and one 35 mm lens in a single style line, so a lone lens there is not on this list
 <!-- @banned:end -->
 
 **Read `slates-prompting-seedance` first.** The prompt GRAMMAR is the same model family: the
@@ -372,8 +372,9 @@ including why the real-vs-AI call is the provider's and not yours, are in
 Also unchanged, and worth restating because 2.5's length makes each one more expensive to get wrong:
 
 - **One primary camera move per shot.**
-- **No lens / aperture / film-stock vocabulary.** That is image-model syntax and a Seedance
-  anti-pattern.
+- **No stacked lens / aperture / film-stock vocabulary.** One camera-and-lens style line is the
+  most the 2.5 guide itself uses; the full rule is in `slates-prompting-seedance` → "Don't
+  cross-pollinate image-model syntax".
 - **No `negativePrompt` field** — constraints go inline, and 2.5 acts on negative phrasing in
   exactly two dimensions: subtitles (*"no subtitles"*) and audio (*"no BGM; environmental and
   action sounds only"*, *"no audio"*). Everywhere else, describe what you want, not what you don't.

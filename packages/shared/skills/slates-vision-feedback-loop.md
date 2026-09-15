@@ -46,7 +46,7 @@ This is a **cost** rule as much as a craft rule: a 1080p/10s premium video gener
    - **Close, but adjustable** → refine with a specific delta, regenerate **once**.
    - **Wrong direction** → ask the user before regenerating. Don't burn credits on prompt-thrashing.
 
-## The defect rubric — four slop tells
+## The defect rubric — five slop tells
 
 | Tell | What it looks like | Why it matters downstream |
 |---|---|---|
@@ -54,6 +54,7 @@ This is a **cost** rule as much as a craft rule: a 1080p/10s premium video gener
 | **Broken-but-plausible objects** | Crates, railings, hardware, mechanisms you can *almost* read but that don't resolve | Turn to mush in motion, and the model multiplies them |
 | **Local logic breaks** | An effect present in only part of the frame — rain scratching one corner, wet ground under one figure | The video model's physical logic breaks along with it |
 | **Oily textures** | Soapy, licked-smooth surfaces that have lost their material identity | Reflections crawl in motion; the plate can't hold continuity |
+| **Too perfect** | A soft light on the face that nothing in the scene could cast, the subject sharper and cleaner than everything around them, every region exposed to be readable, colour pushed warm and saturated | It reads as a subject pasted onto a location, and every shot built from the plate inherits the studio look. Fix it in words: `slates-cinematic-look` |
 
 ### Per-model accents — check the one you actually used
 

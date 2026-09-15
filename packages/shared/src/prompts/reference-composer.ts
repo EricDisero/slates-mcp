@@ -311,7 +311,7 @@ export function composeReferences(
   // ── 2. Inline-name token groups in the prompt body ──
   // For each character/environment group whose token appears in the prompt, the
   // FIRST occurrence becomes "Name (image N)"; later ones become just "Name".
-  // Style tokens are removed (a single trailing clause carries the style). Token
+  // Style tokens become image citations at the user's chosen binding site. Token
   // groups NOT found in the prompt fall through to a key line in step 3.
   const tokenGroups = numbered.filter((g) => g.token && (g.kind === 'character' || g.kind === 'environment' || g.kind === 'style'))
   const byNorm = new Map<string, NumberedGroup>()
@@ -336,24 +336,7 @@ export function composeReferences(
     unresolvedTokens.push(`${sigil}${tok}`)
   }
 
-  // First strip "in/with the style of #tag" phrases so the style reads as a
-  // clean trailing clause, not a dangling preposition (legacy cleanPrompt
-  // behaviour). ONLY when the tag resolves: an unresolved one leaves the whole
-  // phrase exactly as authored and falls through to the token pass below, which
-  // reports it and sends it as written.
-  let body = rawPrompt.replace(
-    /\s+(with|in)\s+the\s+style\s+of\s+([@#])([\w-]+(?:\.[\w-]+)*)/gi,
-    (_full, _prep, sigil, tok) => {
-      const g = byNorm.get(normToken(`${sigil}${tok}`))
-      if (g && g.kind === 'style') {
-        matchedInPrompt.add(normToken(`${sigil}${tok}`))
-        return ''
-      }
-      return _full
-    }
-  )
-
-  body = body.replace(TOKEN_RE, (_full, _sigil: string, tok: string) => {
+  const body = rawPrompt.replace(TOKEN_RE, (_full, _sigil: string, tok: string) => {
     const key = normToken(`${_sigil}${tok}`)
     const g = byNorm.get(key)
     if (!g) {
@@ -362,7 +345,7 @@ export function composeReferences(
       return _full
     }
     matchedInPrompt.add(key)
-    if (g.kind === 'style') return '' // styles never inline — trailing clause only
+    if (g.kind === 'style') return g.imageNums.length ? citeImages(g.imageNums) : g.name
     if (!seenFirst.has(key)) {
       seenFirst.add(key)
       // 🚨 ONE BINDING SITE PER ENTITY, CARRYING EVERY MEDIUM SHE OWNS
@@ -391,8 +374,12 @@ export function composeReferences(
     return g.name
   })
 
-  // Collapse the whitespace the token removals left behind.
-  body = body.replace(/[ \t]{2,}/g, ' ').replace(/\s+([,.;:!?])/g, '$1').trim()
+  // Literal citations are authored bindings too. Do not add a competing role
+  // sentence when the user already describes what that image supplies.
+  const citedImages = new Set<number>()
+  for (const match of body.matchAll(/\bimages?\s+(\d+(?:\s*(?:,\s*(?:(?:and|&)\s*)?|(?:and|&)\s*)\d+)*)\b/gi)) {
+    for (const n of match[1].match(/\d+/g) ?? []) citedImages.add(Number(n))
+  }
 
   // ── 3. Build the key lines for token-less / unmatched-token groups ──
   // Video sources, pinned/base canvases, and picked subjects that have no token
@@ -453,10 +440,11 @@ export function composeReferences(
   for (const g of numbered) {
     if ((g.kind === 'character' || g.kind === 'environment') && g.imageNums.length > 0) {
       const tokenWasMatched = g.token && matchedInPrompt.has(normToken(g.token))
-      if (!tokenWasMatched) {
-        const noun = g.imageNums.length === 1 ? 'Image' : 'Images'
-        const verb = g.imageNums.length === 1 ? 'is' : 'are'
-        topKeys.push(`${noun} ${joinNums(g.imageNums)} ${verb} ${g.name}.`)
+      const unmentioned = g.imageNums.filter((n) => !citedImages.has(n))
+      if (!tokenWasMatched && unmentioned.length) {
+        const noun = unmentioned.length === 1 ? 'Image' : 'Images'
+        const verb = unmentioned.length === 1 ? 'is' : 'are'
+        topKeys.push(`${noun} ${joinNums(unmentioned)} ${verb} ${g.name}.`)
       }
     }
   }
@@ -560,10 +548,10 @@ export function composeReferences(
   // binding inline removed the reason for the exception along with the
   // exception.
 
-  // ── 4. Style trailing clause (one, at the end — style reads best last) ──
+  // ── 4. Fallback for style attachments the user has not cited ──
   const styleNums: number[] = []
   for (const g of numbered) {
-    if (g.kind === 'style') styleNums.push(...g.imageNums)
+    if (g.kind === 'style') styleNums.push(...g.imageNums.filter((n) => !citedImages.has(n)))
   }
   const styleClauses: string[] = []
   if (styleNums.length > 0) {
@@ -767,4 +755,9 @@ export function composeKlingEdit(rawPrompt: string, groups: ReferenceGroup[]): K
     elements,
     styleImages,
   }
+}
+
+/** No-reference paths use the same composer and preserve authored prose. */
+export function cleanPrompt(userPrompt: string): string {
+  return composeReferences(userPrompt, []).prompt
 }

@@ -14,7 +14,7 @@ export { CONFIRM_CREDITS, DEVIATION_FACTOR } from './operations/index.js'
 // parity was proven of the ID SET and unproven of the BYTES. Both call this now.
 export {
   toolDefinitions, toolDefinition, groupFor, tierFor,
-  OPERATION_GROUPS, GROUP_SUMMARY, type ToolDefinition,
+  OPERATION_GROUPS, GROUP_SUMMARY, STARTUP_TOOL_IDS, type ToolDefinition,
 } from './operations/index.js'
 // Model routing/prompting facts — the SSOT the desktop Studio Agent system
 // prompt derives its MODEL ROUTING doctrine from (kind: image | video | audio,

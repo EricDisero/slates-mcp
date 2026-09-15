@@ -294,7 +294,7 @@ Every reference rule below is a corollary of that one sentence, which is why "pr
 Identity = a few flat-lit neutral angles; one reference per role, named inline; 2-4 refs not 12; describe environments instead of feeding a grid.
 
 1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each one adds context AND another variable to balance.
-2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates composes the naming for you from your `@mentions` / `#tags` — you never hand-write role labels.
+2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates resolves `@mentions` / `#tags` into numbered citations. You can also bind references directly in scene prose, naming what each image supplies.
 3. **One identity sheet per character, named inline.** A character's identity is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is better, because the model cannot tell which one is authoritative and averages them.** Slates cites it as `Marcus (image 1)`. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 4. **Flat-light identity refs.** Prep identity references with flat, even, shadowless lighting on a plain neutral background. A studio-lit or scene-lit character sheet bleeds its lighting into every generation — the failure looks like the subject was green-screen-pasted in front of the location. Reference prep beats prompting here.
 5. **Environment: describe it, don't feed a grid.** Default to describing the location in words and let the model build a space that fits the shot. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with natural ambient light that reads as the location's real light — never a multi-panel grid fed whole.
@@ -384,9 +384,9 @@ One primary anchor + 2-3 supporting details, as the trailing paragraph (both off
 
 ## ⚠️ Don't cross-pollinate image-model syntax
 
-Named **lenses, apertures, film stocks, and camera bodies** — `85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`, `shot on Sony A7S3` — are an **image-model lever** (correct and encouraged in `slates-prompting-nano-banana-2`) and a **Seedance anti-pattern**. ByteDance's guide uses shot sizes, camera moves, pacing words, and the image-quality/style vocabulary throughout, and never once mentions fps, shutter angle, f-stop, or lens millimetres.
-
-If you are carrying a look over from an NB2 start frame, translate it: `85mm f/1.4, Portra 400` → `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`.
+<!-- @inject:lens-video-split -->
+Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`) are an image-model lever. On a video model, translate the look instead of pasting the gear list: `85mm f/1.4, Portra 400` becomes `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. ByteDance's Seedance 2.0 guide never mentions fps, shutter angle, f-stop or lens millimetres. Its Seedance 2.5 guide does, once: the visual-style line of its own storyboard example names one camera body and one 35 mm cinema lens. On 2.5 a single line like that is vendor-sanctioned; a stacked gear list still is not.
+<!-- @end:lens-video-split -->
 
 ## Negative prompting — inline only
 

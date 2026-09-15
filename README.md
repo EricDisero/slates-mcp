@@ -12,7 +12,7 @@ Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is 
 
 ## What it does
 
-The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->92<!-- /gen:tool-count --> tools total.
+The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->93<!-- /gen:tool-count --> tools total.
 
 Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
 
@@ -78,9 +78,9 @@ slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
 ```
 
-In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->92<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
+In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->93<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
 
-The <!-- gen:skill-count -->34<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->18<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
+The <!-- gen:skill-count -->35<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->19<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
 
 ## Architecture
 
@@ -129,3 +129,14 @@ This builds everything first, then publishes shared → mcp → cli with `--acce
 ## License
 
 MIT — see [LICENSE](LICENSE). Copyright Blueprint Online Learning Inc.
+
+### Context on demand
+
+The server starts with a small workspace/discovery tool set. Use `slates_load_tools` with `query`
+to find a capability, then `names` to load its exact schemas. A named/group load replaces the optional
+selection and emits `tools/list_changed`; existing direct operation names remain callable.
+`--tools=flat` restores the complete listing for clients that need it.
+
+`slates_get_prompting_guide` returns a short readable card by default. Use `query` for a section or
+cinematic technique ID, `depth: "index"` for headings, or `depth: "full"` for the complete guide.
+Both text and structured content include the actual guide body. No extra loading hook is required.

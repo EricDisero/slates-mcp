@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-gpt-image-2-5
-description: Prompting GPT Image 2.5 (Flare and Sunburst) — the readable-text / character-sheet / shot-grid engine AND the photoreal front-runner. Read before calling slates_generate_image with model gpt-image-2-5-flare or gpt-image-2-5-sunburst. Covers picking the variant, the five quality tiers (high is the default and the everyday seat), resolution classes (1k/2k=1080p/3k=1440p/4k), reference-image roles, text-accuracy prompting, panel/grid layout direction, edit constraints, and when to route to the Banana line instead.
+description: Prompt and edit images with GPT Image 2.5 Flare or Sunburst. Covers reference roles, realistic lighting, text, grids, quality choices and targeted edits. Use with slates_generate_image or slates_edit_image on these models.
 ---
 
 # GPT Image 2.5 — sheets, grids, and text that actually reads
@@ -15,23 +15,28 @@ description: Prompting GPT Image 2.5 (Flare and Sunburst) — the readable-text 
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — GPT Image 2.5.** The readable-text, ordered-panel and exact-placement engine, and the photoreal front-runner for people. Structure: subject and action, then the exact copy in quotes, then layout, then light.
+**Card — GPT Image 2.5.** The photoreal front-runner for people, and the readable-text, ordered-panel engine. Structure: subject and action with each reference named where it is used, then any exact copy in quotes, then layout, then light.
 
-**Pick the seat first.** `flare` = the small/FAST seat, quality *comparable to* GPT Image 2 — drafts, exploration, volume. `sunburst` = OpenAI's *most capable*, higher quality, slower, same price — finals, hero frames, photoreal, multi-reference edits. Explore on Flare, finish on Sunburst.
+**Pick the seat.** `flare` is the fast seat, quality comparable to GPT Image 2: drafts and volume. `sunburst` is the most capable: finals, hero frames, photoreal people, multi-reference edits. Use the product default; choose Flare when speed is a stated priority.
 
-**The six levers**
-1. **Quote every string that must render verbatim** — `the sign reads "OPEN 24 HOURS"`. Quoted strings render most reliably.
-2. **Font FEEL, never a font name** — `clean geometric sans, high contrast`, `hand-painted brush lettering`.
-3. **Order dense copy explicitly** — `Line 1: "..." Line 2: "..."`. It respects the ordering.
-4. **Name the layout as a grid** for sheets and panels — `a 3x2 grid of panels, reading left to right, equal gutters`.
-5. **Give every reference image a ROLE** — subject / style / clothing / background. New emphasis in 2.5 and the highest-leverage change for multi-reference work.
-6. **Set `quality` deliberately.** Five rungs — `low`, `medium`, `high` (default), `xhigh`, `max` — spanning ~36× end to end, in UNEVEN steps: `max` is 4× `high`, but `xhigh` only ~1.8× it. `medium` is the draft seat; `high` is the everyday tier; reach past it only when tiny type, dense diagrams or many labelled elements ARE the job. 🚨 **Coming from GPT Image 2, the names moved one rung:** its `medium` is this `high`, its `high` is this `max` — same money, renamed ladder. Carrying an old value over silently buys a cheaper picture.
+**The levers**
+1. **Name each reference inline** — `the woman from image 1`, `lit and graded like image 2`. Never an opening paragraph about what the references are.
+2. **Quote every string that must render verbatim** — `the jacket reads "SLATES"`. Describe a font's feel, never its name; keep on-image text under about 30 words.
+3. **Name the layout as a grid** for sheets and panels — `a 3x2 grid of panels, reading left to right, equal gutters`.
+4. **Set `quality` deliberately.** `high` is the everyday tier; `max` is 4× its price, `xhigh` about 1.8×. Coming from GPT Image 2 the names moved one rung: its `medium` is this `high`.
 
-**Examples**
-- `A 2x3 character turnaround sheet on a neutral grey field, equal gutters, reading left to right: front, three-quarter, profile, back, three-quarter back, top. One woman, mid-30s, cropped dark hair, olive field jacket. Flat even studio light, no cast shadows. Small caption under each panel naming the angle.`
-- `Photoreal portrait, natural window light from camera-left, visible skin texture and pores, 85mm compression. A man in his 50s in a charcoal knit, half-smile, looking just past lens.`
+<!-- @inject:cinematic-card -->
+**For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
+- **Inspect every reference first.** Write its grade and imperfections in words: darkness, contrast, muddy or true blacks, colour, softness/noise, subject separation. Never grade cleaner or brighter than the look reference unless asked.
+- **One light system** — `low sun behind her`, `her face falls into deep shadow`, `no light in front of her`.
+- **Visible exposure** — `the sky burns out to white`, `dense, slightly crushed shadows`.
+- **Lens name plus effect** — `200mm telephoto`, `peaks loom huge behind her and melt into soft shapes`.
+- **Name every garment and close the foreground.** Omissions invite reference leakage or invented props.
+Bind references inline. A scene reference owns the grade; for a look-only reference, write the new scene's light. References are optional. For owned-frame edits, describe only the change and what stays.
+<!-- slates-only -->Use `slates-cinematic-look` with a technique ID or section query for more.<!-- /slates-only -->
+<!-- @end:cinematic-card -->
 
-**Hard constraint:** keep total on-image text under about 30 words for perfect accuracy — beyond that it degrades, gracefully but really. It has its own content filter, distinct from Gemini's.
+**Hard constraint:** its own content filter, distinct from Gemini's. Never describe a reference as a photograph of a real person.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -42,8 +47,8 @@ description: Prompting GPT Image 2.5 (Flare and Sunburst) — the readable-text 
      backticked and prose outside the backticks. -->
 <!-- /slates-only -->
 **Never use:**
-- a font NAME — describe the feel (`clean geometric sans, high contrast`) instead
-- a reference role essay (`Reference image 1 is a photograph of a woman. Use that exact woman.`) — name the subject inline instead
+- a font NAME — describe the feel instead, as in: clean geometric sans, high contrast
+- a reference described as a photograph of a real person (`is a photograph of a woman`), or any up-front essay about what each reference is for — name the subject inline where it is used instead, as in: the woman from image 1
 - `8k`, `masterpiece`, `best quality`, `highly detailed` — quality incantations do nothing here either
 <!-- @banned:end -->
 
@@ -55,7 +60,7 @@ GPT Image's edge is **character-level text accuracy** (~99% on English), ordered
 
 🚨 **FLARE IS NOT AN UPGRADE OVER GPT IMAGE 2 — IT IS THE FAST ONE.** OpenAI, verbatim: *"GPT Image 2.5 Flare is the small model, optimized for speed, with image quality **comparable to** GPT Image 2. GPT Image 2.5 Sunburst is the base model, optimized for quality, with **higher image quality than** GPT Image 2."* Their model pages agree: Flare is *"our fastest model for high-quality, everyday image generation"*, Sunburst *"our most capable model for image generation and editing."* **Sunburst is the seat that beats what we had; Flare is the one that holds it at half the latency.** An earlier revision of this file called Flare "better than GPT Image 2" and sent Sunburst only to multi-reference edits — both wrong, corrected 2026-09-09 against the vendor docs.
 
-**The production pattern: explore on Flare, finish on Sunburst.** Drafts, layout checks and volume go to Flare. Finals, hero frames, photoreal people and any edit that must preserve identity or geometry go to Sunburst.
+**Choose for the task.** Use the product default for ordinary work. Flare is an option when speed matters; changing model is not a mandatory draft stage.
 
 **Sunburst's widest lead is multi-reference editing** — several references all surviving into one frame, the character-consistency-across-shots problem. Reach for it there first, but that is not the only place it belongs.
 
@@ -63,7 +68,7 @@ GPT Image's edge is **character-level text accuracy** (~99% on English), ordered
 
 🚨 **The GPT Image line is ALSO the photoreal front-runner, and this file said the opposite until 2026-08-24.** **Receipts:** Eric's direct call, plus a head-to-head on the Higgsfield rail where GPT Image 2 at `quality: high`, 2K beat both Nano Banana rails on skin realism for photoreal people — that result is why the whole AI-influencer ad lane generates its plates here. **Route photoreal to this line, not away from it.**
 
-⚠️ **Which SEAT reproduces it follows from the two facts above, and it is not the obvious one.** The receipt was measured on GPT Image 2 at `high`, which is this model's **`max`** — the ladder was renamed, not repriced (see `slates-model-selection`). Flare is only *comparable* to GPT Image 2, so **Flare at `max` is the floor: it holds the measured result rather than beating it.** Sunburst is documented as higher quality than GPT Image 2, which makes **Sunburst at `max` the seat most likely to exceed it** — and a photoreal final is exactly the "quality outranks speed" case OpenAI routes to Sunburst. Nobody has re-run the head-to-head on either seat, so this is reasoning from the vendor's positioning, not a measurement. **Run Flare-max against Sunburst-max on one plate before committing the lane, and write the result here.**
+**Historical receipt, not a tier recommendation:** the photoreal comparison above used GPT Image 2 at its old `high` tier. It has not been repeated on 2.5 under matched conditions. Start with the product default and test a higher tier only against an unmet requirement; the old comparison does not establish a minimum tier for this model.
 
 **What the Banana line still owns:** edit-heavy work, and holding many subjects coherently in one frame. **Not the reference ceiling any more** — that line was true until 2026-09-09, when GPT Image went to its documented 16 against Banana's 14. Route on which model keeps them all recognisable, not on the count.
 
@@ -77,17 +82,17 @@ All five rungs are exposed, and they span ~36× end to end (2k class: $0.0044 �
 |---|---|
 | `low` | Roughest pass — layout and composition checks, throwaway comps. |
 | `medium` | The draft seat. Cheaper than NB2 Lite and available up to 4K, which is why the draft lane moved here. |
-| `high` | **Default.** The everyday tier. Blind benchmarks on GPT Image 2 put this rung — which it called `medium` — within a hair of `max` (which it called `high`) at a quarter of the cost. Inherited from the old ladder, never re-run on 2.5, and it says nothing about `xhigh`. |
+| `high` | General-purpose quality tier. Blind benchmarks on GPT Image 2 put this rung — which it called `medium` — within a hair of `max` (which it called `high`) at a quarter of the cost. Inherited from the old ladder, never re-run on 2.5, and it says nothing about `xhigh`. |
 | `xhigh` | One rung short of the top at about half its price (2k: 4 cr against `max`'s 8). Worth trying before `max`. |
 | `max` | Top of the ladder. Tiny type, dense diagrams, many labelled elements. |
 
 ⚠️ **A tier label means different things on different models.** OpenAI: *"The same quality label does not imply the same image quality or response time across models."* Flare at `max` and Sunburst at `max` are not the same picture, and neither matches Nano Banana's idea of "high".
 
-🚨 **The tier NAMES moved between versions and the strings did not.** GPT Image 2's `medium` is this model's `high`; its `high` is this model's `max` — same money, one rung of renaming. So a recipe, a doc or a memory that says "GPT Image at medium" means **`high` here**. Getting this backwards costs picture quality silently: nothing errors, the bill is correct for what was asked, and the image is just worse.
+🚨 **The tier NAMES moved between versions and the strings did not.** GPT Image 2's `medium` is this model's `high`; its `high` is this model's `max` — same money, one rung of renaming. For a recipe explicitly written for GPT Image 2, map the old tier before reusing it on 2.5. A current user request for `medium` still means `medium`. Getting this backwards costs picture quality silently: nothing errors, the bill is correct for what was asked, and the image is just worse.
 
-Never rely on the provider default. fal's default is `high`, which is correct today — but it is the third rung of five rather than the top of two, so leaning on it means a fal-side change silently reprices you. The Slates ops send `high` unless you say otherwise.
+Never rely on the provider default. fal's default is `high`, which is correct today — but it is the third rung of five rather than the top of two, so leaning on it means a fal-side change silently reprices you. Slates sends its configured quality explicitly; current defaults live in `slates-model-selection`. Your explicit choice overrides them.
 
-**Find the tier from the top down, then walk back.** OpenAI's own procedure: *"If the output falls short, test a higher quality setting. Once it meets your requirements, test lower settings to see whether they preserve acceptable quality while reducing latency. Use `xhigh` or `max` only when they improve an unmet quality requirement within your latency budget."* A higher rung does **not** guarantee a better result on a given prompt. Compare `medium` against `high` when the job is small or dense text; that is where the rungs separate most visibly.
+**Start at the default and change tiers for an unmet requirement.** OpenAI's own procedure: *"If the output falls short, test a higher quality setting. Once it meets your requirements, test lower settings to see whether they preserve acceptable quality while reducing latency. Use `xhigh` or `max` only when they improve an unmet quality requirement within your latency budget."* A higher rung does **not** guarantee a better result on a given prompt. Compare `medium` against `high` when the job is small or dense text; that is where the rungs separate most visibly.
 
 ## Resolution classes
 
@@ -101,9 +106,13 @@ Never rely on the provider default. fal's default is `high`, which is correct to
 
 🚨 **THE ASPECT RATIO CHANGES THE PRICE ON THIS MODEL, and on no other image model.** OpenAI bills image OUTPUT TOKENS and the count tracks the frame's SHAPE, so at the same resolution class **`1:1` costs about 1.8× and `4:3`/`3:4` about 1.37× what `16:9` costs**; `9:16` costs the same as `16:9`. Metered 2026-09-09 and priced into the cost key, so the quote you get before generating is the real number — but if you are choosing between shapes and the budget is tight, **16:9 or 9:16 is the cheap one.** Every other image model charges the same whatever the shape.
 
-## Reference images — give every one a role
+## Reference images — give every one a role, inline, where it is used
 
 **Assign a role to every reference image: subject, style, clothing, or background.** This is new emphasis in 2.5 and the highest-leverage change for the 16-reference character lane. An unroled pile of references makes the model guess what each one is for, and it guesses differently every run — which is the drift people mistake for a consistency failure.
+
+**The role rides a clause in the scene, not a paragraph in front of it.** *The woman from image 1 cooks on a rocky summit…*, *lit and graded like image 2*. Never open with sentences about what each reference is and what to take or ignore from it: that is the role essay the shared reference rules below forbid, and it drags the sheet's studio light into the scene.
+
+**Receipt, 2026-09-15, Sunburst, IMG-A192–A198.** The up-front version returned the studio look; the inline versions were never refused and never came back as a sheet. Two costs, both fixed in words: anything the prompt does not describe is taken from the reference (name every garment), and props nobody asked for appear (say what is in the foreground and that nothing else is). One sheet-only plate kept its described location, which narrows the two-reference rule in `slates-ugc-influencer-ad`. A look reference did far less than a described light. The full ladder is the vault's `cinematic-look-research.md`; the techniques are `slates-cinematic-look`.
 
 Reference images route through the edit endpoint, **up to 16** — fal's documented `maxItems`, and the highest reference ceiling of any image seat in Slates (the Banana line takes 14). It was capped at 10 until 2026-09-09, which was never anybody's limit, just a number nobody had checked. The composed "image N" naming applies as everywhere else. Mask-based inpainting exists at the API level but is not surfaced: a mask is something the user has to paint, and there is no painting surface — describe the change instead.
 
@@ -142,6 +151,8 @@ For anything with several requirements, OpenAI recommends organising the prompt 
 
 Name materials, lighting, colour and medium. Mood words are cues only — "cinematic", "moody", "epic" tell the model almost nothing on their own. Give scale, atmosphere and colour instead. Camera specs (`85mm`, `f/1.4`) are appearance hints, not a physical simulation; they bias the look, they do not compute optics.
 
+**Name the lens and describe its effect, every time.** A lens named alone changed nothing visible (IMG-A195, 2026-09-15); named together with what it does to the picture, it produced real compression and depth of field (IMG-A198). Wording: `slates-cinematic-look` → `compression-as-outcome`, `defocus-as-outcome`.
+
 **For people, state body framing and scale**: "full body visible, feet included", "hands naturally gripping the handlebars". This is also the safest way to phrase a crop — see the blocked-phrasings section below.
 
 **No special syntax is required.** Prose, JSON and tagged blocks all work equally well, so pick whatever stays maintainable in the caller.
@@ -162,6 +173,8 @@ Name materials, lighting, colour and medium. Mood words are cues only — "cinem
 > ✅ `Reference image 1 is a character identity sheet showing one woman across several panels — the face in the large portrait panel is the authority for her identity. Use that exact woman.`
 
 The first reads to the filter as *recreate this real person's likeness*, which is a hard refusal regardless of what the rest of the prompt says. The second signals a fictional character and passes. **This is a wording change only — the reference image can be the same file either way.** One plate flipped from refused to accepted on this single sentence with nothing else altered.
+
+**Inline naming sidesteps the question and is now the default:** never describe the reference at all, and name her where she is used (*the woman from image 1*). Six of six Sunburst plates written that way passed on 2026-09-15. Keep the sheet sentence above as the fallback if a refusal appears.
 
 **2. Never attach a reference sheet containing a headless body panel.** A sheet whose full-body panels are cropped above the neck is refused every time, even with the correct opener. Regenerate the sheet with the head visible in every panel. Related, and already in this file's sheet guidance: phrase a cropped panel as *framing* (`cropped at the collarbone`), never as *absence* (`the head not shown`).
 

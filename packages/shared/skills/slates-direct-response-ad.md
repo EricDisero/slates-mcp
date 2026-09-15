@@ -13,13 +13,13 @@ You are building a 30-second hyper-motion direct-response ad. The user has hande
 
 - Always estimate cost before generating. Use `slates_estimate_generation_cost` and surface the total.
 - All Slates generation routes through Slates Credits, period (BYOK is retired) — don't suggest "use your own keys" workarounds.
-- Default model: `nano-banana-2-2k`. For close-up product hero frames step up to `4k` only if the user asks.
+- Use the current image defaults in `slates-model-selection`; preserve the user's explicit model and quality choices.
 - Hyper-motion = punchy cuts, 4 frames in 30 seconds, ~7s each. Don't over-storyboard.
 
 ## Workflow
 
 ### 1. Set up the project
-- Create a project named for the product (`slates_create_project`).
+- Use the current project. Create one with `slates_create_project` only if the user asks.
 - If the user gave a product image as a file path, upload it (`slates_upload_reference_image`).
 - If they pasted base64 / a data URL, use the same op with `dataUrl`.
 
@@ -51,7 +51,7 @@ For each frame:
   - **Continue here:** ask you to keep going.
 
 ### 5. If they say keep going — motion, assembly, export
-- Generate motion per frame with `slates_generate_video` (`firstFrameAssetId` = the frame's asset, `background: true`), routed per `slates-model-selection` (Kling 3.0 std 8s by default; Seedance 2 for any physics-heavy beat like the hook). Submit all four, then poll `slates_get_generation_status` until each completes (1-5 min).
+- Generate motion per frame with `slates_generate_video` (`firstFrameAssetId` = the frame's asset, `background: true`), routed per `slates-model-selection` (choose a model suited to the action and a duration that fits the beat). Submit all four, then poll `slates_get_generation_status` until each completes.
 - Assemble: `slates_add_clip_to_timeline` for each completed clip in beat order (Hook → Lifestyle → Problem-Solution → CTA). Verify with `slates_get_timeline`; fix order with `slates_reorder_clips`.
 - Export: `slates_export_video` to an absolute `.mp4` path (default `<slates_get_project_directory>/exports/<product>-ad.mp4`), then `slates_reveal_file` so the user sees the file.
 - Full pipeline doctrine (batch cost authorization, model mixing, multi-take selection): `slates-one-prompt-film`.

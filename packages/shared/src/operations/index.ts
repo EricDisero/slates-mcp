@@ -1,4 +1,5 @@
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { retrieveGuide, guideSections, type GuideDepth } from '../prompts/guide-retrieval.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -26,6 +27,8 @@ import {
   // file did it anyway for 1,282 characters that repeated MODEL_FACTS phrase
   // for phrase. Edit model-facts.ts; both surfaces follow.
   describeRouting,
+  // The default seat per kind, READ from `tier` — never a literal model id.
+  defaultModelFor,
 } from '../prompts/model-facts.js'
 // 🚨 MODEL CAPABILITY SSOT. Aspect ratios, video resolutions and durations are
 // VALIDATED against and DESCRIBED from `MODEL_CAPABILITIES` — this file must
@@ -37,7 +40,7 @@ import {
 // 1080p. A customer burned a round trip on `4:5` + Seedance: accepted here,
 // queued, credits reserved, rejected by the provider asynchronously.
 import {
-  AGENT_ROUTE_PROVIDER,
+  AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
   aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
   checkAspectRatio, checkVideoResolution, checkDuration,
@@ -45,17 +48,13 @@ import {
   describeReferenceImageCaps,
   type AspectRatio, type VideoResolution,
 } from '../prompts/model-capabilities.js'
-// 🚨 "LOAD THE GUIDE" MADE STRUCTURAL. The never-use token lists are EXTRACTED
-// from the skill files (between `@banned` markers) and inlined into the two
-// generate ops' descriptions, which are always in context on both surfaces —
-// no call to skip, no discretion. `bannedTokenWarning` then reports what the
-// submitted prompt actually contained, in the result, without blocking it.
-// Never hand-type one of these tokens here; edit the skill.
+// Per-model warnings are extracted from skill @banned blocks. They ride the
+// selected model's estimate and submitted-prompt result, never another model's schema.
 import {
   describeBannedTokens, bannedTokenWarning, describeBannedTokensForSkill,
 } from '../prompts/banned-tokens.js'
 // 🚨 THE OTHER HALF OF THE SAME LESSON. The banned list is the NEGATIVE half and
-// it rides an op description. The CRAFT CARD is the POSITIVE half — the levers
+// it rides the selected estimate. The CRAFT CARD is the POSITIVE half — the levers
 // that make a shot good rather than merely un-bad — and it rides the estimate
 // RESULT, which the doctrine already makes the agent call before generating.
 // Zero prefix bytes, present at the moment the model has just been named.
@@ -180,10 +179,8 @@ export interface Operation<I> {
    * Which tier of the desktop tool surface this op belongs to.
    *
    * `core` is sent on every Studio Agent turn; `extended` is deferred behind
-   * `slates_load_tools` and appended to the tool list for the rest of the run
-   * once a group loads. The MCP server registers everything as before — hosts
-   * there do their own deferral (Claude Code defers stdio tool schemas through
-   * its tool search) and a stdio server has no run to append to.
+   * `slates_load_tools` and selected until the next named/group load
+   * on either surface. MCP keeps unlisted operations callable for older clients.
    *
    * Defaults to `core` when absent, so a new op is visible until someone
    * deliberately defers it.
@@ -408,7 +405,7 @@ function backgroundSubmitted(
 export const getWorkspaceState: Operation<{ projectId?: string; limit?: number }> = {
   id: 'slates_get_workspace_state',
   description:
-    'Snapshot of the user\'s Slates workspace: the project list (most recent first) plus the active project in full when you name one. Call once at the start of a workflow to seed your understanding.',
+    'Snapshot of the user\'s Slates workspace: the project list (most recent first) plus the active project in full when you name one.',
   input: z.object({
     projectId: z.string().optional(),
     limit: z.number().int().min(1).max(200).optional().describe('How many projects to list, newest first. Default 40.'),
@@ -441,7 +438,83 @@ export const getWorkspaceState: Operation<{ projectId?: string; limit?: number }
         ? { truncated: `${rows.length - compact.length} more — raise limit or call slates_list_projects.` }
         : {}),
       activeProject,
+      generationDefaults: {
+        imageModel: defaultModelFor('image'),
+        imageResolution: defaultImageResolutionFor(defaultModelFor('image')),
+        gptQuality: DEFAULT_GPT_QUALITY,
+        videoModel: defaultModelFor('video'),
+      },
     })
+  },
+}
+
+/**
+ * What the user has selected in the app RIGHT NOW. The selection band in every
+ * grid (images, clips, audio, storyboard shots) reports its ids to the desktop,
+ * and the image viewer reports what is open; the desktop looks codes and labels
+ * up at request time. Exists so "make these into videos" needs no codes typed.
+ */
+export const getSelection: Operation<Record<string, never>> = {
+  id: 'slates_get_selection',
+  description:
+    // Lean on purpose: WHEN to call it is the doctrine's ASSET CODES line, and
+    // this description is paid on every desktop turn (lockstep § 7).
+    'The user\'s live selection in the Slates app: ticked cards (with codes) and the image open in the viewer.',
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    const r = await ctx.desktop().get<{
+      selection: {
+        surface: string
+        projectId: string | null
+        projectName: string | null
+        items: unknown[]
+        updatedAt: string
+      } | null
+      viewing: { projectId: string | null; item: unknown; updatedAt: string } | null
+    }>('/agent/selection')
+    const describe = (row: Record<string, unknown>): string =>
+      row.code ? (row.label ? `${row.code} — ${row.label}` : String(row.code)) : String(row.id)
+    const selected = r.selection
+      ? r.selection.items.map((i) => {
+          const row = i as Record<string, unknown>
+          return row.type === 'shot'
+            ? { id: row.id, code: row.code ?? null, label: row.label ?? null, type: 'shot' }
+            : compactAsset(row)
+        })
+      : []
+    const viewed = r.viewing ? compactAsset(r.viewing.item) : null
+    const lines: string[] = []
+    if (r.selection) {
+      const where = r.selection.projectName ? ` in project "${r.selection.projectName}"` : ''
+      lines.push(
+        `${selected.length} selected on the ${r.selection.surface} tab${where} (projectId ${r.selection.projectId}): ` +
+          selected.map(describe).join(', ') +
+          '.'
+      )
+    }
+    if (viewed) lines.push(`Open in the viewer: ${describe(viewed)}.`)
+    if (lines.length === 0) {
+      lines.push(
+        'Nothing is selected and no image is open in the viewer. Ask the user to select the cards in Slates (click or drag), or to name the codes.'
+      )
+    }
+    return {
+      text: lines.join(' '),
+      data: {
+        selection: r.selection
+          ? {
+              surface: r.selection.surface,
+              project_id: r.selection.projectId,
+              project_name: r.selection.projectName,
+              items: selected,
+              updated_at: r.selection.updatedAt,
+            }
+          : null,
+        viewing: viewed
+          ? { project_id: r.viewing!.projectId, item: viewed, updated_at: r.viewing!.updatedAt }
+          : null,
+      },
+    }
   },
 }
 
@@ -717,8 +790,8 @@ export const estimateGenerationCost: Operation<{
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
       'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
     ),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only (default 2k; 3k: GPT Image/seedream-5-lite).'),
-    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image tier; default high.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only. Omit for the model default; pass the same value to generation.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     aspectRatio: z.string().optional().describe('Image only. 1:1/4:3/3:4 cost more than 16:9.'),
     sound: z.boolean().optional().describe('Veo only — audio flag changes the cost key.'),
     seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
@@ -748,7 +821,7 @@ export const estimateGenerationCost: Operation<{
       // billed `high`, so the op the doctrine tells agents to call before every
       // generation quoted 1 cr for a 2 cr job. Four separate copies of one
       // default is what made that possible; there are now none.
-      if (img) key = imageCostKey(img, input.resolution ?? (img === 'nano-banana-2-lite' ? '1k' : '2k'), input.quality, input.aspectRatio)
+      if (img) key = imageCostKey(img, input.resolution ?? defaultImageResolutionFor(img), input.quality, input.aspectRatio)
     }
     // 2a) audio base id → seconds. Both surfaces bill per second, so a
     //     duration is always required. Runs BEFORE the video resolver: it is
@@ -1123,7 +1196,7 @@ export const getAssetImage: Operation<{ id: string; fullRes?: boolean }> = {
 export const getAssetsBatch: Operation<{ ids: string[] }> = {
   id: 'slates_get_assets_batch',
   description:
-    'Fetch up to 8 image-asset thumbnails inline in a single call. Use this when picking the right reference from a project gallery — one round trip beats N. Each returned image carries its short code (IMG-A12) and label so you can speak about candidates in the user\'s shared vocabulary ("between IMG-A12 and IMG-A14, the second has the right composition"). Video assets are not supported here — call slates_get_asset_video_frames for those.',
+    'Fetch up to 8 image-asset thumbnails inline in a single call. Use this when picking the right reference from a project gallery — one round trip beats N. Each returned image carries its short code (IMG-A12) and label. Video assets are not supported here — call slates_get_asset_video_frames for those.',
   input: z.object({
     ids: z.array(z.string().uuid()).min(1).max(8).describe('1-8 image-asset ids. Order is preserved in the response.'),
   }),
@@ -1850,7 +1923,7 @@ export type GptBackgroundId = GptBackground
  * ten and the other five would be accepted here. The image param surface has
  * not been audited (aspect ratios, resolution classes, per-model reference
  * caps) — that audit is the named follow-up in
- * `slate/docs/plan-docs/2026-08-16-MODEL-CAPABILITY-SSOT.md` §5. The machinery
+ * `second-brain/plans/2026-08-16-slates-model-capability-ssot.md` §5. The machinery
  * to close it already exists: call `checkAspectRatio(model, ratio)` the way
  * `assertVideoCapabilities` does below.
  */
@@ -1890,7 +1963,7 @@ function gptKeyAspect(aspectRatio?: string): string {
 export function imageCostKey(
   model: ImageModelId,
   resolution: '1k' | '2k' | '3k' | '4k',
-  quality: GptQualityId = 'high',
+  quality: GptQualityId = DEFAULT_GPT_QUALITY,
   aspectRatio?: string
 ): string {
   if (model === 'flux-2-max') return resolution === '1k' ? 'flux-2-max' : `flux-2-max-${resolution}`
@@ -1899,6 +1972,14 @@ export function imageCostKey(
   if (model === 'nano-banana-pro') return `nano-banana-pro-${resolution}`
   if (isGptImageModel(model)) return `${model}-${gptKeyTier(quality)}-${resolution}${gptKeyAspect(aspectRatio)}`
   return `nano-banana-2-${resolution}`
+}
+
+// The default image seat with a project to route through, READ from MODEL_FACTS
+// `tier`. Asserted at load so a default moved to a seat this op cannot send
+// fails the build instead of every omitted-model call.
+const DEFAULT_IMAGE_MODEL = defaultModelFor('image') as ImageModelId
+if (!(IMAGE_MODELS as readonly string[]).includes(DEFAULT_IMAGE_MODEL)) {
+  throw new Error(`slates_generate_image: default image seat ${DEFAULT_IMAGE_MODEL} is not in IMAGE_MODELS`)
 }
 
 export const generateImage: Operation<{
@@ -1933,10 +2014,10 @@ export const generateImage: Operation<{
     describeBannedTokens('image'),
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: zEnum(IMAGE_MODELS).optional().describe('Image model. Default nano-banana-2. Routing doctrine: slates-model-selection skill. All except nano-banana-2 require projectId.'),
+    model: zEnum(IMAGE_MODELS).optional().describe(`Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, nano-banana-2 (the only headless seat) without. Routing: slates-model-selection skill.`),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('1k drafts, 2k hero, 4k final. nano-banana-2-lite: 1k only. GPT Image classes 1024²/1080p/1440p/2160p. Never default this.'),
-    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image only. UNEVEN ladder: max=4× high, xhigh~1.8×. medium drafts; default high.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Omit for the selected model default. Override for a specific delivery size; use the same setting when estimating.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image only. Default ${DEFAULT_GPT_QUALITY}; estimate the chosen tier before generation.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
@@ -1955,7 +2036,11 @@ export const generateImage: Operation<{
     // Non-blocking prompt hygiene. Computed once, reported on every exit path
     // that echoes a prompt -- the clarification and confirm gates are PRE-spend,
     // which is where a rewrite is still free.
-    const promptWarning = bannedTokenWarning(input.prompt, 'image')
+    // Omitted model: the default seat when there is a project to route through,
+    // nano-banana-2 without one, because it is the only headless seat.
+    const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : 'nano-banana-2')
+    const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
+    input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
     if (!input.aspectRatio || !input.resolution) {
       const missing: string[] = []
       if (!input.aspectRatio) missing.push('aspectRatio')
@@ -1967,14 +2052,13 @@ export const generateImage: Operation<{
         message:
           (promptWarning ? `${promptWarning}\n\n` : '') +
           `Missing required field(s): ${missing.join(', ')}. ` +
-          `Read the slates-prompting-nano-banana-2 + slates-cost-discipline skills, ` +
-          // Generated from MODEL_CAPABILITIES — never retype a ratio list.
+          `Read the ${promptingSkillFor(imageModel)} + slates-cost-discipline skills, ` +
+          // Generated from MODEL_CAPABILITIES — never retype a ratio or resolution list.
           `or ask the user. Aspect ratio by model: ${describeAspectRatios(IMAGE_MODELS)}. ` +
-          `Resolution options: 1k 2k 4k (same price band — pick by need, not cost).`,
+          `Resolution options for ${imageModel}: ${(MODEL_CAPABILITIES[imageModel]?.imageResolutions ?? []).join(' ')}.`,
       })
     }
     const resolution = input.resolution
-    const imageModel = input.model ?? 'nano-banana-2'
     const resolutions = MODEL_CAPABILITIES[imageModel]?.imageResolutions ?? []
     if (resolution && !resolutions.includes(resolution)) {
       return ok({ requires_clarification: true, missing: ['resolution'],
@@ -2134,7 +2218,7 @@ export const generateImage: Operation<{
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
-        ...(isGptImageModel(imageModel) ? { gptQuality: input.quality, gptBackground: input.backgroundMode } : {}),
+        ...(isGptImageModel(imageModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         background: input.background,
       })
@@ -2369,7 +2453,7 @@ export const editImage: Operation<{
     editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'flux-2-max', 'seedream-5-lite']).optional(),
     referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana only (NB Pro 13, NB2 Lite 3).'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
-    quality: z.enum(GPT_QUALITY_TIERS).optional().describe('GPT Image tier; default high.'),
+    quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
@@ -2382,7 +2466,7 @@ export const editImage: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     const editModel = input.editModel ?? 'nano-banana-2'
-    const resolution = input.resolution ?? (editModel === 'nano-banana-2-lite' ? '1k' : '2k')
+    const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
     if (isGptImageModel(editModel)) {
       // 🚨 v3, LIKE generateImage — this site was missed once already.
       // A pre-2.5 desktop advertises v2, so gating the 2.5 seats on v2 lets it
@@ -2435,7 +2519,7 @@ export const editImage: Operation<{
       editModel,
       referenceAssetIds: input.referenceAssetIds,
       resolution,
-      ...(isGptImageModel(editModel) ? { gptQuality: input.quality, gptBackground: input.backgroundMode } : {}),
+      ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
       aspectRatio: input.aspectRatio,
       background: input.background,
     })
@@ -3102,7 +3186,7 @@ export const generateVideo: Operation<{
     // not reasonable for video given the cost.
     // Non-blocking prompt hygiene, computed once. Reported on the gates that
     // fire BEFORE any spend, where a rewrite is still free.
-    const promptWarning = bannedTokenWarning(input.prompt, 'video')
+    const promptWarning = bannedTokenWarning(input.prompt, 'video', promptingSkillFor(resolved.model))
     if (!input.projectId) {
       return ok({
         requires_clarification: true,
@@ -6345,7 +6429,7 @@ export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean
   },
 }
 
-function resolveGuideTopic(topic: string): string | null {
+export function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (SKILLS[t]) return t
   if (t === 'slates-character-turnaround' || t === 'character-turnaround') {
@@ -6371,6 +6455,34 @@ function resolveGuideTopic(topic: string): string | null {
   if (t === 'camera' || t === 'camera-moves' || t === 'camera moves' || t === 'shot-list' || t === 'shot list') {
     return 'slates-camera-language'
   }
+  // The cinematic-look catalogue: light, exposure, grade, what a lens does to the
+  // picture, imperfection. Above the model prefixes like the blocks before it;
+  // `camera` stays with camera-language, `lens` and `lighting` are look words.
+  if (
+    t === 'cinematic' ||
+    t === 'cinematic-look' ||
+    t === 'cinematic look' ||
+    t === 'film-look' ||
+    t === 'film look' ||
+    t === 'look' ||
+    t === 'lighting' ||
+    t === 'light' ||
+    t === 'exposure' ||
+    t === 'grade' ||
+    t === 'grading' ||
+    t === 'color-grade' ||
+    t === 'colour-grade' ||
+    t === 'silhouette' ||
+    t === 'lens' ||
+    t === 'lenses' ||
+    t === 'realism' ||
+    t === 'natural-light' ||
+    t === 'natural light' ||
+    t === 'too-perfect' ||
+    t === 'imperfection'
+  ) {
+    return 'slates-cinematic-look'
+  }
   if (t === 'blocking-to-prompt' || t === 'previs-prompt' || t === 'reference-video' || t === 'video-to-video' || t === 'v2v') {
     return 'slates-blocking-to-prompt'
   }
@@ -6391,7 +6503,7 @@ function resolveGuideTopic(topic: string): string | null {
     return 'slates-model-selection'
   }
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
-  if (t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-5'
+  if (t === 'sunburst' || t === 'flare' || t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-5'
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('veo')) return 'slates-prompting-veo-3'
@@ -6504,7 +6616,7 @@ function describeGuideTopics(): string {
   )
 }
 
-export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'full'; query?: string }> = {
+export const getPromptingGuide: Operation<{ topic: string; depth?: GuideDepth; query?: string }> = {
   id: 'slates_get_prompting_guide',
   description:
     'For app help and exact UI instructions use topic "app-manual" with a query such as "voice recording". This returns the canonical product manual, shared by every agent surface. ' +
@@ -6516,18 +6628,21 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
     // not this op is ever called.
     "Return a bundled Slates prompting/workflow guide. MCP-only clients (Claude Desktop, Smithery) don't get the CLI-installed skill files — call this instead. Accepts a guide name or a model id ('veo-3.1-fast', 'kling-v3.0-pro', 'seedance-2', 'nano-banana-2'), which maps to the right guide. Reach for it when a card is not enough: the failure modes, the worked examples and the sources are only in the full text.",
   input: z.object({
-    query: z.string().max(200).optional().describe('For app-manual: keywords to retrieve relevant UI sections. Omit for the entire manual.'),
+    query: z.string().max(200).optional().describe('Keywords, section heading, or exact cinematic technique ID. Returns only the matching section or technique.'),
     topic: z
       .string()
       .min(1)
       .describe(`Guide name, model id, or style name. ${describeGuideTopics()}`),
-    depth: z.enum(['card', 'full']).optional().describe(
-      '"card" returns just the levers block (a few hundred words — the same card slates_estimate_generation_cost already attached, so usually redundant). "full" (default) returns the whole guide, up to several thousand words.'
+    depth: z.enum(['card', 'index', 'section', 'full']).optional().describe(
+      'Default "card" is a short overview. "index" lists sections; query selects one section or technique; "full" explicitly returns the complete guide.'
     ),
   }),
   async run(input) {
     if (input.topic.trim().toLowerCase() === 'app-manual') {
-      const content = appManualSections(input.query)
+      const content = input.query || input.depth === 'full'
+        ? appManualSections(input.query)
+        : 'App manual sections. Pass query to read a section, or depth "full" for the complete manual.\n\n' +
+          guideSections(appManualSections()).map((s) => `- ${s.title}`).join('\n')
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
     const resolved = resolveGuideTopic(input.topic)
@@ -6537,25 +6652,10 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
         `Unknown guide topic: ${input.topic}. Valid topics: ${Object.keys(SKILLS).sort().join(', ')}`
       )
     }
-    if (input.depth === 'card') {
-      const card = describeCraftCard(resolved)
-      if (card) {
-        return { text: card, data: { topic: resolved, depth: 'card', bytes: Buffer.byteLength(card, 'utf8'), guide: card } }
-      }
-      // No card on this guide — returning nothing would read as "no guidance",
-      // which is worse than a fall-through the result names.
-    }
-    // 🚨 THE BODY RIDES IN `data` TOO. The MCP server mirrors `data` as
-    // `structuredContent`, and at least one host (Claude Code, 2026-09-14)
-    // shows the model ONLY structuredContent when it is present — so a guide
-    // whose body lived only in `text` reached the model as a topic and a byte
-    // count, and the model prompted a video seat from the cost-estimate card
-    // alone. `guide` is the same string as `text`; a data block that describes
-    // prose without carrying it is a broken result on this op.
-    return {
-      text: content,
-      data: { topic: resolved, depth: 'full', bytes: Buffer.byteLength(content, 'utf8'), guide: content },
-    }
+    const depth = input.depth ?? 'card'
+    const guide = retrieveGuide(resolved, content, depth, input.query)
+    // Both fields carry the body: some native clients expose structured data only.
+    return { text: guide, data: { topic: resolved, depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
   },
 }
 
@@ -6563,33 +6663,30 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
  * The one op that changes what OTHER ops are visible.
  *
  * 🚨 IT EXISTS BECAUSE THE SURFACE IS 112 KB AND EVERY TURN PAYS FOR ALL OF IT.
- * The desktop Studio Agent sends `core` plus this; a group arrives when the
- * work needs it and stays for the rest of the run. On the MCP surface every op
- * is registered up front (a stdio server has no run to append to), so this
- * returns the same definitions as a plain listing — useful either way, since
- * it is also how an agent asks "what else can you do".
+ * Both surfaces start with the shared core set. Search returns compact metadata;
+ * names/group returns exact schemas and replaces the optional selection.
  */
-export const loadTools: Operation<{ group: OperationGroup }> = {
+export const loadTools: Operation<{ group?: OperationGroup; query?: string; names?: string[] }> = {
   id: 'slates_load_tools',
-  description:
-    'Load a deferred group of tools for the rest of this session. The core surface is always present; these four groups are held back so every turn does not pay for the whole registry. ' +
-    (Object.entries(GROUP_SUMMARY) as Array<[OperationGroup, string]>)
-      .map(([g, s]) => `"${g}": ${s}`)
-      .join('. ') +
-    '. Call it the moment the work needs one of those — the tools arrive in the same turn\'s result and stay loaded. On MCP clients every tool is already registered and this just lists the group.',
+  description: 'Discover and load tools on demand. query searches operation names and descriptions and returns a compact list. names loads up to five exact tools with their schemas. group loads a whole task group. A load replaces the previous optional selection; query alone does not change it. Call the discovered tools by their own names. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
   input: z.object({
-    group: z.enum(['library', 'timeline', 'admin', 'blender']).describe('Which group to load.'),
-  }),
+    group: z.enum(['library', 'timeline', 'admin', 'blender']).optional(),
+    query: z.string().min(1).max(160).optional().describe('Search for a task such as generate image, create shot, or edit video.'),
+    names: z.array(z.string()).min(1).max(5).optional().describe('Exact operation names to load after discovery. Their permission annotations remain separate.'),
+  }).refine((v) => [v.group, v.query, v.names].filter(Boolean).length === 1, 'Pass exactly one of query, names, or group.'),
   async run(input) {
-    const defs = toolDefinitions(
-      ALL_OPERATIONS.filter((op) => groupFor(op.id) === input.group),
-      { surface: 'mcp' }
-    )
-    return ok(
-      { group: input.group, tools: defs },
-      `Loaded the "${input.group}" group — ${defs.length} tool(s) now available:\n` +
-        defs.map((d) => `${d.name}: ${d.description.split(/(?<=\.)\s/)[0]}`).join('\n')
-    )
+    if (input.query) {
+      const words = input.query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+      const ranked = ALL_OPERATIONS.map((op) => ({ op, score: words.reduce((n, w) => n + (op.id.includes(w) ? 4 : op.description.toLowerCase().includes(w) ? 1 : 0), 0) }))
+        .filter((x) => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 10)
+      const matches = ranked.map(({ op }) => ({ name: op.id, description: op.description.split(/(?<=\.)\s/)[0], billable: !!op.billable, annotations: op.annotations }))
+      return ok({ matches }, matches.map((o) => `${o.name}: ${o.description}`).join('\n') || 'No matching tools. Try another task description.')
+    }
+    const names = input.names ?? OPERATION_GROUPS[input.group!]
+    const unknown = names.filter((id) => !ALL_OPERATIONS.some((op) => op.id === id))
+    if (unknown.length) throw new Error(`Unknown operation(s): ${unknown.join(', ')}`)
+    const defs = toolDefinitions(ALL_OPERATIONS.filter((op) => names.includes(op.id)), { surface: 'mcp' })
+    return ok({ group: input.group, tools: defs }, `Loaded tools (call by name):\n${JSON.stringify(defs)}`)
   },
 }
 
@@ -6777,6 +6874,7 @@ export const blenderRenderBlocking: Operation<{
 
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getWorkspaceState as unknown as Operation<unknown>,
+  getSelection as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
   listAvailableModels as unknown as Operation<unknown>,
@@ -6922,4 +7020,4 @@ for (const op of ALL_OPERATIONS) {
   }
 }
 
-export { toolDefinitions, toolDefinition, groupFor, tierFor, OPERATION_GROUPS, GROUP_SUMMARY, type ToolDefinition } from './surface.js'
+export { toolDefinitions, toolDefinition, groupFor, tierFor, OPERATION_GROUPS, GROUP_SUMMARY, type ToolDefinition, STARTUP_TOOL_IDS } from './surface.js'

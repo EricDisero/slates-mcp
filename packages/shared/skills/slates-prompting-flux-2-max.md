@@ -24,9 +24,16 @@ description: How to prompt FLUX.2 Max (Black Forest Labs image model). Read befo
 4. **Bind every hex colour to an object.** `a #1B4D3E enamel mug` lands; an unbound colour does not.
 5. **For portraits add texture words** — `natural skin texture, realistic pores, subtle imperfections, soft diffused lighting`.
 
-**Examples**
-- `A chef plating in a steel kitchen pass. Shot on Hasselblad X2D, 80mm, f/2.8. Overhead fluorescents plus warm spill from the line. Natural skin texture, subtle imperfections. Muted steel and #7A3B2E copper.`
-- `An empty municipal pool at dusk, 35mm, deep focus, early digital camera with slight noise and flash falloff. Cracked #4A7C8C tiles. Candid, unstaged.`
+<!-- @inject:cinematic-card -->
+**For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
+- **Inspect every reference first.** Write its grade and imperfections in words: darkness, contrast, muddy or true blacks, colour, softness/noise, subject separation. Never grade cleaner or brighter than the look reference unless asked.
+- **One light system** — `low sun behind her`, `her face falls into deep shadow`, `no light in front of her`.
+- **Visible exposure** — `the sky burns out to white`, `dense, slightly crushed shadows`.
+- **Lens name plus effect** — `200mm telephoto`, `peaks loom huge behind her and melt into soft shapes`.
+- **Name every garment and close the foreground.** Omissions invite reference leakage or invented props.
+Bind references inline. A scene reference owns the grade; for a look-only reference, write the new scene's light. References are optional. For owned-frame edits, describe only the change and what stays.
+<!-- slates-only -->Use `slates-cinematic-look` with a technique ID or section query for more.<!-- /slates-only -->
+<!-- @end:cinematic-card -->
 
 **Hard constraint:** no negative prompting. Every "no X" must be rewritten as the positive state — `no blur` becomes `sharp focus throughout`, `no people` becomes `empty scene`, `no harsh shadows` becomes `soft, diffused lighting`.
 <!-- @card:end -->
@@ -43,6 +50,10 @@ description: How to prompt FLUX.2 Max (Black Forest Labs image model). Read befo
 - an unbound hex colour — bind it to an object or it lands inconsistently
 - `masterpiece`, `best quality`, `trending on artstation`, `8k`
 <!-- @banned:end -->
+
+**Examples**
+- `A chef plating in a steel kitchen pass. Shot on Hasselblad X2D, 80mm, f/2.8. Overhead fluorescents plus warm spill from the line. Natural skin texture, subtle imperfections. Muted steel and #7A3B2E copper.`
+- `An empty municipal pool at dusk, 35mm, deep focus, early digital camera with slight noise and flash falloff. Cracked #4A7C8C tiles. Candid, unstaged.`
 
 Black Forest Labs' top image model, routed via fal.ai. In Slates: `slates_generate_image` with `model: flux-2-max` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). Strengths vs Nano Banana 2: photoreal texture, less censored, precise hex-color control, strong typography. Reference images route through FLUX's edit endpoint and carry a lower per-model cap than NB2's 14.
 
@@ -141,7 +152,7 @@ Every reference rule below is a corollary of that one sentence, which is why "pr
 Identity = a few flat-lit neutral angles; one reference per role, named inline; 2-4 refs not 12; describe environments instead of feeding a grid.
 
 1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each one adds context AND another variable to balance.
-2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates composes the naming for you from your `@mentions` / `#tags` — you never hand-write role labels.
+2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates resolves `@mentions` / `#tags` into numbered citations. You can also bind references directly in scene prose, naming what each image supplies.
 3. **One identity sheet per character, named inline.** A character's identity is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is better, because the model cannot tell which one is authoritative and averages them.** Slates cites it as `Marcus (image 1)`. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 4. **Flat-light identity refs.** Prep identity references with flat, even, shadowless lighting on a plain neutral background. A studio-lit or scene-lit character sheet bleeds its lighting into every generation — the failure looks like the subject was green-screen-pasted in front of the location. Reference prep beats prompting here.
 5. **Environment: describe it, don't feed a grid.** Default to describing the location in words and let the model build a space that fits the shot. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with natural ambient light that reads as the location's real light — never a multi-panel grid fed whole.

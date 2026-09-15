@@ -18,7 +18,7 @@ This portable skill is deliberately thin. Its reference files are generated dire
 |---|---|---|
 | **Kling 3.0** | THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue, lip-sync and the widest aspect-ratio set; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools. | `reference-kling.md` |
 | **Seedance 2.0** | THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare "seedance" still resolves here for older CLIs that expect 4K. | `reference-seedance.md` |
-| **Nano Banana 2 (Gemini 3.1 Flash Image)** | DEFAULT image model and the all-rounder — route here unless another seat's speciality is the point. Best start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images. | `reference-nano-banana.md` |
+| **Nano Banana 2 (Gemini 3.1 Flash Image)** | The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, and the start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images. | `reference-nano-banana.md` |
 <!-- @end:model-routing -->
 
 If the user names a model, use it. Otherwise route by the generated table above.

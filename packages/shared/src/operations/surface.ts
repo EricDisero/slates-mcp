@@ -11,10 +11,9 @@
 //
 //   2. TIERS. 90 ops is 112 KB of descriptions and JSON schemas on EVERY
 //      desktop Studio Agent turn. `core` is what a session needs to work;
-//      `extended` is deferred behind `slates_load_tools` and appended to the
-//      run's tool list once a group loads. The MCP server still registers
-//      everything — a stdio server has no run to append to, and Claude Code
-//      already defers stdio tool schemas through its own tool search.
+//      `extended` is selected through `slates_load_tools`. Both surfaces replace
+//      the optional selection on a named/group load. MCP keeps every direct
+//      operation callable for compatibility and notifies when its listing changes.
 //
 //   3. ONE SCHEMA RENDERER. The desktop rendered `$refStrategy: 'none'` and
 //      the MCP server rendered `target: 'openApi3'`, so "the two surfaces
@@ -207,8 +206,14 @@ export function groupFor(id: string): OperationGroup | undefined {
 
 /** `extended` iff the op names a group. Absent from every group ⇒ `core`, so a
  *  new op is visible until someone deliberately defers it. */
+export const STARTUP_TOOL_IDS = new Set([
+  'slates_load_tools', 'slates_get_prompting_guide', 'slates_get_workspace_state',
+  'slates_list_projects', 'slates_create_project', 'slates_list_assets',
+  'slates_get_asset_image', 'slates_get_generation_status', 'slates_estimate_generation_cost',
+])
+
 export function tierFor(id: string): OperationTier {
-  return GROUP_BY_OP.has(id) ? 'extended' : 'core'
+  return STARTUP_TOOL_IDS.has(id) ? 'core' : 'extended'
 }
 
 /** One-line summary of each group, for `slates_load_tools`' own description. */
@@ -255,18 +260,18 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
  * Render a tool surface.
  *
  * `desktop` sends `core` plus whatever groups have been loaded this run; `mcp`
- * sends everything, because a stdio server has no run to append to.
+ * renders all definitions; the MCP server filters its connection listing from that set.
  */
 export function toolDefinitions(
   ops: readonly SurfaceOp[],
-  opts: { surface: 'desktop' | 'mcp'; groups?: readonly OperationGroup[] }
+  opts: { surface: 'desktop' | 'mcp'; groups?: readonly OperationGroup[]; names?: readonly string[] }
 ): ToolDefinition[] {
   const loaded = new Set(opts.groups ?? [])
   return ops
     .filter((op) => {
       if (opts.surface === 'mcp') return true
       const group = groupFor(op.id)
-      return group === undefined || loaded.has(group)
+      return STARTUP_TOOL_IDS.has(op.id) || !!opts.names?.includes(op.id) || (group !== undefined && loaded.has(group))
     })
     .map(toolDefinition)
 }

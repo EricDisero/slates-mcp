@@ -197,6 +197,7 @@ export interface VoiceCloneCapability {
 
 export const GPT_QUALITY_TIERS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 export type GptQuality = (typeof GPT_QUALITY_TIERS)[number]
+export const DEFAULT_GPT_QUALITY: GptQuality = 'high'
 export const GPT_BACKGROUNDS = ['auto', 'transparent', 'opaque'] as const
 export type GptBackground = (typeof GPT_BACKGROUNDS)[number]
 export type ImageResolution = '1k' | '2k' | '3k' | '4k'
@@ -307,6 +308,8 @@ export function falImageSize(
 
 export interface ModelCapability {
   imageResolutions?: ImageResolution[]
+  /** Product default shared by estimates and generation. */
+  defaultImageResolution?: ImageResolution
   /**
    * Images ONE request may ask the provider for in a single batch.
    *
@@ -379,6 +382,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // ── Image models ───────────────────────────────────────────────────────────
 
   'nano-banana-2': {
+    defaultImageResolution: '2k',
     imageResolutions: ['1k', '2k', '4k'],
     // fal's nano-banana-2 schema caps `num_images` at 4 (read 2026-09-09). This
     // is the ONLY model that batches: the MCP's headless path (no projectId) asks
@@ -390,12 +394,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'nano-banana-2-lite': {
+    defaultImageResolution: '1k',
     imageResolutions: ['1k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 4, // fal edit endpoint caps input images at 4
   },
 
   'nano-banana-pro': {
+    defaultImageResolution: '2k',
     imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 14,
@@ -438,24 +444,28 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // limits either: the MCP's 4,000-character prompt against fal's 32,000, and
   // image quantity, which is a fan-out and has no provider ceiling at all.
   'gpt-image-2-5-flare': {
+    defaultImageResolution: '2k',
     imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
     maxRefImages: 16,
   },
 
   'gpt-image-2-5-sunburst': {
+    defaultImageResolution: '3k',
     imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
     maxRefImages: 16,
   },
 
   'flux-2-max': {
+    defaultImageResolution: '1k',
     imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 4,
   },
 
   'seedream-5-lite': {
+    defaultImageResolution: '2k',
     imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 10,
@@ -1145,4 +1155,13 @@ export function minimaxMaxReferenceTokens(input: {
   return Math.max(0, Math.ceil(input.imagePixels / MINIMAX_MAX_REFERENCE.imagePixelsPerToken +
     input.videoSeconds * (rate ?? 0) + input.audioSeconds * MINIMAX_MAX_REFERENCE.audioTokensPerSecond -
     MINIMAX_MAX_REFERENCE.freeTokens))
+}
+
+/** Quotes and generation use the same model default. */
+export function defaultImageResolutionFor(model: string): ImageResolution {
+  const c = MODEL_CAPABILITIES[model]
+  if (!c?.defaultImageResolution || !c.imageResolutions?.includes(c.defaultImageResolution)) {
+    throw new Error(`Missing or invalid image default for ${model}`)
+  }
+  return c.defaultImageResolution
 }

@@ -65,6 +65,7 @@ export type PromptingTipsKey =
   | 'ltx-2-5'
   | 'nano-banana'
   | 'nano-banana-lite'
+  | 'gpt-image-2-5'
   | 'seed-audio'
   | 'eleven-sfx'
   | 'inworld-tts-2'
@@ -446,6 +447,46 @@ const OMNI_FLASH_EDIT: PromptingTipsEntry = {
   ],
 }
 
+const GPT_IMAGE_25: PromptingTipsEntry = {
+  label: 'GPT Image 2.5',
+  intro: [
+    'Two seats at the same price: Flare is the fast one; Sunburst is the most capable, and slower. Explore on Flare, finish on Sunburst.',
+    'The photoreal front-runner for people, and the most reliable model for readable text, ordered panels and exact placement.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Name each reference where it is used',
+        example: 'The woman from image 1 cooks on a rocky summit, lit and graded like image 2.',
+        note: PARTIALS['reference-tips-short'],
+      },
+      {
+        heading: 'Quote text that must render',
+        example: 'the word "SLATES" once in small plain letters on the left chest',
+        note: "Quoted strings render most reliably. Describe a font's feel, never its name, and keep on-image text under about 30 words.",
+      },
+      {
+        heading: 'Set the quality tier on purpose',
+        example: 'low · medium · high · xhigh · max',
+        note: 'High is the everyday tier and max costs about four times as much. Medium is cheap enough to draft on; go past high only when tiny type or a finished frame needs it.',
+      },
+    ],
+    [
+      {
+        heading: 'The look: describe what the camera sees',
+        example: 'She is close to a silhouette: her face falls into deep shadow.\nThe sky around the sun burns out to white.',
+        note: PARTIALS['cinematic-tips-short'],
+        critical: true,
+      },
+      {
+        heading: 'Describe the frame, or swap into one you own',
+        example: 'Dark hiking trousers. The only things on the rock are the stove and the pan.\nTake image 1 and change only the character to the character in image 2.',
+        note: PARTIALS['cinematic-routes-short'],
+      },
+    ],
+  ],
+}
+
 const NANO_BANANA: PromptingTipsEntry = {
   label: 'Nano Banana 2',
   intro: [
@@ -462,7 +503,7 @@ const NANO_BANANA: PromptingTipsEntry = {
       {
         heading: 'Named lenses + apertures',
         example: '85mm f/1.4 · 135mm f/2.8 · 50mm f/1.2 · 35mm f/2 · Panavision anamorphic · 400mm telephoto',
-        note: '135mm f/2.8 is the cheat code for skin texture and intimate compression. Anamorphic for cinematic width + horizontal flares.',
+        note: 'Describe the intended perspective, depth of field and texture alongside the lens. A model does not guarantee physical lens simulation.',
       },
       {
         heading: 'Named film stocks (one per prompt)',
@@ -472,7 +513,7 @@ const NANO_BANANA: PromptingTipsEntry = {
       {
         heading: "Don't carry lens + stock into a video prompt",
         example: '85mm f/1.4, Portra 400\n→ close-up, shallow depth of field, warm natural colors, cinematic texture',
-        note: 'Lenses, apertures, film stocks and camera bodies are an image-model lever and a video-model anti-pattern — ByteDance\'s Seedance guide never mentions f-stops, lens millimetres, fps or shutter angle. When you animate a frame you made here, translate the look into shot size, depth of field and colour tone instead of pasting the gear list across.',
+        note: PARTIALS['lens-video-split'],
       },
       {
         heading: 'Physics-based lighting',
@@ -482,14 +523,19 @@ const NANO_BANANA: PromptingTipsEntry = {
       {
         heading: 'Imperfection vocabulary',
         example: 'visible pores · peach fuzz · ISO noise · sweat beading · slight hyperpigmentation · unretouched raw photography',
-        note: 'Forces the model away from AI-clean skin. The default is too smooth — you have to ask for the imperfections that real photos have.',
+        note: 'Forces the model away from AI-clean skin. The default is too smooth — you have to ask for the imperfections that real photos have. Lead with the kind of photograph and the conditions on the skin; a bare list of flaw words reads as tokens.',
+      },
+      {
+        heading: 'The look: describe what the camera sees',
+        example: 'She is close to a silhouette: her face falls into deep shadow.\nThe sky around the sun burns out to white.',
+        note: PARTIALS['cinematic-tips-short'],
       },
     ],
     [
       {
         heading: '❌ The anti-list — avoid these',
         example: '8k · masterpiece · hyperrealistic · ultra-detailed · trending on ArtStation · perfect skin · flawless · airbrushed · cinematic (alone)',
-        note: 'Tag-soup phrases from the Stable-Diffusion era. Measured success ~60-70% with these vs ~95%+ with positive description. Always specify which cinema — director, lens, era, stock.',
+        note: 'Generic quality tags do not specify an observable result. Describe the medium, light, exposure and texture the brief calls for.',
         critical: true,
       },
       {
@@ -838,6 +884,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'ltx-2-5': LTX_2_5,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
+  'gpt-image-2-5': GPT_IMAGE_25,
 
   'seed-audio': SEED_AUDIO,
   'eleven-sfx': ELEVEN_SFX,

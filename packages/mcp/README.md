@@ -75,9 +75,9 @@ No environment variables, no API keys to paste into config files.
 
 ## What the agent can do
 
-<!-- gen:tool-count -->92<!-- /gen:tool-count --> tools covering the full workspace: project, folder, character, environment, style, and storyboard management (create / update / delete), image generation and surgical image editing (<!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> — with project-asset reference images), video generation (<!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->), audio generation (<!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->), lip sync, motion transfer, background generation with status polling, timeline assembly (add / reorder / remove clips), MP4 export and FCP7 XML export for DaVinci Resolve, cost estimation, and credit balance. Bundled prompting/workflow guides are readable at runtime via the `slates_get_prompting_guide` tool — no skill installation needed for MCP-only clients.
+<!-- gen:tool-count -->93<!-- /gen:tool-count --> tools covering the full workspace: project, folder, character, environment, style, and storyboard management (create / update / delete), image generation and surgical image editing (<!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> — with project-asset reference images), video generation (<!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->), audio generation (<!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->), lip sync, motion transfer, background generation with status polling, timeline assembly (add / reorder / remove clips), MP4 export and FCP7 XML export for DaVinci Resolve, cost estimation, and credit balance. Bundled prompting/workflow guides are readable at runtime via the `slates_get_prompting_guide` tool — no skill installation needed for MCP-only clients.
 
-Generation tools estimate cost first and ask for confirmation on anything over <!-- gen:confirm-credits -->17<!-- /gen:confirm-credits --> credits, so the agent cannot silently burn credits. Every tool also carries MCP annotations, so a host can auto-approve a read and warn on a delete; the <!-- gen:skill-count -->34<!-- /gen:skill-count --> bundled skills are exposed as MCP **prompts**, and the manual, the model capability table and the live price list as **resources**.
+Generation tools estimate cost first and ask for confirmation on anything over <!-- gen:confirm-credits -->17<!-- /gen:confirm-credits --> credits, so the agent cannot silently burn credits. Every tool also carries MCP annotations, so a host can auto-approve a read and warn on a delete; the <!-- gen:skill-count -->35<!-- /gen:skill-count --> bundled skills are exposed as MCP **prompts**, and the manual, the model capability table and the live price list as **resources**.
 
 The timeline, export, background-generation, edit-image, and image-reference tools require a Slates desktop on agent API v2 — if a tool reports a version error, update Slates (Settings → Check for Updates) and retry.
 
@@ -86,3 +86,14 @@ The timeline, export, background-generation, edit-image, and image-reference too
 - Website: [slates.video](https://slates.video)
 - Source: [github.com/EricDisero/slates-mcp](https://github.com/EricDisero/slates-mcp)
 - Issues: [github.com/EricDisero/slates-mcp/issues](https://github.com/EricDisero/slates-mcp/issues)
+
+### Context on demand
+
+The server starts with a small workspace/discovery tool set. Use `slates_load_tools` with `query`
+to find a capability, then `names` to load its exact schemas. A named/group load replaces the optional
+selection and emits `tools/list_changed`; existing direct operation names remain callable.
+`--tools=flat` restores the complete listing for clients that need it.
+
+`slates_get_prompting_guide` returns a short readable card by default. Use `query` for a section or
+cinematic technique ID, `depth: "index"` for headings, or `depth: "full"` for the complete guide.
+Both text and structured content include the actual guide body. No extra loading hook is required.

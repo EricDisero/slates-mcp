@@ -12,6 +12,7 @@ paths:
 
 Each one moved a fact to a single home and left a rebuild-and-publish obligation behind it.
 
+- **🚨 CINEMATIC-LOOK SSOT = `skills/slates-cinematic-look.md` for wording, the vault's `business/projects/slates/research/cinematic-look-research.md` for evidence (added 2026-09-15).** They share a technique id, its evidence tag and the worked-example prompts, and `scripts/cinematic-catalogue-check.mjs` (end of the root `npm run build`) fails when any of those differ; it skips the cross-file half when the vault is absent. Add research to the vault doc first, then the skill row. The short copies are partials: `cinematic-card` (on every image model's craft card), `cinematic-tips-short` and `cinematic-routes-short` (tips). **The default seat per kind is read through `defaultModelFor(kind)` in `model-facts.ts`, never typed** — the op surface and slates-web both hand-typed `nano-banana-2` for six days after the app moved to Sunburst.
 - **Prompting-tips SSOT = `packages/shared/src/prompts/prompting-tips.ts`.** There is NO hand-written tips copy anywhere downstream, ever (a hand-mirrored modal is how Omni Flash shipped showing a Veo body under a Kling title, caught 2026-07-10). **Adding a new model = three entries in THIS repo, same pass: (1) `model-facts.ts` fact, (2) `skills/slates-prompting-{model}.md` skill, (3) `prompting-tips.ts` entry (the curated user-facing subset of the skill).** When a skill's rules change, update the tips entry in the same pass.
   - **🚨 THE DESKTOP NO LONGER RENDERS THE TIPS AT ALL (2026-08-10).** They render in exactly one place: the generated page **<https://slates.video/docs/prompting>**, emitted by `slates-web/scripts/build-llm-docs.mjs` via `scripts/llm-docs/extract-tips.ts`, which imports `PROMPTING_TIPS` from this file. The desktop links to it from the Help menu (`?` in the title bar). *(This bullet previously pointed at `slate/.../prompt/PromptingTipsRenderer.tsx`, which had already been deleted on 2026-08-01 — the tips then lived in a Settings accordion, and now they live on the web. Rationale and the standing rule: `slate/CLAUDE.md` → Prompting-tips SSOT.)*
   - **So a tips edit is not done until slates-web regenerates.** After changing this file run `npm run build:llm-docs` from `slates-web/`; `npm run build` there FAILS on stale docs (`check:llm-docs`). A new key also needs a reading group in `extract-tips.ts`, or it renders on no page — the generator warns by name.
@@ -252,26 +253,25 @@ Four new locks, each replacing a fact that was stated in prose with one the buil
     model it is about to use. Putting fifteen cards in the `model` param would have grown the largest
     op on the surface on every turn of every session, to be read once.
   - **The desktop de-dups; the MCP surface does not.** A documented asymmetry: `loop.ts` tracks
-    which models' cards it has already sent this run and strips the repeats, because a ten-shot run
+    which models' cards remain in the retained context and strips repeats while they remain, because a ten-shot run
     estimates the same model ten times. The MCP op layer has no session concept and sends it every
     time.
   - `check:agent-surface` § 8 asserts every per-model skill has a card, that it is under 2,400
-    characters, that it names at least five levers as backticked phrases (the eval scorer's
-    `craft_levers_present` reads exactly those), that it LEADS the file, and that the estimate op
+    characters, that it contains concrete examples as backticked phrases (phrase overlap is an eval diagnostic,
+    never proof that a prompt follows the brief), that it LEADS the file, and that the estimate op
     still attaches it.
 - **🚨 PER-MODEL BANNED LISTS.** `describeBannedTokens('image')` was Nano Banana's list and
   `('video')` was Seedance's — two skills of fifteen — so a Veo, Kling, LTX, MiniMax, FLUX, Seedream,
   GPT-Image or audio prompt was matched against another model's never-use list. Every per-model skill
-  now carries its own `@banned` block; the cross-model lists STAY on the op descriptions (a
-  description is one static string and cannot vary with the `model` argument) and the per-model list
-  rides the estimate result beside the card.
+  now carries its own `@banned` block. Only the selected model's list rides its estimate result and
+  warning. Shared operation descriptions carry no borrowed cross-model blacklist.
 - **🚨 THE TOOL SURFACE HAS A BUDGET, AND IT IS PRINTED
   (`packages/shared/src/operations/surface.ts`).** Measured 2026-09-02: 112,114 bytes on EVERY
   desktop turn, across 90 ops. `Operation.tier` defers four groups — `library`, `timeline`, `admin`,
-  `blender` — behind `slates_load_tools`, which appends a group to the run's tool list for the rest
-  of the run; `check:agent-surface` § 7 pins a ceiling on what is left and prints the per-turn total.
+  `blender` — behind `slates_load_tools`, which retrieves named tools or a legacy group; each load replaces the optional selection; `check:agent-surface` § 7 pins a ceiling on what is left and prints the per-turn total.
   **A GROUP IS A BUDGET, NOT A LAW:** if a task regresses because a tool arrives a turn late, move it
-  back to core. The MCP server still registers everything — a stdio server has no run to append to.
+  back to core. MCP lists the same small startup set, updates it per connection, and emits `tools/list_changed`.
+  All operation names remain callable for older clients; `--tools=flat` restores the full listing.
 - **🚨 THE PROTOCOL IS THE PRODUCT SURFACE.** `packages/mcp/src/server.ts` used exactly one MCP
   feature until 2026-09-02, so a host could not tell `slates_list_assets` from
   `slates_delete_project`. It now emits **annotations** (derived in `surface.ts`, re-derived
@@ -285,3 +285,13 @@ Four new locks, each replacing a fact that was stated in prose with one the buil
   `target: 'openApi3'`, so "the two surfaces expose the same tools" was true of the ID SET and
   unproven of the BYTES. `toolDefinitions()` in shared is the only renderer either one calls, and
   § 1 fails the build if either stops using it.
+
+## Selective context (2026-09-15)
+
+`guide-retrieval.ts` owns card/index/section/full retrieval; a technique ID returns one complete
+catalogue row. Both `text` and `data.guide` carry the body. Cards are the default; full guides are
+explicit. `surface.ts` owns the startup set, search and exact schema rendering. The Studio Agent
+retains recent tool results and two image-bearing messages in its wire context; older heavy results
+become retrievable stubs. User messages and the stored transcript are preserved. These are soft
+retention bounds, not a promise to fit arbitrary user input into a fixed budget. Protocol checks and
+`slate`'s `check:prompt-control` cover these contracts; no host-specific loading hook is required.

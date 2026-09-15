@@ -140,11 +140,9 @@ Eight plates in eight different rooms, all carrying *"shot on a phone at arm's l
 
 ## PHASE 4 — THE PLATES. One per beat.
 
-`slates_generate_image`, model `gpt-image-2-5-sunburst`, `quality: max`, vertical `9:16`. **Fire concurrently — 8 slots run at once; serial calls waste the day.** Pass `projectId` so every plate lands in the gallery where you can see it.
+Use the product image default in `slates-model-selection`. The older GPT Image 2 photoreal receipt does not establish a minimum quality tier for 2.5. Increase quality only after a specific output fails the brief.
 
-**Why that seat and that rung.** `max` because the 2026-08-24 photoreal result was measured at GPT Image 2's `high`, which is `max` here — the ladder was renamed, not repriced. **Sunburst** because these plates are finals and OpenAI routes quality to Sunburst: Flare's quality is only *comparable to* GPT Image 2, while Sunburst is documented higher. Same price, so the only cost is latency, and you are firing eight in parallel anyway. Use **Flare** while you are still exploring wardrobe, room or framing, then re-fire the chosen direction on Sunburst. ⚠️ Reasoned from OpenAI's positioning, not measured — if you A/B one plate, write the answer into `slates-prompting-gpt-image-2-5`.
-
-**GPT Image is the rail for photoreal people.** Head-to-head against the alternatives it is the one that returns photographic rather than plastic skin. Routing detail: `slates-model-selection`.
+The earlier GPT Image 2 comparison favored its skin rendering in those tests. Use `slates-model-selection` for current routing; inspect the result against the brief.
 
 ### 🚨 GPT Image 2.5 routes references through its EDIT endpoint
 
@@ -152,6 +150,8 @@ Two consequences, both of which waste a generation:
 
 1. **A prompt that opens by describing the reference gets the reference edited.** Open with *"one reference image is a three-panel character identity sheet"* and it returns a brand-new character identity sheet. The head block below is written the way it is precisely to prevent this.
 2. **One reference alone drags the scene into that reference's background.** A sheet-only roll puts her on the sheet's plain grey backdrop with no location at all. **Always pass two references:** the identity sheet, plus a second image supplying either the environment or the skin quality to match.
+
+⚠️ **Both were measured on GPT Image 2 and narrowed on Sunburst (2026-09-15).** Naming her inline (*the woman from image 1 cooks on…*) with no sentence about what either reference is was never refused and never returned a sheet across five plates, and one sheet-only plate kept its described location. Every garment the prompt did not name came from the sheet. The head block below is what shipped; inline naming is the tested alternative, with its receipts in `slates-prompting-gpt-image-2-5`.
 
 ### 🚨 THE PLATE IS FRAME ZERO
 
@@ -199,7 +199,7 @@ Use a second reference for *design* (a creature's build, a style) — never for 
 
 ### 🚨 Write the light as ONE physical system, or the character reads as pasted in
 
-The single most common tell is a key light on the subject's face that has no source in the picture. Name all four of these explicitly:
+The single most common tell is a key light on the subject's face that has no source in the picture. The full set of light, exposure, lens and imperfection techniques, organized so you pick only what the shot needs, is `slates-cinematic-look`. For this lane, name all four of these explicitly:
 
 1. **One source, and where it is.** *"The sun is low and directly down the avenue behind everything."*
 2. **What that does to HER specifically.** If she is backlit, say her face is in ambient bounce with no highlight and no catchlight, and put the hard rim on her hair, one shoulder and the collar.

@@ -24,9 +24,16 @@ description: How to prompt Seedream 5 Lite (ByteDance image model — the cheap 
 4. **Name the light as a named condition** — `golden hour`, `dramatic side lighting`, `soft diffused light`, `moody low-key`, `bright high-key`.
 5. **Quote in-image text.** It takes quoted strings for posters and layouts, which is half of why it is the drafting seat.
 
-**Examples**
-- `Professional headshot of a female CEO, short blonde hair, confident expression, navy suit, neutral office background. Studio lighting, shallow depth of field, high-end corporate photography, shot on 85mm.`
-- `A rain-soaked night market stall, cinematic, rule of thirds with the vendor camera-right, foreground steam blurred, moody low-key lighting with practical neon, shot on 35mm.`
+<!-- @inject:cinematic-card -->
+**For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
+- **Inspect every reference first.** Write its grade and imperfections in words: darkness, contrast, muddy or true blacks, colour, softness/noise, subject separation. Never grade cleaner or brighter than the look reference unless asked.
+- **One light system** — `low sun behind her`, `her face falls into deep shadow`, `no light in front of her`.
+- **Visible exposure** — `the sky burns out to white`, `dense, slightly crushed shadows`.
+- **Lens name plus effect** — `200mm telephoto`, `peaks loom huge behind her and melt into soft shapes`.
+- **Name every garment and close the foreground.** Omissions invite reference leakage or invented props.
+Bind references inline. A scene reference owns the grade; for a look-only reference, write the new scene's light. References are optional. For owned-frame edits, describe only the change and what stays.
+<!-- slates-only -->Use `slates-cinematic-look` with a technique ID or section query for more.<!-- /slates-only -->
+<!-- @end:cinematic-card -->
 
 **Hard constraint:** it is the DRAFTING seat, not the hero seat. Explore here, then re-run the winner on Nano Banana 2 or FLUX.2 Max for the locked shot.
 <!-- @card:end -->
@@ -42,6 +49,10 @@ description: How to prompt Seedream 5 Lite (ByteDance image model — the cheap 
 - `masterpiece`, `best quality`, `highly detailed`, `8k`, `award-winning` — quality incantations, not description
 - a prompt past about 100 words: this model gets confused by very long prompts, and focused beats exhaustive
 <!-- @banned:end -->
+
+**Examples**
+- `Professional headshot of a female CEO, short blonde hair, confident expression, navy suit, neutral office background. Studio lighting, shallow depth of field, high-end corporate photography, shot on 85mm.`
+- `A rain-soaked night market stall, cinematic, rule of thirds with the vendor camera-right, foreground steam blurred, moody low-key lighting with practical neon, shot on 35mm.`
 
 ByteDance's Seedream image model, Lite tier, routed via fal.ai. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId — no headless path). **Flat-priced regardless of resolution** — the cheapest image model in Slates, which makes it the right default for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
 

@@ -23,7 +23,7 @@ import {
   buildAgentDoctrine,
   APP_MANUAL,
   defaultContext,
-  toolDefinitions,
+  toolDefinitions, STARTUP_TOOL_IDS,
   cachedLatestVersion,
   refreshLatestVersion,
   updateNotice,
@@ -93,7 +93,7 @@ const server = new Server(
   { name: 'slates-studio', version: pkg.version },
   {
     capabilities: {
-      tools: {},
+      tools: { listChanged: true },
       // Every bundled skill, offered in the host's own picker rather than
       // only through a tool call the model has to decide to make.
       prompts: {},
@@ -115,9 +115,11 @@ const server = new Server(
 // of the ID SET and unproven of the BYTES. `toolDefinitions()` in shared is now
 // the only renderer either one calls, and the lockstep check compares them.
 //
-// `surface: 'mcp'` sends every op: a stdio server has no run to append to, and
-// Claude Code already defers stdio tool schemas through its own tool search.
+// Render once; listing filters startup + connection selection below. Direct calls
+// retain access to every operation for clients that do not refresh their listing.
 const TOOLS = toolDefinitions(ops, { surface: 'mcp' })
+const flatTools = process.argv.includes('--tools=flat')
+let selectedTools = new Set<string>()
 
 /**
  * Output schemas for the ops whose result shape is STABLE.
@@ -184,7 +186,7 @@ const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
 }
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOLS.map((t) => ({
+  tools: TOOLS.filter((t) => flatTools || STARTUP_TOOL_IDS.has(t.name) || selectedTools.has(t.name)).map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema,
@@ -330,7 +332,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       if (ticker) clearInterval(ticker)
     }
 
-    const data = result.data as Record<string, unknown> | undefined
+    let data = result.data as Record<string, unknown> | undefined
+    if (op.id === 'slates_load_tools' && Array.isArray(data?.tools)) {
+      selectedTools = new Set((data.tools as Array<{ name: string }>).map((t) => t.name))
+      await server.sendToolListChanged().catch(() => {})
+    }
+
 
     // The one place the server can ask the USER instead of the model.
     //
@@ -349,6 +356,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
           ...defaultContext(),
           signal: extra?.signal,
         })
+        data = result.data as Record<string, unknown> | undefined
       } else if (answer === false) {
         return {
           content: [{ type: 'text', text: 'The user declined the spend. Do not re-call without new instructions.' }],

@@ -118,7 +118,7 @@ export const WORKING_METHOD: ReadonlyArray<Record<AgentSurface, string>> = [
     `2. ORIENT: call slates_get_workspace_state once at the start of a workflow. Work in the user's CURRENT project — this chat lives inside it. NEVER create a new project unless explicitly asked; if there's no current project, ask which to use.`
   ),
   both(
-    `3. LOAD KNOWLEDGE ON DEMAND: before prompting any model or running a multi-step workflow, load the matching guide with slates_get_prompting_guide (index below). Only the guides the task needs, when it needs them.`
+    `3. LOAD KNOWLEDGE ON DEMAND: slates_get_prompting_guide returns a short card by default; query a section or technique when needed. Use slates_load_tools with query to find a capability, then names to load its exact schema. A load replaces the previous optional selection. Before quoting a model, load its tool schema or routing guide. Use workspace generationDefaults when the user has no preference. Read the model card delivered by the estimate; fetch a section or full guide for an unfamiliar mode or missing detail. Reuse guidance already in context; retrieve it again when omitted or stale.`
   ),
   // FORKED: `present_plan` is a loop-level DESKTOP tool, deliberately not in
   // ALL_OPERATIONS, so MCP never sees it and has no plan gate at all. Its
@@ -181,7 +181,7 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
     `- MODEL KINDS: image, video and audio models are disjoint — no image model makes a video, no video model makes a standalone image, no image or video model makes audio. Which SEAT to pick inside a kind is on each generate op's own \`model\` description, and the full table is the slates-model-selection skill.`
   ),
   both(
-    `- ASSET CODES + STALENESS: every asset carries a badge code (IMG-A12 / VID-V3 / AUD-S1, top-left of its gallery card); speak about assets by code + label. Asset lists go STALE — the user creates assets in the Slates UI mid-conversation. When the user names a code you have NOT seen in a tool result this session, resolve it with slates_list_assets (use the search filter) BEFORE using it. NEVER guess an asset id or reuse a nearby UUID — pass the exact id a tool returned for that exact code. A wrong start frame burns real credits.`
+    `- ASSET CODES + STALENESS: every asset carries a badge code (IMG-A12 / VID-V3 / AUD-S1, top-left of its gallery card); speak about assets by code + label. When the user says "these" or "this one", call slates_get_selection rather than asking which. Asset lists go STALE — the user creates assets in the Slates UI mid-conversation. When the user names a code you have NOT seen in a tool result this session, resolve it with slates_list_assets (use the search filter) BEFORE using it. NEVER guess an asset id or reuse a nearby UUID — pass the exact id a tool returned for that exact code. A wrong start frame burns real credits.`
   ),
   both(
     `- CREDITS ONLY: every generation you drive bills Slates credits (your tool calls enforce this). Never suggest BYOK keys for agent work.`

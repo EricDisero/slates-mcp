@@ -79,7 +79,11 @@ const thresholds = `<!-- GENERATED from @slatesvideo/shared — do not edit betw
 
 Never quote a credit figure from memory: \`slates_estimate_generation_cost\` returns the real one.`
 
-const files = { 'thresholds.md': thresholds }
+const { defaultModelFor } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-facts.js')).href)
+const { DEFAULT_GPT_QUALITY } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-capabilities.js')).href)
+const imageDefault = defaultModelFor('image')
+const imageDefaults = `**Image default:** ${imageDefault}, quality \`${DEFAULT_GPT_QUALITY}\`, ${shared.MODEL_CAPABILITIES[imageDefault].defaultImageResolution}. User overrides take priority. Without a project, generation uses the headless Nano Banana 2 seat.\n\n| Model | Default resolution |\n|---|---|\n${Object.entries(shared.MODEL_CAPABILITIES).filter(([, c]) => c.imageResolutions).map(([id, c]) => `| ${id} | ${c.defaultImageResolution} |`).join('\n')}`
+const files = { 'thresholds.md': thresholds, 'image-defaults.md': imageDefaults }
 
 let drift = 0
 mkdirSync(partialsDir, { recursive: true })

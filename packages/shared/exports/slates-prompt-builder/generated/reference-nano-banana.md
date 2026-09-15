@@ -8,15 +8,21 @@
 **Card — Nano Banana 2 (Gemini 3.1 Flash Image).** Brief it like a creative director, not a tag list. Structure: `Film still from [director] [genre]. Shot on [camera] with [lens]. [Subject and action]. [3-5 specific visual details]. [Lighting — direction + quality]. [Color palette]. [Film stock]. [1-2 word tone].`
 
 **The five levers**
-1. **Named lens + aperture** beats "shallow depth of field" — `85mm f/1.4`, `135mm f/2.8` (the cheat code for skin), `Panavision anamorphic`, `400mm telephoto`.
+1. **Named lens + aperture** beats "shallow depth of field" — `85mm f/1.4`, `135mm f/2.8`, `Panavision anamorphic`, `400mm telephoto`.
 2. **Light by direction and quality**, never "good lighting" — `hard sidelight from a single window, deep falloff`, `overcast north light`, `practical tungsten spill`.
 3. **A named film stock or sensor** carries a whole palette — `Kodak Portra 400`, `Cinestill 800T`, `ARRI Alexa 65`.
 4. **Composition as a shot** — `low angle`, `aerial view`, `rule of thirds with the subject camera-left`, `foreground occlusion`.
 5. **Positive framing only.** Describe what is there. "Empty street", never "no cars"; "unstaged documentary photography", never "not anime".
 
-**Examples**
-- `Film still from a Denis Villeneuve thriller. Shot on ARRI Alexa 65, 85mm f/1.4. A woman in a charcoal wool coat stands at a rain-slick bus stop, breath visible. Hard sodium light from a single overhead lamp, deep falloff into blue night. Kodak Vision3 500T. Isolated.`
-- `Editorial still life on seamless bone paper. 100mm macro, f/8. A cracked ceramic bowl holding three figs. Soft north light from camera-left, one gentle shadow. Muted earth palette. Portra 400 grain. Quiet.`
+<!-- @inject:cinematic-card -->
+**For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
+- **Inspect every reference first.** Write its grade and imperfections in words: darkness, contrast, muddy or true blacks, colour, softness/noise, subject separation. Never grade cleaner or brighter than the look reference unless asked.
+- **One light system** — `low sun behind her`, `her face falls into deep shadow`, `no light in front of her`.
+- **Visible exposure** — `the sky burns out to white`, `dense, slightly crushed shadows`.
+- **Lens name plus effect** — `200mm telephoto`, `peaks loom huge behind her and melt into soft shapes`.
+- **Name every garment and close the foreground.** Omissions invite reference leakage or invented props.
+Bind references inline. A scene reference owns the grade; for a look-only reference, write the new scene's light. References are optional. For owned-frame edits, describe only the change and what stays.
+<!-- @end:cinematic-card -->
 
 **Hard constraint:** there is no `negativePrompt` field. Suppress by reframing positively, or inline `without` / `free of`. Knowledge cutoff January 2025 — anything later needs reference images.
 <!-- @card:end -->
@@ -46,12 +52,14 @@ Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and a
 
 ## Photorealism positives — what consistently works
 
-> ⚠️ **This vocabulary is an IMAGE-model lever and a video-model anti-pattern — do not carry it across.**
-> Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`) are correct and encouraged **here**. They are a **Seedance anti-pattern**: ByteDance's own guide uses shot sizes, camera moves, pacing words and its image-quality vocabulary throughout, and never once mentions fps, shutter angle, f-stop, or lens millimetres.
-> The leak happens in one specific way — you write an NB2 start frame, then write the video prompt to animate it and carry the look description straight across. **Translate instead of copying:** `85mm f/1.4, Portra 400` → `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. Full rule and the receipts: `reference-seedance.md` (Part 3, "Don't cross-pollinate image-model syntax").
+⚠️ **This vocabulary is correct here and does not carry into a video prompt.** The leak happens one way: you write an NB2 start frame, then carry its look description straight into the prompt that animates it.
+
+<!-- @inject:lens-video-split -->
+Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`) are an image-model lever. On a video model, translate the look instead of pasting the gear list: `85mm f/1.4, Portra 400` becomes `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. ByteDance's Seedance 2.0 guide never mentions fps, shutter angle, f-stop or lens millimetres. Its Seedance 2.5 guide does, once: the visual-style line of its own storyboard example names one camera body and one 35 mm cinema lens. On 2.5 a single line like that is vendor-sanctioned; a stacked gear list still is not.
+<!-- @end:lens-video-split -->
 
 **Named lenses + apertures** beat generic "shallow depth of field":
-- `85mm f/1.4`, `135mm f/2.8` (the cheat code for skin texture), `50mm f/1.2`, `35mm f/2`
+- `85mm f/1.4`, `135mm f/2.8`, `50mm f/1.2`, `35mm f/2`
 - `Panavision anamorphic` for horizontal flares + cinematic width
 - `400mm telephoto` for compression + isolation
 - `24mm` for environmental interiors
@@ -76,6 +84,7 @@ Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and a
 - `visible pores`, `natural skin grain`, `peach fuzz`, `slight hyperpigmentation`
 - `unretouched raw photography`, `ISO noise`, `sweat beading`
 - `crisp catchlights in the eyes`, `skin micro-detail`
+- Lead with the kind of photograph and the conditions on the skin (sun, wind, sweat), then add one or two of these. A bare list of flaw words read as tokens and produced plastic skin on GPT Image 2 (2026-08-24).
 
 **Director references** (use when locking style):
 | Director | Tone | Visual signature |
@@ -103,6 +112,9 @@ These are Stable-Diffusion-era tag soup. The model treats them as low-signal noi
 - `cinematic` standing alone — always specify *which cinema* (director, lens, era, stock)
 - `not anime, not cartoon, not 3D` — negation tag soup, replace with a positive style cue
 
+**Examples**
+- `Film still from a Denis Villeneuve thriller. Shot on ARRI Alexa 65, 85mm f/1.4. A woman in a charcoal wool coat stands at a rain-slick bus stop, breath visible. Hard sodium light from a single overhead lamp, deep falloff into blue night. Kodak Vision3 500T. Isolated.`
+
 ## Negative prompting — there is no field
 
 Nano Banana 2 has **no `negativePrompt` parameter**. Three patterns to suppress unwanted content:
@@ -116,7 +128,7 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 ## Reference images
 
 - **Hard limit: 14 images** (10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
-- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style, Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3)`, with a trailing `Render in the visual style of image 4.` The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
+- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style, Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3)`, or `lit and graded like image 4` where you placed the style mention. An unmentioned style attachment gets a short fallback clause The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 
 ### Reference rules (the verified ones)
 
@@ -138,7 +150,7 @@ Every reference rule below is a corollary of that one sentence, which is why "pr
 Identity = a few flat-lit neutral angles; one reference per role, named inline; 2-4 refs not 12; describe environments instead of feeding a grid.
 
 1. **2-4 strong references beat both extremes.** Not 1 (warps toward itself), not 12 (averages worse). Start with 2-3 focused refs — each one adds context AND another variable to balance.
-2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates composes the naming for you from your `@mentions` / `#tags` — you never hand-write role labels.
+2. **One reference per ROLE, named in the prompt** — identity / style-grade / environment. The model does **not** infer a reference's role from its position in the list; the inline name carries it. Same-role competitors drift (two "identity" refs of different people blend into a third face). Slates resolves `@mentions` / `#tags` into numbered citations. You can also bind references directly in scene prose, naming what each image supplies.
 3. **One identity sheet per character, named inline.** A character's identity is a single asset (dominant portrait + body panels), so attach that one asset rather than a pile of views: **fewer competing renderings of a face is better, because the model cannot tell which one is authoritative and averages them.** Slates cites it as `Marcus (image 1)`. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render a neutral expression") — that drags the sheet's studio lighting and wardrobe into a scene that asked for neither. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 4. **Flat-light identity refs.** Prep identity references with flat, even, shadowless lighting on a plain neutral background. A studio-lit or scene-lit character sheet bleeds its lighting into every generation — the failure looks like the subject was green-screen-pasted in front of the location. Reference prep beats prompting here.
 5. **Environment: describe it, don't feed a grid.** Default to describing the location in words and let the model build a space that fits the shot. Reserve an environment reference for a mandatory exact-match, and then use ONE clean establishing image with natural ambient light that reads as the location's real light — never a multi-panel grid fed whole.

@@ -1,6 +1,6 @@
 ---
 name: slates-cost-discipline
-description: Mandatory pre-flight discipline before ANY generation call (image or video) — estimate cost, announce in credits, get confirmation, aggregate batches. Read this every time before calling slates_generate_image or any future slates_generate_* op. Skipping this risks burning the user's credits on guesses.
+description: Mandatory pre-flight discipline before ANY generation call (image or video) — estimate cost, announce in credits, get confirmation, aggregate batches. Use its rules when planning generation; reload only when the rules are needed. Skipping this risks burning the user's credits on guesses.
 ---
 
 # Slates cost discipline — read before every generation
@@ -14,11 +14,11 @@ Generation costs real money. Every call is on the user's credits. The user can't
 Before ANY `slates_generate_*` call, run `slates_estimate_generation_cost` first. Inputs you must lock before estimating:
 
 - **Model** — the id you are about to pass, whatever it is. `slates_estimate_generation_cost` takes the same base ids the generate ops take and resolves the billing key itself; do not build one by hand.
-- **Resolution** — never let the op default. Pick deliberately. Drafts → 1k. Hero → 2k. Print → 4k.
+- **Resolution** — use the selected model default unless the user or delivery requires another size. Estimate and generate with the same settings.
 - **Aspect ratio** — never let the op default to 1:1. Pick from the use case (cinematic → 16:9, mobile vertical → 9:16, square feed → 1:1).
 - **Count** — explicit. Don't generate 4 when 1 will tell you if the prompt works.
 
-If aspect ratio or resolution isn't obvious from the user's request, **ask before estimating**. Don't guess.
+If the aspect ratio cannot be inferred from the intended delivery, ask. A missing resolution uses the model default; it does not require another question.
 
 ### 2. Announce in credits, plainly, before spending
 
@@ -80,15 +80,21 @@ After each generation completes, the response includes `cost_credits` (when avai
 
 ## Resolution decision rules
 
-| Use case | Resolution |
-|---|---|
-| First draft of a new prompt | 1k |
-| Storyboard frame (will likely regenerate) | 1k |
-| Hero shot, locked composition | 2k |
-| Print, marketing asset, final delivery | 4k |
-| Iterating to refine | match the previous resolution |
+Use the model defaults below for ordinary work. For cheap exploration, choose a supported lower setting and compare the quote. For final delivery, use the size the output needs. When comparing prompts, hold model, quality, size and references constant.
 
-Resolution is a price lever, not a free choice: on Nano Banana 2 and FLUX.2 Max, 4k costs roughly 2x 1k (Seedream 5 Lite is flat-priced regardless of resolution). Prices change — call `slates_estimate_generation_cost` or `slates_list_available_models` for current numbers instead of assuming. Pick the cheapest resolution that serves the use case.
+<!-- @inject:image-defaults -->
+**Image default:** gpt-image-2-5-sunburst, quality `high`, 3k. User overrides take priority. Without a project, generation uses the headless Nano Banana 2 seat.
+
+| Model | Default resolution |
+|---|---|
+| nano-banana-2 | 2k |
+| nano-banana-2-lite | 1k |
+| nano-banana-pro | 2k |
+| gpt-image-2-5-flare | 2k |
+| gpt-image-2-5-sunburst | 3k |
+| flux-2-max | 1k |
+| seedream-5-lite | 2k |
+<!-- @end:image-defaults -->
 
 **4K VIDEO is Pro-only (2026-07-07).** The ladder above is for IMAGES (open at every tier). For VIDEO — Kling, Seedance, Veo — 4K requires a Slates Pro account; a base-tier 4K video gen is rejected server-side with `PRO_REQUIRED`. Default video to 1080p or lower and only reach for 4K when the user is on Pro and explicitly asks. 4K *images* are never gated.
 
@@ -109,7 +115,7 @@ If the user prompt mixes signals (e.g. "cinematic Instagram post"), ask. Don't g
 
 ## When the gate fires
 
-The server returns `requires_clarification` when aspect ratio or resolution is missing, and `requires_confirm` when total spend crosses the gate above. In both cases:
+The server returns `requires_clarification` when required composition inputs are missing, and `requires_confirm` when total spend crosses the gate above. In both cases:
 
 1. Surface the gate response to the user
 2. Get a clean answer

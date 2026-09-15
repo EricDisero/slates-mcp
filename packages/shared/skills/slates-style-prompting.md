@@ -9,13 +9,13 @@ The style library (`slates_create_style` / the app's style ids) defines what eac
 
 ## The four ground rules (all styles)
 
-1. **Reference beats adjectives.** A style reference image outperforms prose style instructions. If the user has an on-style image — or you can cheaply generate one — attach it and let the default `inherit` behavior match it. Prose styling is the fallback.
-2. **Style lives in ONE slot per model:**
+1. **Assign references where they contribute.** Describe the scene with inline bindings, such as "the woman from image 1, lit and graded like image 2." Preserve an existing scene reference when its look should stay. A look-only reference may need light and exposure described for the new scene; prose and references can work together.
+2. **Use each model’s language, without imposing a fixed prompt template:**
    - **Nano Banana 2** — narrative prose; the style is the opening framing of the sentence ("A hand-drawn 2D anime cel illustration of…"), never a comma tag.
    - **Seedance 2.0** — the 8-part formula reserves "visual style" (slot 6) and "image quality" (slot 7). One clause each. Don't scatter style words through the action text.
    - **Kling V3** — prose scene direction; style rides the lighting/style tail of Scene → Subject → Action → Camera → Lighting/Style. Tag soup underperforms badly.
-3. **Multi-shot consistency = the SAME style clause, byte-identical, in every shot's prompt** (plus shared references). Paraphrasing the style clause between shots invites drift.
-4. **The styled start-frame is the cheapest reliable style lever for video.** Compose the styled frame in NB2 (cheap), hand it to Seedance/Kling image-to-video, and describe only what CHANGES (motion). Never re-describe the style in the i2v prompt — the frame already encodes it.
+3. **Keep the intended look consistent across shots.** Reuse relevant references and stable descriptions, adapting the wording to each scene.
+4. **A styled start frame is one video control.** Generate it with the image seat suited to the brief, then describe the motion. Preserve its look unless the user wants the light or grade to change.
 
 Never stack style buzzwords ("ARRI ALEXA, 35mm, film grain, depth-of-field mastery…"). One or two register tokens maximum — piles of specs dull the image.
 

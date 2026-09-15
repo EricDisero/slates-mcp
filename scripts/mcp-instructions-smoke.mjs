@@ -42,7 +42,7 @@ const check = (name, cond, detail = '') => {
 
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [serverPath],
+  args: [serverPath, '--tools=flat'],
   stderr: 'pipe',
 })
 const client = new Client({ name: 'slates-instructions-smoke', version: '1.0.0' })
@@ -97,20 +97,7 @@ if (typeof instructions === 'string') {
 check('tool list is non-empty', tools.length > 0, `${tools.length}`)
 const generateImage = tools.find((t) => t.name === 'slates_generate_image')
 check('slates_generate_image is exposed', !!generateImage)
-if (generateImage) {
-  // The structural half of "load the guide": the never-use list rides the
-  // description, which every client has in context with no call required.
-  check(
-    'its description carries the generated never-use list',
-    generateImage.description.includes('NEVER put these in a prompt'),
-    generateImage.description.slice(-160)
-  )
-  check(
-    'and the tokens really came from the skill',
-    generateImage.description.includes('"photorealistic"') &&
-      generateImage.description.includes('"cinematic"')
-  )
-}
+if (generateImage) check('no cross-model blacklist in the schema', !generateImage.description.includes('"photorealistic"'))
 
 // ── the enforcement, end to end, through the real MCP call path ────────────
 //
@@ -290,7 +277,7 @@ if (generateImage) {
   )
   const staleTransport = new StdioClientTransport({
     command: process.execPath,
-    args: [serverPath],
+    args: [serverPath, '--tools=flat'],
     stderr: 'pipe',
     env: { ...process.env, HOME: home, USERPROFILE: home },
   })
