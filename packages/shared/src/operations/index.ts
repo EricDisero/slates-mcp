@@ -6528,7 +6528,7 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
   async run(input) {
     if (input.topic.trim().toLowerCase() === 'app-manual') {
       const content = appManualSections(input.query)
-      return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8') } }
+      return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
     const resolved = resolveGuideTopic(input.topic)
     const content = resolved ? SKILLS[resolved] : undefined
@@ -6540,14 +6540,21 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: 'card' | 'ful
     if (input.depth === 'card') {
       const card = describeCraftCard(resolved)
       if (card) {
-        return { text: card, data: { topic: resolved, depth: 'card', bytes: Buffer.byteLength(card, 'utf8') } }
+        return { text: card, data: { topic: resolved, depth: 'card', bytes: Buffer.byteLength(card, 'utf8'), guide: card } }
       }
       // No card on this guide — returning nothing would read as "no guidance",
       // which is worse than a fall-through the result names.
     }
+    // 🚨 THE BODY RIDES IN `data` TOO. The MCP server mirrors `data` as
+    // `structuredContent`, and at least one host (Claude Code, 2026-09-14)
+    // shows the model ONLY structuredContent when it is present — so a guide
+    // whose body lived only in `text` reached the model as a topic and a byte
+    // count, and the model prompted a video seat from the cost-estimate card
+    // alone. `guide` is the same string as `text`; a data block that describes
+    // prose without carrying it is a broken result on this op.
     return {
       text: content,
-      data: { topic: resolved, depth: 'full', bytes: Buffer.byteLength(content, 'utf8') },
+      data: { topic: resolved, depth: 'full', bytes: Buffer.byteLength(content, 'utf8'), guide: content },
     }
   },
 }
