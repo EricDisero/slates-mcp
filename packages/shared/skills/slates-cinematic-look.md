@@ -60,7 +60,7 @@ Each row: the technique, its evidence, what it does to the frame, when to reach 
 
 | Technique | Evidence | What it does | Reach for · skip | Say |
 |---|---|---|---|---|
-| `flat-underexposure` | untested | The whole frame sits in a narrow, dark tonal range; the subject barely separates | A dark, flat look reference or fading light · skip hard contrast, glowing practicals and crushed blacks | "Everything sits in dark, muddy navy blue; nothing is bright or truly black. Her dim face barely separates from the trees; even the focused face is slightly soft, with fine noise in the dark blues." |
+| `flat-underexposure` | receipt | The whole frame sits in a narrow, dark tonal range; the subject barely separates | A dark, flat look reference or fading light · skip hard contrast, glowing practicals and crushed blacks | "Everything sits in dark, muddy navy blue; nothing is bright or truly black. Her dim face barely separates from the trees; even the focused face is slightly soft, with fine noise in the dark blues." |
 | `subject-under-key` | untested | The face is clearly darker than the brightest part of the frame; features read, nothing lights them | Backlit exteriors, sunrise and sunset, window interiors · skip beauty, product, lip-sync close-ups | "Her face is in shadow, clearly darker than the sky behind her; her features are readable but nothing lights them." |
 | `near-silhouette` | receipt | A dark shape with edge detail against a bright field | Wides, entrances and exits, solitude · skip shots that depend on recognising the face | "She is close to a silhouette: her face and jacket fall into deep shadow, her features only just readable." |
 | `clipped-highlights` | receipt | The sky near the sun, windows and practicals go pure white | Backlit shots, windows, night practicals · skip skies that carry the story, white packaging | "The sky around the sun burns out to white." |
@@ -216,7 +216,7 @@ The sun sits just above the far peaks behind her right shoulder and the whole fr
 ```
 <!-- @example:img-a198:end -->
 
-**Route 1, platform revision (untested).** IMG-A199 followed its written hot lamp and crushed blacks, but Eric wanted the reference's flatter, darker, softer grade. This revision describes that observed grade; it has not been generated.
+**Route 1, platform revision (IMG-A200 and IMG-A204).** IMG-A199 followed its written hot lamp and crushed blacks, but Eric wanted the reference's flatter, darker, softer grade. This exact revision subsequently produced A200 and A204 using neutral identity sheets and the original look reference. Eric preferred A204 to the scene-reference remixes A201–A203; A203 and A204 used the same model and quality settings. Prompt and references changed together, so their individual contributions are not isolated.
 
 <!-- @example:platform-flat-untested:start -->
 ```text

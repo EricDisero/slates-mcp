@@ -41,13 +41,15 @@
     "!dist/**/*.map",
     "skills",
     "exports/slates-prompt-builder/generated",
+    "exports/slates-chatgpt-images/generated",
     "README.md"
   ],
   "scripts": {
     "sync-partials": "node scripts/sync-partials.mjs",
     "build-prompt-builder": "node scripts/build-prompt-builder.mjs",
     "check-prompt-builder": "node scripts/build-prompt-builder.mjs --check",
-    "build": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check && node scripts/update-check-check.mjs",
+    "build-chatgpt-skill": "node scripts/build-chatgpt-skill.mjs",
+    "build": "node scripts/build-chatgpt-skill.mjs --check && node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check && node scripts/update-check-check.mjs",
     "typecheck": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
     "prepublishOnly": "npm run build && node ../../scripts/cinematic-catalogue-check.mjs && node ../../scripts/prompt-control-check.mjs",
     "render-partials": "node scripts/render-capability-partials.mjs"

@@ -1,6 +1,6 @@
 # @slatesvideo/cli
 
-The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->93<!-- /gen:tool-count --> tool schemas into context.
+The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->97<!-- /gen:tool-count --> tool schemas into context.
 
 ## Install
 
@@ -19,7 +19,7 @@ Requires Node.js 18+ and the Slates desktop app ([slates.video](https://slates.v
 | `slates status` | Show connection state, account, and credit balance |
 | `slates mcp` | Detect installed MCP clients and print the exact config for each; `--write` merges it into Claude Desktop / Cursor configs (with a `.bak` backup) |
 | `slates install-skills` | Install the bundled agent skills into `.claude/skills/<name>/SKILL.md`; `--global` targets `~/.claude/skills` |
-| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->93<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
+| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->97<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
 | `slates run <op> --input '<json>'` | Pass a NESTED object (Shot `params`/`refs`, batch updates) — flags cannot express those |
 | `slates use <project>` | Set the default project, by id or name, so ops stop needing `--projectId` |
 | `slates doctor` | Check every setup precondition and print the fix for each failure |
@@ -27,7 +27,7 @@ Requires Node.js 18+ and the Slates desktop app ([slates.video](https://slates.v
 
 ## Skills
 
-<!-- gen:skill-count -->35<!-- /gen:skill-count --> agent skills ship embedded in `@slatesvideo/shared`: <!-- gen:workflow-skill-count -->19<!-- /gen:workflow-skill-count --> workflow recipes (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->.
+<!-- gen:skill-count -->36<!-- /gen:skill-count --> agent skills ship embedded in `@slatesvideo/shared`: <!-- gen:workflow-skill-count -->20<!-- /gen:workflow-skill-count --> workflow recipes (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, chatgpt-images, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->.
 
 `slates install-skills` writes each one to `.claude/skills/<skill-name>/SKILL.md` in your current project, which is the layout Claude Code's skill discovery requires. Use `--global` to install for every project. Restart Claude Code afterward, then ask: "what slates skills do you have?" to verify.
 

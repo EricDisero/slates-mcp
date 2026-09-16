@@ -1,3 +1,10 @@
+/** Connected host, not an API model: capabilities are checked at runtime. */
+export const CHATGPT_IMAGE_HOST = {
+  id: 'chatgpt-account', label: 'ChatGPT',
+  note: 'Generate with your connected ChatGPT account',
+  usage: 'Uses your ChatGPT account limits',
+} as const
+
 // Per-model prompting facts — routing doctrine and the prompt formula, as
 // KNOWLEDGE (for skills + lead-magnet + op descriptions).
 //
@@ -27,6 +34,18 @@
 // routing. The figures go, because those are data.
 
 import { MODEL_CAPABILITIES } from './model-capabilities.js'
+
+/** Authoring presets only: these do not claim hosted ChatGPT API capabilities. */
+export const CHATGPT_FRAMING_RATIOS = MODEL_CAPABILITIES['gpt-image-2-5-sunburst'].aspectRatios
+export function composeChatGptFraming(prompt: string, aspectRatio?: string): string {
+  if (aspectRatio === undefined) return prompt
+  if (!CHATGPT_FRAMING_RATIOS.includes(aspectRatio as typeof CHATGPT_FRAMING_RATIOS[number])) {
+    throw new Error('Choose a supported ChatGPT framing preset')
+  }
+  // Reuse may contain our previous appended request. Replace only this exact suffix.
+  const base = prompt.replace(/\n\nRequested output framing: \d+:\d+ aspect ratio\.$/, '')
+  return `${base}\n\nRequested output framing: ${aspectRatio} aspect ratio.`
+}
 
 export interface ModelFact {
   id: string
@@ -483,4 +502,3 @@ export function describeRouting(
 export function getModelFact(id: string): ModelFact | undefined {
   return FACT_BY_ID.get(id)
 }
-
