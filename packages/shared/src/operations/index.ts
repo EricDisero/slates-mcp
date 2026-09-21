@@ -1,3 +1,4 @@
+import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
 import { retrieveGuide, guideSections, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
@@ -29,6 +30,8 @@ import {
   describeRouting,
   // The default seat per kind, READ from `tier` — never a literal model id.
   defaultModelFor,
+  // The seat a built-in tool renders on, READ from TOOL_SEAT (generation-policy.ts).
+  toolModelFor,
   CHATGPT_FRAMING_RATIOS,
 } from '../prompts/model-facts.js'
 // 🚨 MODEL CAPABILITY SSOT. Aspect ratios, video resolutions and durations are
@@ -1031,6 +1034,9 @@ function compactAsset(a: unknown): Record<string, unknown> {
       prompt: typeof r.prompt === 'string' ? r.prompt : null,
     }),
     type: r.type,
+    // Only when it IS one. A compact row pays for every key on every asset,
+    // and "not a favorite" is the default the app writes — absent says it.
+    ...(r.isFavorite === true ? { isFavorite: true } : {}),
     created_at: r.createdAt ?? r.created_at ?? undefined,
   }
 }
@@ -1122,7 +1128,7 @@ export const listAssets: Operation<{
   limit?: number
 }> = {
   id: 'slates_list_assets',
-  description: 'List assets in a Slates project as COMPACT rows (id, code, label, type) — newest first, default limit 50. Each asset carries its short code (IMG-A12 / VID-V3 / AUD-S1 — the badge the user sees on the gallery card) and label. When the user names an asset by code ("use IMG-A36 as the reference"), pass it as `search` to resolve the assetId. Always speak about assets by code + label, never by UUID. NOTE: generate_* results already return the new asset ids — do NOT call this to find an asset you just created.',
+  description: 'List assets in a Slates project as COMPACT rows (id, code, label, type) — newest first, default limit 50. Each asset carries its short code (IMG-A12 / VID-V3 / AUD-S1 — the badge the user sees on the gallery card) and label. When the user names an asset by code ("use IMG-A36 as the reference"), pass it as `search` to resolve the assetId. Always speak about assets by code + label, never by UUID. A favorited asset carries `isFavorite: true` (absent means not favorited). NOTE: generate_* results already return the new asset ids — do NOT call this to find an asset you just created.',
   input: z.object({
     projectId: z.string().uuid(),
     type: z.enum(['image', 'video', 'audio']).optional().describe('Only this asset type'),
@@ -1453,6 +1459,32 @@ export const moveAssetsToFolder: Operation<{ assetIds: string[]; folderId: strin
   },
 }
 
+export const setAssetFavorite: Operation<{ assetId: string; favorite: boolean }> = {
+  id: 'slates_set_asset_favorite',
+  description:
+    'Mark or unmark one asset as a favorite. The heart persists on the card in the app, and slates_list_assets reports it as isFavorite.',
+  input: z.object({
+    assetId: z.string().uuid(),
+    favorite: z.boolean(),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/assets/favorite', input))
+  },
+}
+
+export const exportAssets: Operation<{ assetIds: string[]; directory: string }> = {
+  id: 'slates_export_assets',
+  description:
+    'Copy the ORIGINAL files of one or more assets (images, clips or audio) into a directory on this machine, named by their codes (IMG-A12.png). Never overwrites: a clash gets -2, -3. The project is untouched. Works for an image-only project with no shot, video or timeline. Returns each exported path and any asset whose file is missing.',
+  input: z.object({
+    assetIds: z.array(z.string().uuid()).min(1),
+    directory: z.string().min(1).describe('Absolute path; created if it does not exist.'),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/assets/export', input))
+  },
+}
+
 export const moveAssetsToProject: Operation<{
   sourceProjectId: string
   assetIds: string[]
@@ -1539,15 +1571,18 @@ export const copyAssetsToProject: Operation<{
 }
 
 export const moveEntityToProject: Operation<{
-  kind: 'character' | 'environment' | 'style'
+  kind?: 'library' | 'character' | 'environment' | 'style'
   entityId: string
   targetProjectId: string
 }> = {
   id: 'slates_move_entity_to_project',
   description:
-    "Move a character, environment, or style into another project, taking every image it references with it. This is the fix when slates_move_assets_to_project refuses an asset because an entity still uses it: the identity image can't leave on its own, but the whole entity can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. Storyboard frames are not movable this way; moving a frame's image out would empty the shot.",
+    "Move a Library item (a character, location, product, look…) into another project, taking every image it references with it; it lands in the target's category of the same name. This is the fix when slates_move_assets_to_project refuses an asset because a Library item still uses it: the image can't leave on its own, but the whole item can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. Storyboard frames are not movable this way; moving a frame's image out would empty the shot.",
   input: z.object({
-    kind: z.enum(['character', 'environment', 'style']),
+    kind: z
+      .enum(['library', 'character', 'environment', 'style'])
+      .optional()
+      .describe('Optional and ignored: every value means a Library item. Kept for older callers.'),
     entityId: z.string().uuid(),
     targetProjectId: z.string().uuid(),
   }),
@@ -1646,14 +1681,14 @@ export const generateCharacterIdentity: Operation<{
   description:
     "Generate one character identity sheet from a base portrait asset and bind it as the character's canonical reference. Call after slates_create_character. Read slates-character-identity before calling and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
-    characterId: z.string().uuid(),
+    characterId: z.string().uuid().describe('A character, or the id of any Library thing: both sheet tools run on any thing, and the result binds as its image.'),
     projectId: z.string().uuid(),
     baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from.'),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
       .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
       .optional()
-      .describe('Image model for the sheet. Omit for the default (nano-banana-2). Exists so the layout-vs-face tradeoff can be tested with comparison gens — do not switch without a receipt.'),
+      .describe(`Image model for the sheet. Omit for the sheet tool's seat (${toolModelFor('character-sheet')}), which is what the app's own button uses. Pass another only to compare seats side by side.`),
   }),
   async run(input, ctx) {
     // 🚨 THE ROSTER GATE, WHICH THIS OP NEVER HAD. Its `model` enum offers
@@ -1690,7 +1725,7 @@ export const generateEnvironmentPlate: Operation<{
   description:
     "Generate one clean establishing image from an optional base image and bind it as the environment's canonical reference. Call after slates_create_environment and quote the cost from slates_estimate_generation_cost.",
   input: z.object({
-    environmentId: z.string().uuid(),
+    environmentId: z.string().uuid().describe('An environment, or the id of any Library thing: both sheet tools run on any thing, and the result binds as its image.'),
     projectId: z.string().uuid(),
     baseAssetId: z
       .string()
@@ -2107,7 +2142,7 @@ export const generateImage: Operation<{
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
-    count: z.number().int().min(1).max(10).optional().describe('Up to 10 with projectId; headless caps at 4.'),
+    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at 4.`),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -2189,7 +2224,7 @@ export const generateImage: Operation<{
         requires_clarification: true,
         missing: ['projectId'],
         message:
-          'count above 4 needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at 4; with a projectId the desktop fires them as separate generations and the limit is 10.',
+          `count above 4 needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at 4; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
       })
     }
     let refEcho = ''
@@ -5321,6 +5356,235 @@ export const deleteStyle: Operation<{ styleId: string }> = {
   },
 }
 
+// ── The Library ─────────────────────────────────────────────────
+// One saved reference in a category the USER names (characters, locations,
+// products, looks…). The character / environment / style ops above read and
+// write the same rows and stay for published clients; new work uses these.
+
+export const listLibrary: Operation<{ projectId: string }> = {
+  id: 'slates_list_library',
+  description:
+    "List a project's Library: its categories (user-named; each is kind 'thing' = cited with @, or 'look' = cited with #) and every saved reference in them. Each item carries `mention` — exactly what to type in a prompt to attach it (a bare name is prose and attaches nothing) — plus its image, source and voice asset ids.",
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/library', { projectId: input.projectId }))
+  },
+}
+
+export const createLibraryItem: Operation<{
+  projectId: string
+  categoryId: string
+  name: string
+  description?: string
+  style?: string
+  imageAssetId?: string
+}> = {
+  id: 'slates_create_library_item',
+  description:
+    'Save a reference to the Library in one of the project\'s categories (ids from slates_list_library) — a person, a location, a product, a prop, a look. Names share ONE namespace per sigil: a name whose handle is already taken comes back suffixed ("Candle 2"), so read `mention` from the result instead of assuming it. Pass imageAssetId (UUID or badge code) to bind its picture in the same call.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    categoryId: z.string().uuid(),
+    name: z.string().min(1).max(120),
+    description: z.string().optional(),
+    style: z.string().max(200).optional().describe('Optional free-text style instruction the sheet tools read.'),
+    imageAssetId: z.string().min(1).optional().describe('The one image a mention attaches. UUID or badge code ("IMG-A8").'),
+  }),
+  async run(input, ctx) {
+    const { imageAssetId, ...body } = input
+    // Resolved BEFORE the create, so an unknown code fails without leaving an
+    // item behind.
+    const resolved = imageAssetId ? await resolveAssetRefs(ctx, input.projectId, [imageAssetId]) : null
+    const created = await ctx.desktop().post<{ item: { id: string } }>('/agent/library/items', body)
+    if (!imageAssetId || !resolved) return ok(created)
+    return ok(
+      await ctx.desktop().post('/agent/library/items/update', {
+        id: created.item.id,
+        data: { imageAssetId: resolved.get(imageAssetId)!.id },
+      })
+    )
+  },
+}
+
+export const updateLibraryItem: Operation<{
+  projectId: string
+  itemId: string
+  name?: string
+  description?: string
+  style?: string
+  categoryId?: string
+  retagShots?: boolean
+  imageAssetId?: string | null
+  voiceAssetId?: string | null
+}> = {
+  id: 'slates_update_library_item',
+  description:
+    "Update a Library item: rename it, move it to another category (categoryId), bind its picture (imageAssetId) or its voice (voiceAssetId, an audio asset; a thing in a location category composes as an environment and carries none). null clears an asset; the asset itself stays. Moving between a 'thing' and a 'look' category flips the sigil (@ ↔ #), and moving a thing into or out of a 'location'-template category changes what it composes as. A rename changes its handle. In every case each saved Shot that mentions the item is rewritten to match (the mention in its prompt, and its mention id), and the result's `move` reports `shotsMentioning`, `shotsRetagged` and the old and new `mention`: tell the user what changed. Pass retagShots:false to leave Shots alone; they then show the item as missing until it is cited again. Moving it back, or renaming it back, undoes the rewrite.",
+  input: z.object({
+    projectId: z.string().uuid().describe('The project the item is in — asset codes resolve against it.'),
+    itemId: z.string().uuid(),
+    name: z.string().min(1).max(120).optional(),
+    description: z.string().optional(),
+    style: z.string().max(200).optional(),
+    categoryId: z.string().uuid().optional(),
+    retagShots: z.boolean().optional().describe('Only with categoryId or name. Default true: Shots that mention the item follow a move or a rename that changes how it is cited.'),
+    imageAssetId: z.string().min(1).nullable().optional().describe('UUID or badge code; null clears.'),
+    voiceAssetId: z.string().min(1).nullable().optional().describe('An AUDIO asset, UUID or badge code; null detaches.'),
+  }),
+  async run(input, ctx) {
+    const refs = [input.imageAssetId, input.voiceAssetId].filter((r): r is string => typeof r === 'string')
+    const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
+    const asset = (ref: string | null | undefined): string | null | undefined =>
+      typeof ref === 'string' ? resolved.get(ref)!.id : ref
+    return ok(
+      await ctx.desktop().post('/agent/library/items/update', {
+        id: input.itemId,
+        retagShots: input.retagShots,
+        data: {
+          name: input.name,
+          description: input.description,
+          style: input.style,
+          categoryId: input.categoryId,
+          // Sent only when given: the route treats presence as intent, and an
+          // explicit null is the clear.
+          ...(input.imageAssetId !== undefined ? { imageAssetId: asset(input.imageAssetId) } : {}),
+          ...(input.voiceAssetId !== undefined ? { voiceAssetId: asset(input.voiceAssetId) } : {}),
+        },
+      })
+    )
+  },
+}
+
+export const deleteLibraryItem: Operation<{ itemId: string }> = {
+  id: 'slates_delete_library_item',
+  description: 'Delete a Library item. Its images and voice clip stay in the project as ordinary assets.',
+  input: z.object({ itemId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/library/items/delete', { id: input.itemId }))
+  },
+}
+
+export const manageLibraryCategory: Operation<{
+  action: 'create' | 'rename' | 'reorder' | 'delete'
+  projectId?: string
+  categoryId?: string
+  name?: string
+  kind?: 'thing' | 'look'
+  template?: 'person' | 'location' | null
+  orderedIds?: string[]
+}> = {
+  id: 'slates_manage_library_category',
+  description:
+    "Create, rename, reorder or delete a Library category. Categories are the USER's labels (\"Products\", \"Mascots\"); never invent ones they did not ask for. create: projectId + name + kind ('thing' = @, 'look' = #), optional template ('person' | 'location' — a 'location' category's things compose as environments and carry no voice; every other thing composes as a character). Kind and template are fixed once made. rename: categoryId + name. reorder: projectId + orderedIds (every category id, in the new order). delete: categoryId — refused while the category holds items.",
+  input: z.object({
+    action: z.enum(['create', 'rename', 'reorder', 'delete']),
+    projectId: z.string().uuid().optional(),
+    categoryId: z.string().uuid().optional(),
+    name: z.string().min(1).max(80).optional(),
+    kind: z.enum(['thing', 'look']).optional(),
+    template: z.enum(['person', 'location']).nullable().optional(),
+    orderedIds: z.array(z.string().uuid()).optional(),
+  }),
+  async run(input, ctx) {
+    switch (input.action) {
+      case 'create':
+        return ok(await ctx.desktop().post('/agent/library/categories', { projectId: input.projectId, name: input.name, kind: input.kind, template: input.template }))
+      case 'reorder':
+        return ok(await ctx.desktop().post('/agent/library/categories/update', { projectId: input.projectId, orderedIds: input.orderedIds }))
+      case 'delete':
+        return ok(await ctx.desktop().post('/agent/library/categories/delete', { id: input.categoryId }))
+      default:
+        return ok(await ctx.desktop().post('/agent/library/categories/update', { id: input.categoryId, name: input.name }))
+    }
+  },
+}
+
+export const copyLibraryItemToProject: Operation<{ itemId: string; targetProjectId: string }> = {
+  id: 'slates_copy_library_item_to_project',
+  description:
+    "Copy a Library item into another project: the item AND duplicates of its picture, source and voice, filed in the target's category of the same name (made when missing). The original is untouched. Use this to reuse a character or product across projects; use slates_move_entity_to_project to take it out of this one instead.",
+  input: z.object({ itemId: z.string().uuid(), targetProjectId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().post('/agent/library/items/copy-to-project', { id: input.itemId, targetProjectId: input.targetProjectId }))
+  },
+}
+
+// ── Templates ───────────────────────────────────────────────────────────
+// A `.slatestemplate` file is a portable storyboard, scene or single Shot: the
+// recipes, their script words, their references and the Library items they
+// mention. It holds no takes, and importing one generates and spends nothing.
+
+export const getTemplate: Operation<{ path?: string }> = {
+  id: 'slates_get_template',
+  description:
+    "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the saved templates on this machine (the app's starter set and the user's own folder).",
+  input: z.object({ path: z.string().min(1).optional().describe('Absolute path of a .slatestemplate file. Omit to list saved templates.') }),
+  async run(input, ctx) {
+    if (!input.path) return ok(await ctx.desktop().get('/agent/templates'))
+    return ok(await ctx.desktop().get('/agent/templates/inspect', { path: input.path }))
+  },
+}
+
+export const exportTemplate: Operation<{
+  projectId: string
+  path: string
+  storyboardId?: string
+  sceneId?: string
+  shotId?: string
+  name?: string
+  description?: string
+}> = {
+  id: 'slates_export_template',
+  description:
+    "Save a storyboard, a scene or one Shot as a template file someone else can start from. Give exactly one of storyboardId, sceneId or shotId. The file carries each Shot's full recipe (prompt, model, settings, reference roles, script words) plus the reference files and the Library items the Shots mention; it carries no takes. The project is untouched. Returns the path, the counts, and a warning for any reference whose file is missing.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    path: z.string().min(1).describe('Absolute path to write, ending in .slatestemplate. Its folder is created if needed.'),
+    storyboardId: z.string().uuid().optional(),
+    sceneId: z.string().uuid().optional(),
+    shotId: z.string().min(1).optional().describe('A Shot id or code (SHOT-A3).'),
+    name: z.string().optional().describe("The template's name. Defaults to the storyboard's, scene's or Shot's."),
+    description: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    const named = [input.storyboardId, input.sceneId, input.shotId].filter(Boolean).length
+    if (named !== 1) throw new Error('Give exactly one of storyboardId, sceneId or shotId.')
+    return ok(await ctx.desktop().post('/agent/templates/export', input))
+  },
+}
+
+export const importTemplate: Operation<{
+  projectId: string
+  path: string
+  storyboardId?: string
+  sceneId?: string
+  swaps?: Record<string, string>
+  useTemplateCategories?: boolean
+}> = {
+  id: 'slates_import_template',
+  description:
+    "Add a template to a project. A storyboard template becomes a new storyboard; a scene template becomes a new scene of `storyboardId` (default: the most recently edited storyboard); a single-Shot template is filed like any new Shot (into `sceneId` when given). Its reference files become new assets of this project and its Library items are created here (a taken name is suffixed and the imported prompts are rewritten to match; see `renamed`). `swaps` maps a slot key from slates_get_template to an asset of THIS project (id or code) of the slot's type: the item takes that picture, or every Shot that attached the template's reference attaches it instead, and the template's own file for that slot is not imported. Generates nothing and spends nothing: price and fire the returned shotIds with slates_generate_from_shots, after the user approves the quote.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    path: z.string().min(1).describe('Absolute path of the .slatestemplate file.'),
+    storyboardId: z.string().uuid().optional(),
+    sceneId: z.string().uuid().optional(),
+    swaps: z.record(z.string().min(1)).optional().describe('{ "item:i1": "IMG-A12", "asset:a3": "<asset id>" }'),
+    useTemplateCategories: z
+      .boolean()
+      .optional()
+      .describe("Remove the project's untouched default Library categories the template does not use. Only acts on a project whose Library is empty; defaults to true on a project with no storyboard."),
+  }),
+  async run(input, ctx) {
+    const swaps: Record<string, string> = {}
+    if (input.swaps) {
+      const resolved = await resolveAssetRefs(ctx, input.projectId, Object.values(input.swaps))
+      for (const [slot, ref] of Object.entries(input.swaps)) swaps[slot] = resolved.get(ref)?.id ?? ref
+    }
+    return ok(await ctx.desktop().post('/agent/templates/import', { ...input, swaps }))
+  },
+}
+
 export const updateStoryboard: Operation<{
   storyboardId: string
   name?: string
@@ -5915,95 +6179,19 @@ interface ShotDetail extends ShotSummary {
   blocked: string | null
 }
 
-/**
- * The registry cost key for a saved Shot, through the SAME builders every quote
- * in this file uses (`videoCostKey` / `imageCostKey` / `audioCostKey`).
- *
- * Returns null when the Shot cannot be priced — no model, or a model this
- * surface does not carry. The caller REPORTS that rather than quoting zero: a
- * missing price displayed as free is the failure mode the whole pricing
- * contract exists to prevent.
- */
-function shotCostKey(detail: ShotSummary & { references?: ShotDetail['references'] }): string | null {
-  const model = detail.model
-  if (!model) return null
-  const p = detail.params as ShotOpParams & { audioDurationSeconds?: number }
-  // Prefer the CLAMPED values the desktop will actually fire with; a listing row
-  // has none, so it falls back to the raw ones and is announced as a floor.
-  const fires = (detail as Partial<ShotDetail>).firesWith
-  if ((AUDIO_MODELS as readonly string[]).includes(model)) {
-    if (model === TTS_MODEL) {
-      const text = (detail as Partial<ShotDetail>).composedPrompt ?? (detail.rawPrompt.trim() || detail.line?.trim() || '')
-      if (!text || text.length > TTS_MAX_CHARACTERS) return null
-      return audioCostKey({ model, characters: text.length })
-    }
-    const seconds = fires?.audioDurationSeconds ?? p.audioDurationSeconds
-    if (!seconds) return null
-    return audioCostKey({ model: model as AudioModel, durationSeconds: seconds })
-  }
-  if ((VIDEO_MODELS as readonly string[]).includes(model)) {
-    const duration = fires?.duration ?? p.duration
-    if (!duration) return null
-    const billed = (d: number): number => model === 'minimax-h3-max' ? Math.max(0, d) : (d > 0 ? Math.ceil(d - 0.05) : 0)
-    return videoCostKey({
-      model: model as VideoModel,
-      duration,
-      videoResolution: (fires?.videoResolution as VideoResolution | undefined) ??
-        p.videoResolution ??
-        defaultVideoResolutionFor(model),
-      sound: p.sound,
-      seedanceFace: p.seedanceFace,
-      // `references` is absent on a LISTING row (it does not compose), so both
-      // of these read 0 there. That is why a listing quote is announced as a
-      // floor and `slates_get_shot` is the exact one.
-      referenceImages: (detail.references ?? []).filter((r) => r.kind === 'image').length,
-      audioRefSeconds: (detail.references ?? []).filter((r) => r.kind === 'audio').reduce((n, r) => n + (r.durationSeconds ?? 0), 0),
-      videoRefSeconds: (detail.references ?? [])
-        .filter((r) => r.kind === 'video')
-        .reduce((n, r) => n + billed(r.durationSeconds ?? 0), 0),
-    })
-  }
-  if ((IMAGE_MODELS as readonly string[]).includes(model)) {
-    return imageCostKey(
-      model as ImageModelId,
-      ((fires?.imageResolution ?? p.imageResolution) as '1k' | '2k' | '3k' | '4k' | undefined) ??
-        (model === 'nano-banana-2-lite' ? '1k' : '2k'),
-      // No inline default — see the note at the estimate op. Firing a Shot with
-      // no stored tier lands on `high` via the desktop's `normalizeGptQuality`,
-      // and `imageCostKey`'s parameter default is pinned to match it.
-      p.gptQuality,
-      // The aspect the Shot will fire at — on GPT Image it moves the key, so
-      // quoting without it under-prices every square Shot. `fires` carries
-      // only the clamped resolution/duration axes, never the aspect.
-      p.aspectRatio
-    )
-  }
-  return null
-}
-
-/** Dynamic reference keys are priced by the same server calculator that debits them. */
+/** Fetch a dynamic cloud cost key for the standalone generation estimate. */
 async function loadDynamicPrice(ctx: OperationContext, byKey: Map<string, number>, key: string | null): Promise<void> {
   if (!key || byKey.has(key)) return
   const response = await ctx.cloud().get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(key)}`)
   for (const row of response.models) byKey.set(row.model, creditCost(row))
 }
 
-/** Credits for one Shot, and how many generations it fires.
- *
- *  `imageQuantity` multiplies IMAGE models only — the same condition the
- *  desktop's `estimateCostFor` applies and the only lane `/agent/shots/*` sends
- *  a `count` for. Multiplying it blindly would quote a video Shot 3× for a
- *  param its request never carries, and the card beside it would say ×1. */
-function shotQuote(
-  detail: ShotSummary & { references?: ShotDetail['references'] },
-  byKey: Map<string, number>
-): { key: string | null; credits: number; quantity: number } {
-  const key = shotCostKey(detail)
-  const isImage =
-    !!detail.model && (IMAGE_MODELS as readonly string[]).includes(detail.model)
-  const quantity = isImage ? ((detail.params as ShotOpParams).imageQuantity ?? 1) || 1 : 1
-  const per = key != null ? byKey.get(key) : undefined
-  return { key, credits: (per ?? 0) * quantity, quantity }
+interface DesktopShotQuote {
+  fingerprint: string
+  items: Array<{ shotId: string; name: string; code: string | null; model: string | null; prompt: string; cost: number | null; credits: number | null; blocked: string | null }>
+  total: number
+  largest: number
+  unpriced: number
 }
 
 export const createShot: Operation<
@@ -6256,7 +6444,7 @@ function describeVarietyReport(v: VarietyReport | null | undefined): string {
 export const listShots: Operation<{ projectId: string; storyboardId?: string; frameId?: string }> = {
   id: 'slates_list_shots',
   description:
-    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with the piece's cut count, runtime, credit floor and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
+    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with the piece's cut count, runtime, saved-recipe quote and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
   input: z.object({
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid().optional().describe('Only Shots attached to a frame in this storyboard.'),
@@ -6275,18 +6463,14 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
       frameId: input.frameId,
     })
     const rows = r.shots ?? []
-    // Deliberately does NOT compose each Shot — that is what slates_get_shot is
-    // for. A listing that composed every row would make browsing cost as much as
-    // auditing.
-    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
-    for (const row of rows) await loadDynamicPrice(ctx, byKey, shotCostKey(row))
+    const projectId = input.projectId
+    const quote = projectId && rows.length ? await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId, shotIds: rows.map(r => r.id) }) }) : null
     let total = 0
     let unpriced = 0
     const shots = rows.map((s) => {
-      const q = shotQuote(s, byKey)
-      if (q.key == null || !byKey.has(q.key)) unpriced += 1
-      total += q.credits
+      const q = quote?.items.find(i => i.shotId === s.id)
+      if (q?.credits == null) unpriced += 1
+      total += q?.credits ?? 0
       return {
         id: s.id,
         code: s.code,
@@ -6305,17 +6489,13 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
         shot_size: s.shotSize,
         camera: s.camera,
         continues: s.continues,
-        credits: q.credits,
+        credits: q?.credits ?? null,
       }
     })
     return ok(
       { shots, total_credits: total, unpriced, variety: r.variety },
       `${shots.length} shot(s), at least ${fmtCredits(total)} to fire them all` +
         (unpriced > 0 ? ` (${unpriced} could not be priced — no model or no duration set).` : '.') +
-        ' 🚨 That is a FLOOR, not the bill: a listing does not compose, so the two dimensions that' +
-        ' depend on the reference set — Seedance reference-clip seconds and MiniMax reference images' +
-        ' past the free five — are missing from it. slates_get_shot prices one exactly, and' +
-        ' slates_generate_from_shots quotes the set exactly before it fires anything.' +
         (describeVarietyReport(r.variety) ? `
 
 ${describeVarietyReport(r.variety)}` : '')
@@ -6334,15 +6514,14 @@ export const getShot: Operation<{ shotId: string }> = {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
     const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
-    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
-    await loadDynamicPrice(ctx, byKey, shotCostKey(r.shot))
-    const q = shotQuote(r.shot, byKey)
+    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: r.shot.projectId, shotIds: [r.shot.id] }) })
+    const q = quote.items[0]
+
     return ok(
-      { ...r.shot, cost_key: q.key, credits: q.credits },
+      { ...r.shot, credits: q.credits, quoteFingerprint: quote.fingerprint },
       `"${r.shot.name || 'Untitled'}" — ${r.shot.model ?? 'no model set'}, ` +
-        (q.key && !r.shot.blocked
-          ? `${fmtCredits(q.credits)} (${q.key}).`
+        (q.credits != null && !r.shot.blocked
+          ? `${fmtCredits(q.credits ?? 0)}.`
           : `CANNOT FIRE YET: ${r.shot.blocked ?? 'not priceable — set a model and a duration.'}`) +
         (r.shot.blocked ? '' : ` Fires with ${JSON.stringify(r.shot.firesWith)}.`) +
         `\nCOMPOSED PROMPT (what the model is told): ${r.shot.composedPrompt}`
@@ -6394,6 +6573,64 @@ export const splitShot: Operation<{ shotId: string; caret?: number }> = {
   },
 }
 
+export const splitTake: Operation<{
+  shotId: string
+  assetId: string
+  sceneId?: string
+  position?: number
+  name?: string
+}> = {
+  id: 'slates_split_take',
+  description:
+    "A take founds its own Shot. The result (a take under `shotId`) moves to a NEW Shot whose recipe is the take's RECORDED one — the prompt, model, params and references it was actually made from, which may differ from what the source Shot says now. The new Shot lands directly after the source by default; the source keeps its other takes and its recipe untouched, and is never deleted when emptied. Script fields (line, speaker) start empty on the new row.",
+  input: z.object({
+    shotId: z.string().describe('The source Shot id, or its SHOT-A code.'),
+    assetId: z.string().describe('The take to move — an asset id or its IMG-A / VID-A code. Must be a take of `shotId`.'),
+    sceneId: z.string().uuid().optional().describe("Scene for the new Shot. Omitted = the source's scene."),
+    position: z.number().int().min(0).optional().describe('Frame position in that scene. Omitted = directly after the source.'),
+    name: z.string().optional().describe("The new Shot's name. Omitted = the take's label or the first 60 characters of its prompt."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{
+      shot: Record<string, unknown>
+      source: Record<string, unknown>
+      moved: number
+      unsavedPaths: string[]
+    }>('/agent/shots/split-take', input)
+    const unsaved = r.unsavedPaths?.length
+      ? ` ${r.unsavedPaths.length} recorded attachment(s) are not project assets and were not carried.`
+      : ''
+    return ok(
+      r,
+      `${(r.shot?.code as string) || 'A new Shot'} founded from that take, after ${(r.source?.code as string) || 'the source'}, with the take's recorded recipe.${unsaved}`
+    )
+  },
+}
+
+export const refileTake: Operation<{ assetId: string; fromShotId?: string | null; toShotId: string }> = {
+  id: 'slates_refile_take',
+  description:
+    'Move a take (a result) from one Shot to another in the same project. Only the attribution moves: neither Shot\'s recipe changes, the asset stays where it is in Media, and a clip that a frame prefers keeps that role. `fromShotId` is a guard — the take moves only if it still hangs under that Shot (omit it to claim an unattributed result). An emptied Shot is kept, never deleted.',
+  input: z.object({
+    assetId: z.string().describe('The take — an asset id or its IMG-A / VID-A code.'),
+    fromShotId: z.string().nullable().optional().describe('The Shot it hangs under now (id or SHOT-A code). Omitted or null = an unattributed result.'),
+    toShotId: z.string().describe('The Shot to move it to (id or SHOT-A code).'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ moved: number; shot: Record<string, unknown> }>('/agent/shots/refile-take', input)
+    return ok(
+      r,
+      r.moved > 0
+        ? `Moved to ${(r.shot?.code as string) || 'that Shot'}.`
+        : `Nothing moved — that result is not under the Shot you named (or is already under ${(r.shot?.code as string) || 'the target'}).`
+    )
+  },
+}
+
 export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
   id: 'slates_merge_shots',
   description:
@@ -6417,100 +6654,186 @@ export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
   },
 }
 
-export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean }> = {
-  id: 'slates_generate_from_shots',
-  billable: true,
+
+// ── The script (overhaul §4.9 "The script IS the shots", P2.4a) ───────
+// A scene owns ONE continuous text and a Shot with words is a RANGE of it;
+// the Shot's `line` mirrors the range. The agent edits the same document
+// through the same operations the Script page uses (rule 8). Offsets are
+// character positions into the scene's script as `slates_get_script` returns
+// it; read before you write, because every edit moves what follows it.
+
+export const getScript: Operation<{ sceneId: string }> = {
+  id: 'slates_get_script',
   description:
-    'Generate from saved Shots, ONE AFTER ANOTHER, with a single quote and a single approval for the whole set. It blocks until the last one lands, so a set of video Shots can outlast the HTTP timeout while the run keeps going — if that happens, poll slates_get_shot for each Shot\'s generationIds instead of re-firing, which double-spends.',
+    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet.",
   input: z.object({
-    shotIds: z.array(z.string()).min(1).max(20).describe('The Shots to fire, in order — ids or SHOT-A codes.'),
-    confirm: z.boolean().optional().describe('Set true after explicit user OK on the TOTAL below.'),
+    sceneId: z.string().uuid().describe('The scene (slates_get_storyboard_with_frames lists them, each with its script).'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    // Resolve and price every Shot BEFORE anything fires. A dead id found
-    // halfway through a batch means a partially-fired, partially-BILLED run.
-    const details: ShotDetail[] = []
-    for (const id of input.shotIds) {
-      const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })
-      details.push(r.shot)
-    }
-    const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
-    await Promise.all(details.map((d) => loadDynamicPrice(ctx, byKey, shotCostKey(d))))
-    const quotes = details.map((d) => ({ detail: d, ...shotQuote(d, byKey) }))
-    const total = quotes.reduce((n, q) => n + q.credits, 0)
-    const largest = quotes.reduce((m, q) => (q.credits > m ? q.credits : m), 0)
-    const unpriced = quotes.filter((q) => q.key == null || !byKey.has(q.key))
-    const blockedShots = details.filter((d) => d.blocked)
-
-    if (!input.confirm) {
-      // ONE approval for the set, itemised. N approvals would re-introduce the
-      // friction the batch exists to remove; the safety is the STATED TOTAL,
-      // prominent — count, total, and the largest single Shot.
-      const lines = quotes.map(
-        (q) =>
-          `  - ${q.detail.name || 'Untitled'} · ${q.detail.model ?? 'no model'} · ` +
-          (q.key ? fmtCredits(q.credits) : 'NOT PRICEABLE')
-      )
-      const blockedLines = blockedShots.map(
-        (d) => `  ✖ ${d.name || 'Untitled'} WILL NOT FIRE: ${d.blocked}`
-      )
-      const warnings = details
-        .filter((d) => d.missing || d.unresolvedTokens?.length)
-        .map(
-          (d) =>
-            `  ! ${d.name || 'Untitled'}: ${d.missing ? 'references something that no longer exists' : ''}` +
-            `${d.unresolvedTokens?.length ? ` ${d.unresolvedTokens.join(', ')} match nothing saved (sent as written, no reference attached)` : ''}`
-        )
-      return ok(
-        {
-          requires_confirm: true,
-          count: quotes.length,
-          total_credits: total,
-          largest_single_credits: largest,
-          blocked_count: blockedShots.length,
-          shots: quotes.map((q) => ({
-            id: q.detail.id,
-            name: q.detail.name,
-            model: q.detail.model,
-            cost_key: q.key,
-            credits: q.credits,
-            blocked: q.detail.blocked,
-          })),
-        },
-        `Firing ${quotes.length} Shot(s) SEQUENTIALLY.\n` +
-          `TOTAL ${fmtCredits(total)} · largest single ${fmtCredits(largest)}\n` +
-          lines.join('\n') +
-          (blockedLines.length > 0 ? `\n${blockedLines.join('\n')}` : '') +
-          (unpriced.length > 0
-            ? `\n  ! ${unpriced.length} shot(s) could not be priced — they will still be attempted and may fail.`
-            : '') +
-          (warnings.length > 0 ? `\n${warnings.join('\n')}` : '') +
-          `\n\nRe-call with confirm: true after explicit user OK on that total.`
-      )
-    }
-
-    const r = await desktop.post<{
-      results: Array<Record<string, unknown>>
-      total: number
-      failed: number
-      succeeded: number
-    }>('/agent/shots/batch-generate', { shotIds: input.shotIds })
-    const failedLines = (r.results ?? [])
-      .filter((x) => x.status === 'failed')
-      .map((x) => `  ✗ ${(x.name as string) || 'Untitled'}: ${x.error ?? 'failed'}`)
-    return ok(
-      r,
-      `${r.succeeded} of ${r.total} generated for about ${fmtCredits(total)}.` +
-        (failedLines.length > 0
-          ? // Reported, never retried: an agent that treats a failed render as
-            // something to try again spends credits before anyone notices.
-            `\n${failedLines.join('\n')}\nThese were NOT retried. Read each error, fix the Shot, and re-fire only what you meant to.`
-          : '') +
-        ` ${BACKGROUND_REVIEW_POINTER}`
+    const r = await desktop.get<{ sceneId: string; script: string; shots: Array<{ code: string | null; start: number; end: number }> }>(
+      '/agent/script',
+      { sceneId: input.sceneId }
     )
+    return ok(r, `${r.script.length} characters, ${r.shots.length} ranged Shot(s).`)
+  },
+}
+
+export const editScript: Operation<{ sceneId: string; at: number; removed: number; text: string }> = {
+  id: 'slates_edit_script',
+  description:
+    "Edit a scene's script: ONE contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once — this IS editing the Shots. Read slates_get_script first; offsets are into that text.",
+  input: z.object({
+    sceneId: z.string().uuid(),
+    at: z.number().int().min(0).describe('Character offset the replacement starts at.'),
+    removed: z.number().int().min(0).describe('How many characters to remove there (0 to insert).'),
+    text: z.string().describe("What goes in their place ('' to delete). A blank line (\\n\\n) separates paragraphs."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ sceneId: string; script: string }>('/agent/script/edit', input)
+    return ok(r, `Script is now ${r.script.length} characters; every Shot's line follows.`)
+  },
+}
+
+export const makeShotFromScript: Operation<{
+  sceneId: string
+  start: number
+  end: number
+  waitingShotId?: string | null
+  perParagraph?: boolean
+}> = {
+  id: 'slates_make_shot_from_script',
+  description:
+    "Do the ONE thing a selection of the script can mean, exactly as the Script page's popover does: Make shot when the selection touches no Shot; Split when it lies inside one Shot (the Shot keeps its first piece and its takes, every other piece becomes a new Shot after it); Extend when it crosses one Shot's edge; Merge when it spans several (the first takes the span — unshot text between them included, nothing deleted — the others give up their words: one with takes stays and waits for text, one without is removed). Pass `waitingShotId` to give a Shot that has no words yet (made on the Board, split off a take) the selected text instead. `perParagraph: true` over several unshot paragraphs makes one Shot per paragraph. A new Shot is filed after every ranged Shot whose words start before it.",
+  input: z.object({
+    sceneId: z.string().uuid(),
+    start: z.number().int().min(0),
+    end: z.number().int().min(0),
+    waitingShotId: z.string().nullable().optional().describe('A Shot with no words (id or SHOT-A code) that should take the selection.'),
+    perParagraph: z.boolean().optional().describe('Over unshot text spanning several paragraphs: one Shot per paragraph.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{
+      action: { kind: string; label: string }
+      shotId: string | null
+      shot: Record<string, unknown> | null
+      shotIds?: string[]
+      kept?: string[]
+      removed?: string[]
+    }>('/agent/script/make-shot', input)
+    const kept = r.kept?.length ? ` ${r.kept.join(', ')} kept ${r.kept.length === 1 ? 'its takes and waits' : 'their takes and wait'} for text.` : ''
+    const removed = r.removed?.length ? ` ${r.removed.length} empty Shot(s) removed.` : ''
+    const made = r.shotIds ? `${r.shotIds.length} Shot(s) made, one per paragraph.` : `${r.action.label}: ${(r.shot?.code as string) || r.shotId || 'done'}.`
+    return ok(r, `${made}${kept}${removed}`)
+  },
+}
+
+export const breakScriptIntoShots: Operation<{ storyboardId?: string; sceneId?: string }> = {
+  id: 'slates_break_script_into_shots',
+  description:
+    '"Break the script into shots": a Shot for every piece of text no Shot holds — one per paragraph — across a whole storyboard, or one scene. Shots that already exist keep their words. This is the cut after the script is right; slates_paste_script is the step before it.',
+  input: z.object({
+    storyboardId: z.string().uuid().optional().describe('Every scene of this storyboard.'),
+    sceneId: z.string().uuid().optional().describe('Only this scene.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ shotIds: string[]; shots: Array<Record<string, unknown>> }>('/agent/script/break', input)
+    return ok(r, `${r.shotIds.length} Shot(s) made from the unshot text.`)
+  },
+}
+
+export const splitScene: Operation<{ sceneId: string; lineStart: number; lineEnd: number; name?: string | null }> = {
+  id: 'slates_split_scene',
+  description:
+    "Open a scene at a heading line, the Notion way: the text from `lineEnd` on moves into a NEW scene directly after this one, with its Shots and their slots; the heading line [lineStart, lineEnd) itself is consumed and `name` becomes the new scene's name. Use slates_paste_script to do this for every SCENE / INT. / EXT. / # line of a pasted script at once.",
+  input: z.object({
+    sceneId: z.string().uuid(),
+    lineStart: z.number().int().min(0).describe('Offset where the heading line starts.'),
+    lineEnd: z.number().int().min(0).describe('Offset just past the heading line (the newline after it is consumed too).'),
+    name: z.string().nullable().optional().describe("The new scene's name. Omitted = 'Scene N'."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ scene: { id: string; name: string } }>('/agent/script/split-scene', input)
+    return ok(r, `Opened "${r.scene?.name ?? 'a scene'}" there; the text below moved into it.`)
+  },
+}
+
+export const mergeScene: Operation<{ sceneId: string }> = {
+  id: 'slates_merge_scene',
+  description:
+    "Join a scene to the one before it (Backspace in an emptied heading): the texts join with a blank line, every Shot keeps its words and its slot appends after the previous scene's. Only the scene row goes — no Shot does. Returns the offset in the joined script where this scene's text now starts.",
+  input: z.object({ sceneId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ sceneId: string; at: number; scene: { name: string } }>('/agent/script/merge-scene', input)
+    return ok(r, `Joined into "${r.scene?.name ?? 'the previous scene'}" at offset ${r.at}.`)
+  },
+}
+
+export const pasteScript: Operation<{ storyboardId?: string; sceneId?: string | null; text: string; at?: number }> = {
+  id: 'slates_paste_script',
+  description:
+    "Dump a script in as TEXT, not Shots: the text lands in the scene's script (at its end by default), and lines reading `SCENE …`, `INT.` / `EXT.` / `I/E.` or `# Name` open scenes. No Shot is made — cutting is the writer's act or yours: slates_break_script_into_shots for one per paragraph, or slates_make_shot_from_script per selection. With no sceneId, a new scene at the end of the storyboard takes the text (dropped again if the script opens with its own heading). Prefer this over slates_create_shot per paragraph: see the whole script, get it right, then cut it.",
+  input: z.object({
+    storyboardId: z.string().uuid().optional().describe('The storyboard, when no scene is named.'),
+    sceneId: z.string().uuid().nullable().optional().describe('The scene to paste into. Omitted = a new scene at the end.'),
+    text: z.string().describe('The script. Blank lines separate paragraphs.'),
+    at: z.number().int().min(0).optional().describe("Offset in the scene's script to paste at. Omitted = the end."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const r = await desktop.post<{ sceneId: string; at: number; scenes: Array<{ id: string; name: string }> }>('/agent/script/paste', input)
+    return ok(r, `Pasted as text; the storyboard now has ${r.scenes.length} scene(s). No Shot was made — break it into shots when it reads right.`)
+  },
+}
+
+export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean; fingerprint?: string; draft?: { model?: ImageModelId } }> = {
+  id: 'slates_generate_from_shots', billable: true,
+  description: 'Preview the itemized desktop quote for saved Shots. After explicit approval, pass confirm and the returned fingerprint. Changed recipes require a fresh quote. Runs sequentially; after a timeout inspect generations instead of re-firing. Pass draft to draft the film instead: one picture for each Shot that has none, never saved to the Shot.',
+  input: z.object({ shotIds: z.array(z.string()).min(1).max(20), confirm: z.boolean().optional(), fingerprint: z.string().optional(), draft: z.object({ model: z.enum(IMAGE_MODELS).optional().describe('The image model to draft on. Omit it for the default image model.') }).optional().describe('Draft the film: pass {} to quote ONE picture for each Shot in scope that has no picture, instead of each Shot recipe, at the chosen image model\u2019s default settings. Works on a Shot with no model. No Shot row changes; the picture becomes a take of that Shot. Pass the same value when confirming.') }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('shots', 'saved Shots')
+    const details = await Promise.all(input.shotIds.map(id => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
+    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map(d => d.shot.id), draft: input.draft }) })
+    const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
+    const largest = Math.max(0, ...quote.items.map(i => i.credits ?? 0))
+    if (!input.confirm || input.fingerprint !== quote.fingerprint) return ok({ ...quote, requires_confirm: true, total_credits: total, largest_single_credits: largest },
+      `TOTAL ${fmtCredits(total)} · largest ${fmtCredits(largest)}.\n` + quote.items.map(i => `${i.code ?? i.name}: ${i.credits == null ? 'unpriced' : fmtCredits(i.credits)}${i.blocked ? ` — ${i.blocked}` : ''}`).join('\n') + '\nGet approval for this quote, then pass its fingerprint with confirm: true.')
+    return ok(await desktop.post('/agent/shots/batch-generate', { shotIds: quote.items.map(i => i.shotId), fingerprint: quote.fingerprint, draft: input.draft }))
+  },
+}
+
+export const quoteBoard: Operation<{ projectId: string; storyboardId?: string; sceneId?: string; shotIds?: string[]; missingOnly?: boolean; draft?: { model?: ImageModelId } }> = {
+  id: 'slates_get_board_quote',
+  description: 'Read an itemized generation quote for a board, scene or shot selection, optionally only missing results. No generation. Uses the desktop composer pricing source and returns a fingerprint for slates_generate_from_shots. Pass draft to quote a film draft (one picture per Shot that has none).',
+  input: z.object({ projectId: z.string().uuid(), storyboardId: z.string().uuid().optional(), sceneId: z.string().uuid().optional(), shotIds: z.array(z.string()).optional(), missingOnly: z.boolean().optional(), draft: z.object({ model: z.enum(IMAGE_MODELS).optional().describe('The image model to draft on. Omit it for the default image model.') }).optional().describe('Draft the film: pass {} to quote one picture for each Shot in scope with no picture, instead of each Shot recipe.') }),
+  async run(input, ctx) { return ok(await ctx.desktop().get('/agent/shots/quote', { input: JSON.stringify(input) })) },
+}
+
+export const getBoardProgress: Operation<{ projectId: string }> = {
+  id: 'slates_get_board_progress', description: 'Read per-shot spend from generation history, surviving take counts, running/failed counts and recorded-round progress. Deleted takes do not reduce spend.',
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) { return ok(await ctx.desktop().get('/agent/shots/progress', input)) },
+}
+
+export const editCut: Operation<{ projectId: string; action: 'changes' | 'replace' | 'sync' | 'build' | 'restore' | 'undo-build'; storyboardId?: string; clipId?: string; assetId?: string; before?: Record<string, unknown>[]; clipIds?: string[]; markerIds?: string[] }> = {
+  id: 'slates_edit_cut', description: 'Read pending preferred-take changes, explicitly replace one clip, sync a storyboard’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
+  input: z.object({ projectId: z.string().uuid(), action: z.enum(['changes','replace','sync','build','restore','undo-build']), storyboardId: z.string().uuid().optional(), clipId: z.string().uuid().optional(), assetId: z.string().optional(), before: z.array(z.object({ id: z.string().uuid(), assetPath: z.string(), assetId: z.string().nullable().optional(), shotId: z.string().nullable().optional(), thumbnailPath: z.string().optional(), sourceDuration: z.number().positive(), sourceFps: z.number().positive(), sourceInFrame: z.number().int().min(0), sourceOutFrame: z.number().int().positive(), endFrame: z.number().int().positive(), shortened: z.boolean().optional() }).passthrough()).optional().describe('Exact before snapshots returned by replace/sync, for restore.'), clipIds: z.array(z.string().uuid()).optional(), markerIds: z.array(z.string().uuid()).optional() }),
+  async run(input, ctx) {
+    const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new Map<string, ResolvedAssetRef>()
+    return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.get(input.assetId)?.id : undefined }))
   },
 }
 
@@ -6979,6 +7302,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   listFolders as unknown as Operation<unknown>,
   createFolder as unknown as Operation<unknown>,
   moveAssetsToFolder as unknown as Operation<unknown>,
+  setAssetFavorite as unknown as Operation<unknown>,
+  exportAssets as unknown as Operation<unknown>,
   moveAssetsToProject as unknown as Operation<unknown>,
   copyAssetsToProject as unknown as Operation<unknown>,
   moveEntityToProject as unknown as Operation<unknown>,
@@ -7031,6 +7356,15 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   createStyle as unknown as Operation<unknown>,
   updateStyle as unknown as Operation<unknown>,
   deleteStyle as unknown as Operation<unknown>,
+  listLibrary as unknown as Operation<unknown>,
+  createLibraryItem as unknown as Operation<unknown>,
+  updateLibraryItem as unknown as Operation<unknown>,
+  deleteLibraryItem as unknown as Operation<unknown>,
+  manageLibraryCategory as unknown as Operation<unknown>,
+  copyLibraryItemToProject as unknown as Operation<unknown>,
+  getTemplate as unknown as Operation<unknown>,
+  exportTemplate as unknown as Operation<unknown>,
+  importTemplate as unknown as Operation<unknown>,
   updateStoryboard as unknown as Operation<unknown>,
   deleteStoryboard as unknown as Operation<unknown>,
   updateScene as unknown as Operation<unknown>,
@@ -7049,9 +7383,23 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   // actually decided. They sit beside the writers, not with the spender.
   splitShot as unknown as Operation<unknown>,
   mergeShots as unknown as Operation<unknown>,
+  // A take founding its own Shot, or moving between Shots (P2.3).
+  splitTake as unknown as Operation<unknown>,
+  refileTake as unknown as Operation<unknown>,
+  // The script IS the shots (P2.4a): one text per scene, Shots as ranges of it.
+  getScript as unknown as Operation<unknown>,
+  editScript as unknown as Operation<unknown>,
+  makeShotFromScript as unknown as Operation<unknown>,
+  breakScriptIntoShots as unknown as Operation<unknown>,
+  splitScene as unknown as Operation<unknown>,
+  mergeScene as unknown as Operation<unknown>,
+  pasteScript as unknown as Operation<unknown>,
   listShots as unknown as Operation<unknown>,
   getShot as unknown as Operation<unknown>,
   generateFromShots as unknown as Operation<unknown>,
+  quoteBoard as unknown as Operation<unknown>,
+  getBoardProgress as unknown as Operation<unknown>,
+  editCut as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
   loadTools as unknown as Operation<unknown>,
   // ── Blender previs, LAST and deliberately ────────────────────────────

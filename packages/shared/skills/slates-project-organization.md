@@ -5,21 +5,25 @@ description: Use when the user names an asset by code ("use IMG-A36"), asks what
 
 # Organizing a Slates project
 
-Slates already gives each REUSABLE reference type its own home — the **Characters**, **Environments**, and **Styles** tabs, each with its own generation + `@mention`/`#ref` behavior. Do NOT recreate those as folders. Folders are for **structure**, never type.
+Slates already gives every REUSABLE reference a home — the **Library**, in categories the user names (Characters, Locations, Products, Looks…; `slates_list_library`), each item cited by `@mention` or `#ref`. Do NOT recreate those as folders, and never invent a category the user did not ask for. Folders are for **structure**, never type.
 
 **Folders = where an asset sits in the FILM**, and they mirror to real subfolders on disk (`projects/<id>/…`), so a human can open the project in Resolve/Finder and navigate it like an edit. Use them for work product, not references.
 
 Create with `slates_create_folder`; file assets with `slates_move_assets_to_folder`. Generations land in the project's active folder, so set it before a batch.
+
+A favorite is a keeper, not a folder: `slates_set_asset_favorite` marks one asset (the heart on its card, `isFavorite` in `slates_list_assets`) without moving it. To hand files out of Slates, `slates_export_assets` copies the ORIGINALS of the assets you name into a directory (named by code, never overwriting) — the way to deliver an image-only job that never needed a shot or a timeline. Use it to flag the takes worth a second look; file with folders once the pick is made.
+
+To reuse a whole piece rather than one reference, use a TEMPLATE: `slates_export_template` saves a storyboard, a scene or one Shot (recipes, script words, references and the Library items they mention; never takes) as a file, `slates_get_template` reads what a file holds and its swap slots, and `slates_import_template` adds it to a project, optionally swapping a slot for one of that project's own assets. An import generates nothing; quote and fire the returned Shots as usual.
 
 Conventions by project type:
 - **Short film / narrative:** `Shots` (scene stills) · `Clips` (generated video) · `Final` (the export). Use one folder per scene (`Scene 1`, `Scene 2`, …) instead when the piece has distinct locations/beats.
 - **Ad / UGC:** `Hooks` · `B-roll` · `Talking-head` · `Final`.
 
 Rules of thumb:
-- Reusable cast / sets / look → leave in the Characters/Environments/Styles tabs. Don't fold them.
+- Reusable cast / sets / products / look → leave in the Library. Don't fold them.
 - Scene stills, clips, and the final cut → file into the structural folder they belong to, as you make them.
 - One folder per asset (folders are structure). Cross-cutting status (hero take, reject, variant) is a tag concern, not a folder.
-- Keep the gallery legible: work product lives in folders; the reference scaffolding (sheets, plates, style images) stays in its tabs.
+- Keep the gallery legible: work product lives in folders; the reference scaffolding (sheets, plates, style images) stays in the Library.
 
 ## Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1)
 

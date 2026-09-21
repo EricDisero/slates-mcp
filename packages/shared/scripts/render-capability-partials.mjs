@@ -83,7 +83,24 @@ const { defaultModelFor } = await import(pathToFileURL(join(pkgRoot, 'dist/promp
 const { DEFAULT_GPT_QUALITY } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-capabilities.js')).href)
 const imageDefault = defaultModelFor('image')
 const imageDefaults = `**Image default:** ${imageDefault}, quality \`${DEFAULT_GPT_QUALITY}\`, ${shared.MODEL_CAPABILITIES[imageDefault].defaultImageResolution}. User overrides take priority. Without a project, generation uses the headless Nano Banana 2 seat.\n\n| Model | Default resolution |\n|---|---|\n${Object.entries(shared.MODEL_CAPABILITIES).filter(([, c]) => c.imageResolutions).map(([id, c]) => `| ${id} | ${c.defaultImageResolution} |`).join('\n')}`
-const files = { 'thresholds.md': thresholds, 'image-defaults.md': imageDefaults }
+// The sheet tools' seat, rung, tier and framing: what the desktop handler bills
+// and what its screens print, from the same TOOL_SEAT table (generation-policy.ts).
+// This line read "Default to Nano Banana 2 at 2K", typed, until 2026-09-21.
+const { toolModelFor } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-facts.js')).href)
+const { SHEET_TOOL_ASPECT_RATIO, SHEET_TOOL_GPT_QUALITY } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/generation-policy.js')).href)
+const sheetLine = (tool, label) => {
+  const model = toolModelFor(tool)
+  // The package's own predicate, never a prefix match on the id.
+  const usesQuality = shared.operations.isGptImageModel(model)
+  return `- **${label}:** \`${model}\` at ${shared.MODEL_CAPABILITIES[model].defaultImageResolution}${usesQuality ? `, quality \`${SHEET_TOOL_GPT_QUALITY}\`` : ''}, one ${SHEET_TOOL_ASPECT_RATIO} image.`
+}
+const sheetToolDefaults = `**What the sheet tools render on** (you do not pick these; omit \`model\`):
+
+${sheetLine('character-sheet', 'Character identity sheet')}
+${sheetLine('environment-plate', 'Establishing image')}
+
+Price a sheet for that model at ${SHEET_TOOL_ASPECT_RATIO}, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.`
+const files = { 'thresholds.md': thresholds, 'image-defaults.md': imageDefaults, 'sheet-tool-defaults.md': sheetToolDefaults }
 
 let drift = 0
 mkdirSync(partialsDir, { recursive: true })

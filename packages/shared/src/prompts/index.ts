@@ -29,3 +29,5 @@ export * from './prompting-tips.js'
 // gallery. Also its own leaf subpath (`@slatesvideo/shared/asset-label`) for the
 // renderer, which cannot import the root barrel.
 export * from './asset-label.js'
+
+export * from './generation-policy.js'

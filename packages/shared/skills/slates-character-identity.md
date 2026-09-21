@@ -68,7 +68,15 @@ If text only: generate from prompt-only — less consistent, so warn the user.
 - Estimate cost first with `slates_estimate_generation_cost` and announce in **credits** — never quote a price from memory.
 <!-- /slates-only -->
 
-- Default to Nano Banana 2 at 2K. **Never 4K** — no identity gain at sheet scale, wasted spend.
+<!-- @inject:sheet-tool-defaults -->
+**What the sheet tools render on** (you do not pick these; omit `model`):
+
+- **Character identity sheet:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
+- **Establishing image:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
+
+Price a sheet for that model at 16:9, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.
+<!-- @end:sheet-tool-defaults -->
+
 - When the result returns inline, **evaluate it before binding**:
   - Is the portrait clearly the largest panel, and is it off-frontal?
   - **Is the front body panel cleanly headless** — an empty collar above a normally rendered body, no partial face, no floating jaw, no smeared neck stump? A botched crop is worse than no crop.

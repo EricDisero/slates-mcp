@@ -34,6 +34,7 @@ export const CHATGPT_IMAGE_HOST = {
 // routing. The figures go, because those are data.
 
 import { MODEL_CAPABILITIES } from './model-capabilities.js'
+import { DEFAULT_IMAGE_SEAT, TOOL_SEAT, type BuiltInTool } from './generation-policy.js'
 
 /** Authoring presets only: these do not claim hosted ChatGPT API capabilities. */
 export const CHATGPT_FRAMING_RATIOS = MODEL_CAPABILITIES['gpt-image-2-5-sunburst'].aspectRatios
@@ -477,7 +478,27 @@ export function defaultModelFor(kind: ModelFact['kind']): string {
   return fact.id
 }
 
+/**
+ * The seat a built-in tool renders on when its caller names no model. Resolves
+ * `TOOL_SEAT` (generation-policy.ts, THE home): `'default-image'` follows the
+ * default image seat above, a model id pins the tool. The desktop resolves the
+ * same table through its generated mirror, so an op description, the skill
+ * partial and the handler that bills cannot name different models.
+ */
+export function toolModelFor(tool: BuiltInTool): string {
+  const seat = TOOL_SEAT[tool]
+  return seat === DEFAULT_IMAGE_SEAT ? defaultModelFor('image') : seat
+}
+
 const FACT_BY_ID = new Map(MODEL_FACTS.map((m) => [m.id, m]))
+
+// A pinned tool seat must be a live image model, or the tool quotes and fires
+// an id nothing can render. Asserted at load, like the one-default-per-kind rule.
+for (const [tool, seat] of Object.entries(TOOL_SEAT)) {
+  if (seat !== DEFAULT_IMAGE_SEAT && FACT_BY_ID.get(seat)?.kind !== 'image') {
+    throw new Error(`TOOL_SEAT: ${tool} is pinned to "${seat}", which is not an image model in MODEL_FACTS`)
+  }
+}
 
 /**
  * Routing prose for one lane, generated from the SSOT.

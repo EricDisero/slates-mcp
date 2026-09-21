@@ -33,20 +33,25 @@ console.log('Shot voice ops: asset codes resolve for create/update/duplicate; so
 
 const line = 'Only the words to speak.'
 const key = audioCostKey({ model: TTS_MODEL, characters: line.length })
-desktop.get = async () => ({ shot: { id: 'shot', projectId, name: 'Speech', model: TTS_MODEL,
-  rawPrompt: line, composedPrompt: line, line, params: { voiceId: 'preset' }, firesWith: {}, blocked: null } })
+desktop.get = async (path) => path === '/agent/shots/quote'
+  ? { fingerprint: 'voice-quote', items: [{ shotId: 'shot', name: 'Speech', model: TTS_MODEL, credits: 1, blocked: null }], total: 0.03, largest: 0.03, unpriced: 0 }
+  : { shot: { id: 'shot', projectId, name: 'Speech', model: TTS_MODEL,
+  rawPrompt: line, composedPrompt: line, line, params: { voiceId: 'preset' }, firesWith: {}, blocked: null } }
 ctx.cloud = () => ({ get: async () => ({ models: [{ model: key, cost_credits: 1 }] }) })
 const detail = await getShot.run({ shotId: 'shot' }, ctx)
-assert.equal(detail.data.cost_key, key, 'TTS Shots must be priceable without a duration')
+assert.equal(detail.data.credits, 1, 'TTS Shots must be priceable without a duration')
 const quote = await generateFromShots.run({ shotIds: ['shot'] }, ctx)
-assert.equal(quote.data.shots[0].cost_key, key)
+assert.equal(quote.data.items[0].credits, 1)
+assert.equal(quote.data.fingerprint, 'voice-quote')
 assert.equal(quote.data.total_credits, 1)
-assert.equal(quote.data.blocked_count, 0)
+assert.equal(quote.data.items[0].blocked, null)
 desktop.post = async (path, body) => {
   assert.equal(path, '/agent/shots/batch-generate')
   assert.deepEqual(body.shotIds, ['shot'])
   return { results: [{ id: 'shot', status: 'completed' }], total: 1, succeeded: 1, failed: 0 }
 }
-const batch = await generateFromShots.run({ shotIds: ['shot'], confirm: true }, ctx)
+const batch = await generateFromShots.run({ shotIds: ['shot'], confirm: true, fingerprint: 'voice-quote' }, ctx)
 assert.equal(batch.data.succeeded, 1, 'a priced TTS batch reaches the shared generation route')
+const stale = await generateFromShots.run({ shotIds: ['shot'], confirm: true, fingerprint: 'stale' }, ctx)
+assert.equal(stale.data.requires_confirm, true, 'changed quote never reaches generation')
 console.log('TTS Shot quotes: get and batch use the text bucket without requiring duration.')
