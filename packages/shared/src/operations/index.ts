@@ -522,6 +522,127 @@ export const getSelection: Operation<Record<string, never>> = {
   },
 }
 
+/** The shape both view ops speak. Mirrors `ViewReport` in the desktop's
+ *  `@shared/types/view`; the desktop is the only writer, and it answers every
+ *  call with what its own stores settled on. */
+interface ViewShape {
+  projectId: string | null
+  lens: 'board' | 'media' | 'script'
+  cut: { open: boolean; full: boolean; side: 'bottom' | 'left' | 'right'; height: number; width: number }
+  leftDock: { open: boolean; width: number }
+  studioAgent: { enabled: boolean; open: boolean; width: number }
+  /** When the desktop last reported it. */
+  updatedAt: string
+}
+
+const describeView = (v: ViewShape): string => {
+  const where = v.cut.full
+    ? 'filling the workspace'
+    : v.cut.open
+      ? v.cut.side === 'bottom'
+        ? `a ${v.cut.height}px band under the ${v.lens} lens`
+        : `a ${v.cut.width}px column on the ${v.cut.side} of the ${v.lens} lens`
+      : 'closed, resting as one line at the bottom'
+  const agent = v.studioAgent.enabled
+    ? v.studioAgent.open
+      ? `the Studio Agent panel is open (${v.studioAgent.width}px)`
+      : 'the Studio Agent panel is closed'
+    : 'the Studio Agent is switched off in Settings'
+  return (
+    `The ${v.lens} lens is showing. The Cut (the timeline) is ${where}. ` +
+    `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.`
+  )
+}
+
+/**
+ * How the Slates window is ARRANGED right now — which lens is showing, where
+ * the timeline sits, which side panels are open. Read it before rearranging
+ * anything, so you change one thing and leave the rest as the user had it.
+ */
+export const getView: Operation<Record<string, never>> = {
+  id: 'slates_get_view',
+  description:
+    "How the Slates window is arranged: the lens showing, where the Cut (timeline) sits, and which side panels are open.",
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    const r = await ctx.desktop().get<{ view: ViewShape | null; reason?: string }>('/agent/view')
+    if (!r.view) {
+      return {
+        text: r.reason
+          ? `Slates has not reported a window layout yet (${r.reason}).`
+          : 'Slates has not reported a window layout yet.',
+        data: { view: null },
+      }
+    }
+    return { text: describeView(r.view), data: { view: r.view } }
+  },
+}
+
+/**
+ * Rearrange the window. Every field is optional and only what you name moves,
+ * so parking the timeline does not also change the lens.
+ *
+ * 🚨 THE APP ANSWERS, NOT THE REQUEST. Sizes are clamped by the app's own
+ * rules and the reply reports what it settled on — ask for a 10px timeline and
+ * you are told 420, because that is what is on the user's screen. A window too
+ * small to show the timeline beside the board will not split at all; it shows
+ * the timeline full-screen instead, and says so.
+ */
+export const setView: Operation<{
+  lens?: 'board' | 'media' | 'script'
+  cut?: { open?: boolean; full?: boolean; side?: 'bottom' | 'left' | 'right'; height?: number; width?: number }
+  leftDock?: { open?: boolean; width?: number }
+  studioAgent?: { open?: boolean; width?: number }
+}> = {
+  id: 'slates_set_view',
+  description:
+    "Rearrange the Slates window: switch lens, open/close the Cut (timeline) or park it along the bottom or as a left/right column, and open/close or resize the side panels. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
+  input: z
+    .object({
+      lens: z.enum(['board', 'media', 'script']).optional().describe('Which lens the centre shows.'),
+      cut: z
+        .object({
+          open: z.boolean().optional().describe('Show or hide the timeline.'),
+          full: z.boolean().optional().describe('Give the timeline the whole workspace.'),
+          side: z
+            .enum(['bottom', 'left', 'right'])
+            .optional()
+            .describe('Where the timeline is parked. A column suits a wide monitor; picking a side opens the Cut.'),
+          height: z.number().optional().describe('The bottom band\'s height in px.'),
+          width: z.number().optional().describe('The side column\'s width in px.'),
+        })
+        .strict()
+        .optional(),
+      leftDock: z
+        .object({
+          open: z.boolean().optional(),
+          width: z.number().optional().describe('Width in px.'),
+        })
+        .strict()
+        .optional()
+        .describe('The project navigator on the left.'),
+      studioAgent: z
+        .object({
+          open: z.boolean().optional(),
+          width: z.number().optional().describe('Width in px.'),
+        })
+        .strict()
+        .optional()
+        .describe('The Studio Agent panel on the right. It cannot be opened while the agent is off in Settings.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    if (Object.keys(input).length === 0) {
+      throw new Error('Name at least one of lens, cut, leftDock or studioAgent — there is nothing to change otherwise.')
+    }
+    const r = await ctx.desktop().post<{ view: ViewShape | null; reason?: string }>('/agent/view', input)
+    if (!r.view) {
+      return { text: r.reason ? `Nothing was rearranged (${r.reason}).` : 'Nothing was rearranged.', data: { view: null } }
+    }
+    return { text: describeView(r.view), data: { view: r.view } }
+  },
+}
+
 export const getMe: Operation<Record<string, never>> = {
   id: 'slates_get_me',
   description: 'Identity, license tier, and credit balance for the connected Slates account.',
@@ -1482,6 +1603,40 @@ export const exportAssets: Operation<{ assetIds: string[]; directory: string }> 
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/assets/export', input))
+  },
+}
+
+export const listPins: Operation<{ projectId: string }> = {
+  id: 'slates_list_pins',
+  description:
+    "List a project's pinned references: the images kept in the dock's Pinned section, one click from the prompt. A pin attaches nothing to a generation by itself.",
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/pins', { projectId: input.projectId }))
+  },
+}
+
+export const pinReferences: Operation<{ projectId: string; assetIds: string[] }> = {
+  id: 'slates_pin_references',
+  description:
+    'Pin one or more images to the dock\'s Pinned section (UUIDs or badge codes like IMG-A8). Already-pinned ones are reported, not doubled. Pinning keeps a picture at hand; pass it as a reference to a generation to actually use it.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    assetIds: z.array(z.string().min(1)).min(1).describe('Image assets, UUIDs or badge codes.'),
+  }),
+  async run(input, ctx) {
+    const resolved = await resolveAssetRefs(ctx, input.projectId, input.assetIds)
+    return ok(await ctx.desktop().post('/agent/pins', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.get(r)!.id) }))
+  },
+}
+
+export const unpinReference: Operation<{ projectId: string; assetId: string }> = {
+  id: 'slates_unpin_reference',
+  description: 'Take one image off the dock\'s Pinned section. The image stays in the project.',
+  input: z.object({ projectId: z.string().uuid(), assetId: z.string().min(1).describe('UUID or badge code.') }),
+  async run(input, ctx) {
+    const resolved = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    return ok(await ctx.desktop().post('/agent/pins/remove', { projectId: input.projectId, assetId: resolved.get(input.assetId)!.id }))
   },
 }
 
@@ -5465,30 +5620,35 @@ export const deleteLibraryItem: Operation<{ itemId: string }> = {
 }
 
 export const manageLibraryCategory: Operation<{
-  action: 'create' | 'rename' | 'reorder' | 'delete'
+  action: 'create' | 'rename' | 'set-behaviour' | 'reorder' | 'delete'
   projectId?: string
   categoryId?: string
   name?: string
   kind?: 'thing' | 'look'
   template?: 'person' | 'location' | null
+  retagShots?: boolean
   orderedIds?: string[]
 }> = {
   id: 'slates_manage_library_category',
   description:
-    "Create, rename, reorder or delete a Library category. Categories are the USER's labels (\"Products\", \"Mascots\"); never invent ones they did not ask for. create: projectId + name + kind ('thing' = @, 'look' = #), optional template ('person' | 'location' — a 'location' category's things compose as environments and carry no voice; every other thing composes as a character). Kind and template are fixed once made. rename: categoryId + name. reorder: projectId + orderedIds (every category id, in the new order). delete: categoryId — refused while the category holds items.",
+    "Create, rename, set behaviour, reorder or delete a Library category. Categories are the USER's labels (\"Products\", \"Mascots\"); never invent ones they did not ask for. create: projectId + name + kind ('thing' = @, 'look' = #), optional template ('person' | 'location' — a 'location' category's things compose as environments and carry no voice; every other thing composes as a character). set-behaviour: categoryId + kind + template (null for no template); retagShots defaults to true and rewrites affected shot mentions to match. The result reports affected items and rewritten shots. rename: categoryId + name. reorder: projectId + orderedIds (every category id, in the new order). delete: categoryId — refused while the category holds items.",
   input: z.object({
-    action: z.enum(['create', 'rename', 'reorder', 'delete']),
+    action: z.enum(['create', 'rename', 'set-behaviour', 'reorder', 'delete']),
     projectId: z.string().uuid().optional(),
     categoryId: z.string().uuid().optional(),
     name: z.string().min(1).max(80).optional(),
     kind: z.enum(['thing', 'look']).optional(),
     template: z.enum(['person', 'location']).nullable().optional(),
+    retagShots: z.boolean().optional(),
     orderedIds: z.array(z.string().uuid()).optional(),
   }),
   async run(input, ctx) {
     switch (input.action) {
       case 'create':
         return ok(await ctx.desktop().post('/agent/library/categories', { projectId: input.projectId, name: input.name, kind: input.kind, template: input.template }))
+      case 'set-behaviour':
+        if (!input.categoryId || !input.kind || input.template === undefined) throw new Error('set-behaviour requires categoryId, kind and template (null for none)')
+        return ok(await ctx.desktop().post('/agent/library/categories/update', { id: input.categoryId, kind: input.kind, template: input.template, retagShots: input.retagShots }))
       case 'reorder':
         return ok(await ctx.desktop().post('/agent/library/categories/update', { projectId: input.projectId, orderedIds: input.orderedIds }))
       case 'delete':
@@ -6204,6 +6364,8 @@ export const createShot: Operation<
       params?: ShotOpParams
       frameId?: string
       sceneId?: string
+      storyboardId?: string
+      position?: number
     }
 > = {
   id: 'slates_create_shot',
@@ -6225,6 +6387,8 @@ export const createShot: Operation<
     styleIds: z.array(z.string().uuid()).optional(),
     frameId: z.string().uuid().optional().describe('Put it in this exact frame. Optional — omit it and the Shot files itself into a scene, creating a storyboard named after the project if there is none.'),
     sceneId: z.string().uuid().optional().describe('File it into this scene. Optional; ignored when frameId is given.'),
+    storyboardId: z.string().uuid().optional().describe('File it into this storyboard (its first scene, or a new one). Optional; ignored when frameId or sceneId is given.'),
+    position: z.number().int().min(0).optional().describe('Slot in the scene it files into, 0 = first. Omit to file it last.'),
     ...shotScriptSchema,
   }),
   async run(input, ctx) {
@@ -6241,6 +6405,8 @@ export const createShot: Operation<
       spec: { ...spec, ...shotScriptPatch(input) },
       frameId: input.frameId ?? null,
       sceneId: input.sceneId ?? null,
+      storyboardId: input.storyboardId ?? null,
+      position: input.position,
     })
     // The CODE is the address the user sees on the row — say it back so the
     // next call, and the next sentence to the user, can point at it.
@@ -6798,39 +6964,137 @@ export const pasteScript: Operation<{ storyboardId?: string; sceneId?: string | 
   },
 }
 
-export const generateFromShots: Operation<{ shotIds: string[]; confirm?: boolean; fingerprint?: string; draft?: { model?: ImageModelId } }> = {
-  id: 'slates_generate_from_shots', billable: true,
-  description: 'Preview the itemized desktop quote for saved Shots. After explicit approval, pass confirm and the returned fingerprint. Changed recipes require a fresh quote. Runs sequentially; after a timeout inspect generations instead of re-firing. Pass draft to draft the film instead: one picture for each Shot that has none, never saved to the Shot.',
-  input: z.object({ shotIds: z.array(z.string()).min(1).max(20), confirm: z.boolean().optional(), fingerprint: z.string().optional(), draft: z.object({ model: z.enum(IMAGE_MODELS).optional().describe('The image model to draft on. Omit it for the default image model.') }).optional().describe('Draft the film: pass {} to quote ONE picture for each Shot in scope that has no picture, instead of each Shot recipe, at the chosen image model\u2019s default settings. Works on a Shot with no model. No Shot row changes; the picture becomes a take of that Shot. Pass the same value when confirming.') }),
+/** The draft mode both quote ops accept: one picture per Shot in scope that has none. */
+const DRAFT_INPUT = z
+  .object({ model: z.enum(IMAGE_MODELS).optional().describe('The image model to draft on. Omit it for the default image model.') })
+  .optional()
+
+export const generateFromShots: Operation<{
+  shotIds: string[]
+  confirm?: boolean
+  fingerprint?: string
+  draft?: { model?: ImageModelId }
+}> = {
+  id: 'slates_generate_from_shots',
+  billable: true,
+  description:
+    'Preview the itemized desktop quote for saved Shots. After explicit approval, pass confirm and the returned fingerprint. Changed recipes require a fresh quote. Runs sequentially; after a timeout inspect generations instead of re-firing. Pass draft to draft the film instead: one picture for each Shot that has none, never saved to the Shot.',
+  input: z.object({
+    shotIds: z.array(z.string()).min(1).max(20),
+    confirm: z.boolean().optional(),
+    fingerprint: z.string().optional(),
+    draft: DRAFT_INPUT.describe(
+      'Draft the film: pass {} to quote ONE picture for each Shot in scope that has no picture, instead of each Shot recipe, at the chosen image model’s default settings. Works on a Shot with no model. No Shot row changes; the picture becomes a take of that Shot. Pass the same value when confirming.'
+    ),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    const details = await Promise.all(input.shotIds.map(id => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
-    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map(d => d.shot.id), draft: input.draft }) })
+    // Resolved first so a SHOT-A code fails here, not halfway through a billed run.
+    const details = await Promise.all(input.shotIds.map((id) => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
+    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
+      input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft: input.draft }),
+    })
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
-    const largest = Math.max(0, ...quote.items.map(i => i.credits ?? 0))
-    if (!input.confirm || input.fingerprint !== quote.fingerprint) return ok({ ...quote, requires_confirm: true, total_credits: total, largest_single_credits: largest },
-      `TOTAL ${fmtCredits(total)} · largest ${fmtCredits(largest)}.\n` + quote.items.map(i => `${i.code ?? i.name}: ${i.credits == null ? 'unpriced' : fmtCredits(i.credits)}${i.blocked ? ` — ${i.blocked}` : ''}`).join('\n') + '\nGet approval for this quote, then pass its fingerprint with confirm: true.')
-    return ok(await desktop.post('/agent/shots/batch-generate', { shotIds: quote.items.map(i => i.shotId), fingerprint: quote.fingerprint, draft: input.draft }))
+    const largest = Math.max(0, ...quote.items.map((i) => i.credits ?? 0))
+    // ONE approval for the set, on the STATED total; a stale fingerprint is a
+    // changed recipe and never reaches generation.
+    if (!input.confirm || input.fingerprint !== quote.fingerprint) {
+      return ok(
+        { ...quote, requires_confirm: true, total_credits: total, largest_single_credits: largest },
+        `TOTAL ${fmtCredits(total)} · largest ${fmtCredits(largest)}.\n` +
+          quote.items
+            .map((i) => `${i.code ?? i.name}: ${i.credits == null ? 'unpriced' : fmtCredits(i.credits)}${i.blocked ? ` — ${i.blocked}` : ''}`)
+            .join('\n') +
+          '\nGet approval for this quote, then pass its fingerprint with confirm: true.'
+      )
+    }
+    return ok(
+      await desktop.post('/agent/shots/batch-generate', {
+        shotIds: quote.items.map((i) => i.shotId),
+        fingerprint: quote.fingerprint,
+        draft: input.draft,
+      })
+    )
   },
 }
 
-export const quoteBoard: Operation<{ projectId: string; storyboardId?: string; sceneId?: string; shotIds?: string[]; missingOnly?: boolean; draft?: { model?: ImageModelId } }> = {
+export const quoteBoard: Operation<{
+  projectId: string
+  storyboardId?: string
+  sceneId?: string
+  shotIds?: string[]
+  missingOnly?: boolean
+  draft?: { model?: ImageModelId }
+}> = {
   id: 'slates_get_board_quote',
-  description: 'Read an itemized generation quote for a board, scene or shot selection, optionally only missing results. No generation. Uses the desktop composer pricing source and returns a fingerprint for slates_generate_from_shots. Pass draft to quote a film draft (one picture per Shot that has none).',
-  input: z.object({ projectId: z.string().uuid(), storyboardId: z.string().uuid().optional(), sceneId: z.string().uuid().optional(), shotIds: z.array(z.string()).optional(), missingOnly: z.boolean().optional(), draft: z.object({ model: z.enum(IMAGE_MODELS).optional().describe('The image model to draft on. Omit it for the default image model.') }).optional().describe('Draft the film: pass {} to quote one picture for each Shot in scope with no picture, instead of each Shot recipe.') }),
-  async run(input, ctx) { return ok(await ctx.desktop().get('/agent/shots/quote', { input: JSON.stringify(input) })) },
+  description:
+    'Read an itemized generation quote for a board, scene or shot selection, optionally only missing results. No generation. Uses the desktop composer pricing source and returns a fingerprint for slates_generate_from_shots. Pass draft to quote a film draft (one picture per Shot that has none).',
+  input: z.object({
+    projectId: z.string().uuid(),
+    storyboardId: z.string().uuid().optional(),
+    sceneId: z.string().uuid().optional(),
+    shotIds: z.array(z.string()).optional(),
+    missingOnly: z.boolean().optional(),
+    draft: DRAFT_INPUT.describe('Draft the film: pass {} to quote one picture for each Shot in scope with no picture, instead of each Shot recipe.'),
+  }),
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/shots/quote', { input: JSON.stringify(input) }))
+  },
 }
 
 export const getBoardProgress: Operation<{ projectId: string }> = {
-  id: 'slates_get_board_progress', description: 'Read per-shot spend from generation history, surviving take counts, running/failed counts and recorded-round progress. Deleted takes do not reduce spend.',
+  id: 'slates_get_board_progress',
+  description:
+    'Read per-shot spend from generation history, surviving take counts, running/failed counts and recorded-round progress. Deleted takes do not reduce spend.',
   input: z.object({ projectId: z.string().uuid() }),
-  async run(input, ctx) { return ok(await ctx.desktop().get('/agent/shots/progress', input)) },
+  async run(input, ctx) {
+    return ok(await ctx.desktop().get('/agent/shots/progress', input))
+  },
 }
 
-export const editCut: Operation<{ projectId: string; action: 'changes' | 'replace' | 'sync' | 'build' | 'restore' | 'undo-build'; storyboardId?: string; clipId?: string; assetId?: string; before?: Record<string, unknown>[]; clipIds?: string[]; markerIds?: string[] }> = {
-  id: 'slates_edit_cut', description: 'Read pending preferred-take changes, explicitly replace one clip, sync a storyboard’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
-  input: z.object({ projectId: z.string().uuid(), action: z.enum(['changes','replace','sync','build','restore','undo-build']), storyboardId: z.string().uuid().optional(), clipId: z.string().uuid().optional(), assetId: z.string().optional(), before: z.array(z.object({ id: z.string().uuid(), assetPath: z.string(), assetId: z.string().nullable().optional(), shotId: z.string().nullable().optional(), thumbnailPath: z.string().optional(), sourceDuration: z.number().positive(), sourceFps: z.number().positive(), sourceInFrame: z.number().int().min(0), sourceOutFrame: z.number().int().positive(), endFrame: z.number().int().positive(), shortened: z.boolean().optional() }).passthrough()).optional().describe('Exact before snapshots returned by replace/sync, for restore.'), clipIds: z.array(z.string().uuid()).optional(), markerIds: z.array(z.string().uuid()).optional() }),
+export const editCut: Operation<{
+  projectId: string
+  action: 'changes' | 'replace' | 'sync' | 'build' | 'restore' | 'undo-build'
+  storyboardId?: string
+  clipId?: string
+  assetId?: string
+  before?: Record<string, unknown>[]
+  clipIds?: string[]
+  markerIds?: string[]
+}> = {
+  id: 'slates_edit_cut',
+  description:
+    'Read pending preferred-take changes, explicitly replace one clip, sync a storyboard’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    action: z.enum(['changes', 'replace', 'sync', 'build', 'restore', 'undo-build']),
+    storyboardId: z.string().uuid().optional(),
+    clipId: z.string().uuid().optional(),
+    assetId: z.string().optional(),
+    before: z
+      .array(
+        z
+          .object({
+            id: z.string().uuid(),
+            assetPath: z.string(),
+            assetId: z.string().nullable().optional(),
+            shotId: z.string().nullable().optional(),
+            thumbnailPath: z.string().optional(),
+            sourceDuration: z.number().positive(),
+            sourceFps: z.number().positive(),
+            sourceInFrame: z.number().int().min(0),
+            sourceOutFrame: z.number().int().positive(),
+            endFrame: z.number().int().positive(),
+            shortened: z.boolean().optional(),
+          })
+          .passthrough()
+      )
+      .optional()
+      .describe('Exact before snapshots returned by replace/sync, for restore.'),
+    clipIds: z.array(z.string().uuid()).optional(),
+    markerIds: z.array(z.string().uuid()).optional(),
+  }),
   async run(input, ctx) {
     const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new Map<string, ResolvedAssetRef>()
     return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.get(input.assetId)?.id : undefined }))
@@ -7283,6 +7547,8 @@ export const blenderRenderBlocking: Operation<{
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getWorkspaceState as unknown as Operation<unknown>,
   getSelection as unknown as Operation<unknown>,
+  getView as unknown as Operation<unknown>,
+  setView as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
   listAvailableModels as unknown as Operation<unknown>,
@@ -7304,6 +7570,9 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   moveAssetsToFolder as unknown as Operation<unknown>,
   setAssetFavorite as unknown as Operation<unknown>,
   exportAssets as unknown as Operation<unknown>,
+  listPins as unknown as Operation<unknown>,
+  pinReferences as unknown as Operation<unknown>,
+  unpinReference as unknown as Operation<unknown>,
   moveAssetsToProject as unknown as Operation<unknown>,
   copyAssetsToProject as unknown as Operation<unknown>,
   moveEntityToProject as unknown as Operation<unknown>,
