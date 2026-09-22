@@ -152,6 +152,9 @@ export interface ShotSpec {
    *  only thing that may number anything, and a stored "image 3" would be a
    *  lie the moment a reference is added, removed or reordered. */
   prompt: string
+  /** Custom bytes remain recoverable when script mode is selected. */
+  recipeMode?: 'script' | 'custom'
+  promptScriptLine?: string | null
   model: string | null
   /**
    * The model the PROMPT WAS AUTHORED FOR. Never auto-rewritten.
@@ -350,7 +353,7 @@ export function scriptPromptBody(spec: Pick<ShotSpec, ScriptTextField>): string 
  * while the row plainly has a script in it.
  */
 export function effectivePrompt(spec: ShotSpec): string {
-  const authored = spec.prompt.trim()
+  const authored = spec.recipeMode === 'script' ? '' : spec.prompt.trim()
   return authored || scriptPromptBody(spec)
 }
 
@@ -481,6 +484,8 @@ export function normalizeShotSpec(raw: unknown): ShotSpec {
   }
   const out: ShotSpec = {
     prompt: typeof v.prompt === 'string' ? v.prompt : '',
+    ...(v.recipeMode === 'script' || v.recipeMode === 'custom' ? { recipeMode: v.recipeMode } : {}),
+    ...(typeof v.promptScriptLine === 'string' || v.promptScriptLine === null ? { promptScriptLine: v.promptScriptLine } : {}),
     model: str(v.model),
     authoredFor: str(v.authoredFor),
     params: readParams(v.params),

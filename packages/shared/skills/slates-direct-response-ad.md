@@ -1,68 +1,28 @@
 ---
 name: slates-direct-response-ad
-description: Build a 30-second hyper-motion direct-response ad in Slates from a product image and brief. Composes upload → storyboard → frame gen → motion gen → timeline → export. Use when the user drops a product image and asks for "an ad", "a promo video", "a TikTok ad", "an Instagram ad", a launch video, or any short-form direct-response video built around a product.
+description: Develop a product-led direct-response ad whose demonstration, argument and next action serve a supplied offer. Use for product-led creative direction; presenter performance belongs in slates-ugc-influencer-ad and general writing in slates-script-craft.
 ---
 
-# Direct-response ad — Slates workflow
+# Product-led direct response
 
-🚨 **Wrong skill if a PERSON talks to camera.** This file builds a product-led hyper-motion spot — product hero frames, punchy cuts, no presenter. **A creator-style ad where a synthetic person speaks to the lens is a different discipline with an inverted rulebook (ugly on purpose, one shot per generation, plate-before-video): read `slates-ugc-influencer-ad`.** Route on the presence of a talking person, not on the platform.
+Use `slates-script-craft` for the words, evidence and hook/bridge variations. This guide supplies an optional product-led approach. A person can appear; a presenter, fixed duration, fixed frame count or hyper-motion treatment is not required.
 
-You are building a 30-second hyper-motion direct-response ad. The user has handed you a product image (or product URL) and a short brief. Slates desktop is open on the second monitor; the user watches it populate as you work.
+## Choose the product's job in the picture
 
-**Hard rules**
+Read the brief and references. Identify the intended audience situation, the supplied claim, what can demonstrate it, and the actual next action. A close product detail, use in context, a visible problem/solution and a final product view are possible ingredients. Omit or reorder any that do not serve the piece.
 
-- Always estimate cost before generating. Use `slates_estimate_generation_cost` and surface the total.
-- All Slates generation routes through Slates Credits, period (BYOK is retired) — don't suggest "use your own keys" workarounds.
-- Use the current image defaults in `slates-model-selection`; preserve the user's explicit model and quality choices.
-- Hyper-motion = punchy cuts, 4 frames in 30 seconds, ~7s each. Don't over-storyboard.
+For example, a keys tray can interrupt a sliding key, show where it lands, then hold on the result. A quiet demonstration may work without narration. A technical product may need an explanatory exchange. Do not invent product finishes, guarantees or quantified benefits from a reference picture.
 
-## Workflow
+## Keep the work editable
 
-### 1. Set up the project
-- Use the current project. Create one with `slates_create_project` only if the user asks.
-- If the user gave a product image as a file path, upload it (`slates_upload_reference_image`).
-- If they pasted base64 / a data URL, use the same op with `dataUrl`.
+Use the current project unless another destination is requested. Save the script as document text, with non-spoken direction separate. Create shots only for the requested production units and file them into explicit scenes. Alternative openings live beside the shared body as section alternatives. Preserve manual edits and reference identity.
 
-### 2. Generate the storyboard frames
-Build exactly 4 frames in this order:
+Read the composed requests before any media call. Model selection, reference slots, durations and resolution come from current capabilities and `slates-model-selection`, never a copied ad recipe. Every prompt stays visible on its shot. A preset imports ordinary editable content and does not authorize generation.
 
-| # | Beat | Visual goal |
-|---|------|-------------|
-| 1 | Hook | Hyper-close-up of the product, dramatic light, motion blur edge |
-| 2 | Lifestyle | Real person using/wearing/holding the product, eye contact |
-| 3 | Problem→solution | The before/after moment that justifies the buy |
-| 4 | CTA | Clean product hero with mental room for an overlaid CTA in editing |
+## Production when requested
 
-For each frame:
-1. Draft a tight 1-2 sentence prompt (visual only — no copy text in the image).
-2. Reference the product upload's URL or asset ID for visual fidelity.
-3. Call `slates_generate_image` with that prompt + reference. **You see the result inline — evaluate it.**
-4. If it's wrong: refine prompt, regenerate. If it's right: bind it as a frame in the storyboard (`slates_add_frame`).
+Follow `slates-cost-discipline` and the user's authorization for the exact selected requests. Estimate the set through the existing quote operation. An extra stochastic take remains an extra requested take; compatible existing media can be deliberately reused.
 
-### 3. Build the storyboard
-- `slates_create_storyboard` named "30s ad — v1".
-- Default scene already exists. Add 3 more scenes ("Hook", "Lifestyle", "Problem-Solution", "CTA") via `slates_add_scene`, or just add all 4 frames to the default scene.
-- For each generated image, add a frame referencing the asset id (`slates_add_frame`).
+Inspect results against the demonstration and supplied references. A failed job is not authorization for an unchanged reroll. Keep earlier takes accessible. Assemble into an explicitly named Cut when comparing variations, inspect playback, and export the selected Cuts with their results. `slates-one-prompt-film` covers this delivery task when a finished video is requested.
 
-### 4. Hand back to the user
-- Surface estimated total credits spent.
-- Tell the user the storyboard is ready and they can either:
-  - **In Slates desktop:** click each frame to generate motion (the existing UI handles motion generation).
-  - **Continue here:** ask you to keep going.
-
-### 5. If they say keep going — motion, assembly, export
-- Generate motion per frame with `slates_generate_video` (`firstFrameAssetId` = the frame's asset, `background: true`), routed per `slates-model-selection` (choose a model suited to the action and a duration that fits the beat). Submit all four, then poll `slates_get_generation_status` until each completes.
-- Assemble: `slates_add_clip_to_timeline` for each completed clip in beat order (Hook → Lifestyle → Problem-Solution → CTA). Verify with `slates_get_timeline`; fix order with `slates_reorder_clips`.
-- Export: `slates_export_video` to an absolute `.mp4` path (default `<slates_get_project_directory>/exports/<product>-ad.mp4`), then `slates_reveal_file` so the user sees the file.
-- Full pipeline doctrine (batch cost authorization, model mixing, multi-take selection): `slates-one-prompt-film`.
-
-## Anti-patterns
-
-- **Don't** generate text overlays in the image. Slates renders captions/CTAs at the editor stage.
-- **Don't** burn credits on slot-machine prompting. If the first generation is off, refine the prompt; don't just regenerate.
-- **Don't** skip the cost estimate. Confirm with the user above ~17 credits.
-- **Don't** invent visual specifics about the product (colors, textures, angles) that aren't in the reference image. Reference-anchored prompts only.
-
-## Voice
-
-The ad lives or dies on the hook frame. Tight, sensory, no fluff. Match the user's brand. Default tone is "scroll-stopping" not "informative."
+No conversion outcome is promised by this format. Creative clarity, observed distribution and measured purchases are different evidence.

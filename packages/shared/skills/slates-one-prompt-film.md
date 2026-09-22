@@ -1,96 +1,38 @@
 ---
 name: slates-one-prompt-film
-description: Use when the user gives ONE idea and wants a finished video out the other end — "make me a video about X", "turn this idea into an ad", "make a short film from this". The full pipeline: script, project, characters, storyboard, frame images, video generation, timeline assembly, MP4 export. This is the master recipe; the other Slates skills are its sub-steps.
+description: Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named Cut and a verified export. Preserve existing work and follow generation authorization.
 ---
 
-# One prompt → finished film — Slates master pipeline
+# Idea to finished video
 
-The user gives an idea. You hand back an MP4 on disk. Everything in between is yours, with exactly TWO mandatory user checkpoints: the creative plan, and ONE aggregated cost approval.
+Carry the requested piece through to an exported file. Use existing work whenever it serves the brief. The creator can enter at any point: writing, importing footage, comparing takes or changing an edit. No mandatory stage sequence, shot count or number of approval checkpoints follows from this guide.
 
-## The pipeline
+## Make the intended piece visible
 
-### 1. Script the beats
-Turn the idea into a beat-level script: 4-10 shots, each with subject, action, setting, camera, and duration (4-8s per shot). Surface it as a tight table. Get the user's nod on the plan, format (aspect ratio — 16:9 vs 9:16 decides everything downstream), and rough budget appetite before touching any op.
+Use the current project and document unless another destination is requested. Save words through the revision-checked document tools; `slates-script-craft` covers writing and alternatives. Add production bindings only where needed. A shot needs no image, and a Cut can use imported footage with no script.
 
-🚨 **Before you fire the set, read its variety counts.** `slates_list_shots` returns the distribution with every listing — shot sizes, camera moves, durations, and any bucket repeating three or more times in a row. Read the table as a COLUMN, not as rows: if push-in is the plurality or every row says wide, the batch is wrong before a credit is spent. The craft is `slates-shot-variety`.
+Preserve fixed passages, explicit creative choices and custom prompt bytes. Record production choices in editable shots. Explain only consequential judgments not already visible there. Recurring cast, repeated framing, silence and dependent scenes are valid when they serve the piece.
 
-**Surface a decision log with the plan.**
+## Inspect the actual requests and estimate
+
+Use `slates_get_shot` to inspect the composed prompt, settings and references. Model choices and supported settings come from `slates-model-selection`, the current capability surface and the selected model's guide. Do not carry limits or prices from an old example.
+
+Follow `slates-cost-discipline` and the user's generation policy. Quote the exact requested set with `slates_generate_from_shots` before confirming it. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing, choosing alternatives, importing and building a Cut do not spend generation credits.
+
+Keep reusable historical media separate from new requests. Matching words alone do not prove matching voice, references or settings. An explicitly requested extra take is never deduplicated away.
+
+## Generate only the authorized material
+
+Submit the chosen requests and inspect each returned state. On an uncertain timeout, read the shot's generation IDs and job status before any retry. Diagnose a failure and follow the existing consent policy for added requests. Never discard other takes merely because a new one was selected.
+
+Inspect image composition and reference fidelity. Inspect video performance, motion and sound across playback; frame samples alone cannot establish speech or motion quality. If an edit can resolve dead air or order, use the existing take rather than assuming another generation is needed.
+
+## Arrange and deliver
+
+Read the available timelines. Name the destination Cut explicitly for a variation; independent comparisons use independent Cuts. Add selected media in the intended order, preserve trim/level/transform choices and inspect the actual timeline.
+
+Use supported video/XML exports and their stated fidelity limits. For selected named Cuts, `slates_export_cuts` records distinct outputs and a manifest; retry unfinished outputs with the same manifest identity. Verify the returned files and playback before reporting success. Describe the completed piece, actual spend where available and output paths. Do not label a render complete merely because its submission succeeded.
 
 <!-- @inject:decision-log -->
-When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify **and that no row already records**:
-
-```
-source phrase or declared default → what you wrote → what it resolves
-"in a diner"        → warm, and the light is the reason           → why the anchor was chosen, not what it is
-(no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
-```
-
-🚨 **Keep it to what is NOT already data — and almost everything now IS.** A Shot holds the references and their roles, the model, every param, the shot size, the camera, the prop, the action and the spoken line, and `slates_list_shots` reads the whole board back in order with its variety counts. Narrating any of those is retelling a row the user can open. **Write the Shot, and let the log carry only the judgement no field holds** — why this world, why this light, why this register.
-
-**Hard rule: never silently add weather, props, style, or camera movement.** Four of those are now FIELDS: put the value on the Shot (`prop`, `camera`, `shotSize`, `action`) so the user can read and change it, and put the *reason* in the log only when you invented it rather than being told it. The rule has not softened — it moved from narration into data, which is stronger, because a field can be corrected and a sentence in chat cannot.
-
-> ❌ **Do NOT turn this into a question gate.** Clarifying questions before optimizing directly fight the locked fast-path rule: *if intent is clear, generate immediately with sane defaults, don't ask questions; only ask for production intent, and batch every question into one message.* Log the decisions, then go. The log is an **output**, not an interrogation — surfaced alongside the plan, never as a separate ceremony, and never as a reason to wait.
+Record production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.
 <!-- @end:decision-log -->
-
-A 4-10 shot script is where you invent the most on the user's behalf — time of day, wardrobe, weather, lens feel, camera moves the brief never mentioned. The log is what makes those visible while they are still free to change.
-
-### 2. Set up the project
-- `slates_create_project` named for the piece.
-- Recurring character? Build it properly — `slates_create_character` + the `slates-character-identity` recipe — so every frame references the same identity.
-- Recurring location? `slates_create_environment`.
-- One-off shots don't need character/environment records; skip the ceremony.
-
-### 3. Storyboard skeleton and the Shots (no generation yet)
-- `slates_create_storyboard`, `slates_add_scene` per script scene.
-- `slates_create_shot` per beat — the prompt, the model, the params and the references, with the roles they carry. **A Shot needs no image**, so the entire film exists as rows before anything is paid for.
-- `slates_get_shot` reads one back COMPOSED: the prompt the model will actually receive, its numbered references, and its exact quote. Audit your own work there — you cannot approve something the request will not contain.
-- Structure first, spend second — the user catches script problems on the free skeleton, not on burned credits.
-
-### 4. ONE aggregated cost approval — then hands-off
-The Shots ARE the quote. `slates_generate_from_shots` without `confirm` returns one itemised total for the set plus the largest single item — no hand arithmetic, no `slates_estimate_generation_cost` per call:
-
-> Plan: 6 frames at 1k 16:9 + 5 × 8s Kling 3.0 std + 1 × 8s Seedance 2 hero shot ≈ N credits total, largest single N. Proceed with the batch?
-
-Per `slates-cost-discipline` 3b: that single OK authorizes `confirm=true` for **every enumerated call in the batch** — no per-call re-asking. Re-confirm only if a call's price overruns the plan >25% or new calls get added (extra retakes, new shots).
-
-### 5. Generate frame images
-Fire the image Shots with `slates_generate_from_shots` (`confirm: true` — step 4 authorized it). Slates names each reference inline as "image N"; you never hand-write a role label or a number. Evaluate every result inline against the beat. Bind keepers via `slates_add_frame`, then `slates_update_shot` with `attachFrameId` so the recipe travels with the picture.
-
-**Multi-take where it matters:** for the hook shot and any shot the whole film hangs on, generate 2-4 variants (cheap model or 1k), pull them back with `slates_get_assets_batch`, pick the strongest on composition + identity, discard the rest. Don't multi-take filler shots.
-
-### 6. Generate video per Shot
-Fork each bound frame's image Shot with `slates_duplicate_shot` (`model:` the video model — that is the A/B lever the op takes inline), then `slates_update_shot` the copy with `firstFrameAssetId` = the bound frame. Two calls, because `slates_duplicate_shot` forks the prompt, the model and the params; **attachments are changed with `slates_update_shot`.** Then fire the set with `slates_generate_from_shots`.
-
-⚠️ **It runs SEQUENTIALLY and blocks until the last clip lands** — a 6-shot film is one long wait, and it will usually outlast the HTTP timeout while the run keeps going. When that happens, poll `slates_get_shot` for each Shot's `generationIds` and then `slates_get_generation_status`; **never re-fire, that double-spends.** (Concurrent batch firing needs a real queue — concurrency limiting, per-item failure isolation, partial-billing semantics — and is deliberately not built yet.)
-
-**Model mixing — route per `slates-model-selection`** (details in the per-model guides):
-- **Seedance 2.5** (`slates-prompting-seedance-2-5`): the DEFAULT for most shots — physics, effects, scale and the hero shot; 4-30s takes, 30 image references, timestamps; 480p/720p/1080p, no 4K. LENGTH is the price dial.
-- **Seedance 2** (`slates-prompting-seedance`): the 4K seat, cheaper than 2.5 at every shared resolution; audio included, first+last frame guidance, native 4K (4K video is Pro-only).
-- **Kling V3** (`slates-prompting-kling-v3`): the cost-effective seat — 16:9 / 9:16 / 1:1, 3-15s, strong start-frame adherence; std is the workhorse, Omni for multi-character dialogue.
-- **MiniMax H3** (`slates-prompting-minimax-h3`): route here when a shot's SOUND is part of the writing — a line delivered a particular way, scene sound under it, score that must stay outside the characters' world. It authors all three in one pass, which **collapses a shot's audio pass into its video pass** and removes the separate `slates_generate_audio` step for that shot. 5-15s, 480p/768p/2K/4K. Its sibling `minimax-h3-max` is faster, tops out at 768p, takes the same references, and costs MORE at 768p — a deliberate speed pick, never a saving.
-- **Veo 3.1** (`slates-prompting-veo-3`): niche, never the default — only when native synced audio must generate WITH the video in one gen; 16:9 or 9:16, 4/6/8s (8s only at 1080p/4K or with reference images).
-
-Failed gen? The run continues past it and **nothing is retried automatically**. Read the per-Shot error in the result, fix that Shot with `slates_update_shot`, and re-fire only it (a retry beyond the plan = announce the delta cost).
-
-### 7. Assemble the timeline
-- `slates_get_timeline` once to get the lay of the land.
-- `slates_add_clip_to_timeline` for each completed video asset **in story order** — defaults append back-to-back on the first video track, which is exactly an assembly cut.
-- Order wrong? `slates_reorder_clips` with the full clip-id list. Dropped a shot? `slates_remove_clip`, then reorder to close the gap.
-
-### 8. Export + deliver
-- Output path: ask the user, or default to `<slates_get_project_directory>/exports/<name>.mp4`.
-- `slates_export_video` (absolute path, `.mp4`; blocks while ffmpeg renders — minutes for long timelines).
-- `slates_reveal_file` so the file is literally in front of them.
-- Offer the finishing path: `slates_export_timeline_xml` → DaVinci Resolve (File → Import → Timeline) for grading, sound, and titles.
-
-### 9. Report
-Shots delivered, total spent vs. approved plan, the export path, and the single best next lever ("re-take shot 3 with a tighter prompt" / "add a CTA end-card").
-
-## Hard rules
-
-- **Two checkpoints only.** Creative plan (step 1) and total cost (step 4). Everything else runs without asking — that's the product promise.
-- **Skeleton before spend.** Project + storyboard structure are free; generation isn't.
-- **Look at everything.** Every image inline, every video via `slates_get_asset_video_frames` if a clip seems off. Never assemble a timeline from clips you haven't evaluated.
-- **3-strike rule per shot.** Three failed takes on one shot = stop, show the user what you tried, ask.
-- **Consistency comes from references, not luck.** Same identity asset on every character frame; same environment refs across a location's shots.
-- **Plan in Shots, not in chat.** Every decision that ends up in a sentence you have to remember is a decision the user cannot see, price, fork or re-fire. A Shot is a row: it survives the conversation, and the user can open it in the app and fix one reference without you.

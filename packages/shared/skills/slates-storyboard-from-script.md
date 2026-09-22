@@ -1,84 +1,32 @@
 ---
 name: slates-storyboard-from-script
-description: Turn a script or treatment into a Slates storyboard with scenes and frames. Use when the user has a script, treatment, shot list, or scene-by-scene description and wants to materialize it as a Slates storyboard, optionally generating frame images per shot.
+description: Put supplied script or treatment into an editable Slates document and bind requested passages to production shots. Preserve the words and structure; generate media only within the user's requested scope.
 ---
 
-# Storyboard from script — Slates workflow
+# Script into editable production
 
-The user has a script, treatment, or shot list. You're turning it into a Slates storyboard with scene → frame structure, optionally generating images for each frame.
+Read the existing document and its revision before writing. Preserve supplied words, speaker context, headings, non-spoken direction and any explicit shot list. A heading formats a document; creating a production scene is a separate choice. Paragraph count does not determine shot count.
 
-## Workflow
+## Save the words once
 
-### 1. Parse the script
-Read the user's script. Decide:
+Use `slates_get_script_document` and `slates_update_script_document` for ordered, revision-checked text and structure edits. Scene strings own spoken words. Paragraph blocks hold offsets and marks; headings/directions own only their non-spoken text. Do not keep an independently editable master body beside the document.
 
-- **Scene count** — usually 1 scene per location/setting change. Don't fragment into one-frame scenes.
-- **Frames per scene** — match the shot list. Default is 3-6 frames per scene unless the script specifies more.
-- **Shot labels** — pull them from the script (e.g., "Wide", "Close-up", "Over-the-shoulder").
+Create a storyboard or scene only when needed for the requested destination. Use the current project unless the user asks for another. Writing a script needs no image, character record or generation.
 
-If the user hasn't named the storyboard, suggest one based on the project tone.
+## Bind production where wanted
 
-### 2. Materialize the structure first (no generation yet)
-- `slates_create_storyboard` with the chosen name.
-- For each scene: `slates_add_scene` with a descriptive name and order.
-- For each shot: `slates_create_shot` with a *visual-only* prompt, the model, the params, and whatever character / environment / style references the project already holds. **Don't generate yet.**
+Select an intended production passage and use the script-to-shot operation. It can make, attach, extend, split or merge according to the existing bindings. Read back the resulting shots and ranges. A silent shot is equally valid and needs no fabricated dialogue.
 
-🚨 **A Shot needs no image, and that is the point.** `slates_add_frame` requires an `assetId`, so before Shots existed there was nowhere to put a planned shot until it had been paid for — the plan lived in chat and the user had to trust your memory of it. A Shot is a row: named, listed, priced, forkable, and readable back COMPOSED with `slates_get_shot` before a single credit is spent. Write the plan as Shots, not as sentences you will have to re-type later.
+A new document-created recipe is script-driven: its spoken text compiles from the active passage. Keep action, delivery, framing and references in their own controls. Do not write the dialogue a second time in a custom prompt. When the creator explicitly chooses a custom prompt, preserve its bytes and review alignment after script changes.
 
-🚨 **A Shot files itself, so pass `sceneId` (or `frameId`) when you know where it goes.** Omit both and it lands in the scene the user has open, else the most recently updated storyboard's last scene, creating a storyboard named after the project if there is none. Nothing you save is ever unfiled — but naming the scene is how the board comes out in the order you wrote it.
+Shots file through the existing filing service. Pass the scene or frame destination when known and use the returned shot codes. Keep recurring identities in existing Library references; a working speaker name does not require a placeholder character.
 
-🚨 **Shots are addressed by CODE.** Every one comes back as `SHOT-A1`, `SHOT-A2` … per project, monotonic, never reused — the same vocabulary the gallery gives assets. Speak to the user in codes, and pass a code anywhere a `shotId` is taken. It is for pointing at a row THIS session, not for retrieval later: there is no shot search and no shot library, because a Shot is workspace state.
+## Review without imposing a format
 
-### 2a. Write the SCRIPT COLUMNS as well as the prompt
+Read composed requests, actual reference roles and the current quote. Explain only consequential decisions not already visible in the document or shot. Variety counts are suggestions: intentional repeated frames, continuing sentences and recurring cast may be exactly right. `slates-script-craft` covers passages and alternatives; `slates-shot-variety` covers deliberate visual rhythm.
 
-`slates_create_shot` takes the beat itself, not only the prompt: `line` (what is said, verbatim), `speaker` (a character id, a bare name, or `VO`), `delivery` (the parenthetical), `action` (what happens, screenplay-style), `prop`, `shotSize` and `camera`. All are optional, all are free text, and none of them is sent to a model — they are what the user READS and what the variety check COUNTS.
-
-⚠️ **In this version you state dialogue TWICE, and that is deliberate rather than an oversight.** `line` is the readable script and the input to the fit check; the model only receives what is in the Shot's *prompt*, so the spoken words still go inside that prompt verbatim, with their delivery, in the body on the beat. **Write both in the same call** — then they agree at authoring time and can only drift if a human edits one side.
-
-A speaker who matches no saved character is a working state, not an error: it renders as plain text and groups its lines. Do not create a placeholder character to avoid it.
-
-Surface the planned structure back to the user as a tight summary — `slates_list_shots` gives you the count and the total in one call:
-> Storyboard "X" • 4 scenes • 12 shots • 340 credits to fire them all
->   Scene 1: Forest opening (3 shots)
->   Scene 2: Confrontation (4 shots)
->   ...
-
-**Surface a decision log alongside that summary.**
+If generation is requested, follow `slates-cost-discipline` for the exact set. On an uncertain timeout inspect existing generation IDs before retrying. Preserve takes and inspect the landed results. Named Cuts keep independent edits separate; writing alone does not require a Cut, export or paid call.
 
 <!-- @inject:decision-log -->
-When you surface the plan, include a short **decision log** — one line per decision *you* made that the user did not specify **and that no row already records**:
-
-```
-source phrase or declared default → what you wrote → what it resolves
-"in a diner"        → warm, and the light is the reason           → why the anchor was chosen, not what it is
-(no time of day)    → late afternoon, low warm key                 → default; say the word and it changes
-```
-
-🚨 **Keep it to what is NOT already data — and almost everything now IS.** A Shot holds the references and their roles, the model, every param, the shot size, the camera, the prop, the action and the spoken line, and `slates_list_shots` reads the whole board back in order with its variety counts. Narrating any of those is retelling a row the user can open. **Write the Shot, and let the log carry only the judgement no field holds** — why this world, why this light, why this register.
-
-**Hard rule: never silently add weather, props, style, or camera movement.** Four of those are now FIELDS: put the value on the Shot (`prop`, `camera`, `shotSize`, `action`) so the user can read and change it, and put the *reason* in the log only when you invented it rather than being told it. The rule has not softened — it moved from narration into data, which is stronger, because a field can be corrected and a sentence in chat cannot.
-
-> ❌ **Do NOT turn this into a question gate.** Clarifying questions before optimizing directly fight the locked fast-path rule: *if intent is clear, generate immediately with sane defaults, don't ask questions; only ask for production intent, and batch every question into one message.* Log the decisions, then go. The log is an **output**, not an interrogation — surfaced alongside the plan, never as a separate ceremony, and never as a reason to wait.
+Record production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.
 <!-- @end:decision-log -->
-
-Turning a script into *visual* frame prompts means resolving things the script left open — what the room looks like, where the light comes from, how the shot is framed. Those are your decisions, not the writer's; name them.
-
-Ask: **"Generate frame images now? (y/N)"**
-
-### 3. Generate frames if requested
-- `slates_generate_from_shots` with every image Shot's id and no `confirm` — it returns ONE itemised quote for the set plus the largest single item. Show that total, get an explicit OK, then re-call with `confirm: true`.
-- It fires the Shots one after another and BLOCKS until the last one lands, so it can outlast the HTTP timeout on a long set. If that happens the run is still going: poll `slates_get_shot` for each Shot's `generationIds` rather than re-firing, which double-spends.
-- Each result returns inline. Evaluate. If one is wrong, fix that Shot (`slates_update_shot`) and re-fire only it — never the set.
-- Bind the keeper to a frame with `slates_add_frame`, then `slates_update_shot` with `attachFrameId` so the recipe and the picture stay together.
-
-### 4. Hand back
-- Total frames generated, total credits spent, storyboard id.
-- Suggest next steps: review via `slates_get_storyboard_with_frames` (it returns every scene, every Shot in order, and the variety distribution), or take the frames to motion — fork each image Shot with `slates_duplicate_shot` (`model:` the video model), give the copy its frame with `slates_update_shot` (`firstFrameAssetId`), then fire the set with `slates_generate_from_shots`. Assemble with `slates_add_clip_to_timeline` in story order and `slates_export_video`. The full frames-to-film pipeline (batch cost authorization, model mixing) is `slates-one-prompt-film`.
-
-## Anti-patterns
-
-- **Don't** auto-generate without asking. Generation is the expensive step. Always confirm first.
-- **Don't** invent shot details the script doesn't mention. If the script says "they argue," ask what the shot looks like, don't fabricate "she clenches her fists in a wide shot."
-- **Don't** mix scene structure and frame generation in one pass — building the skeleton first lets the user catch errors before spending credits.
-- **Don't** write the plan into chat when a Shot can hold it. A Shot is the whole recipe AND the beat — line, speaker, action, prop, framing, references, model, params — and it is the only form of the plan the user can open, price, re-chop and re-fire without you.
-- **Don't** fire a set without reading its variety counts first. `slates_list_shots` returns them with every listing; if one shot size is the plurality or three cuts in a row share a camera move, fix the board before spending. `slates-shot-variety` is the craft behind that.

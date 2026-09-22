@@ -1,53 +1,24 @@
 ---
 name: slates-shot-variety
-description: Use when planning a set of shots, before firing a batch, when the variety counts on a shot list show one bucket dominating, or when a finished piece reads as flat, samey or repetitive despite each shot being individually fine.
+description: Diagnose unintended visual sameness across a shot sequence while preserving deliberate repetition, continuing performance and the user's chosen format.
 ---
 
-# Shot variety — why it all starts to look the same
+# Visual rhythm across a sequence
 
-The failure this skill exists for is mechanical, not artistic: **every shot is fine and the sequence is dead.** It happens because a model asked ten times in a row, from ten similar prompts, returns ten similar framings — and because the person writing those prompts is thinking about *what is in the shot* rather than *how this shot differs from the one before it*.
+`slates_list_shots` supplies distributions and repeated runs from authored shot fields. Read across the sequence, then decide whether repetition serves the intended effect. A dominant bucket is a question, not a defect or generation barrier.
 
-Slates counts the sameness for you. It does not judge it. **`slates_list_shots` returns the distribution with every listing** — shot sizes, camera moves, models, durations, and any bucket repeating three or more times in a row — so the numbers are in front of you before you spend anything. Reading them is the job; deciding what to do is yours.
+## Compare neighboring cuts
 
-## Read the table as a COLUMN, not as rows
+Look at framing, camera behavior, duration, subject distance, location and cast. Change the dimension that carries the meaning of the next beat. A wider view may reveal geography; a close view may make a small action legible. Do not add camera motion simply because another shot is static.
 
-This is the whole technique, and it is one sentence:
+Repeated frames can establish a joke, a comparison or a calm observational register. Recurring people and locations can carry a conversation. A later change often works because the earlier pattern held. State that purpose briefly when a count flags an intentional choice.
 
-> Sort the list by shot size and count. Sort it by camera move and count. **If push-in is the plurality, or every row says wide, the batch is wrong before a single credit is spent.**
+## Re-cut only for a reason
 
-A shot list read row by row always looks fine, because each row was written to be good on its own. The sameness only shows up in the column. That is why the counts ship in the op result rather than in your head.
+Merge when performance and picture should continue together. Split when the image needs to change while speech continues, or when the intended read needs another placement. Preserve sentence continuity and references across the split. Price the resulting requests; do not assume splitting is free or merging is cheaper.
 
-## What to vary, in order of how much it matters
+The script fit signal derives from an opt-in ad corpus measured over whole runtime. Above-sample pace deserves inspection; it does not prove a line impossible. Measure the actual spoken take when available, including pauses and reactions. No fixed cut length or shot count is a universal rule.
 
-1. **Shot size.** The single biggest lever, and the one that collapses first. A sequence of seven mediums reads as a slideshow no matter what is in them. Wide → close is a cut; medium → medium is a dissolve nobody asked for.
-2. **Camera move.** Second-biggest, and the one models default to: ask for "cinematic" and you get a slow push-in, every time. If five of seven cuts push in, four of them should not.
-3. **Duration.** Rhythm is not decoration. Seven identical 8-second cuts is a metronome. A 3-second cut lands differently *because* the one before it ran twelve.
-4. **Distance between subjects and lens.** A long lens on a close-up and a wide lens on a close-up are different shots, and the model will render the difference.
-5. **Location and cast.** If three cuts happen in the same room with the same person, that is a scene — fine. If *nine* do, the piece has one idea.
+Multi-shot generations can contain several visual cuts. Compare their internal rhythm as well as the boundaries between generated clips. The app counts only authored information: an unknown framing bucket is missing description, not evidence about the pixels.
 
-## When repetition is deliberate — and it often is
-
-Do not treat the counts as a defect list. Repetition is a technique with two real uses:
-
-- **A repeated frame IS the joke, or the point.** Three identical wides with one thing changed each time is a gag structure, and varying them would destroy it.
-- **A locked-off frame is a choice.** Static, static, static, then a move — the move only lands because the first three did not have one.
-
-The check catches a bucket dominating. It cannot tell whether you meant it. If you did, say so and move on; the counts do not block anything and never will.
-
-## Choosing the chop: one long take or several short ones
-
-This is the decision that owns the rhythm, and Slates puts the price next to it: `slates_split_shot` and `slates_merge_shots` re-cut a board, and the row's duration and quote move as you do it.
-
-- **Merge** when the words run continuously and the picture has no reason to change. One 16-second take on a model that holds up is cheaper to *make* than two 8-second cuts and reads calmer.
-- **Split** when the words keep going and the picture should not. This is the strongest move in the format: one spoken line running unbroken while the visual hard-cuts mid-clause to a new world. Split at a word boundary mid-sentence and both rows carry the same sentence — Slates marks the second as continuing the first, so the script still reads as one line.
-- **Split** also when a line will not fit its cut. Slates flags only lines that cannot be read at *any* plausible pace (above the fastest read in a corpus of 71 real ads), so a flag is never a matter of taste — the chop is genuinely wrong. Splitting the line across two cuts or merging into a longer one both fix it.
-
-## Multi-shot generations count as their cuts, not as one
-
-A model that puts three cuts inside one generation contributes **three** rows to the distribution. That is deliberate: counting generations would score a three-cut clip as a single wide shot and miss exactly the sequences this check exists to catch. Money is counted per generation; rhythm is counted per cut, and the header says which is which.
-
-## What this cannot tell you
-
-It measures buckets, not taste. Seven varied shot sizes can still be seven boring shots, and a piece that scores perfectly can still be flat. It catches the one mechanical failure — everything starting to look the same — and nothing else.
-
-It also only sees what is filled in. A board where nobody wrote `shotSize` reports `other` for every cut and tells you nothing. That is correct rather than a gap: inferring a shot size from a prompt would be Slates guessing at your work, and the counts are trustworthy precisely because they are arithmetic on what you actually wrote.
+This guide improves deliberate visual decisions. It does not measure taste, conversion or the quality of a finished performance. Use `slates-script-craft` for the argument, exchanges and setup/payoff that the picture supports.

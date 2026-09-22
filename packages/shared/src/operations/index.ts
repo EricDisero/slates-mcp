@@ -205,7 +205,7 @@ export interface OperationAnnotations {
 }
 
 export type OperationTier = 'core' | 'extended'
-export type OperationGroup = 'library' | 'timeline' | 'admin' | 'blender'
+export type OperationGroup = 'script' | 'library' | 'timeline' | 'admin' | 'blender'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -4969,16 +4969,42 @@ interface TimelineView {
   durationSec?: number
 }
 
-export const getTimeline: Operation<{ projectId: string }> = {
+const exportCutsInput = z.object({ projectId: z.string().uuid(), directory: z.string(), manifestId: z.string().min(1),
+  action: z.enum(['start','status','cancel']).optional().describe('start (default) begins, or re-attaches to a running export; status reads it; cancel stops after the output being rendered.'),
+  items: z.array(z.object({ timelineId: z.string().uuid(), format: z.enum(['mp4','xml']) })).min(1).optional().describe('Required to start.') })
+export const exportCuts: Operation<z.infer<typeof exportCutsInput>> = {
+  id: 'slates_export_cuts', description: 'Export explicit named cuts to distinct local files with a frozen manifest of timeline settings, media, script revisions and generation provenance. Returns at once while rendering continues; poll with action status. Starting again with the same manifestId and selection retries unfinished outputs under the same filenames and skips finished ones. Existing outputs are never overwritten, and export never generates media. Uses current video/XML fidelity limits.',
+  input: exportCutsInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('named-cuts', 'named cuts')
+ return ok(await ctx.desktop().post('/agent/timeline/export-cuts', input)) },
+}
+
+export const listTimelines: Operation<{ projectId: string }> = {
+  id: 'slates_list_timelines', description: 'List the independent named cuts in a project. Use the selected timelineId for edits, builds and exports.',
+  input: z.object({ projectId: z.string().uuid() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('named-cuts', 'named cuts')
+ return ok(await ctx.desktop().get('/agent/timelines', input)) },
+}
+export const saveTimeline: Operation<{ projectId: string; timelineId?: string; name: string }> = {
+  id: 'slates_save_timeline', description: 'Create a named cut, or rename the explicit timelineId. Existing cuts and the legacy default stay intact.',
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional(), name: z.string().min(1) }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('named-cuts', 'named cuts')
+ return ok(await ctx.desktop().post('/agent/timelines', input)) },
+}
+
+export const getTimeline: Operation<{ projectId: string; timelineId?: string }> = {
   id: 'slates_get_timeline',
   description:
-    'Get (or lazily create) the single editing timeline for a Slates project, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame.',
-  input: z.object({ projectId: z.string().uuid() }),
+    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame.',
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
     const r = await desktop.get<TimelineView & { success: boolean }>('/agent/timeline', {
-      projectId: input.projectId,
+      projectId: input.projectId, timelineId: input.timelineId,
     })
     const t = r.timeline ?? {}
     const clipCount =
@@ -4996,7 +5022,7 @@ export const getTimeline: Operation<{ projectId: string }> = {
 }
 
 export const addClipToTimeline: Operation<{
-  projectId: string
+  projectId: string; timelineId?: string
   assetId: string
   trackId?: string
   startFrame?: number
@@ -5007,7 +5033,7 @@ export const addClipToTimeline: Operation<{
   description:
     "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions.",
   input: z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     assetId: z.string().uuid().describe('Video or audio asset already in the project.'),
     trackId: z.string().uuid().optional().describe('Target track (type must match the asset: video asset → video track, audio asset → audio track). Default: the first track of the matching type.'),
     startFrame: z.number().int().min(0).optional().describe('Timeline frame to place the clip at. Default: append after the last clip.'),
@@ -5031,7 +5057,7 @@ export const addClipToTimeline: Operation<{
         }
       }
     >('/agent/timeline/add-clip', {
-      projectId: input.projectId,
+      projectId: input.projectId, timelineId: input.timelineId,
       assetId: input.assetId,
       trackId: input.trackId,
       startFrame: input.startFrame,
@@ -5082,7 +5108,7 @@ export const removeClip: Operation<{ clipId: string }> = {
 }
 
 export const addTimelineTrack: Operation<{
-  projectId: string
+  projectId: string; timelineId?: string
   type?: 'video' | 'audio'
   name?: string
 }> = {
@@ -5090,7 +5116,7 @@ export const addTimelineTrack: Operation<{
   description:
     "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). The new track is appended below existing tracks. Returns the new track and the full timeline.",
   input: z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     type: z.enum(['video', 'audio']).optional().describe('Default: audio.'),
     name: z.string().optional().describe("Default: 'Audio N' / 'Video N'."),
   }),
@@ -5143,7 +5169,7 @@ export const removeTimelineTrack: Operation<{ projectId: string; trackId: string
 }
 
 export const updateTimelineSettings: Operation<{
-  projectId: string
+  projectId: string; timelineId?: string
   width?: number
   height?: number
   frameRate?: 24 | 30 | 60
@@ -5153,7 +5179,7 @@ export const updateTimelineSettings: Operation<{
   description:
     "Update the project timeline's output settings: resolution, frame rate (24/30/60 — all clips are conformed to it on export), and masterVolume, the output fader (linear gain, -∞ to +12 dB) applied to the final mix in both preview and MP4 export (use it to prevent clipping when stacking loud tracks). Note these are normally auto-managed: the first video clip sets fps + resolution, and higher-res clips raise the canvas. Changing frameRate after clips are placed retimes them — avoid unless the timeline is empty.",
   input: z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     width: z.number().int().min(16).optional(),
     height: z.number().int().min(16).optional(),
     frameRate: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
@@ -5716,6 +5742,7 @@ export const exportTemplate: Operation<{
 export const importTemplate: Operation<{
   projectId: string
   path: string
+  sceneIndices?: number[]
   storyboardId?: string
   sceneId?: string
   swaps?: Record<string, string>
@@ -5727,6 +5754,7 @@ export const importTemplate: Operation<{
   input: z.object({
     projectId: z.string().uuid(),
     path: z.string().min(1).describe('Absolute path of the .slatestemplate file.'),
+    sceneIndices: z.array(z.number().int().min(0)).min(1).optional().describe('Import only these scene indices from the inspected parts, preserving their order. Omit for the whole template.'),
     storyboardId: z.string().uuid().optional(),
     sceneId: z.string().uuid().optional(),
     swaps: z.record(z.string().min(1)).optional().describe('{ "item:i1": "IMG-A12", "asset:a3": "<asset id>" }'),
@@ -6063,6 +6091,8 @@ function shotScriptShape(described: boolean): z.ZodRawShape {
   ) as { [K in ScriptTextField]: z.ZodOptional<z.ZodNullable<z.ZodString>> }
   return {
     ...text,
+    recipeMode: z.enum(['script', 'custom']).optional().describe('Script mode compiles active words with production fields. Custom keeps the authored prompt exactly.'),
+    promptScriptLine: z.string().nullable().optional().describe('The exact script line reviewed when authoring this custom prompt.'),
     continues: described
       ? z.boolean().optional().describe(SCRIPT_FIELD_DESCRIPTION.continues)
       : z.boolean().optional(),
@@ -6083,6 +6113,8 @@ const FRAMING_NOTE =
   `and anything unrecognised counts as "other", which is a fine answer.`
 
 interface ShotOpScript {
+  recipeMode?: 'script' | 'custom'
+  promptScriptLine?: string | null
   speaker?: string | null
   line?: string | null
   delivery?: string | null
@@ -6099,6 +6131,8 @@ interface ShotOpScript {
 function shotScriptPatch(input: ShotOpScript): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   const raw = input as Record<string, unknown>
+  if (input.recipeMode === 'script' || input.recipeMode === 'custom') out.recipeMode = input.recipeMode
+  if (typeof input.promptScriptLine === 'string' || input.promptScriptLine === null) out.promptScriptLine = input.promptScriptLine
   for (const field of SCRIPT_TEXT_FIELDS) {
     if (raw[field] !== undefined) out[field] = raw[field]
   }
@@ -6846,12 +6880,142 @@ export const getScript: Operation<{ sceneId: string }> = {
   },
 }
 
-export const editScript: Operation<{ sceneId: string; at: number; removed: number; text: string }> = {
+const variationSchema = z.object({
+  storyboardId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), name: z.string().min(1),
+  choices: z.array(z.object({ sectionId: z.string().uuid(), alternativeId: z.string().uuid() })),
+  arrangement: z.array(z.object({ sectionId: z.string().uuid(), alternativeId: z.string().uuid() })).optional(),
+  itemOverrides: z.array(z.object({ from: z.string().uuid(), to: z.string().uuid(), voice: z.enum(['keep','replace']) })).optional(),
+  assetOverrides: z.array(z.object({ from: z.string().min(1), to: z.string().min(1) })).optional(),
+  idempotencyKey: z.string().min(1).optional(),
+})
+export const previewScriptVariation: Operation<z.infer<typeof variationSchema>> = {
+  id: 'slates_preview_script_variation', description: 'Preview explicit section choices and independent ID-based reference replacements without writes or generation. An optional ordered arrangement supports repetition and omission. Returns composed requests, custom-prompt/reference warnings, a quote, and a plan marking each shot reuse (a finished take with matching inputs exists) or new. Inspect only the combinations you need.',
+  input: variationSchema,
+  async run(input, ctx) { return ok(await ctx.desktop().post('/agent/script/variation-preview', await resolveVariationRefs(input, ctx))) },
+}
+export const createScriptVariation: Operation<z.infer<typeof variationSchema>> = {
+  id: 'slates_create_script_variation', description: 'Materialize one reviewed variation as an independent Board with local shot IDs and lineage. Requires idempotencyKey; retry returns the same Board. Returns a quote through the normal request service. No media generation or implicit take reuse.',
+  input: variationSchema,
+  async run(input, ctx) { return ok(await ctx.desktop().post('/agent/script/variation-create', await resolveVariationRefs(input, ctx))) },
+}
+
+async function resolveVariationRefs(input: z.infer<typeof variationSchema>, ctx: OperationContext): Promise<z.infer<typeof variationSchema>> {
+  await ctx.desktop().requireCapability('script-documents', 'script documents and variations')
+  if (!input.assetOverrides?.length) return input
+  const { storyboard } = await ctx.desktop().get<{ storyboard: { projectId: string } }>('/agent/storyboards/get', { id: input.storyboardId })
+  const assets = await resolveAssetRefs(ctx, storyboard.projectId, input.assetOverrides.flatMap(o => [o.from, o.to]))
+  return { ...input, assetOverrides: input.assetOverrides.map(o => ({ from: assets.get(o.from)!.id, to: assets.get(o.to)!.id })) }
+}
+
+export const getScriptUses: Operation<{ sectionId: string }> = {
+  id: 'slates_get_script_uses',
+  description: 'Review each reused passage before updating it: current and proposed words, destination revision, and local-edit conflicts. Pass only explicitly selected non-conflicting uses to slates_update_script_section.',
+  input: z.object({ sectionId: z.string().uuid() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ return ok(await ctx.desktop().get('/agent/script/uses', input)) },
+}
+export const getShotInputs: Operation<{ projectId: string; shotId: string }> = {
+  id: 'slates_get_shot_inputs',
+  description: 'Read take input history and compatible reusable media. Earlier and unknown inputs remain playable; they are never treated as a fresh match. No generation.',
+  input: z.object({ projectId: z.string().uuid(), shotId: z.string() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ return ok(await ctx.desktop().get('/agent/shots/inputs', input)) },
+}
+export const reuseShotTake: Operation<{ projectId: string; shotId: string; assetId: string }> = {
+  id: 'slates_reuse_shot_take',
+  description: 'Explicitly link a take with matching saved request and recipe inputs to this shot. Keeps the original generation and independent shot recipe. Input changes are rechecked before reuse; costs no credits.',
+  input: z.object({ projectId: z.string().uuid(), shotId: z.string(), assetId: z.string().describe('Asset UUID or badge code from compatibleTakes.') }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+
+    const assets = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    return ok(await ctx.desktop().post('/agent/shots/reuse-take', { ...input, assetId: assets.get(input.assetId)!.id }))
+  },
+}
+
+export const getScriptSections: Operation<{ storyboardId: string }> = {
+  id: 'slates_get_script_sections', description: 'Read free-named script sections, anchored fragments, saved alternatives and local-change state.',
+  input: z.object({ storyboardId: z.string().uuid() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ const data = await ctx.desktop().get('/agent/script/sections', input); return ok(data, 'Script sections read.') },
+}
+const sectionInput = z.object({
+  storyboardId: z.string().uuid(), expectedRevision: z.number().int().min(0), action: z.enum(['create', 'alternative', 'choose', 'save', 'reuse', 'updateUses', 'rename', 'archive', 'tags']),
+  sectionId: z.string().uuid().optional(), alternativeId: z.string().uuid().optional(), parentId: z.string().uuid().optional(), label: z.string().optional(),
+  tags: z.array(z.string()).max(20).optional().describe('Free tags for action tags; replaces the list.'),
+  target: z.object({ sceneId: z.string().uuid(), at: z.number().int().min(0), expectedRevision: z.number().int().min(0) }).optional(),
+  uses: z.array(z.object({ sectionId: z.string().uuid(), expectedRevision: z.number().int().min(0) })).optional(),
+  fragments: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0) })).optional(),
+})
+export const changeScriptSection: Operation<z.infer<typeof sectionInput>> = {
+  id: 'slates_update_script_section', description: 'Create a free-named section from a selected passage, fork an alternative, save or choose one, insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one alternative, or set its free tags. Switching saves the current text first; archiving a section keeps its words, shots and media on the page. Uses the current document revision and never generates media. Partial crossing sections are refused.',
+  input: sectionInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ const data = await ctx.desktop().post('/agent/script/sections', input); return ok(data, 'Script section updated.') },
+}
+
+export const getScriptSuggestions: Operation<{ storyboardId: string }> = {
+  id: 'slates_get_script_suggestions', description: 'Read suggested replacements on a script: pending ones first (stale when their words changed since), then recent accepted or dismissed ones.',
+  input: z.object({ storyboardId: z.string().uuid() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+    return ok(await ctx.desktop().get('/agent/script/suggestions', input), 'Script suggestions read.') },
+}
+const suggestionInput = z.object({
+  storyboardId: z.string().uuid(), expectedRevision: z.number().int().min(0), action: z.enum(['create', 'accept', 'dismiss']),
+  suggestions: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0),
+    original: z.string().describe('The exact words now at start to end.'), replacement: z.string(), note: z.string().max(500).optional().describe('One line on why.') })).min(1).max(20).optional(),
+  suggestionId: z.string().uuid().optional(),
+})
+export const changeScriptSuggestions: Operation<z.infer<typeof suggestionInput>> = {
+  id: 'slates_update_script_suggestions', description: 'Propose replacements for exact passages without editing the script (create), or accept or dismiss one. Use create when asked to suggest or improve a passage; the creator reviews and accepts it in the document. Each quotes the words it replaces; one whose words change later is stale and will not apply. Accepting is one undoable write. Never generates media.',
+  input: suggestionInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+    return ok(await ctx.desktop().post('/agent/script/suggestions', input), 'Script suggestions updated.') },
+}
+
+const documentBlocks = z.array(z.object({
+  id: z.string().min(1), kind: z.enum(['paragraph', 'heading', 'direction']),
+  start: z.number().int().min(0), end: z.number().int().min(0), label: z.string().optional(), level: z.union([z.literal(2), z.literal(3)]).optional(),
+  marks: z.array(z.object({ start: z.number().int().min(0), end: z.number().int().min(0), type: z.enum(['strong', 'em']) })),
+}))
+export const getScriptDocument: Operation<{ storyboardId: string }> = {
+  id: 'slates_get_script_document',
+  description: 'Read the whole script document: scene strings, UTF-16 block/shot anchors, non-spoken headings/directions and a revision for safe writes. Formatting metadata contains no second copy of paragraph text.',
+  input: z.object({ storyboardId: z.string().uuid() }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ const data = await ctx.desktop().get('/agent/script/document', input); return ok(data, 'Script document read.') },
+}
+const writeScriptDocumentInput = z.object({
+  storyboardId: z.string().uuid(), expectedRevision: z.number().int().min(0),
+  edits: z.array(z.object({ sceneId: z.string().uuid(), at: z.number().int().min(0), removed: z.number().int().min(0), text: z.string() })),
+  structures: z.array(z.object({ sceneId: z.string().uuid(), blocks: documentBlocks })).optional(),
+  move: z.object({ sceneId: z.string().uuid(), blockId: z.string(), delta: z.union([z.literal(-1), z.literal(1)]) }).optional(),
+  makeShots: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0), waitingShotId: z.string().uuid().optional() })).optional(),
+  restoreRevision: z.number().int().min(0).optional(), ensureScene: z.boolean().optional(),
+  sceneAction: z.discriminatedUnion('kind', [z.object({ kind: z.literal('split'), sceneId: z.string().uuid(), at: z.number().int().min(0) }), z.object({ kind: z.literal('merge'), sceneId: z.string().uuid() })]).optional(),
+})
+export const writeScriptDocument: Operation<z.infer<typeof writeScriptDocumentInput>> = {
+  id: 'slates_update_script_document',
+  description: 'Apply ordered script edits and optional formatting in one revision-checked transaction. Read the document first. Stale writes are refused without replacing either author’s work. A move carries contained shot anchors; restoreRevision restores an existing text/structure revision. No generation side effect. ensureScene creates an empty scene only if needed.',
+  input: writeScriptDocumentInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('script-documents', 'script documents')
+ const data = await ctx.desktop().post('/agent/script/document', input); return ok(data, 'Script document updated.') },
+}
+
+export const editScript: Operation<{ expectedRevision?: number; sceneId: string; at: number; removed: number; text: string }> = {
   id: 'slates_edit_script',
   description:
     "Edit a scene's script: ONE contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once — this IS editing the Shots. Read slates_get_script first; offsets are into that text.",
   input: z.object({
-    sceneId: z.string().uuid(),
+    sceneId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().optional(),
     at: z.number().int().min(0).describe('Character offset the replacement starts at.'),
     removed: z.number().int().min(0).describe('How many characters to remove there (0 to insert).'),
     text: z.string().describe("What goes in their place ('' to delete). A blank line (\\n\\n) separates paragraphs."),
@@ -7054,7 +7218,7 @@ export const getBoardProgress: Operation<{ projectId: string }> = {
 }
 
 export const editCut: Operation<{
-  projectId: string
+  projectId: string; timelineId?: string
   action: 'changes' | 'replace' | 'sync' | 'build' | 'restore' | 'undo-build'
   storyboardId?: string
   clipId?: string
@@ -7062,12 +7226,13 @@ export const editCut: Operation<{
   before?: Record<string, unknown>[]
   clipIds?: string[]
   markerIds?: string[]
+  skipPresent?: boolean
 }> = {
   id: 'slates_edit_cut',
   description:
     'Read pending preferred-take changes, explicitly replace one clip, sync a storyboard’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
   input: z.object({
-    projectId: z.string().uuid(),
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     action: z.enum(['changes', 'replace', 'sync', 'build', 'restore', 'undo-build']),
     storyboardId: z.string().uuid().optional(),
     clipId: z.string().uuid().optional(),
@@ -7094,6 +7259,7 @@ export const editCut: Operation<{
       .describe('Exact before snapshots returned by replace/sync, for restore.'),
     clipIds: z.array(z.string().uuid()).optional(),
     markerIds: z.array(z.string().uuid()).optional(),
+    skipPresent: z.boolean().optional().describe('build: add only Shots this cut does not already hold, so a repeated build appends nothing twice. Default appends the whole board.'),
   }),
   async run(input, ctx) {
     const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new Map<string, ResolvedAssetRef>()
@@ -7342,7 +7508,7 @@ export const loadTools: Operation<{ group?: OperationGroup; query?: string; name
   id: 'slates_load_tools',
   description: 'Discover and load tools on demand. query searches operation names and descriptions and returns a compact list. names loads up to five exact tools with their schemas. group loads a whole task group. A load replaces the previous optional selection; query alone does not change it. Call the discovered tools by their own names. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
   input: z.object({
-    group: z.enum(['library', 'timeline', 'admin', 'blender']).optional(),
+    group: z.enum(['script', 'library', 'timeline', 'admin', 'blender']).optional(),
     query: z.string().min(1).max(160).optional().describe('Search for a task such as generate image, create shot, or edit video.'),
     names: z.array(z.string()).min(1).max(5).optional().describe('Exact operation names to load after discovery. Their permission annotations remain separate.'),
   }).refine((v) => [v.group, v.query, v.names].filter(Boolean).length === 1, 'Pass exactly one of query, names, or group.'),
@@ -7599,6 +7765,9 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   editImage as unknown as Operation<unknown>,
   getGenerationStatus as unknown as Operation<unknown>,
   listGenerations as unknown as Operation<unknown>,
+  listTimelines as unknown as Operation<unknown>,
+  saveTimeline as unknown as Operation<unknown>,
+  exportCuts as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,
@@ -7657,6 +7826,17 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   refileTake as unknown as Operation<unknown>,
   // The script IS the shots (P2.4a): one text per scene, Shots as ranges of it.
   getScript as unknown as Operation<unknown>,
+  getScriptUses as unknown as Operation<unknown>,
+  getShotInputs as unknown as Operation<unknown>,
+  reuseShotTake as unknown as Operation<unknown>,
+  previewScriptVariation as unknown as Operation<unknown>,
+  createScriptVariation as unknown as Operation<unknown>,
+  getScriptSections as unknown as Operation<unknown>,
+  changeScriptSection as unknown as Operation<unknown>,
+  getScriptSuggestions as unknown as Operation<unknown>,
+  changeScriptSuggestions as unknown as Operation<unknown>,
+  getScriptDocument as unknown as Operation<unknown>,
+  writeScriptDocument as unknown as Operation<unknown>,
   editScript as unknown as Operation<unknown>,
   makeShotFromScript as unknown as Operation<unknown>,
   breakScriptIntoShots as unknown as Operation<unknown>,
