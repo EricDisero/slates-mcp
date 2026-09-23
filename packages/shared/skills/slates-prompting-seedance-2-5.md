@@ -127,11 +127,11 @@ Worked, at the shipped rates:
 |---|---|
 | 2.5 · 480p · 5s · faceless | 26 |
 | 2.5 · 720p · 5s · faceless | 58 |
-| 2.5 · 1080p · 5s · faceless | 103 |
+| 2.5 · 1080p · 5s · faceless | 142 |
 | 2.5 · 720p · 30s · faceless | 347 |
 | 2.5 · 720p · 30s · AI-face route | **489** |
 | 2.5 · 720p · 30s · consented real-face route | **710** |
-| 2.5 · 1080p · 30s · faceless | **614** |
+| 2.5 · 1080p · 30s · faceless | **853** |
 | 2.5 · 1080p · 30s · consented real-face route | **1,749** |
 | *(for scale)* 2.0 · 1080p · 15s · AI-face route | 411 |
 

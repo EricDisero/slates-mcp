@@ -626,10 +626,9 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // ['480p','720p','1080p']. There is still NO 4K on 2.5 (2.0 is the only
     // Seedance with one), which is what keeps `is4kVideoKey` version-blind.
     //
-    // DEFAULT STAYS 720p, deliberately: a 30s take at 1080p is ~614 credits
-    // against a 1,000-credit welcome grant, and that is at the promotional
-    // 1080p rate — it rises when the promo lapses. Reaching a tier and
-    // defaulting to it are different decisions.
+    // DEFAULT STAYS 720p, deliberately: a 30s take at 1080p is ~853 credits
+    // against a 1,000-credit welcome grant. Reaching a tier and defaulting to it
+    // are different decisions.
     videoResolution: { options: ['480p', '720p', '1080p'], default: '720p' },
     duration: { min: 4, max: 30, mode: 'continuous' },
     maxIngredientImages: 30,
