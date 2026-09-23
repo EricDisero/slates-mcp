@@ -38,14 +38,36 @@ function frontmatterName(markdown: string, fallback: string): string {
   return m ? m[1].trim() : fallback
 }
 
-/** Every op that needs a desktop capability, and the capability it needs. Kept
- *  in step with `requireCapability` call sites in the ops registry. */
+/** Every capability an op checks with `requireCapability`, and what needs it.
+ *  scripts/agent-surface-lockstep-check.mjs (check 11) fails when this list and
+ *  the ops' call sites disagree. */
 const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['shots', 'Shots — the whole shot-list surface'],
   ['background-generation', 'background: true on any generate op'],
   ['image-references', 'reference images on image generation'],
   ['image-models-v2', 'nano-banana-pro / nano-banana-2-lite'],
   ['image-models-v3', 'gpt-image-2-5-flare / gpt-image-2-5-sunburst (five quality tiers)'],
+  ['edit-image', 'image edits'],
+  ['edit-video', 'video edits'],
+  ['audio-generation', 'the audio lane'],
+  ['voices', 'the preset voice shelf'],
+  ['timeline', 'the timeline'],
+  ['timeline-tracks', 'timeline tracks and settings'],
+  ['export', 'video and XML export'],
+  ['chatgpt-image-generation', 'connected ChatGPT images'],
+  ['external-image-metadata', 'saving an external image with its generation record'],
+  ['selection', 'reading the live selection'],
+  ['view', 'the window layout'],
+  ['pins', 'pinned references'],
+  ['asset-favorite', 'favorites'],
+  ['asset-export', 'exporting media'],
+  ['library', 'the Library'],
+  ['templates', 'templates'],
+  ['takes', 'moving takes between Shots'],
+  ['script', 'the Script page'],
+  ['board-quote', 'Shot prices and the board quote'],
+  ['board-progress', 'board progress'],
+  ['cut-edit', 'editing a cut'],
 ]
 
 export async function runDoctor(): Promise<void> {

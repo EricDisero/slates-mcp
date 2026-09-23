@@ -466,6 +466,7 @@ export const getSelection: Operation<Record<string, never>> = {
     'The user\'s live selection in the Slates app: ticked cards (with codes) and the image open in the viewer.',
   input: z.object({}).strict(),
   async run(_input, ctx) {
+    await ctx.desktop().requireCapability('selection', 'reading the live selection')
     const r = await ctx.desktop().get<{
       selection: {
         surface: string
@@ -565,6 +566,7 @@ export const getView: Operation<Record<string, never>> = {
     "How the Slates window is arranged: the lens showing, where the Cut (timeline) sits, and which side panels are open.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
+    await ctx.desktop().requireCapability('view', 'the window layout')
     const r = await ctx.desktop().get<{ view: ViewShape | null; reason?: string }>('/agent/view')
     if (!r.view) {
       return {
@@ -632,6 +634,7 @@ export const setView: Operation<{
     })
     .strict(),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('view', 'the window layout')
     if (Object.keys(input).length === 0) {
       throw new Error('Name at least one of lens, cut, leftDock or studioAgent — there is nothing to change otherwise.')
     }
@@ -1589,6 +1592,7 @@ export const setAssetFavorite: Operation<{ assetId: string; favorite: boolean }>
     favorite: z.boolean(),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('asset-favorite', 'favorites')
     return ok(await ctx.desktop().post('/agent/assets/favorite', input))
   },
 }
@@ -1602,6 +1606,7 @@ export const exportAssets: Operation<{ assetIds: string[]; directory: string }> 
     directory: z.string().min(1).describe('Absolute path; created if it does not exist.'),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('asset-export', 'exporting media')
     return ok(await ctx.desktop().post('/agent/assets/export', input))
   },
 }
@@ -1612,6 +1617,7 @@ export const listPins: Operation<{ projectId: string }> = {
     "List a project's pinned references: the images kept in the dock's Pinned section, one click from the prompt. A pin attaches nothing to a generation by itself.",
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('pins', 'pinned references')
     return ok(await ctx.desktop().get('/agent/pins', { projectId: input.projectId }))
   },
 }
@@ -1625,6 +1631,7 @@ export const pinReferences: Operation<{ projectId: string; assetIds: string[] }>
     assetIds: z.array(z.string().min(1)).min(1).describe('Image assets, UUIDs or badge codes.'),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('pins', 'pinned references')
     const resolved = await resolveAssetRefs(ctx, input.projectId, input.assetIds)
     return ok(await ctx.desktop().post('/agent/pins', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.get(r)!.id) }))
   },
@@ -1635,6 +1642,7 @@ export const unpinReference: Operation<{ projectId: string; assetId: string }> =
   description: 'Take one image off the dock\'s Pinned section. The image stays in the project.',
   input: z.object({ projectId: z.string().uuid(), assetId: z.string().min(1).describe('UUID or badge code.') }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('pins', 'pinned references')
     const resolved = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
     return ok(await ctx.desktop().post('/agent/pins/remove', { projectId: input.projectId, assetId: resolved.get(input.assetId)!.id }))
   },
@@ -5522,6 +5530,7 @@ export const listLibrary: Operation<{ projectId: string }> = {
     "List a project's Library: its categories (user-named; each is kind 'thing' = cited with @, or 'look' = cited with #) and every saved reference in them. Each item carries `mention` — exactly what to type in a prompt to attach it (a bare name is prose and attaches nothing) — plus its image, source and voice asset ids.",
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     return ok(await ctx.desktop().get('/agent/library', { projectId: input.projectId }))
   },
 }
@@ -5546,6 +5555,7 @@ export const createLibraryItem: Operation<{
     imageAssetId: z.string().min(1).optional().describe('The one image a mention attaches. UUID or badge code ("IMG-A8").'),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     const { imageAssetId, ...body } = input
     // Resolved BEFORE the create, so an unknown code fails without leaving an
     // item behind.
@@ -5587,6 +5597,7 @@ export const updateLibraryItem: Operation<{
     voiceAssetId: z.string().min(1).nullable().optional().describe('An AUDIO asset, UUID or badge code; null detaches.'),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     const refs = [input.imageAssetId, input.voiceAssetId].filter((r): r is string => typeof r === 'string')
     const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
     const asset = (ref: string | null | undefined): string | null | undefined =>
@@ -5615,6 +5626,7 @@ export const deleteLibraryItem: Operation<{ itemId: string }> = {
   description: 'Delete a Library item. Its images and voice clip stay in the project as ordinary assets.',
   input: z.object({ itemId: z.string().uuid() }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     return ok(await ctx.desktop().post('/agent/library/items/delete', { id: input.itemId }))
   },
 }
@@ -5643,6 +5655,7 @@ export const manageLibraryCategory: Operation<{
     orderedIds: z.array(z.string().uuid()).optional(),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     switch (input.action) {
       case 'create':
         return ok(await ctx.desktop().post('/agent/library/categories', { projectId: input.projectId, name: input.name, kind: input.kind, template: input.template }))
@@ -5665,6 +5678,7 @@ export const copyLibraryItemToProject: Operation<{ itemId: string; targetProject
     "Copy a Library item into another project: the item AND duplicates of its picture, source and voice, filed in the target's category of the same name (made when missing). The original is untouched. Use this to reuse a character or product across projects; use slates_move_entity_to_project to take it out of this one instead.",
   input: z.object({ itemId: z.string().uuid(), targetProjectId: z.string().uuid() }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('library', 'the Library')
     return ok(await ctx.desktop().post('/agent/library/items/copy-to-project', { id: input.itemId, targetProjectId: input.targetProjectId }))
   },
 }
@@ -5680,6 +5694,7 @@ export const getTemplate: Operation<{ path?: string }> = {
     "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the saved templates on this machine (the app's starter set and the user's own folder).",
   input: z.object({ path: z.string().min(1).optional().describe('Absolute path of a .slatestemplate file. Omit to list saved templates.') }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('templates', 'templates')
     if (!input.path) return ok(await ctx.desktop().get('/agent/templates'))
     return ok(await ctx.desktop().get('/agent/templates/inspect', { path: input.path }))
   },
@@ -5707,6 +5722,7 @@ export const exportTemplate: Operation<{
     description: z.string().optional(),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('templates', 'templates')
     const named = [input.storyboardId, input.sceneId, input.shotId].filter(Boolean).length
     if (named !== 1) throw new Error('Give exactly one of storyboardId, sceneId or shotId.')
     return ok(await ctx.desktop().post('/agent/templates/export', input))
@@ -5736,6 +5752,7 @@ export const importTemplate: Operation<{
       .describe("Remove the project's untouched default Library categories the template does not use. Only acts on a project whose Library is empty; defaults to true on a project with no storyboard."),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('templates', 'templates')
     const swaps: Record<string, string> = {}
     if (input.swaps) {
       const resolved = await resolveAssetRefs(ctx, input.projectId, Object.values(input.swaps))
@@ -6619,6 +6636,8 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
+    await desktop.requireCapability('board-quote', 'Shot prices')
     const r = await desktop.get<{
       shots: ShotSummary[]
       variety: VarietyReport | null
@@ -6679,6 +6698,8 @@ export const getShot: Operation<{ shotId: string }> = {
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
+    await desktop.requireCapability('board-quote', 'Shot prices')
     const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: r.shot.projectId, shotIds: [r.shot.id] }) })
     const q = quote.items[0]
@@ -6758,7 +6779,7 @@ export const splitTake: Operation<{
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('takes', 'moving takes between Shots')
     const r = await desktop.post<{
       shot: Record<string, unknown>
       source: Record<string, unknown>
@@ -6786,7 +6807,7 @@ export const refileTake: Operation<{ assetId: string; fromShotId?: string | null
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('takes', 'moving takes between Shots')
     const r = await desktop.post<{ moved: number; shot: Record<string, unknown> }>('/agent/shots/refile-take', input)
     return ok(
       r,
@@ -6837,7 +6858,7 @@ export const getScript: Operation<{ sceneId: string }> = {
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.get<{ sceneId: string; script: string; shots: Array<{ code: string | null; start: number; end: number }> }>(
       '/agent/script',
       { sceneId: input.sceneId }
@@ -6858,7 +6879,7 @@ export const editScript: Operation<{ sceneId: string; at: number; removed: numbe
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{ sceneId: string; script: string }>('/agent/script/edit', input)
     return ok(r, `Script is now ${r.script.length} characters; every Shot's line follows.`)
   },
@@ -6883,7 +6904,7 @@ export const makeShotFromScript: Operation<{
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{
       action: { kind: string; label: string }
       shotId: string | null
@@ -6909,7 +6930,7 @@ export const breakScriptIntoShots: Operation<{ storyboardId?: string; sceneId?: 
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{ shotIds: string[]; shots: Array<Record<string, unknown>> }>('/agent/script/break', input)
     return ok(r, `${r.shotIds.length} Shot(s) made from the unshot text.`)
   },
@@ -6927,7 +6948,7 @@ export const splitScene: Operation<{ sceneId: string; lineStart: number; lineEnd
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{ scene: { id: string; name: string } }>('/agent/script/split-scene', input)
     return ok(r, `Opened "${r.scene?.name ?? 'a scene'}" there; the text below moved into it.`)
   },
@@ -6940,7 +6961,7 @@ export const mergeScene: Operation<{ sceneId: string }> = {
   input: z.object({ sceneId: z.string().uuid() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{ sceneId: string; at: number; scene: { name: string } }>('/agent/script/merge-scene', input)
     return ok(r, `Joined into "${r.scene?.name ?? 'the previous scene'}" at offset ${r.at}.`)
   },
@@ -6958,7 +6979,7 @@ export const pasteScript: Operation<{ storyboardId?: string; sceneId?: string | 
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
-    await desktop.requireCapability('shots', 'saved Shots')
+    await desktop.requireCapability('script', 'the Script page')
     const r = await desktop.post<{ sceneId: string; at: number; scenes: Array<{ id: string; name: string }> }>('/agent/script/paste', input)
     return ok(r, `Pasted as text; the storyboard now has ${r.scenes.length} scene(s). No Shot was made — break it into shots when it reads right.`)
   },
@@ -6990,6 +7011,8 @@ export const generateFromShots: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
+    await desktop.requireCapability('board-quote', 'Shot prices')
     // Resolved first so a SHOT-A code fails here, not halfway through a billed run.
     const details = await Promise.all(input.shotIds.map((id) => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
@@ -7039,6 +7062,7 @@ export const quoteBoard: Operation<{
     draft: DRAFT_INPUT.describe('Draft the film: pass {} to quote one picture for each Shot in scope with no picture, instead of each Shot recipe.'),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('board-quote', 'the board quote')
     return ok(await ctx.desktop().get('/agent/shots/quote', { input: JSON.stringify(input) }))
   },
 }
@@ -7049,6 +7073,7 @@ export const getBoardProgress: Operation<{ projectId: string }> = {
     'Read per-shot spend from generation history, surviving take counts, running/failed counts and recorded-round progress. Deleted takes do not reduce spend.',
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('board-progress', 'board progress')
     return ok(await ctx.desktop().get('/agent/shots/progress', input))
   },
 }
@@ -7096,6 +7121,7 @@ export const editCut: Operation<{
     markerIds: z.array(z.string().uuid()).optional(),
   }),
   async run(input, ctx) {
+    await ctx.desktop().requireCapability('cut-edit', 'editing a cut')
     const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new Map<string, ResolvedAssetRef>()
     return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.get(input.assetId)?.id : undefined }))
   },

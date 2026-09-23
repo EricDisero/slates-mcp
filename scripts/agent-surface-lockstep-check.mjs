@@ -34,10 +34,15 @@
 //                         ceiling, LEADING the file, naming at least five
 //                         levers as backticked phrases; and the estimate op
 //                         still attaches it.
+//   9. ROUTES<->CALLERS — every desktop route has a caller, and every route an
+//                         op calls exists.
+//  10. API HOST MIRROR  — slate's PROD_API_URL equals shared SLATES_API_URL.
+//  11. CAPABILITY GATES — an op reaching a route the last released desktop
+//                         lacks checks a token that desktop lacks.
 //
-// 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of the eight has
-// been mutation-tested (break it, confirm red, restore, confirm green). If you
-// add a ninth, mutation-test it too or it is decoration.
+// 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of them has been
+// mutation-tested (break it, confirm red, restore, confirm green). If you add
+// another, mutation-test it too or it is decoration.
 //
 // This is a SOURCE-LEVEL check for the two consumers on purpose. The desktop
 // mapper lives in a sibling repo and imports Electron main-process modules and
@@ -750,6 +755,93 @@ function zodDescriptions(op) {
     if (!m) fail(CHECK, 'slate/src/shared/constants.ts no longer declares PROD_API_URL as a string literal')
     else if (m[1] !== SLATES_API_URL) fail(CHECK, `slate PROD_API_URL '${m[1]}' ≠ shared SLATES_API_URL '${SLATES_API_URL}'`)
     else pass(CHECK, `slate mirrors SLATES_API_URL (${SLATES_API_URL})`)
+  }
+}
+
+// ── 11. an op on a route newer than the last released desktop is gated ─────
+// mcp-server publishes BEFORE the desktop that serves its new routes (runbook
+// step 2 before step 5), so for a while every new op runs against the previous
+// desktop. `requireCapability` turns that into "Update Slates" only when the op
+// checks a token the previous desktop does NOT advertise; gating on an old
+// token passes and then 404s. 28 ops shipped to the 1.5.9 candidate that way.
+// The previous desktop is derived, never typed: the highest vX.Y.Z tag in
+// ../slate, its routes and its AGENT_CAPABILITIES read with `git show`.
+// Also asserted: every token an op checks is one the current desktop
+// advertises (else the op refuses on every install), and the CLI doctor's
+// REQUIRED_CAPABILITIES names exactly the tokens the ops check.
+{
+  const CHECK = '11 capability gates'
+  const { execFileSync } = await import('node:child_process')
+  const git = (...args) => execFileSync('git', ['-C', desktopRoot, ...args], { encoding: 'utf8' })
+  let released = null
+  try {
+    const semver = (t) => t.slice(1).split('.').map(Number)
+    const tags = git('tag', '--list', 'v*').split(/\r?\n/).filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
+    tags.sort((a, b) => { const [x, y] = [semver(a), semver(b)]; return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] })
+    released = tags.at(-1) ?? null
+  } catch { /* no git or no clone: warned below */ }
+  if (!released) {
+    warn(`${CHECK}: no released vX.Y.Z tag readable in ../slate; skipped`)
+  } else {
+    const capsIn = (src) => {
+      const m = /const AGENT_CAPABILITIES = \[([\s\S]*?)\] as const/.exec(src)
+      return new Set(m ? [...m[1].replace(/\/\/[^\r\n]*/g, '').matchAll(/'([^']+)'/g)].map((x) => x[1]) : [])
+    }
+    const routesIn = (src) => new Set([...src.matchAll(/r\.add\(\s*'(?:GET|POST|PUT|DELETE)'\s*,\s*'([^']+)'/g)].map((x) => x[1]))
+    const oldCaps = capsIn(git('show', `${released}:src/main/agent/server.ts`))
+    const nowCaps = capsIn(readFileSync(join(desktopRoot, 'src', 'main', 'agent', 'server.ts'), 'utf8'))
+    const oldRoutes = new Set()
+    for (const f of git('ls-tree', '--name-only', `${released}:src/main/agent/`).split(/\r?\n/).filter((n) => /^routes.*\.ts$/.test(n))) {
+      for (const p of routesIn(git('show', `${released}:src/main/agent/${f}`))) oldRoutes.add(p)
+    }
+    if (oldCaps.size === 0 || oldRoutes.size === 0) fail(CHECK, `could not read ${released}'s capabilities or routes; the parser is stale`)
+
+    // Top-level declarations of the ops index: an op object, or a helper an op calls.
+    const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
+    const lines = opsSrc.split(/\r?\n/)
+    const decl = /^(?:export )?(?:async )?(?:function\s+(\w+)|const\s+(\w+))/
+    const blocks = []
+    for (let i = 0; i < lines.length; i++) {
+      const m = decl.exec(lines[i])
+      if (m) blocks.push({ name: m[1] ?? m[2], start: i })
+    }
+    blocks.forEach((b, k) => { b.body = lines.slice(b.start, blocks[k + 1]?.start ?? lines.length).join('\n') })
+    const callRe = /desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs
+    const byName = new Map(blocks.map((b) => [b.name, b]))
+    const routesOf = (b, seen = new Set()) => {
+      if (seen.has(b.name)) return new Set()
+      seen.add(b.name)
+      const out = new Set([...b.body.matchAll(callRe)].map((x) => x[1]))
+      for (const [, callee] of b.body.matchAll(/\b(\w+)\(/g)) {
+        const h = byName.get(callee)
+        if (h && h !== b && !/id:\s*'slates_/.test(h.body)) for (const p of routesOf(h, seen)) out.add(p)
+      }
+      return out
+    }
+    const used = new Set()
+    const ungated = []
+    for (const b of blocks) {
+      const id = /\bid:\s*'(slates_[a-z0-9_]+)'/.exec(b.body)?.[1]
+      if (!id) continue
+      const tokens = [...b.body.matchAll(/requireCapability\(\s*'([^']+)'/g)].map((x) => x[1])
+      tokens.forEach((t) => used.add(t))
+      const fresh = [...routesOf(b)].filter((p) => !oldRoutes.has(p))
+      if (fresh.length && !tokens.some((t) => nowCaps.has(t) && !oldCaps.has(t))) {
+        ungated.push(`${id} calls ${fresh.join(', ')}${tokens.length ? ` but checks only ${tokens.join(', ')}, which ${released} already advertises` : ' and checks no capability'}`)
+      }
+    }
+    const unknown = [...used].filter((t) => !nowCaps.has(t))
+    const doctorSrc = readFileSync(join(repoRoot, 'packages', 'cli', 'src', 'commands', 'doctor.ts'), 'utf8')
+    const doctorList = /REQUIRED_CAPABILITIES[^=]*=\s*\[([\s\S]*?)\n\]/.exec(doctorSrc)?.[1] ?? ''
+    const doctor = new Set([...doctorList.matchAll(/\[\s*'([^']+)'/g)].map((x) => x[1]))
+    const doctorMissing = [...used].filter((t) => !doctor.has(t))
+    const doctorExtra = [...doctor].filter((t) => !used.has(t))
+    if (ungated.length) fail(CHECK, `${ungated.length} op(s) reach a route ${released} does not serve without a capability ${released} lacks — on that desktop they 404 instead of saying "Update Slates": ${ungated.join('; ')}`)
+    if (unknown.length) fail(CHECK, `op(s) check capabilities the desktop does not advertise, so they refuse on every install: ${unknown.join(', ')}`)
+    if (doctorMissing.length || doctorExtra.length) fail(CHECK, `packages/cli doctor REQUIRED_CAPABILITIES drifted from the ops: missing ${doctorMissing.join(', ') || 'none'}; extra ${doctorExtra.join(', ') || 'none'}`)
+    if (!ungated.length && !unknown.length && !doctorMissing.length && !doctorExtra.length) {
+      pass(CHECK, `every op on a route newer than ${released} checks a token ${released} lacks; ${used.size} tokens in use, all advertised, all in doctor`)
+    }
   }
 }
 
