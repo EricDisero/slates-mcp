@@ -37,12 +37,12 @@ For each frame:
 1. Draft a tight 1-2 sentence prompt (visual only — no copy text in the image).
 2. Reference the product upload's URL or asset ID for visual fidelity.
 3. Call `slates_generate_image` with that prompt + reference. **You see the result inline — evaluate it.**
-4. If it's wrong: refine prompt, regenerate. If it's right: bind it as a frame in the storyboard (`slates_add_frame`).
+4. If it's wrong: refine prompt, regenerate. If it's right, keep it for step 3.
 
 ### 3. Build the storyboard
 - `slates_create_storyboard` named "30s ad — v1".
 - Default scene already exists. Add 3 more scenes ("Hook", "Lifestyle", "Problem-Solution", "CTA") via `slates_add_scene`, or just add all 4 frames to the default scene.
-- For each generated image, add a frame referencing the asset id (`slates_add_frame`).
+- For each kept image, add ONE frame referencing its asset id (`slates_add_frame`); that frame is the beat's slot. An image made from a Shot is already a take on that Shot's slot, so it needs no frame of its own: a second one would show the beat twice.
 
 ### 4. Hand back to the user
 - Surface estimated total credits spent.

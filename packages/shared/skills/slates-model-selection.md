@@ -72,7 +72,7 @@ Both tools are **Kling-only**. Every entry in them is a real Kling endpoint that
 
 **Want the Seedance version of either?** It is not a switch on these tools — it is a normal `slates_generate_video` on `seedance-2` with the clip attached as a **video reference** and the motion or dialogue written into the prompt ("the character from image 1 performs the exact motion from video 1"). That routes to the same endpoint the tool would have called, with the prompt visible and editable instead of ghost-written. Single-pass conditioning genuinely beats post-hoc retargeting on fast choreography, contact, cloth and hair — and it carries native audio — so escalate there whenever fidelity matters.
 
-- Seedance video-reference gens bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming. Driving clips must be 2–15s on Seedance 2.0 and up to 30s on 2.5; past that it is Kling MC's lane.
+- Seedance video-reference gens bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming. Driving clips must be 2–15s on Seedance 2.0 and up to 30s on 2.5; past that it is Kling MC's lane. On Seedance 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
 - Faces on that route go through the normal cascade: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent` for a real person (premium realface pricing).
 
 **Rules:**

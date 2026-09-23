@@ -185,14 +185,13 @@ export interface ShotSpec {
 
   // ── The script layer ─────────────────────────────────────────────
   //
-  // 🚨 A ROW OWNS ITS TEXT. NOTHING POINTS INTO A SIBLING ROW'S CONTENT.
-  // There is no script blob, no screenplay field, no offsets and no spans.
-  // "The full script" is these rows rendered in order. The obvious
-  // implementation — one text blob with cut points as character offsets — is
-  // the one design that cannot be made safe: every edit shifts every
-  // downstream offset and one bad edit orphans every shot after it. If a
-  // proposed feature needs an offset, a span, or a range into another row,
-  // it is that design in disguise; reject it.
+  // 🚨 THE SCRIPT IS THE SHOTS (1.5.9). Each scene holds its text, and a Shot
+  // with words holds a range into its own scene's text; `line` here mirrors
+  // that range. Offsets are safe only because the desktop has ONE writer of the
+  // text (`applyScriptEdit`, `main/storage/sceneScript.ts`), which shifts every
+  // range in the same transaction, and an edit measured on older text is
+  // refused by its revision (`rev`), never misplaced. Nothing on this spec
+  // points into another Shot's words or another scene's text.
   //
   // 🚨 THE SCRIPT IS AUTHORED. THE PROMPT IS DERIVED FROM IT (2026-08-31).
   // This block used to say the opposite — "a planning and counting surface …

@@ -69,7 +69,7 @@ Ask: **"Generate frame images now? (y/N)"**
 - `slates_generate_from_shots` with every image Shot's id and no `confirm` — it returns ONE itemised quote for the set plus the largest single item. Show that total, get an explicit OK, then re-call with `confirm: true`.
 - It fires the Shots one after another and BLOCKS until the last one lands, so it can outlast the HTTP timeout on a long set. If that happens the run is still going: poll `slates_get_shot` for each Shot's `generationIds` rather than re-firing, which double-spends.
 - Each result returns inline. Evaluate. If one is wrong, fix that Shot (`slates_update_shot`) and re-fire only it — never the set.
-- Bind the keeper to a frame with `slates_add_frame`, then `slates_update_shot` with `attachFrameId` so the recipe and the picture stay together.
+- The keeper is already on the Board: every take lands on its own Shot, and the Shot already has its slot. Never add a frame for it, which would put a second copy of the beat on the Board. When the Shot shows a different picture than the keeper, set it with `slates_update_shot` (`posterAssetId`).
 
 ### 4. Hand back
 - Total frames generated, total credits spent, storyboard id.

@@ -172,12 +172,14 @@ Each one moved a fact to a single home and left a rebuild-and-publish obligation
       composed prompt is a COMPOSER change and belongs with the `audioRefSpokenText` defect, not
       here — which is why in v1 an author states dialogue twice (as `line` for reading and the fit
       check, and inside the prompt where the model receives it) and the skill says so.
-    - **🚨 A ROW OWNS ITS TEXT. NOTHING POINTS INTO A SIBLING ROW'S CONTENT.** No script blob, no
-      offsets, no spans — "the full script" is the rows rendered in order. The obvious
-      implementation (one blob, cut points as character offsets) is the one design that cannot be
-      made safe, and every proposed feature needing a range into another row is that design in
-      disguise. `continues` carries "these two rows are one sentence" with one boolean and no
-      pointer. The desktop's `main/storage/shotCuts.ts` header is the long form.
+    - **🚨 THE SCRIPT IS THE SHOTS (the 1.5.9 overhaul, superseding "a row owns its text").** Each
+      scene holds its text, and a Shot with words holds a range into its OWN scene's text; `line`
+      mirrors that range. It is safe for the two reasons the old rule said a blob could not be:
+      there is ONE writer of the text (`applyScriptEdit` in the desktop's
+      `main/storage/sceneScript.ts`), which shifts every range in the same transaction, and an edit
+      measured on older text is refused by its revision (`rev`, from `slates_get_script`), never
+      misplaced. A range never points into another scene. `continues` still carries "these two
+      rows are one sentence" with one boolean. The long form is the `sceneScript.ts` header.
     - **`audioRefSpokenText` IS NOT `line` and must not be merged into it.** It is keyed by asset id
       and means *"what this reference recording contains"* — asset binding for a clip you attached,
       not a line you wrote. It is separately misfiled and separately owned.

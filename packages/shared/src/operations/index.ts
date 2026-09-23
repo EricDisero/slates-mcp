@@ -2276,6 +2276,11 @@ if (!(IMAGE_MODELS as readonly string[]).includes(DEFAULT_IMAGE_MODEL)) {
   throw new Error(`slates_generate_image: default image seat ${DEFAULT_IMAGE_MODEL} is not in IMAGE_MODELS`)
 }
 
+/** The headless path's one fal batch: `maxBatchImages` owns it (nano-banana-2 is the only batching model). */
+const HEADLESS_BATCH_CAP = MODEL_CAPABILITIES['nano-banana-2']?.maxBatchImages ?? 1
+/** A 1.5.8 desktop's own clamp on a project batch, frozen with that build. */
+const LEGACY_DESKTOP_IMAGE_BATCH = 4
+
 export const generateImage: Operation<{
   prompt: string
   model?: ImageModelId
@@ -2316,7 +2321,7 @@ export const generateImage: Operation<{
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
-    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at 4.`),
+    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}.`),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -2393,12 +2398,12 @@ export const generateImage: Operation<{
     // `num_images` maximum is 4 (fal schema, 2026-09-09). Refused rather than
     // clamped: a silent clamp would make four images against a request for ten
     // and read to the caller as a partial failure it should retry.
-    if (!input.projectId && (input.count ?? 1) > 4) {
+    if (!input.projectId && (input.count ?? 1) > HEADLESS_BATCH_CAP) {
       return ok({
         requires_clarification: true,
         missing: ['projectId'],
         message:
-          `count above 4 needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at 4; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
+          `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
       })
     }
     let refEcho = ''
@@ -2429,8 +2434,8 @@ export const generateImage: Operation<{
     ) {
       await ctx.desktop().requireCapability('image-models-v2', `${imageModel} generation`)
     }
-    // 1.5.8 clamps a project batch to 4 and bills 4 against this op's quote for all of them.
-    if (input.projectId && (input.count ?? 1) > 4) {
+    // 1.5.8 clamps a project batch to its own 4 and bills 4 against this op's quote for all of them.
+    if (input.projectId && (input.count ?? 1) > LEGACY_DESKTOP_IMAGE_BATCH) {
       await ctx.desktop().requireCapability('image-variations', 'more than 4 images per call')
     }
     const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1')
@@ -2743,7 +2748,7 @@ export const editImage: Operation<{
   id: 'slates_edit_image',
   billable: true,
   description:
-    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model nano-banana-2 (only model that also accepts referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
+    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the one the app uses; only the Nano Banana models also accept referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
   input: z.object({
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
@@ -2763,7 +2768,8 @@ export const editImage: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    const editModel = input.editModel ?? 'nano-banana-2'
+    // The image-edit tool's seat (TOOL_SEAT), the model the app's own Edit uses.
+    const editModel = input.editModel ?? (toolModelFor('image-edit') as NonNullable<typeof input.editModel>)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
     if (isGptImageModel(editModel)) {
       // 🚨 v3, LIKE generateImage — this site was missed once already.
@@ -3778,7 +3784,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSeconds'],
         message:
-          'A Seedance video reference bills on combined input+output seconds. Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+          'A Seedance video reference bills on combined input+output seconds (on 2.5 AI-face, max(input, output) + output). Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
       })
     }
     const pluralRefCount = input.videoReferenceAssetIds?.length ?? 0
@@ -3790,7 +3796,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSecondsEach'],
         message:
-          `A Seedance video reference bills on combined input+output seconds. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
+          `A Seedance video reference bills on combined input+output seconds (on 2.5 AI-face, max(input, output) + output). Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
     const cloud = ctx.cloud()
@@ -4472,7 +4478,8 @@ export const generateLipSync: Operation<{
       audioFilePath: input.audioFilePath,
       avatarModel: input.avatarModel,
       klingProvider: input.klingProvider,
-      estimatedCost: totalCents,
+      // No estimatedCost: the desktop prices the media itself, in dollars.
+      // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
@@ -4602,7 +4609,8 @@ export const generateMotionTransfer: Operation<{
       characterOrientation: input.characterOrientation ?? 'video',
       prompt: input.prompt,
       klingProvider: input.klingProvider,
-      estimatedCost: totalCents,
+      // No estimatedCost: the desktop prices the media itself, in dollars.
+      // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
@@ -5866,13 +5874,13 @@ export const updateFrame: Operation<{
     // of what the Shot in this slot already encodes — the image's role and the
     // beat's words — and they were backfilled into Shots on 2026-08-31. Use
     // slates_update_shot for either.
-    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
+    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. A scene or position change carries the words in this slot with it on the Script page. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
   input: z.object({
     frameId: z.string().uuid(),
     shotLabel: z.string().optional(),
     notes: z.string().optional(),
     assetId: z.string().uuid().nullable().optional(),
-    sceneId: z.string().uuid().nullable().optional(),
+    sceneId: z.string().uuid().optional(),
     position: z.number().int().min(0).optional(),
   }),
   async run(input, ctx) {
@@ -5916,7 +5924,7 @@ export const batchUpdateFrames: Operation<{
 }> = {
   id: 'slates_batch_update_frames',
   description:
-    'Update MANY slots in one call — shot labels, notes, asset binding, scene/position. Prefer this over repeated slates_update_frame when re-arranging a scene: it is one round-trip and one UI refresh, and every id is validated before anything is written, so the batch never lands half-applied. To write the BEATS themselves, use slates_create_shot / slates_update_shot.',
+    'Update MANY slots in one call — shot labels, notes, asset binding, scene/position. Prefer this over repeated slates_update_frame when re-arranging a scene: it is one round-trip and one UI refresh, and every id is validated before anything is written, so the batch never lands half-applied. A scene or position change carries the words in each slot with it on the Script page. To write the BEATS themselves, use slates_create_shot / slates_update_shot.',
   input: z.object({
     updates: z
       .array(
@@ -5925,7 +5933,7 @@ export const batchUpdateFrames: Operation<{
           shotLabel: z.string().optional(),
           notes: z.string().optional(),
           assetId: z.string().uuid().nullable().optional(),
-          sceneId: z.string().uuid().nullable().optional(),
+          sceneId: z.string().uuid().optional(),
           position: z.number().int().min(0).optional(),
         })
       )
@@ -6670,7 +6678,16 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
     })
     const rows = r.shots ?? []
     const projectId = input.projectId
-    const quote = projectId && rows.length ? await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId, shotIds: rows.map(r => r.id) }) }) : null
+    // The quote is a GET with every id in its query string, and Node refuses a
+    // request head over 16 KiB (about 345 ids), so a long board is quoted in
+    // chunks. Each Shot's price is its own; only this listing reads them.
+    const QUOTE_CHUNK = 150
+    const chunks: string[][] = []
+    for (let i = 0; i < rows.length; i += QUOTE_CHUNK) chunks.push(rows.slice(i, i + QUOTE_CHUNK).map(r => r.id))
+    const quote = projectId && rows.length
+      ? { items: (await Promise.all(chunks.map((shotIds) =>
+          desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId, shotIds }) })))).flatMap((q) => q.items) }
+      : null
     let total = 0
     let unpriced = 0
     const shots = rows.map((s) => {
@@ -6873,14 +6890,14 @@ export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
 export const getScript: Operation<{ sceneId: string }> = {
   id: 'slates_get_script',
   description:
-    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet.",
+    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet. `rev` names this exact text: pass it to slates_edit_script so an edit measured on it is refused, not misplaced, if the words changed in between (1.5.9 desktops; older ones return none).",
   input: z.object({
     sceneId: z.string().uuid().describe('The scene (slates_get_storyboard_with_frames lists them, each with its script).'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('script', 'the Script page')
-    const r = await desktop.get<{ sceneId: string; script: string; shots: Array<{ code: string | null; start: number; end: number }> }>(
+    const r = await desktop.get<{ sceneId: string; script: string; rev?: string; shots: Array<{ code: string | null; start: number; end: number }> }>(
       '/agent/script',
       { sceneId: input.sceneId }
     )
@@ -6888,20 +6905,21 @@ export const getScript: Operation<{ sceneId: string }> = {
   },
 }
 
-export const editScript: Operation<{ sceneId: string; at: number; removed: number; text: string }> = {
+export const editScript: Operation<{ sceneId: string; at: number; removed: number; text: string; rev?: string }> = {
   id: 'slates_edit_script',
   description:
-    "Edit a scene's script: ONE contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once — this IS editing the Shots. Read slates_get_script first; offsets are into that text.",
+    "Edit a scene's script: ONE contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once — this IS editing the Shots. Read slates_get_script first; offsets are into that text. Pass its `rev`: when the Script page or anything else changed the words since, the edit is refused with 'the script changed since you read it', and you re-read and measure again. The result carries the new `rev` for a following edit.",
   input: z.object({
     sceneId: z.string().uuid(),
     at: z.number().int().min(0).describe('Character offset the replacement starts at.'),
     removed: z.number().int().min(0).describe('How many characters to remove there (0 to insert).'),
     text: z.string().describe("What goes in their place ('' to delete). A blank line (\\n\\n) separates paragraphs."),
+    rev: z.string().optional().describe('The `rev` slates_get_script (or the previous edit) returned. The edit is refused if the text changed since.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('script', 'the Script page')
-    const r = await desktop.post<{ sceneId: string; script: string }>('/agent/script/edit', input)
+    const r = await desktop.post<{ sceneId: string; script: string; rev?: string }>('/agent/script/edit', input)
     return ok(r, `Script is now ${r.script.length} characters; every Shot's line follows.`)
   },
 }
@@ -6915,7 +6933,7 @@ export const makeShotFromScript: Operation<{
 }> = {
   id: 'slates_make_shot_from_script',
   description:
-    "Do the ONE thing a selection of the script can mean, exactly as the Script page's popover does: Make shot when the selection touches no Shot; Split when it lies inside one Shot (the Shot keeps its first piece and its takes, every other piece becomes a new Shot after it); Extend when it crosses one Shot's edge; Merge when it spans several (the first takes the span — unshot text between them included, nothing deleted — the others give up their words: one with takes stays and waits for text, one without is removed). Pass `waitingShotId` to give a Shot that has no words yet (made on the Board, split off a take) the selected text instead. `perParagraph: true` over several unshot paragraphs makes one Shot per paragraph. A new Shot is filed after every ranged Shot whose words start before it.",
+    "Do the ONE thing a selection of the script can mean, exactly as the Script page's popover does: Make shot when the selection touches no Shot; Split when it lies inside one Shot (the Shot keeps its first piece and its takes, every other piece becomes a new Shot after it); Extend when it crosses one Shot's edge; Merge when it spans several (the first takes the span — unshot text between them included, nothing deleted — the others give up their words: one holding a take (finished or generating), a prompt, a reference or a picture stays and waits for text; only a completely blank one is removed). Pass `waitingShotId` to give a Shot that has no words yet (made on the Board, split off a take) the selected text instead. `perParagraph: true` over several unshot paragraphs makes one Shot per paragraph. A new Shot is filed after every ranged Shot whose words start before it.",
   input: z.object({
     sceneId: z.string().uuid(),
     start: z.number().int().min(0),

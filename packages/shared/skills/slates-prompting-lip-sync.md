@@ -60,7 +60,7 @@ Seedance can generate the performance rather than bolting a mouth onto finished 
 That is the same endpoint the old `engine=seedance-2` branch called — it just built the sentence for you, invisibly, and it presupposed a "video 1" that might not exist. Writing the prompt is the whole difference, and it is the part you want control of.
 
 - Driving clips must be 2–15s; output duration is whatever you set (4–15s).
-- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming.
+- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming. On Seedance 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
 - Faces go through the normal cascade: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent` for a real person.
 
 Everything below is about the Kling tool.

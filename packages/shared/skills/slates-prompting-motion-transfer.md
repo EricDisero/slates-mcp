@@ -64,7 +64,7 @@ movement from video 1. Preserve the character's identity, appearance, and outfit
 That is the same endpoint the old `motionModel=seedance-2` branch called — it just wrote that sentence for you, invisibly. Add style/setting/camera direction freely; Seedance re-generates the whole shot.
 
 - **Driving clip must be 2–15s** (all providers cap reference video at 15s). Longer clips: trim first, or use Kling MC (`characterOrientation: 'video'` takes up to 30s).
-- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key — quote via the confirm gate before spending.
+- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key — quote via the confirm gate before spending. On Seedance 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
 - **Faces route through the face cascade**: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → confirm consent → `seedanceRealFace=true, realFaceConsent=true` (premium realface vref pricing).
 - `characterOrientation` has no Seedance equivalent; framing follows the prompt + `aspectRatio`.
 
