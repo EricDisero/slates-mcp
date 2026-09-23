@@ -769,6 +769,10 @@ function zodDescriptions(op) {
 // Also asserted: every token an op checks is one the current desktop
 // advertises (else the op refuses on every install), and the CLI doctor's
 // REQUIRED_CAPABILITIES names exactly the tokens the ops check.
+// NOT covered: an old route whose MEANING changed (a new field the previous
+// desktop ignores, a new default it does not share). Those need a reading of
+// the previous desktop's handler; sheet-tool-seats, image-variations and
+// shot-position are the 1.5.9 examples.
 {
   const CHECK = '11 capability gates'
   const { execFileSync } = await import('node:child_process')

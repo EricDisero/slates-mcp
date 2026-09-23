@@ -1750,6 +1750,10 @@ export const moveEntityToProject: Operation<{
     targetProjectId: z.string().uuid(),
   }),
   async run(input, ctx) {
+    // 1.5.8 refuses an omitted or 'library' kind; only a legacy kind reaches it.
+    if (input.kind === undefined || input.kind === 'library') {
+      await ctx.desktop().requireCapability('library', 'the Library')
+    }
     return ok(await ctx.desktop().post('/agent/entities/move-to-project', input))
   },
 }
@@ -1865,6 +1869,11 @@ export const generateCharacterIdentity: Operation<{
     } else if (input.model === 'nano-banana-pro' || input.model === 'nano-banana-2-lite') {
       await ctx.desktop().requireCapability('image-models-v2', `${input.model} character identity`)
     }
+    // 1.5.8 renders an unnamed model as Nano Banana 2 and every model at 2k, so
+    // only an explicit Nano Banana model runs there as quoted.
+    if (!input.model || isGptImageModel(input.model)) {
+      await ctx.desktop().requireCapability('sheet-tool-seats', 'sheet tools on the default image seat')
+    }
     return ok(
       await ctx.desktop().post('/agent/characters/generate-identity', {
         characterId: input.characterId,
@@ -1898,6 +1907,8 @@ export const generateEnvironmentPlate: Operation<{
     userNotes: z.string().optional(),
   }),
   async run(input, ctx) {
+    // 1.5.8 always renders the plate on Nano Banana 2 at 2k, never the seat quoted.
+    await ctx.desktop().requireCapability('sheet-tool-seats', 'sheet tools on the default image seat')
     return ok(
       await ctx.desktop().post('/agent/environments/generate-plate', {
         environmentId: input.environmentId,
@@ -2417,6 +2428,10 @@ export const generateImage: Operation<{
       (imageModel === 'nano-banana-pro' || imageModel === 'nano-banana-2-lite')
     ) {
       await ctx.desktop().requireCapability('image-models-v2', `${imageModel} generation`)
+    }
+    // 1.5.8 clamps a project batch to 4 and bills 4 against this op's quote for all of them.
+    if (input.projectId && (input.count ?? 1) > 4) {
+      await ctx.desktop().requireCapability('image-variations', 'more than 4 images per call')
     }
     const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1')
     const cloud = ctx.cloud()
@@ -6404,7 +6419,7 @@ export const createShot: Operation<
     styleIds: z.array(z.string().uuid()).optional(),
     frameId: z.string().uuid().optional().describe('Put it in this exact frame. Optional — omit it and the Shot files itself into a scene, creating a storyboard named after the project if there is none.'),
     sceneId: z.string().uuid().optional().describe('File it into this scene. Optional; ignored when frameId is given.'),
-    storyboardId: z.string().uuid().optional().describe('File it into this storyboard (its first scene, or a new one). Optional; ignored when frameId or sceneId is given.'),
+    storyboardId: z.string().uuid().optional().describe('File it into this storyboard (its last scene, or a new one). Optional; ignored when frameId or sceneId is given.'),
     position: z.number().int().min(0).optional().describe('Slot in the scene it files into, 0 = first. Omit to file it last.'),
     ...shotScriptSchema,
   }),
@@ -6415,6 +6430,8 @@ export const createShot: Operation<
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    // 1.5.8 ignores `position` and files the Shot last.
+    if (input.position !== undefined) await desktop.requireCapability('shot-position', 'placing a new Shot at a slot')
     const { spec, refEcho } = await buildShotSpecInput(ctx, input.projectId, input)
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots', {
       projectId: input.projectId,
