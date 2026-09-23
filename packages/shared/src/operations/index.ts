@@ -3015,7 +3015,11 @@ export function videoCostKey(input: {
     if (vrefSecs > 0) {
       // ceil(x - 0.05) matches the server's probe rounding — quote = bill.
       const maxTotal = v25 ? SEEDANCE_25_VREF_MAX_TOTAL : SEEDANCE_20_VREF_MAX_TOTAL
-      const total = Math.min(maxTotal, Math.max(6, Math.ceil(vrefSecs - 0.05) + input.duration))
+      // EvoLink (the AI-face rail) bills a reference on max(input, output) +
+      // output on 2.5. Mirrors seedanceBilledRefSeconds in slate pricing.ts.
+      const inSecs = Math.ceil(vrefSecs - 0.05)
+      const billedIn = v25 && face === '-face' ? Math.max(inSecs, input.duration) : inSecs
+      const total = Math.min(maxTotal, Math.max(6, billedIn + input.duration))
       return `${input.model}${face}-vref-${res}-${total}s`
     }
     return `${input.model}${face}-${res}-${input.duration}s`
