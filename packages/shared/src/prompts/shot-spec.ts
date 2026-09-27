@@ -313,6 +313,16 @@ export type ScriptTextField = (typeof SCRIPT_TEXT_FIELDS)[number]
  * Dialogue is quoted so a model receives it as speech rather than as
  * description — the one piece of grammar this adds, and the reason it is not
  * just `join(' ')`.
+ *
+ * 🚨 A LINE IS SPEECH ONLY WHEN THE SHOT SAYS WHO SPEAKS OR HOW (2026-09-27).
+ * Since the Script page became one continuous text (2026-09-19, "cues stay
+ * words"), `line` holds whatever script text a Shot's range covers, and most
+ * of a script is action. Composing every speaker-less line as `A voice says
+ * "…"` told the video model that someone speaks the stage direction: an ad
+ * script broken into four Shots sent four of them (first-hour walk finding 15).
+ * Unlabelled text now goes in as written; a speaker (VO included) or a
+ * delivery note still makes it quoted speech. Mirrored byte-for-byte in both
+ * repos, and `check:composer-mirror` compares the two outputs.
  */
 export function scriptPromptBody(spec: Pick<ShotSpec, ScriptTextField>): string {
   const clean = (v: string | null): string => (v ?? '').trim()
@@ -333,10 +343,15 @@ export function scriptPromptBody(spec: Pick<ShotSpec, ScriptTextField>): string 
   if (line) {
     const speaker = clean(spec.speaker)
     const delivery = clean(spec.delivery).replace(/^\(|\)$/g, '').trim()
-    // "VO" is a screenplay abbreviation, not something to send to a model.
-    const who = !speaker || speaker.toUpperCase() === 'VO' ? 'A voice' : speaker
-    const how = delivery ? `, ${delivery},` : ''
-    parts.push(`${who} says${how} "${line}"`)
+    if (!speaker && !delivery) {
+      // Script text with no one named to speak it: sent as written.
+      parts.push(line)
+    } else {
+      // "VO" is a screenplay abbreviation, not something to send to a model.
+      const who = !speaker || speaker.toUpperCase() === 'VO' ? 'A voice' : speaker
+      const how = delivery ? `, ${delivery},` : ''
+      parts.push(`${who} says${how} "${line}"`)
+    }
   }
 
   return parts.join(' ')

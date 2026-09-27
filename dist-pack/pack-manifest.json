@@ -1,9 +1,9 @@
 {
   "version": "1.1.2",
-  "filename": "agentic-skills-pack-v1.1.2-84b476f0a80e08e5.zip",
-  "sha256": "84b476f0a80e08e5e96e3a08e71c922a56994ad7988e776693e544bdec0500f9",
-  "bytes": 226477,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-84b476f0a80e08e5.zip",
+  "filename": "agentic-skills-pack-v1.1.2-0ea12e9af19f06f6.zip",
+  "sha256": "0ea12e9af19f06f66fed5c2c3c82591b94ad503e3fdd9b4bc5afe0e0295ad0bd",
+  "bytes": 226457,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-0ea12e9af19f06f6.zip",
   "skillCount": 38,
   "freeSkills": [
     "slates-blocking-to-prompt",

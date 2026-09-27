@@ -25,7 +25,7 @@ If the user hasn't named the storyboard, suggest one based on the project tone.
 
 🚨 **A Shot needs no image, and that is the point.** `slates_add_frame` requires an `assetId`, so before Shots existed there was nowhere to put a planned shot until it had been paid for — the plan lived in chat and the user had to trust your memory of it. A Shot is a row: named, listed, priced, forkable, and readable back COMPOSED with `slates_get_shot` before a single credit is spent. Write the plan as Shots, not as sentences you will have to re-type later.
 
-🚨 **A Shot files itself, so pass `sceneId` (or `frameId`) when you know where it goes.** Omit both and it lands in the scene the user has open, else the most recently updated storyboard's last scene, creating a storyboard named after the project if there is none. Nothing you save is ever unfiled — but naming the scene is how the board comes out in the order you wrote it.
+🚨 **A Shot files itself, so pass `sceneId` (or `frameId`) when you know where it goes.** Omit both and it lands in the scene the user has open, else the most recently updated storyboard's last scene, creating Storyboard 1 if there is none. Nothing you save is ever unfiled — but naming the scene is how the board comes out in the order you wrote it.
 
 🚨 **Shots are addressed by CODE.** Every one comes back as `SHOT-A1`, `SHOT-A2` … per project, monotonic, never reused — the same vocabulary the gallery gives assets. Speak to the user in codes, and pass a code anywhere a `shotId` is taken. It is for pointing at a row THIS session, not for retrieval later: there is no shot search and no shot library, because a Shot is workspace state.
 

@@ -6429,7 +6429,7 @@ export const createShot: Operation<
     characterIds: z.array(z.string().uuid()).optional().describe('Characters the prompt @mentions — stored as ENTITY ids, so updating the character updates every Shot that names it.'),
     environmentIds: z.array(z.string().uuid()).optional(),
     styleIds: z.array(z.string().uuid()).optional(),
-    frameId: z.string().uuid().optional().describe('Put it in this exact frame. Optional — omit it and the Shot files itself into a scene, creating a storyboard named after the project if there is none.'),
+    frameId: z.string().uuid().optional().describe('Put it in this exact frame. Optional — omit it and the Shot files itself into a scene, creating Storyboard 1 if there is none.'),
     sceneId: z.string().uuid().optional().describe('File it into this scene. Optional; ignored when frameId is given.'),
     storyboardId: z.string().uuid().optional().describe('File it into this storyboard (its last scene, or a new one). Optional; ignored when frameId or sceneId is given.'),
     position: z.number().int().min(0).optional().describe('Slot in the scene it files into, 0 = first. Omit to file it last.'),
