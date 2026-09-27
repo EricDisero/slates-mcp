@@ -1,9 +1,9 @@
 {
   "version": "1.1.2",
-  "filename": "agentic-skills-pack-v1.1.2-60ae6c69ae138b8f.zip",
-  "sha256": "60ae6c69ae138b8fa4ca0f8c74fcd1b8783f55cbf8cc4bc1ec6e1686a8e680b2",
-  "bytes": 225734,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-60ae6c69ae138b8f.zip",
+  "filename": "agentic-skills-pack-v1.1.2-84b476f0a80e08e5.zip",
+  "sha256": "84b476f0a80e08e5e96e3a08e71c922a56994ad7988e776693e544bdec0500f9",
+  "bytes": 226477,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-84b476f0a80e08e5.zip",
   "skillCount": 38,
   "freeSkills": [
     "slates-blocking-to-prompt",
@@ -46,5 +46,197 @@
   "paidSkills": [
     "slates-cinematic-advertisement",
     "slates-ugc-advertisement"
+  ],
+  "catalog": [
+    {
+      "key": "slates-cinematic-advertisement",
+      "tier": "paid",
+      "summary": "Write cinematic direct-response ad footage that does not read as AI."
+    },
+    {
+      "key": "slates-ugc-advertisement",
+      "tier": "paid",
+      "summary": "Write phone-shot UGC and AI-influencer ad footage that reads as captured rather than produced."
+    },
+    {
+      "key": "slates-blocking-to-prompt",
+      "tier": "free",
+      "summary": "Write the generation prompt that matches a blocking clip second by second, so the reference video and the text agree instead of fighting."
+    },
+    {
+      "key": "slates-camera-language",
+      "tier": "free",
+      "summary": "Turn director vocabulary into real Blender camera rigs."
+    },
+    {
+      "key": "slates-character-identity",
+      "tier": "free",
+      "summary": "Build a Slates character from a reference image."
+    },
+    {
+      "key": "slates-chatgpt-images",
+      "tier": "free",
+      "summary": "Generate images using a connected ChatGPT account or the desktop host's built-in image tool, preserving Slates project context, exact prompts and reference lineage."
+    },
+    {
+      "key": "slates-cinematic-look",
+      "tier": "free",
+      "summary": "Use when a frame should look filmed, not generated (light, exposure, grade, lens, atmosphere, imperfection), or when an image came back too clean or studio-lit."
+    },
+    {
+      "key": "slates-content-policy",
+      "tier": "free",
+      "summary": "Read before writing any prompt involving conflict, creatures, crowds, destruction, weapons, or young characters."
+    },
+    {
+      "key": "slates-cost-discipline",
+      "tier": "free",
+      "summary": "Mandatory pre-flight discipline before ANY generation call (image or video)."
+    },
+    {
+      "key": "slates-dialogue-blocking",
+      "tier": "free",
+      "summary": "Keep multiple characters spatially consistent across cuts."
+    },
+    {
+      "key": "slates-direct-response-ad",
+      "tier": "free",
+      "summary": "Build a 30-second hyper-motion direct-response ad in Slates from a product image and brief."
+    },
+    {
+      "key": "slates-edit-and-iterate",
+      "tier": "free",
+      "summary": "Iterate on an existing Slates asset."
+    },
+    {
+      "key": "slates-model-selection",
+      "tier": "free",
+      "summary": "Which model to pick for a given job."
+    },
+    {
+      "key": "slates-one-prompt-film",
+      "tier": "free",
+      "summary": "Use when the user gives ONE idea and wants a finished video out the other end."
+    },
+    {
+      "key": "slates-previs-blocking",
+      "tier": "free",
+      "summary": "Build a 3D blocking pass in Blender, render it grey-box, and use it as a reference video so the generated shot follows a camera path you designed instead of one the model invented."
+    },
+    {
+      "key": "slates-project-organization",
+      "tier": "free",
+      "summary": "Use when the user names an asset by code (\"use IMG-A36\"), asks what a code means, or is organizing or navigating a project."
+    },
+    {
+      "key": "slates-prompting-elevenlabs",
+      "tier": "free",
+      "summary": "How to prompt ElevenLabs Sound Effects v2 in Slates."
+    },
+    {
+      "key": "slates-prompting-flux-2-max",
+      "tier": "free",
+      "summary": "How to prompt FLUX.2 Max (Black Forest Labs image model)."
+    },
+    {
+      "key": "slates-prompting-gpt-image-2-5",
+      "tier": "free",
+      "summary": "Prompt and edit images with GPT Image 2.5 Flare or Sunburst."
+    },
+    {
+      "key": "slates-prompting-inworld-tts",
+      "tier": "free",
+      "summary": "How to use Inworld Realtime TTS-2, the VOICE seat."
+    },
+    {
+      "key": "slates-prompting-kling-v3",
+      "tier": "free",
+      "summary": "How to prompt Kling V3.0 (Kuaishou)."
+    },
+    {
+      "key": "slates-prompting-lip-sync",
+      "tier": "free",
+      "summary": "How to set up lip-sync."
+    },
+    {
+      "key": "slates-prompting-ltx-2-5",
+      "tier": "free",
+      "summary": "How to prompt LTX-2.5 and LTX-2.5 Pro."
+    },
+    {
+      "key": "slates-prompting-minimax-h3",
+      "tier": "free",
+      "summary": "How to prompt MiniMax H3 and MiniMax H3 Max."
+    },
+    {
+      "key": "slates-prompting-motion-transfer",
+      "tier": "free",
+      "summary": "How to set up motion transfer."
+    },
+    {
+      "key": "slates-prompting-nano-banana-2",
+      "tier": "free",
+      "summary": "How to write prompts that produce cinematic, photorealistic results from Nano Banana 2 (Google Gemini 3.1 Flash Image, accessed via fal-ai/nano-banana-2)."
+    },
+    {
+      "key": "slates-prompting-omni-flash",
+      "tier": "free",
+      "summary": "How to prompt Gemini Omni Flash (Google, via fal)."
+    },
+    {
+      "key": "slates-prompting-seed-audio",
+      "tier": "free",
+      "summary": "How to prompt Seed Audio 1.0 (ByteDance, via fal)."
+    },
+    {
+      "key": "slates-prompting-seedance-2-5",
+      "tier": "free",
+      "summary": "How to prompt Seedance 2.5 and Seedance 2.5 Edit."
+    },
+    {
+      "key": "slates-prompting-seedance",
+      "tier": "free",
+      "summary": "How to prompt Seedance 2.0 (ByteDance video model)."
+    },
+    {
+      "key": "slates-prompting-seedream-5-lite",
+      "tier": "free",
+      "summary": "How to prompt Seedream 5 Lite (ByteDance image model)."
+    },
+    {
+      "key": "slates-prompting-veo-3",
+      "tier": "free",
+      "summary": "How to prompt Veo 3.1 (Google)."
+    },
+    {
+      "key": "slates-restyle-from-blocking",
+      "tier": "free",
+      "summary": "Render one blocking pass as several different visual worlds."
+    },
+    {
+      "key": "slates-shot-variety",
+      "tier": "free",
+      "summary": "Use when planning a set of shots, before firing a batch, when the variety counts on a shot list show one bucket dominating, or when a finished piece reads as flat, samey or repetitive despite each shot being individually fine."
+    },
+    {
+      "key": "slates-storyboard-from-script",
+      "tier": "free",
+      "summary": "Turn a script or treatment into a Slates storyboard with scenes and frames."
+    },
+    {
+      "key": "slates-style-prompting",
+      "tier": "free",
+      "summary": "Use when the user asks for a visual style (\"make it anime\", \"painterly look\", \"like a Pixar film\"), or when a style has to hold across several shots."
+    },
+    {
+      "key": "slates-ugc-influencer-ad",
+      "tier": "free",
+      "summary": "Build a UGC-style AI-influencer ad in Slates."
+    },
+    {
+      "key": "slates-vision-feedback-loop",
+      "tier": "free",
+      "summary": "Lower-level utility skill for any Slates workflow that needs to \"generate, look at the result, refine, regenerate.\" Defines the standard inline-vision pattern."
+    }
   ]
 }

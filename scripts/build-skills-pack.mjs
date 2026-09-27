@@ -8,13 +8,20 @@
  * BACKSLASH path separators (`skills\name\SKILL.md`), which unzip warns about
  * and some extractors mishandle. Both problems are fixed here.
  *
- * CONTENTS = the free skills (placeholder filler, per slates-mcp/CLAUDE.md
- * "the currently-shipped pack zip is a placeholder built from these free skills
- * until blueprints exist") PLUS everything in pack-skills/, which is
- * pack-EXCLUSIVE and deliberately absent from the npm tarball.
+ * CONTENTS = the paid skills PLUS the free ones, so a buyer has everything in
+ * one download. The free/paid line is the FOLDER, and nothing else:
  *
- *   packages/shared/skills/*.md   → free layer, also ships on npm
- *   pack-skills/*.md              → PAID, ships ONLY in this zip
+ *   packages/shared/skills/*.md       → FREE: npm, the MCP, the desktop agent
+ *   ../slates-api/pack-skills/*.md    → PAID: this zip and the members feed only
+ *
+ * The paid folder lives in slates-api because that repo is private; this one
+ * is public (moved 2026-09-27). Set SLATES_PACK_SKILLS_DIR to build from
+ * elsewhere. What may be paid: second-brain funnel-architecture.md § Pack
+ * content doctrine (capability free, outcomes paid; paid means proven ads).
+ *
+ * The manifest's `catalog` is THE chart of every skill and its tier. slates-web
+ * mirrors it into src/app/lib/generated/skillsCatalog.ts for /docs/skills-pack,
+ * and its lockstep check fails when the mirror is stale.
  *
  * The zip is deterministic: fixed timestamps, sorted entries, no dependencies.
  * Rebuilding without source changes produces a byte-identical file, so the
@@ -57,7 +64,7 @@ const root = resolve(here, '..');
 const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.2';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
-const PAID_DIR = join(root, 'pack-skills');
+const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');
 const OUT_DIR = join(root, 'dist-pack');
 
 // ── Deterministic DOS timestamp (2026-08-16 12:00:00) ──────────────────
@@ -153,16 +160,38 @@ function buildZip(entries) {
 }
 
 // ── Collect skills ─────────────────────────────────────────────────────
+/**
+ * The chart's one line: the frontmatter `description:` up to its first
+ * sentence end or em dash (the website bans em dashes in visible copy).
+ */
+function summary(body) {
+  const fm = body.toString('utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  const desc = fm?.[1].match(/^description:\s*(.+)$/m)?.[1].trim() ?? '';
+  let first = desc.split(/\s+—\s+|(?<=[.!?])\s/)[0].replace(/[.!?]$/, '');
+  if (!first) throw new Error('a skill has no description: frontmatter; the chart cannot describe it');
+  // A cut inside a parenthesis ("(ByteDance image model — the cheap…") closes it.
+  if ((first.match(/\(/g) ?? []).length > (first.match(/\)/g) ?? []).length) first += ')';
+  return `${first}.`;
+}
+
 function collect(dir, tier) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((f) => f.endsWith('.md'))
     .sort()
-    .map((f) => ({
-      key: basename(f, '.md'),
-      tier,
-      body: readFileSync(join(dir, f)),
-    }));
+    .map((f) => {
+      const body = readFileSync(join(dir, f));
+      return { key: basename(f, '.md'), tier, body, summary: summary(body) };
+    });
+}
+
+if (!existsSync(PAID_DIR)) {
+  console.error(
+    `✖ build:skills-pack — the paid skills folder is missing: ${PAID_DIR}\n` +
+      '  It lives in the private slates-api repo next to this one. Check it out there,\n' +
+      '  or point SLATES_PACK_SKILLS_DIR at it.'
+  );
+  process.exit(1);
 }
 
 const free = collect(FREE_DIR, 'free');
@@ -170,7 +199,7 @@ const paid = collect(PAID_DIR, 'paid');
 
 if (paid.length === 0) {
   console.error(
-    '✖ build:skills-pack — pack-skills/ is empty.\n' +
+    '✖ build:skills-pack — the paid skills folder is empty.\n' +
       '  The pack would contain nothing the free npm install does not already give away,\n' +
       '  which means the $29 bump has no exclusive content. Refusing to build.'
   );
@@ -187,58 +216,49 @@ if (dupes.length) {
 // ── README ─────────────────────────────────────────────────────────────
 // Regenerated so the skill inventory is never hand-typed (workspace rule:
 // "never hand-type a fact an LLM will read").
-const paidList = paid.map((s) => `  - \`${s.key}\``).join('\n');
-const readme = `# Slates — Agentic Skills Pack
+const paidList = paid.map((s) => `- \`${s.key}\`: ${s.summary}`).join('\n');
+const readme = `# Slates Agentic Skills Pack
 
-The exact skills and workflows we use to make our own videos with Slates. Your AI agent
-(Claude Code, Claude Desktop, Cursor, or any MCP client connected to Slates) reads these and
-drives the whole production for you — storyboards, generation, editing, export — hands-off.
-
-**Pack version ${PACK_VERSION} — ${all.length} skills.**
+**Pack version ${PACK_VERSION}: ${paid.length} paid ad playbooks, plus all ${free.length} free Slates skills.**
 
 ---
 
-## ⭐ Pack-exclusive — these are ONLY in this download
+## What you paid for: the ad playbooks
 
-These are the real campaign skills behind our own ads. They are **not** published to npm and
-**not** installed by \`install-skills\`. The only way to get them is this zip:
+The playbooks behind our own ads. They are only in this download and in your members feed.
+They are not on npm and the one-command installer does not include them.
 
 ${paidList}
 
-**Install these by copying the folders** (Option B below). The one-command installer in
-Option A does *not* include them — it only installs the free layer.
+Install these by copying their folders (Option B below).
 
----
+## What's free, and already yours
 
-## What else is inside (\`skills/\`)
+The other ${free.length} skills are free for everyone: per-model prompting, the production
+workflows, and craft and cost discipline. The Slates MCP already serves them to your AI, and
+one command installs them (Option A). They are in \`skills/\` too, so everything is in one place.
 
-- **Production workflows** — full recipes the agent runs end to end (one-prompt film,
-  direct-response ad, script → storyboard → shots → timeline, character turnaround,
-  edit-and-iterate, vision feedback loop)
-- **Per-model prompting mastery** — one skill per model, so the agent prompts each the way it
-  actually responds best
-- **Craft + discipline** — model selection, style prompting, project organization, cost
-  discipline (the agent quotes credit costs before it spends), content policy
+The full chart of what is free and what is paid: https://slates.video/docs/skills-pack
 
 ---
 
 ## Setup (about two minutes)
 
 **Before you start:** your AI tool needs to be connected to Slates. If it isn't yet, follow
-https://slates.video/docs/connect-claude first — one click from inside the app
+https://slates.video/docs/connect-claude first. It's one click from inside the app
 (Settings → Agent Control), or one terminal command.
 
-### Option A — one command (free layer only)
+### Option A: one command (the free skills)
 
 \`\`\`
 npx -y @slatesvideo/cli install-skills --global
 \`\`\`
 
 That installs the free skills for Claude Code account-wide (drop \`--global\` to install into
-just the current project folder). **It does not install the pack-exclusive skills listed
-above** — use Option B for those. Restart your AI tool; skills load at startup.
+just the current project folder). **It does not install the paid ad playbooks listed above**,
+so use Option B for those. Restart your AI tool; skills load at startup.
 
-### Option B — copy the folders (required for the exclusives)
+### Option B: copy the folders (required for the ad playbooks)
 
 Each skill in this pack's \`skills/\` folder is a ready-to-use folder
 (\`<skill-name>/SKILL.md\`). Copy the ones you want into:
@@ -246,7 +266,7 @@ Each skill in this pack's \`skills/\` folder is a ready-to-use folder
 - **Claude Code (this project):** \`.claude/skills/\` inside your project folder
 - **Claude Code (everywhere):** \`~/.claude/skills/\` (Windows: \`C:\\Users\\<you>\\.claude\\skills\\\`)
 - **Other MCP clients (Claude Desktop, Cursor, etc.):** the skills also work as plain
-  instructions — open any \`SKILL.md\` and paste its contents into your conversation or your
+  instructions. Open any \`SKILL.md\` and paste its contents into your conversation or your
   tool's custom-instructions/rules area when you want that workflow.
 
 Restart your AI tool after copying.
@@ -255,11 +275,11 @@ Restart your AI tool after copying.
 
 ## Using them
 
-Just ask — skills trigger automatically when your request matches. You never invoke them by name:
+Just ask. Skills trigger automatically when your request matches, so you never invoke them by name:
 
 > "Make me a 30-second UGC-style ad for my coffee brand in Slates."
 
-> "Take this script and build the whole video — storyboard it, generate the shots, assemble the timeline."
+> "Take this script and build the whole video: storyboard it, generate the shots, assemble the timeline."
 
 > "Create a consistent character named Mara and put her in five different scenes."
 
@@ -270,14 +290,14 @@ the app fill in live. Every generation shows its credit cost before it runs.
 
 ## Troubleshooting
 
-- **The agent ignores the skills.** Restart your AI tool — skills are read at startup.
+- **The agent ignores the skills.** Restart your AI tool, since skills are read at startup.
 - **"Not connected to Slates."** Open the desktop app and check Settings → Agent Control, or
   run \`npx -y @slatesvideo/cli login\`.
 - **Full setup guide:** https://slates.video/docs/skills-pack
 
 ---
 
-_Setup guide: https://slates.video/docs/skills-pack — keep your purchase email; the download
+_Setup guide: https://slates.video/docs/skills-pack. Keep your purchase email; the download
 link stays live._
 `;
 
@@ -304,6 +324,8 @@ const manifest = {
   skillCount: all.length,
   freeSkills: free.map((s) => s.key),
   paidSkills: paid.map((s) => s.key),
+  // THE chart: every skill, its tier, one line on what it does. Paid first.
+  catalog: [...paid, ...free].map((s) => ({ key: s.key, tier: s.tier, summary: s.summary })),
 };
 writeFileSync(join(OUT_DIR, 'pack-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
