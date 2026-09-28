@@ -30,7 +30,7 @@ if (!exampleName && !listOnly) {
   process.exit(1)
 }
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.next', 'out', '.out', '.git', '.venv', 'venv', 'coverage', 'dist-mcpb', '.turbo', 'exports'])
+const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.next', '.next-verify', '.next-clean', '.next-dev', 'out', '.out', '.git', '.venv', 'venv', 'coverage', 'dist-mcpb', '.turbo', 'exports'])
 const EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.mts', '.cjs', '.py', '.sh', '.ps1'])
 const PLATFORM = new Set(['NODE_ENV', 'PORT', 'VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'FLY_APP_NAME', 'FLY_REGION', 'FLY_ALLOC_ID', 'CI', 'HOME', 'PATH', 'TZ', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'TEMP', 'TMP', 'ELECTRON_RENDERER_URL', 'NODE_OPTIONS', 'npm_config_user_agent', 'npm_lifecycle_event', 'CLAUDE_PROJECT_DIR', 'CUDA_VISIBLE_DEVICES', 'GITHUB_ACTIONS', 'GITHUB_TOKEN', 'RUNNER_OS'])
 
