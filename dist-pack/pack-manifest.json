@@ -1,10 +1,10 @@
 {
   "version": "1.1.2",
-  "filename": "agentic-skills-pack-v1.1.2-0ea12e9af19f06f6.zip",
-  "sha256": "0ea12e9af19f06f66fed5c2c3c82591b94ad503e3fdd9b4bc5afe0e0295ad0bd",
-  "bytes": 226457,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-0ea12e9af19f06f6.zip",
-  "skillCount": 38,
+  "filename": "agentic-skills-pack-v1.1.2-5a92ab19e53639ea.zip",
+  "sha256": "5a92ab19e53639eab1e5f6619626c75e80b4f8d972389189f659e347a49ae4cc",
+  "bytes": 212285,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-5a92ab19e53639ea.zip",
+  "skillCount": 39,
   "freeSkills": [
     "slates-blocking-to-prompt",
     "slates-camera-language",
@@ -37,6 +37,7 @@
     "slates-prompting-seedream-5-lite",
     "slates-prompting-veo-3",
     "slates-restyle-from-blocking",
+    "slates-script-craft",
     "slates-shot-variety",
     "slates-storyboard-from-script",
     "slates-style-prompting",
@@ -101,7 +102,7 @@
     {
       "key": "slates-direct-response-ad",
       "tier": "free",
-      "summary": "Build a 30-second hyper-motion direct-response ad in Slates from a product image and brief."
+      "summary": "Develop a product-led direct-response ad whose demonstration, argument and next action serve a supplied offer."
     },
     {
       "key": "slates-edit-and-iterate",
@@ -116,7 +117,7 @@
     {
       "key": "slates-one-prompt-film",
       "tier": "free",
-      "summary": "Use when the user gives ONE idea and wants a finished video out the other end."
+      "summary": "Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named Cut and a verified export."
     },
     {
       "key": "slates-previs-blocking",
@@ -214,14 +215,19 @@
       "summary": "Render one blocking pass as several different visual worlds."
     },
     {
+      "key": "slates-script-craft",
+      "tier": "free",
+      "summary": "Write or revise script passages, develop distinct openings and bridges, and compare section variations while preserving the user's format, voice and fixed material."
+    },
+    {
       "key": "slates-shot-variety",
       "tier": "free",
-      "summary": "Use when planning a set of shots, before firing a batch, when the variety counts on a shot list show one bucket dominating, or when a finished piece reads as flat, samey or repetitive despite each shot being individually fine."
+      "summary": "Diagnose unintended visual sameness across a shot sequence while preserving deliberate repetition, continuing performance and the user's chosen format."
     },
     {
       "key": "slates-storyboard-from-script",
       "tier": "free",
-      "summary": "Turn a script or treatment into a Slates storyboard with scenes and frames."
+      "summary": "Put supplied script or treatment into an editable Slates document and bind requested passages to production shots."
     },
     {
       "key": "slates-style-prompting",
@@ -231,7 +237,7 @@
     {
       "key": "slates-ugc-influencer-ad",
       "tier": "free",
-      "summary": "Build a UGC-style AI-influencer ad in Slates."
+      "summary": "Direct a creator-style spoken performance when the brief calls for an ordinary camera-facing person or exchange."
     },
     {
       "key": "slates-vision-feedback-loop",

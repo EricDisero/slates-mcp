@@ -164,7 +164,9 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_reveal_file',
   ],
   // The cut and the export. A generation session never touches these.
+  script: ['slates_get_script_document', 'slates_update_script_document', 'slates_get_script_sections', 'slates_update_script_section', 'slates_get_script_suggestions', 'slates_update_script_suggestions', 'slates_get_script_uses', 'slates_preview_script_variation', 'slates_create_script_variation', 'slates_get_shot_inputs', 'slates_reuse_shot_take'],
   timeline: [
+    'slates_list_timelines', 'slates_save_timeline', 'slates_export_cuts',
     'slates_get_timeline',
     'slates_add_clip_to_timeline',
     'slates_reorder_clips',
@@ -234,7 +236,8 @@ export function tierFor(id: string): OperationTier {
 /** One-line summary of each group, for `slates_load_tools`' own description. */
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, the Library (user-named categories of saved references: characters, locations, products, looks), moving and copying assets and Library items between projects, revealing files on disk',
-  timeline: 'the timeline (tracks, clips, settings), video export and NLE XML export, clip trimming',
+  script: 'rich script documents, anchored sections, alternatives, reusable passages, variations and take input history',
+  timeline: 'named cuts and selected exports; the timeline (tracks, clips, settings), video export and NLE XML export, clip trimming',
   admin: 'rename / delete / reorder for projects, characters, environments, storyboards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }

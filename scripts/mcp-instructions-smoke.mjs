@@ -8,7 +8,7 @@
 // session receives.
 //
 // It cannot prove a given CLIENT reads or keeps them (that is the human check in
-// slate/docs/testing/2026-08-30-agent-guidance-ssot.md), but it closes the gap
+// slate/docs/testing/2026-09-22-carried-over-checks.md), but it closes the gap
 // between "we set the field" and "the field arrives".
 //
 //   node scripts/mcp-instructions-smoke.mjs

@@ -213,7 +213,7 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // 13% before and after. This sentence exists only to say the numbers are
   // there and must be looked at; the craft is the skill.
   both(
-    `- READ THE VARIETY COUNTS BEFORE FIRING A SET: slates_list_shots and slates_get_storyboard_with_frames return the distribution (shot sizes, camera moves, runs of three or more) with the rows. If one bucket is the plurality, fix the board before you spend — slates-shot-variety is the craft.`
+    `- READ THE VARIETY COUNTS BEFORE FIRING A SET: slates_list_shots and slates_get_storyboard_with_frames return authored framing and movement distributions. Review unintended sameness while preserving deliberate repetition and the user's format; counts do not require a rewrite. slates-shot-variety is the craft.`
   ),
   both(
     `- AUDIO LENGTH IS PROMPT-DRIVEN ON SEED AUDIO: it has no duration parameter, so the durationSeconds you pass is written into the prompt AND is what the user is charged, whatever comes back. Choose it deliberately and load slates-prompting-seed-audio before the first call.`

@@ -71,6 +71,8 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['sheet-tool-seats', 'sheet tools on the default image seat'],
   ['image-variations', 'more than 4 images per call'],
   ['shot-position', 'placing a new Shot at a slot'],
+  ['script-documents', 'script documents, sections, suggestions and variations'],
+  ['named-cuts', 'named cuts and batch export'],
 ]
 
 export async function runDoctor(): Promise<void> {
