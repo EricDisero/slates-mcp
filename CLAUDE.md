@@ -66,6 +66,8 @@ slates-mcp/
 
 ## Build
 
+`scripts/desktop-source.mjs` reads the desktop from `SLATES_DESKTOP_DIR`, which a worktree must set, else `../slate`. A missing desktop fails locally; only single-repo CI skips it, with a warning.
+
 ```bash
 npm install
 npm run build       # shared → mcp → cli, then the agent-surface lockstep check
@@ -73,9 +75,9 @@ npm run typecheck   # whole-monorepo type check
 npm run check:agent-surface   # just the lockstep check (needs a built dist)
 ```
 
-`scripts/agent-surface-lockstep-check.mjs` runs at the end of `npm run build`. Its numbered checks
+`npm run build` runs `scripts/agent-surface-lockstep-check.mjs`, whose numbered checks
 **print their own numbers** — the op count, the doctrine size, the per-turn byte total —
-so nothing downstream has to restate them in prose (which is exactly how they went stale):
+so nothing downstream has to restate them in prose (which is how they went stale):
 
 | # | Asserts |
 |---|---|
@@ -93,8 +95,7 @@ so nothing downstream has to restate them in prose (which is exactly how they we
 **Every one is mutation-tested** — break it, confirm red, restore, confirm green. A checker nobody has
 seen fail is not a checker. `scripts/mcp-instructions-smoke.mjs` then spawns the real stdio server and
 reads the doctrine, the annotations, a prompt, a resource, structured content and a flattened
-validation error back off a real client. The desktop half of checks 1 and 3 skips with a warning when
-`../slate` is not on disk, per the sibling-repo rule.
+validation error back off a real client.
 
 ## Adding a new operation
 

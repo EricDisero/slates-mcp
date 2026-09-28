@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { APP_MANUAL, appManualSections, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
+import { desktopSource } from './desktop-source.mjs'
 
-const canonical = new URL('../../slate/docs/slates-llm-manual.md', import.meta.url)
+const canonical = desktopSource('docs/slates-llm-manual.md')
 if (existsSync(canonical)) {
   assert.equal(APP_MANUAL, readFileSync(canonical, 'utf8'), 'Manual drift: run npm run build:llm-docs in slates-web')
 } else console.warn('Canonical sibling absent; checking the published snapshot only.')

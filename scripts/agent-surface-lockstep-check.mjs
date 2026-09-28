@@ -50,22 +50,22 @@
 // "import it and compare" is "assert the source still says what we claim it
 // says", with anchors precise enough that a real change moves them.
 //
-// Sibling-repo rule (root CLAUDE.md): `../slate` may be absent — a clone of
-// slates-mcp alone must still build. The desktop half SKIPS WITH A WARNING
-// rather than failing, exactly like slates-web/scripts/check-price-lockstep.mjs.
+// Local checks require the selected desktop. Single-repo CI can warn and skip
+// an implicit sibling; an explicitly selected but missing source always fails.
 // ============================================================
 
 import { readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
+import { desktopSource } from './desktop-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
 const sharedRoot = join(repoRoot, 'packages', 'shared')
 const skillsDir = join(sharedRoot, 'skills')
 const mcpServerPath = join(repoRoot, 'packages', 'mcp', 'src', 'server.ts')
-const desktopRoot = join(repoRoot, '..', 'slate')
+const desktopRoot = desktopSource()
 const desktopContextPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'context.ts')
 const desktopOpsPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'ops.ts')
 
@@ -311,7 +311,7 @@ console.log('agent-surface-lockstep-check')
   ]
   const consumers = [
     ['packages/mcp/src/server.ts', mcpServerPath],
-    ['../slate/src/main/studio-agent/context.ts', desktopContextPath],
+    [desktopContextPath, desktopContextPath],
   ]
   for (const [label, path] of consumers) {
     if (!existsSync(path)) continue // sibling-absent case already warned in check 1
