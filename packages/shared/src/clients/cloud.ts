@@ -106,7 +106,7 @@ export class SlatesCloudClient {
       if (res.status === 401) {
         throw new Error(
           `slates-api ${path} rejected the auth token (401) — it's expired or was revoked. ` +
-            'To reconnect, run `slates login` (CLI) or reconnect in Slates → Settings → Agent Control'
+            'To reconnect, run `slates login` (CLI) or reconnect in Slates → Settings → AI tools'
         )
       }
       const detail =

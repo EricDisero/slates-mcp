@@ -24,11 +24,11 @@ Work in the user's document. Read its revision, requested passage and neighborin
 
 ## Distinct openings and compatible bridges
 
-Change the idea: an event, question, objection, proof, audience situation or reveal. Merely swapping adjectives is not a useful comparison. Name what stays fixed for this operation. A dependency belongs in the selected passage: if an opening changes what “that” means, include its bridge in the alternative.
+Change the idea: an event, question, objection, proof, audience situation or reveal. Merely swapping adjectives is not a useful comparison. Name what stays fixed for this operation. A dependency belongs in the selected passage: if an opening changes what “that” means, include its bridge in the version.
 
 Read each candidate as a complete piece with the same body. Check unanswered promises, introduced speakers, incompatible offers and repeated reveals. Suggestions remain editable; no required Hook/Body/CTA fields.
 
-Use `slates_get_script_document`, `slates_get_script_sections` and revision-checked `slates_update_script_document` / `slates_update_script_section`. Capture alternatives before switching. Preview one requested combination before materializing it; never expand every possible combination automatically. Reference substitutions are explicit IDs, not name replacements in prose. Keep voice retention deliberate.
+Use `slates_get_script_document`, `slates_get_script_sections` and revision-checked `slates_update_script_document` / `slates_update_script_section`. Save versions before switching. Preview one requested combination before materializing it; never expand every possible combination automatically. Reference substitutions are explicit IDs, not name replacements in prose. Keep voice retention deliberate.
 
 ## Spoken flow and pacing
 
@@ -42,4 +42,4 @@ Read the canonical fit analysis supplied with the shots. Its corpus estimate use
 
 For suggestions, propose each replacement with `slates_update_script_suggestions` (action `create`), quoting the exact words it replaces at the revision you read; the creator accepts or dismisses it in the document, and `slates_get_script_suggestions` reports what became of it. For an explicit edit request, apply the scoped edit and read it back; do not add an approval ceremony. On a stale revision, reread and preserve both authors' changes. Do not replace the whole script to change one opening.
 
-Headings and directions are non-spoken metadata. Shots are optional production bindings. Script-driven recipes compile the active words; custom prompts retain their bytes and need a visible alignment review. Existing takes remain historical media. Writing, switching alternatives and importing templates do not generate anything. Load production and cost guidance only when production is requested.
+Headings and directions are non-spoken metadata. Shots are optional production bindings. Script-driven recipes compile the active words; custom prompts retain their bytes and need a visible alignment review. Existing takes remain historical media. Writing, switching versions and importing templates do not generate anything. Load production and cost guidance only when production is requested.

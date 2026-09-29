@@ -92,7 +92,7 @@ export class MissingCloudTokenError extends Error {
   code = 'CLOUD_TOKEN_MISSING'
   constructor() {
     super(
-      'No Slates cloud token found. Run `slates login` to authorize, or open Slates → Settings → Agent Control → Connect Claude Code.'
+      'No Slates cloud token found. Run `slates login` to authorize, or open Slates → Settings → AI tools → Send link.'
     )
   }
 }
@@ -101,7 +101,7 @@ export class MissingDesktopServerError extends Error {
   code = 'DESKTOP_SERVER_MISSING'
   constructor() {
     super(
-      'Slates desktop is not running with Agent Control enabled. Open Slates → Settings → Agent Control → toggle on.'
+      'Slates desktop is not running with its local server on. Open Slates → Settings → AI tools and connect (Send link, or Connect without the email link).'
     )
   }
 }

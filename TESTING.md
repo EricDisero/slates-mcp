@@ -87,15 +87,15 @@ curl http://localhost:3000/api/agent/models \
 
 ## Phase 2 — Slate desktop agent server
 
-Open Slate desktop (running via `npm run dev` in Terminal 3). Settings → **Agent Control** accordion.
+Open Slate desktop (running via `npm run dev` in Terminal 3). Settings → **AI tools**.
 
-1. Toggle **Local HTTP server** ON. Status indicator should say "Listening on 127.0.0.1:27272". Last request: never.
+1. Turn on **Connect without the email link**. This starts the local server on 127.0.0.1:27272, and the status still reads **Not connected yet**.
 2. Confirm `~/.slates/agent-connection.json` exists. On Windows: `%USERPROFILE%\.slates\agent-connection.json`.
    ```bash
    cat ~/.slates/agent-connection.json
    ```
    Expected fields: `desktop.enabled=true`, `desktop.port=27272` (or scanned fallback), `desktop.token="<hex>"`, `cloud.token=null` (until next step).
-3. In the same Settings panel, **Connect Claude Code:** enter your email and click **Send link**. Click the link in your email.
+3. In the same Settings panel, enter your email and click **Send link**. Click the link in your email.
 4. Status flips to **Connected**. Re-read the connection file — `cloud.token` is now `slates_sk_...`.
 
 Test the local server with the desktop token:

@@ -385,7 +385,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (/not reachable|Agent Control/i.test(message)) warn(message)
+    if (/not reachable|is not running|AI tools|Agent Control/i.test(message)) warn(message)
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],
       isError: true,

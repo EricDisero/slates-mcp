@@ -69,7 +69,7 @@ Notes for agent use:
 ## First-time setup
 
 1. Install and open the Slates desktop app.
-2. **Settings → Agent Control → enter your email → Send link.** Click the emailed link.
+2. **Settings → AI tools → enter your email → Send link.** Click the emailed link.
 3. `slates status` should now show your account. (Alternative: `slates login`.)
 
 Credentials live in `~/.slates/agent-connection.json`. No env vars.

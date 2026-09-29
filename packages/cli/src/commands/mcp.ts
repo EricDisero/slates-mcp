@@ -149,7 +149,7 @@ export function runMcp(opts: McpOptions): void {
   }
 
   console.log('\n── Next steps ──')
-  console.log('  1. Connect your account: open Slates → Settings → Agent Control → Send link')
+  console.log('  1. Connect your account: open Slates → Settings → AI tools → Send link')
   console.log('     (or run `slates login`)')
   console.log('  2. Install the agent skills: `slates install-skills`')
 }

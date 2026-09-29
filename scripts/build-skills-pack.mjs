@@ -246,7 +246,7 @@ The full chart of what is free and what is paid: https://slates.video/docs/skill
 
 **Before you start:** your AI tool needs to be connected to Slates. If it isn't yet, follow
 https://slates.video/docs/connect-claude first. It's one click from inside the app
-(Settings → Agent Control), or one terminal command.
+(Settings → AI tools), or one terminal command.
 
 ### Option A: one command (the free skills)
 
@@ -291,7 +291,7 @@ the app fill in live. Every generation shows its credit cost before it runs.
 ## Troubleshooting
 
 - **The agent ignores the skills.** Restart your AI tool, since skills are read at startup.
-- **"Not connected to Slates."** Open the desktop app and check Settings → Agent Control, or
+- **"Not connected to Slates."** Open the desktop app and check Settings → AI tools, or
   run \`npx -y @slatesvideo/cli login\`.
 - **Full setup guide:** https://slates.video/docs/skills-pack
 

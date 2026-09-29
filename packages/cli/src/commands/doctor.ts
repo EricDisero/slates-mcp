@@ -84,7 +84,7 @@ export async function runDoctor(): Promise<void> {
     name: 'Connection file',
     ok: existsSync(CONNECTION_FILE),
     detail: existsSync(CONNECTION_FILE) ? CONNECTION_FILE : `not found at ${CONNECTION_FILE}`,
-    fix: 'Run `slates login`, or open Slates → Settings → Agent Control → Send link.',
+    fix: 'Run `slates login`, or open Slates → Settings → AI tools → Send link.',
   })
 
   // 2. The cloud token, verified against the API rather than merely present.
@@ -93,7 +93,7 @@ export async function runDoctor(): Promise<void> {
       name: 'Cloud account',
       ok: false,
       detail: 'no token',
-      fix: 'Run `slates login` (or connect from Slates → Settings → Agent Control).',
+      fix: 'Run `slates login` (or connect from Slates → Settings → AI tools).',
     })
   } else {
     try {
@@ -121,7 +121,7 @@ export async function runDoctor(): Promise<void> {
       name: 'Desktop server',
       ok: false,
       detail: 'not enabled in the connection file',
-      fix: 'Open Slates → Settings → Agent Control → toggle on. Every workspace op needs this.',
+      fix: 'Open Slates → Settings → AI tools and connect (Send link, or Connect without the email link). Every workspace op needs this.',
     })
   } else {
     try {
@@ -136,7 +136,7 @@ export async function runDoctor(): Promise<void> {
         name: 'Desktop server',
         ok: false,
         detail: err instanceof Error ? err.message : String(err),
-        fix: 'Open the Slates app. If it IS open, the stored port is stale — toggle Agent Control off and on.',
+        fix: 'Open the Slates app. If it IS open, the stored port is stale — in Settings → AI tools, Disconnect and connect again.',
       })
     }
   }

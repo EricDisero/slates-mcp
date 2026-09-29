@@ -44,7 +44,7 @@ export function runSetup(opts: SetupOptions): void {
     if (hasCloud || hasDesktop) {
       console.log(`  Partially connected (${hasCloud ? 'cloud' : 'desktop'} only) — finish the link below.`)
     }
-    console.log('  Open Slates desktop → Settings → Agent Control → enter your email → Send link,')
+    console.log('  Open Slates desktop → Settings → AI tools → enter your email → Send link,')
     console.log('  then click the link in your email. (Or run `slates login`.)')
     console.log('  That one step authorizes the agent AND starts the local server the tools talk to.')
   }

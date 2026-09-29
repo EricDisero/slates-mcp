@@ -11,7 +11,7 @@ Read the existing document and its revision before writing. Preserve supplied wo
 
 Use `slates_get_script_document` and `slates_update_script_document` for ordered, revision-checked text and structure edits. Scene strings own spoken words. Paragraph blocks hold offsets and marks; headings/directions own only their non-spoken text. Do not keep an independently editable master body beside the document.
 
-Create a storyboard or scene only when needed for the requested destination. Use the current project unless the user asks for another. Writing a script needs no image, character record or generation.
+Create a board or scene only when needed for the requested destination. Use the current project unless the user asks for another. Writing a script needs no image, character record or generation.
 
 ## Bind production where wanted
 
@@ -23,9 +23,9 @@ Shots file through the existing filing service. Pass the scene or frame destinat
 
 ## Review without imposing a format
 
-Read composed requests, actual reference roles and the current quote. Explain only consequential decisions not already visible in the document or shot. Variety counts are suggestions: intentional repeated frames, continuing sentences and recurring cast may be exactly right. `slates-script-craft` covers passages and alternatives; `slates-shot-variety` covers deliberate visual rhythm.
+Read composed requests, actual reference roles and the current quote. Explain only consequential decisions not already visible in the document or shot. Variety counts are suggestions: intentional repeated frames, continuing sentences and recurring cast may be exactly right. `slates-script-craft` covers passages and versions; `slates-shot-variety` covers deliberate visual rhythm.
 
-If generation is requested, follow `slates-cost-discipline` for the exact set. On an uncertain timeout inspect existing generation IDs before retrying. Preserve takes and inspect the landed results. Named Cuts keep independent edits separate; writing alone does not require a Cut, export or paid call.
+If generation is requested, follow `slates-cost-discipline` for the exact set. On an uncertain timeout inspect existing generation IDs before retrying. Preserve takes and inspect the landed results. Named cuts keep independent edits separate; writing alone does not require a cut, export or paid call.
 
 <!-- @inject:decision-log -->
 Record production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.

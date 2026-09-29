@@ -17,7 +17,7 @@ description: Prompt and edit images with GPT Image 2.5 Flare or Sunburst. Covers
 <!-- /slates-only -->
 **Card — GPT Image 2.5.** The photoreal front-runner for people, and the readable-text, ordered-panel engine. Structure: subject and action with each reference named where it is used, then any exact copy in quotes, then layout, then light.
 
-**Pick the seat.** `flare` is the fast seat, quality comparable to GPT Image 2: drafts and volume. `sunburst` is the most capable: finals, hero frames, photoreal people, multi-reference edits. Use the product default; choose Flare when speed is a stated priority.
+**Pick the tier.** `flare` is Faster, quality comparable to GPT Image 2: drafts and volume. `sunburst` is Better quality, the most capable: finals, hero frames, photoreal people, multi-reference edits. Use the product default; choose Flare when speed is a stated priority.
 
 **The levers**
 1. **Name each reference inline** — `the woman from image 1`, `lit and graded like image 2`. Never an opening paragraph about what the references are.
@@ -81,7 +81,7 @@ All five rungs are exposed, and they span ~36× end to end (2k class: $0.0044 �
 | Tier | Use it for |
 |---|---|
 | `low` | Roughest pass — layout and composition checks, throwaway comps. |
-| `medium` | The draft seat. Cheaper than NB2 Lite and available up to 4K, which is why the draft lane moved here. |
+| `medium` | The draft tier. Cheaper than NB2 Lite and available up to 4K, which is why the draft lane moved here. |
 | `high` | General-purpose quality tier. Blind benchmarks on GPT Image 2 put this rung — which it called `medium` — within a hair of `max` (which it called `high`) at a quarter of the cost. Inherited from the old ladder, never re-run on 2.5, and it says nothing about `xhigh`. |
 | `xhigh` | One rung short of the top at about half its price (2k: 4 cr against `max`'s 8). Worth trying before `max`. |
 | `max` | Top of the ladder. Tiny type, dense diagrams, many labelled elements. |

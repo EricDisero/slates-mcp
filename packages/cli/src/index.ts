@@ -25,7 +25,7 @@ import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 // the operations into recipes.
 //
 // First-time use:
-//   1. Open Slates desktop → Settings → Agent Control → Send link.
+//   1. Open Slates desktop → Settings → AI tools → Send link.
 //   2. Click the link in your email (or run `slates login`).
 //   3. The connection is written to ~/.slates/agent-connection.json —
 //      cloud token + the desktop app's local port + token.

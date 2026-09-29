@@ -5,7 +5,7 @@ description: Direct a creator-style spoken performance when the brief calls for 
 
 # Creator-style performance
 
-Read `slates-script-craft` for the script and opening/bridge alternatives. Match the requested creator, audience and reference register. Phone footage, quiet polish and cinematic treatment are choices; no evidence here establishes one as universally highest-converting.
+Read `slates-script-craft` for the script and opening/bridge versions. Match the requested creator, audience and reference register. Phone footage, quiet polish and cinematic treatment are choices; no evidence here establishes one as universally highest-converting.
 
 ## Direct a person in a place
 

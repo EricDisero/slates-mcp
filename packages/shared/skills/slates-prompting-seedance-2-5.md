@@ -364,7 +364,7 @@ not a lip-sync job. Bill it like any other edit — on the source clip's length.
 
 The three-tier face routing is identical to 2.0 — faceless → default route, an AI character's face →
 `seedanceFace: true` (the relaxed provider, a real cost premium), a real person's photo → the
-consent-gated premium route after a `[REAL_FACE_DETECTED]` rejection, with `realFaceConsent: true`
+consent-gated real-person route after a `[REAL_FACE_DETECTED]` rejection, with `realFaceConsent: true`
 set **only** after the user explicitly confirms they hold the rights to the likeness. The full rules,
 including why the real-vs-AI call is the provider's and not yours, are in
 `slates-prompting-seedance`.

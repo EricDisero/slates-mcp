@@ -12,7 +12,7 @@ Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is 
 
 ## What it does
 
-The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and storyboards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->139<!-- /gen:tool-count --> tools total.
+The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and boards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->139<!-- /gen:tool-count --> tools total.
 
 Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
 
@@ -21,7 +21,7 @@ Both surfaces share one operations layer (`@slatesvideo/shared`) and one config 
 ## Setup
 
 1. Install or update Slates desktop. Open it.
-2. **Settings → Agent Control → enter your email → Send link.** This one click starts the local HTTP server on `127.0.0.1:27272` (or the next free port) AND emails you a sign-in link.
+2. **Settings → AI tools → enter your email → Send link.** This one click starts the local HTTP server on `127.0.0.1:27272` (or the next free port) AND emails you a sign-in link.
 3. Click the link in your email to authorize this machine.
 4. The connection file is now written with both:
    - `desktop` — port + token for the local server
@@ -56,7 +56,7 @@ For **Claude Desktop or Cursor**, add to your MCP config:
 
 Restart your client. Slates tools appear in the tool palette.
 
-**Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → Agent Control → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients and writes their config. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
+**Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → AI tools → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients and writes their config. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
 
 ### CLI (Codex, Claude Code, terminal scripts)
 
@@ -124,7 +124,7 @@ This builds everything first, then publishes shared → mcp → cli with `--acce
 - The desktop server is bound to `127.0.0.1` only. It rejects any non-loopback connection at the OS level.
 - Every request is rejected if it carries a cross-origin `Origin` header (kills browser-fetch attacks) or a non-loopback `Host` header (kills DNS rebinding), before the bearer token is even read.
 - The `slates_sk_` token is sent only to the configured cloud host (`slates-api.fly.dev` by default). `SLATES_CLOUD_BASE_URL` can override the host for dev/staging, but only over `https://` (or `http://localhost`) — an insecure override is ignored so the token can't be exfiltrated or sent in cleartext.
-- Disconnect (Slates desktop → Settings → Agent Control) revokes the `slates_sk_` token server-side and clears it locally. Once revoked, that token's hash never authenticates again — so a leaked copy stops working too.
+- Disconnect (Slates desktop → Settings → AI tools) revokes the `slates_sk_` token server-side and clears it locally. Once revoked, that token's hash never authenticates again — so a leaked copy stops working too.
 
 ## License
 

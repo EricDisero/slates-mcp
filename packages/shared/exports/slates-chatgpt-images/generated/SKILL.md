@@ -16,7 +16,7 @@ Do not apply another API model's settings or capabilities to the host generator.
 
 ## Connected desktop path
 
-This add-on is off by default. The user enables Settings → ChatGPT Images in
+This add-on is off by default. The user enables Settings → AI tools → ChatGPT images in
 Slates before connecting. It requires an installed Codex host and an eligible
 ChatGPT account; a subscription alone does not install or connect the host.
 Settings offers installation instructions, Connect ChatGPT and Check again in

@@ -233,7 +233,7 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
     [
       {
         heading: 'When to use it instead of the others',
-        note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner and the cheapest seat, and Kling O3 Edit is the one that takes subject and style reference images.',
+        note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner and the cheapest option, and Kling O3 Edit is the one that takes subject and style reference images.',
       },
       {
         heading: 'It edits the audio too',
@@ -394,7 +394,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
         note: 'No negative-prompt field — write what to avoid as a direct instruction.',
       },
       {
-        heading: 'Know its seat',
+        heading: 'Know its role',
         note: 'Cheap drafts, iteration volume, and audio-in-one-gen at low cost. For hero shots, Seedance 2.5 (the default) or Seedance 2.0 (4K, cheaper) still win.',
       },
     ],
@@ -450,7 +450,7 @@ const OMNI_FLASH_EDIT: PromptingTipsEntry = {
 const GPT_IMAGE_25: PromptingTipsEntry = {
   label: 'GPT Image 2.5',
   intro: [
-    'Two seats at the same price: Flare is the fast one; Sunburst is the most capable, and slower. Explore on Flare, finish on Sunburst.',
+    'Two tiers at the same price: Flare is the faster one; Sunburst is the better-quality one, and slower. Explore on Flare, finish on Sunburst.',
     'The photoreal front-runner for people, and the most reliable model for readable text, ordered panels and exact placement.',
   ],
   columns: [
@@ -636,7 +636,7 @@ const SEED_AUDIO: PromptingTipsEntry = {
         note: 'Up to 3 audio clips (max 30s each), referenced as @Audio1–@Audio3 — OR one image to score what is in frame. Never both in the same generation.',
       },
       {
-        heading: 'Know its seat',
+        heading: 'Know its role',
         note: 'Scenes, beds, room tone and dialogue in one pass. For a single effect that has to land on a specific frame, use Sound Effects.',
       },
     ],
@@ -679,7 +679,7 @@ const ELEVEN_SFX: PromptingTipsEntry = {
         note: 'Higher hugs your wording with less variation between takes; lower explores. Raise it when a re-roll keeps wandering off the brief.',
       },
       {
-        heading: 'Know its seat',
+        heading: 'Know its role',
         note: 'One precise effect on a known frame. Full rooms and layered scenes are cheaper and better in one Seed Audio pass.',
       },
     ],
@@ -690,7 +690,7 @@ const MINIMAX_H3: PromptingTipsEntry = {
   label: 'MiniMax H3',
   intro: [
     'MiniMax H3 generates picture and sound in one pass — 24fps, 32kHz stereo, 5-15 seconds, 11 stably-supported languages. It is the only video model in Slates where audio is AUTHORED rather than switched on: synchronised dialogue and action sounds go in the body of the prompt, ambience goes in a soundscape section, and audience-only music goes in a score section. Put a sound in the wrong section and it is dropped, doubled, or attributed to the wrong source.',
-    'Three seats. Base H3 runs 480p / 768p / 2K / 4K; H3 Max is fal\'s faster post-train and runs 480p / 768p / 1080p, dearer than base H3 at the tier they share - a deliberate speed pick, never the cheap one; H3 Max Turbo has Max\'s ladder at half Max\'s rate and takes NO references. Base H3 and Max read up to 9 reference images plus 3 video and 3 audio clips (12 files total, and audio never travels alone); all three animate a start frame and an end frame. 768p is the default on all three because it is the tier the model natively generates; base H3\'s 2K and 4K are upscales of a 768p base, and 1080p on Max and Turbo is a refinement of it. Reference images past the free allowance are billed and the allowances DIFFER: 5 free on base H3, 4 on Max.',
+    'Three models. Base H3 runs 480p / 768p / 2K / 4K; H3 Max is fal\'s faster post-train and runs 480p / 768p / 1080p, dearer than base H3 at the tier they share - a deliberate speed pick, never the cheap one; H3 Max Turbo has Max\'s ladder at half Max\'s rate and takes NO references. Base H3 and Max read up to 9 reference images plus 3 video and 3 audio clips (12 files total, and audio never travels alone); all three animate a start frame and an end frame. 768p is the default on all three because it is the tier the model natively generates; base H3\'s 2K and 4K are upscales of a 768p base, and 1080p on Max and Turbo is a refinement of it. Reference images past the free allowance are billed and the allowances DIFFER: 5 free on base H3, 4 on Max.',
   ],
   columns: [
     [
@@ -725,7 +725,7 @@ const MINIMAX_H3: PromptingTipsEntry = {
       {
         heading: 'Say how much of a reference survives',
         example: 'Give the man in image 3 the weathered leather texture of the jacket in image 4.',
-        note: 'H3 is the only seat that understands transferring a characteristic onto a DIFFERENT subject. State each reference\'s job and how much of it should carry through — kept whole, kept in part, transferred, or a loose echo.',
+        note: 'H3 is the only model that understands transferring a characteristic onto a DIFFERENT subject. State each reference\'s job and how much of it should carry through — kept whole, kept in part, transferred, or a loose echo.',
       },
       {
         heading: 'Reference images past the fifth cost extra',
@@ -752,7 +752,7 @@ const LTX_2_5: PromptingTipsEntry = {
   label: 'LTX-2.5',
   intro: [
     'LTX-2.5 scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE, not the last. Lightricks ranks the six parts of a prompt in this order: sound, camera, character detail, shot type and scene, then scene dressing — and scene dressing is the first thing to cut when a prompt sprawls. Everything goes in ONE flowing paragraph, not a list of labelled sections.',
-    'Two seats. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest native 1080p second in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
+    'Two models. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest native 1080p second in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
   ],
   columns: [
     [
@@ -808,14 +808,14 @@ const LTX_2_5: PromptingTipsEntry = {
   ],
   footer: [
     'Frames, not references. LTX takes a start frame and an optional end frame (which generates a transition between the two) — it has no reference endpoint at all, so identity, style and environment reference images are not available on this model. For character consistency across separate shots, use MiniMax H3 or Kling.',
-    'Aspect ratios are 16:9 and 9:16 only, and native audio is included free at every resolution — there is no sound surcharge on either seat.',
+    'Aspect ratios are 16:9 and 9:16 only, and native audio is included free at every resolution — there is no sound surcharge on either model.',
     'In image-to-video, do not cut away from the opening frame too early: you have paid for that frame, so let it play before the first move.',
   ],
 }
 const INWORLD_TTS: PromptingTipsEntry = {
   label: 'Inworld TTS-2',
   intro: [
-    'The voice seat: one named voice saying one line. Unlike every other surface in Slates, the prompt is not a description of what you want — it IS the words that get spoken, verbatim, and its length is what you are billed for.',
+    'The voice model: one named voice saying one line. Unlike every other surface in Slates, the prompt is not a description of what you want — it IS the words that get spoken, verbatim, and its length is what you are billed for.',
     'A voice belongs to a character, the same way a face does. Build it once from a clip or a description, then send it lines.',
   ],
   columns: [
@@ -863,7 +863,7 @@ const INWORLD_TTS: PromptingTipsEntry = {
         note: 'Numbers, dates and abbreviations are read literally. Write them as they should sound.',
       },
       {
-        heading: 'Know its seat',
+        heading: 'Know its role',
         note: 'One voice, cleanly. Dialogue mixed with effects and room tone in one pass is Seed Audio; a single non-speech sound is Sound Effects.',
       },
     ],

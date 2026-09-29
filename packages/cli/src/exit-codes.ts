@@ -22,7 +22,7 @@ export const EXIT = {
   /** The op returned `requires_clarification` — a required choice is missing
    *  (aspect ratio, resolution, duration). Its `message` names the field. */
   CLARIFICATION_REQUIRED: 4,
-  /** The Slates desktop app is not running with Agent Control on. */
+  /** The Slates desktop app is not running, or its local server is off (Settings → AI tools). */
   DESKTOP_UNREACHABLE: 5,
   /** No cloud token, or it was revoked. Run `slates login`. */
   NOT_SIGNED_IN: 6,
@@ -36,7 +36,7 @@ export function exitFor(err: unknown): number {
   if (code === 'DESKTOP_SERVER_MISSING') return EXIT.DESKTOP_UNREACHABLE
   if (code === 'CLOUD_TOKEN_MISSING') return EXIT.NOT_SIGNED_IN
   const message = err instanceof Error ? err.message : String(err)
-  if (/not reachable|Agent Control|is not running/i.test(message)) return EXIT.DESKTOP_UNREACHABLE
+  if (/not reachable|AI tools|Agent Control|is not running/i.test(message)) return EXIT.DESKTOP_UNREACHABLE
   if (/rejected the auth token|slates login|401/i.test(message)) return EXIT.NOT_SIGNED_IN
   return EXIT.ERROR
 }

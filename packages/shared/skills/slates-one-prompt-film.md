@@ -1,6 +1,6 @@
 ---
 name: slates-one-prompt-film
-description: Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named Cut and a verified export. Preserve existing work and follow generation authorization.
+description: Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named cut and a verified export. Preserve existing work and follow generation authorization.
 ---
 
 # Idea to finished video
@@ -9,7 +9,7 @@ Carry the requested piece through to an exported file. Use existing work wheneve
 
 ## Make the intended piece visible
 
-Use the current project and document unless another destination is requested. Save words through the revision-checked document tools; `slates-script-craft` covers writing and alternatives. Add production bindings only where needed. A shot needs no image, and a Cut can use imported footage with no script.
+Use the current project and document unless another destination is requested. Save words through the revision-checked document tools; `slates-script-craft` covers writing and versions. Add production bindings only where needed. A shot needs no image, and a cut can use imported footage with no script.
 
 Preserve fixed passages, explicit creative choices and custom prompt bytes. Record production choices in editable shots. Explain only consequential judgments not already visible there. Recurring cast, repeated framing, silence and dependent scenes are valid when they serve the piece.
 
@@ -17,7 +17,7 @@ Preserve fixed passages, explicit creative choices and custom prompt bytes. Reco
 
 Use `slates_get_shot` to inspect the composed prompt, settings and references. Model choices and supported settings come from `slates-model-selection`, the current capability surface and the selected model's guide. Do not carry limits or prices from an old example.
 
-Follow `slates-cost-discipline` and the user's generation policy. Quote the exact requested set with `slates_generate_from_shots` before confirming it. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing, choosing alternatives, importing and building a Cut do not spend generation credits.
+Follow `slates-cost-discipline` and the user's generation policy. Quote the exact requested set with `slates_generate_from_shots` before confirming it. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing, choosing versions, importing and building a cut do not spend generation credits.
 
 Keep reusable historical media separate from new requests. Matching words alone do not prove matching voice, references or settings. An explicitly requested extra take is never deduplicated away.
 
@@ -29,9 +29,9 @@ Inspect image composition and reference fidelity. Inspect video performance, mot
 
 ## Arrange and deliver
 
-Read the available timelines. Name the destination Cut explicitly for a variation; independent comparisons use independent Cuts. Add selected media in the intended order, preserve trim/level/transform choices and inspect the actual timeline.
+Read the available timelines. Name the destination cut explicitly for a variation; independent comparisons use independent cuts. Add selected media in the intended order, preserve trim/level/transform choices and inspect the actual timeline.
 
-Use supported video/XML exports and their stated fidelity limits. For selected named Cuts, `slates_export_cuts` records distinct outputs and a manifest; retry unfinished outputs with the same manifest identity. Verify the returned files and playback before reporting success. Describe the completed piece, actual spend where available and output paths. Do not label a render complete merely because its submission succeeded.
+Use supported video/XML exports and their stated fidelity limits. For selected named cuts, `slates_export_cuts` records distinct outputs and a manifest; retry unfinished outputs with the same manifest identity. Verify the returned files and playback before reporting success. Describe the completed piece, actual spend where available and output paths. Do not label a render complete merely because its submission succeeded.
 
 <!-- @inject:decision-log -->
 Record production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.

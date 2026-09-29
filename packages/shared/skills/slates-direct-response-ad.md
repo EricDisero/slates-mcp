@@ -15,7 +15,7 @@ For example, a keys tray can interrupt a sliding key, show where it lands, then 
 
 ## Keep the work editable
 
-Use the current project unless another destination is requested. Save the script as document text, with non-spoken direction separate. Create shots only for the requested production units and file them into explicit scenes. Alternative openings live beside the shared body as section alternatives. Preserve manual edits and reference identity.
+Use the current project unless another destination is requested. Save the script as document text, with non-spoken direction separate. Create shots only for the requested production units and file them into explicit scenes. Alternative openings live beside the shared body as saved versions of a section. Preserve manual edits and reference identity.
 
 Read the composed requests before any media call. Model selection, reference slots, durations and resolution come from current capabilities and `slates-model-selection`, never a copied ad recipe. Every prompt stays visible on its shot. A preset imports ordinary editable content and does not authorize generation.
 
@@ -23,6 +23,6 @@ Read the composed requests before any media call. Model selection, reference slo
 
 Follow `slates-cost-discipline` and the user's authorization for the exact selected requests. Estimate the set through the existing quote operation. An extra stochastic take remains an extra requested take; compatible existing media can be deliberately reused.
 
-Inspect results against the demonstration and supplied references. A failed job is not authorization for an unchanged reroll. Keep earlier takes accessible. Assemble into an explicitly named Cut when comparing variations, inspect playback, and export the selected Cuts with their results. `slates-one-prompt-film` covers this delivery task when a finished video is requested.
+Inspect results against the demonstration and supplied references. A failed job is not authorization for an unchanged reroll. Keep earlier takes accessible. Assemble into an explicitly named cut when comparing variations, inspect playback, and export the selected cuts with their results. `slates-one-prompt-film` covers this delivery task when a finished video is requested.
 
 No conversion outcome is promised by this format. Creative clarity, observed distribution and measured purchases are different evidence.

@@ -236,9 +236,9 @@ export function tierFor(id: string): OperationTier {
 /** One-line summary of each group, for `slates_load_tools`' own description. */
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, the Library (user-named categories of saved references: characters, locations, products, looks), moving and copying assets and Library items between projects, revealing files on disk',
-  script: 'rich script documents, anchored sections, alternatives, reusable passages, variations and take input history',
-  timeline: 'named cuts and selected exports; the timeline (tracks, clips, settings), video export and NLE XML export, clip trimming',
-  admin: 'rename / delete / reorder for projects, characters, environments, storyboards, scenes and frames; shot duplicate, split and merge',
+  script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
+  timeline: 'named cuts and selected exports; the timeline (tracks, clips, settings), video export and export for DaVinci, Premiere or Final Cut (XML), clip trimming',
+  admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }
 

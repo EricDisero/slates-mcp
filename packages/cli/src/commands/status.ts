@@ -9,7 +9,7 @@ export async function runStatus(): Promise<void> {
     `Desktop server:    ${
       c.desktop.enabled
         ? `enabled on 127.0.0.1:${c.desktop.port}`
-        : 'disabled — open Slates → Settings → Agent Control'
+        : 'disabled — open Slates → Settings → AI tools'
     }`
   )
 

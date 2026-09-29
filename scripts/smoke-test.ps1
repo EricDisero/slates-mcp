@@ -58,7 +58,7 @@ Write-Host ""
 Write-Host "[1] Connection file" -ForegroundColor Cyan
 $conn = $null
 if (-not (Test-Path $connectionFile)) {
-    Add-Result 'Connection file exists' 'FAIL' "$connectionFile not found. Open Slates -> Settings -> Agent Control -> toggle on."
+    Add-Result 'Connection file exists' 'FAIL' "$connectionFile not found. Open Slates -> Settings -> AI tools -> Send link."
 } else {
     try {
         $conn = Get-Content $connectionFile -Raw | ConvertFrom-Json
@@ -78,7 +78,7 @@ if ($conn) {
     if ($conn.desktop.enabled -and $conn.desktop.port -and $conn.desktop.token) {
         Add-Result 'Desktop server enabled' 'PASS' "127.0.0.1:$($conn.desktop.port)"
     } else {
-        Add-Result 'Desktop server enabled' 'SKIP' 'Toggle Settings -> Agent Control -> Local HTTP server'
+        Add-Result 'Desktop server enabled' 'SKIP' 'Connect in Settings -> AI tools (Send link, or Connect without the email link)'
     }
 }
 
