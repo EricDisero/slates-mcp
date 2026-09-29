@@ -108,9 +108,9 @@ const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
 const SEEDANCE_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
 
 /**
- * MiniMax H3, both seats: six. Read off fal's live OpenAPI 2026-08-27 for
- * `minimax/h3/text-to-video` and `minimax/h3-max/text-to-video` — identical
- * enums. It happens to be the same six Seedance takes; kept as its OWN constant
+ * MiniMax H3, all three seats: six. Read off fal's live OpenAPI 2026-08-27 for
+ * `minimax/h3/text-to-video` and `minimax/h3-max/text-to-video`, and 2026-09-29
+ * for `minimax/h3-max-turbo/text-to-video` — identical enums. It happens to be the same six Seedance takes; kept as its OWN constant
  * because a provider that adds a ratio adds it to ITS family, and sharing the
  * Seedance constant would silently move H3 the next time ByteDance moves.
  *
@@ -473,10 +473,15 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   // ── Kling video ────────────────────────────────────────────────────────────
 
+  // Standard is 720p and Pro is 1080p; 4K is a separate endpoint shared by all
+  // four. Kling's own API: "std: ... The output video resolution is 720P.
+  // pro: ... The output video resolution is 1080P." The fal Standard endpoint
+  // takes no resolution parameter, and every Standard and Omni render we
+  // measured came back 1280x720 (2026-09-29). This row said 1080p until then.
   'kling-v3.0-std': {
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
-    videoResolution: { options: ['1080p', '4k'] },
+    videoResolution: { options: ['720p', '4k'] },
     // 3, not 5. The op claimed "Kling: 5-15" and refused legal 3-4s takes.
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
@@ -493,7 +498,8 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   'kling-v3.0-omni': {
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
-    videoResolution: { options: ['1080p', '4k'] },
+    // O3 Standard: 720p, as Standard above. Omni Pro is the 1080p tier.
+    videoResolution: { options: ['720p', '4k'] },
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
   },
@@ -664,21 +670,25 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // canvas and arrives through `sourceVideo`, not as a reference.
   },
 
-  // ── MiniMax H3 (both seats on fal — added 2026-08-27) ──────────────────────
+  // ── MiniMax H3 (three seats on fal — base and Max added 2026-08-27, Max
+  //    Turbo 2026-09-29) ─────────────────────────────────────────────────────
   //
-  // Every value below is READ OFF fal's live OpenAPI, fetched 2026-08-27:
+  // Every value below is READ OFF fal's live OpenAPI, fetched 2026-08-27, and
+  // re-read 2026-09-29 for the Max 1080p tier and the Turbo row:
   //   minimax/h3/{text-to-video,image-to-video,reference-to-video}
   //   minimax/h3-max/{text-to-video,image-to-video,reference-to-video}
+  //   minimax/h3-max-turbo/{text-to-video,image-to-video} (reference-to-video 404s)
   // 🚨 CORRECTED 2026-09-09: `minimax/h3-max/reference-to-video` DOES exist —
   // 9 images, 3 videos, 3 audio. The earlier note here said it 404s; the schema
   // had never been read. Both rows now declare the full omni-reference set, and
   // every cap on the Max row was re-read on the Max endpoint rather than copied
   // down from the base row.
   //
-  // 🚨 NEVER PREFIX-MATCH THESE TWO IDS. `minimax-h3-max` starts with
-  // `minimax-h3`, so any `startsWith('minimax-h3')` swallows the Max row into
-  // the base row's branch — a different ladder AND a different price at the one
-  // tier they share. Every lookup downstream is an exact-id map, not a prefix.
+  // 🚨 NEVER PREFIX-MATCH THESE THREE IDS. `minimax-h3-max-turbo` starts with
+  // `minimax-h3-max`, which starts with `minimax-h3`, so any `startsWith`
+  // swallows a row into its neighbour's branch — a different ladder AND a
+  // different price at the tiers they share. Every lookup downstream is an
+  // exact-id map, not a prefix.
 
   'minimax-h3': {
     // fal reference-to-video schema, 2026-09-09: each audio clip is 2-15s.
@@ -742,8 +752,29 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // arms — quoted off this endpoint, not inherited.
     maxReferenceVideoSeconds: 15,
     maxReferenceAudioSeconds: 15,
-    videoResolution: { options: ['480p', '768p'], default: '768p' },
+    // 1080P is on all three h3-max endpoints' enum (fal schema, 2026-09-09 and
+    // 2026-09-29), described as "1080P latent refinement from a native 768P
+    // source": a refinement, not a native generation and not base H3's
+    // 2K/4K upscaler. It was keyed 2026-09-09 and pulled 2026-09-10 because the
+    // 1080p video-reference token rate was unpublished; fal now states it
+    // (see MINIMAX_MAX_REFERENCE). Default stays 768p, the native tier.
+    videoResolution: { options: ['480p', '768p', '1080p'], default: '768p' },
     duration: { min: 5, max: 15, mode: 'continuous' },
+  },
+
+  'minimax-h3-max-turbo': {
+    aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
+    // fal schema for both Turbo endpoints, 2026-09-29: enum
+    // ["480P","768P","1080P"], default "768P", the same 1080P "latent
+    // refinement from a native 768P source" as the Max row.
+    videoResolution: { options: ['480p', '768p', '1080p'], default: '768p' },
+    // duration: integer, minimum 5, maximum 15, default 5 (both endpoints).
+    duration: { min: 5, max: 15, mode: 'continuous' },
+    // NO reference capacity: `minimax/h3-max-turbo/reference-to-video` returns
+    // 404 from fal's OpenAPI endpoint (2026-09-29), and neither published
+    // endpoint carries a reference array. Start and end frames ride
+    // image-to-video and live in MODEL_REGISTRY.features.lastFrame.
+    maxIngredientImages: 0,
   },
 
   // ── LTX-2.5 (both seats on fal — added 2026-08-29) ─────────────────────────
@@ -1131,14 +1162,16 @@ export function describeReferenceImageCaps(models: readonly string[]): string {
 
 /** H3 Max reference accounting, fal's worked tables read 2026-09-09.
  * https://fal.ai/models/minimax/h3-max/reference-to-video
- * 1080p video-reference pricing is unpublished; never infer it from output rates.
+ * 1080p: fal's page, read 2026-09-29: "768p and 1080p output use the same
+ * reference-video token counts." So 1080p takes the 768p figure; it was absent
+ * until fal published that sentence, and must never be inferred from output rates.
  */
 export const MINIMAX_MAX_REFERENCE = {
   freeTokens: 4096,
   imagePixelsPerToken: 1024,
   normalizedImageEdge: 1024,
   audioTokensPerSecond: 80,
-  videoTokensPerSecond: { '480p': 2886, '768p': 7459.2 } as Partial<Record<VideoResolution, number>>,
+  videoTokensPerSecond: { '480p': 2886, '768p': 7459.2, '1080p': 7459.2 } as Partial<Record<VideoResolution, number>>,
 } as const
 
 export function minimaxMaxReferenceTokens(input: {

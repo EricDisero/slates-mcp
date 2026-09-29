@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.EricDisero/slates",
+  "title": "Slates",
+  "description": "Drive the Slates desktop AI video studio: storyboards, characters, image and video generation.",
+  "websiteUrl": "https://slates.video",
+  "repository": {
+    "url": "https://github.com/EricDisero/slates-mcp",
+    "source": "github",
+    "subfolder": "packages/mcp"
+  },
+  "version": "0.5.21",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@slatesvideo/mcp-server",
+      "version": "0.5.21",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

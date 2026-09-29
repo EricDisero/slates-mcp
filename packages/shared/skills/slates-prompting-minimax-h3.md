@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-minimax-h3
-description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling slates_generate_video with model minimax-h3 or minimax-h3-max. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, capped at 768p, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it animates start and end frames AND takes the same 9+3+3 omni-reference set (corrected 2026-09-09), so the seats differ on ladder and price, not on what they accept. Two hazards live here: reference images past the free allowance are billed (5 free then +4 credits on base H3; pooled media tokens on Max), and audio written into the wrong section is dropped or duplicated.
+description: How to prompt MiniMax H3, H3 Max and H3 Max Turbo. Read before calling slates_generate_video with model minimax-h3, minimax-h3-max or minimax-h3-max-turbo. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, runs 480p/768p plus a 1080p refinement of its 768p render, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it animates start and end frames AND takes the same 9+3+3 omni-reference set (corrected 2026-09-09). minimax-h3-max-turbo is a second fal post-train with Max's ladder at half Max's rate; it takes start and end frames but has NO reference endpoint. Two hazards live here: reference images past the free allowance are billed (5 free then +4 credits on base H3; pooled media tokens on Max), and audio written into the wrong section is dropped or duplicated.
 ---
 
 # MiniMax H3 — prompting
@@ -28,7 +28,7 @@ description: How to prompt MiniMax H3 and MiniMax H3 Max. Read before calling sl
 - `A woman sits still at a kitchen table for a beat, then looks up. She says in English, "You said Tuesday." Scene sound: a fridge hum, a spoon set down on formica. Score: none.`
 - `Two mechanics either side of an open bonnet. The younger one wipes his hands, waits, then speaks in Spanish, "No es el alternador." Scene sound: a socket wrench, a radio two bays over. Score: a low sustained cello under the last three seconds, audience only.`
 
-**Hard constraint:** the two seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` tops out at 768p rather than 4K, takes the same 9+3+3 references, and costs MORE at the tier they share — it is a speed pick, never the cheap one. H3's top two resolution tiers are UPSCALES of the native render: judge at native. Reference inputs affect the quote; include every attached modality when estimating.
+**Hard constraint:** the three seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` tops out at 1080p, takes the same 9+3+3 references, and costs MORE at the tier they share — a speed pick, never the cheap one; `minimax-h3-max-turbo` has Max's ladder at half its rate and takes frames only, NO references. Every tier above 768p is built from the native 768p render: judge at native. Reference inputs affect the quote; include every attached modality when estimating.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -50,20 +50,30 @@ German, Italian, Japanese, Korean, Portuguese, Russian, Spanish). That single fa
 everything below — the prompt is not a shot description with sound bolted on, it is a **timeline
 with three audio layers you author separately**.
 
-**Two seats, one grammar.** Everything in this file applies to both. They differ only in what the
-endpoint accepts:
+**Three seats, one grammar.** Everything in this file applies to all three. They differ only in
+what the endpoint accepts:
 
-| | `minimax-h3` | `minimax-h3-max` |
-|---|---|---|
-| Resolution | 480p / 768p / **2K / 4K** | 480p / 768p |
-| References | 9 images + 3 video + 3 audio (12 files) | 9 images + 3 video + 3 audio (12 files) |
-| Frames | start and/or end | start and/or end |
-| Price at 768p | **$0.060/s** | $0.080/s |
-| Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) |
+| | `minimax-h3` | `minimax-h3-max` | `minimax-h3-max-turbo` |
+|---|---|---|---|
+| Resolution | 480p / 768p / **2K / 4K** | 480p / 768p / 1080p | 480p / 768p / 1080p |
+| References | 9 images + 3 video + 3 audio (12 files) | 9 images + 3 video + 3 audio (12 files) | **none** (no reference endpoint) |
+| Frames | start and/or end | start and/or end | start and/or end |
+| Price at 768p | **$0.060/s** | $0.080/s | $0.040/s |
+| Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) | **price** — half Max's rate at every tier |
 
 **Max is the premium seat, not the budget one.** It is 33% dearer at the one tier they share and it
 tops out lower. Route there when a fast turnaround on a text-to-video or start-frame shot is worth
 paying for; route to base H3 for anything needing resolution, references, or the same tier cheaper.
+
+**Turbo is the budget seat.** Same grammar and Max's ladder at half Max's rate, with no reference
+endpoint: attach a reference and Slates refuses the call rather than dropping it. Route there for
+drafts, volume and start-frame coverage, then re-run the keeper on Max or base H3 when it needs
+references.
+
+**1080p on Max and Turbo is a refinement, not a native render.** fal's schema, verbatim: *"1080P
+latent refinement from a native 768P source."* It is a different stage from base H3's 2K/4K
+upscaler, and it costs double the 768p second. Judge a 1080p take against the same shot at 768p
+before paying for it across a batch.
 
 **The speed is measured, not claimed** (2026-08-27, same prompt and params on both rows): a 5-second
 768p text-to-video finished in **4.8 seconds** on Max against **57 seconds** on base H3 — roughly
@@ -192,8 +202,8 @@ original wording preserved exactly: *A red neon sign reading "Open Late" glows a
 
 ## References — H3's real differentiator is the declared RELATIONSHIP
 
-*(BOTH rows. `minimax-h3-max` gained the reference set on 2026-09-09; its free allowance is
-FOUR images rather than the base row's five.)*
+*(`minimax-h3` and `minimax-h3-max`. Max gained the reference set on 2026-09-09; its free allowance
+is FOUR images rather than the base row's five. `minimax-h3-max-turbo` takes no references.)*
 
 <!-- @inject:references-read-literally -->
 > **The general law: the model reads a reference literally.**
@@ -260,7 +270,7 @@ exactly and say so.
 **An audio reference cannot travel alone** — H3 refuses a reference set that is audio only. Pair it
 with at least one image or video reference.
 
-### 💸 Reference images past the free allowance are billed — and the two rows differ
+### 💸 Reference images past the free allowance are billed — and the two reference rows differ
 
 On `minimax-h3` the first **5** are free and each additional image adds **4 credits**.
 Max pools image pixels, reference-video seconds and reference-audio seconds into one token
@@ -279,14 +289,14 @@ reference-heavy job — a quote that omits it under-reports the bill.
 
 ## Frames
 
-`minimax-h3` and `minimax-h3-max` both take a **start frame**, an **end frame**, or both. With an
+All three rows take a **start frame**, an **end frame**, or both. With an
 end frame, land it explicitly: describe the final pose, spacing and composition as the thing the
 shot **settles into** at the end, rather than hoping the model finds it.
 
 > *"…she rotates the handle into the final angle and settles into the pose, spacing and composition
 > of image 2 at the end of the shot."*
 
-**Frames and references are mutually exclusive** on both rows — they are different endpoints, and
+**Frames and references are mutually exclusive** on the two reference rows — they are different endpoints, and
 the reference endpoint has no frame slots at all. Slates refuses the combination rather than
 dropping one side.
 
@@ -301,6 +311,9 @@ dropping one side.
 | `minimax-h3` · 2K · 10s | 65 |
 | `minimax-h3` · 4K · 10s | 80 |
 | `minimax-h3-max` · 768p · 10s | 40 |
+| `minimax-h3-max` · 1080p · 10s | 80 |
+| `minimax-h3-max-turbo` · 768p · 10s | 20 |
+| `minimax-h3-max-turbo` · 1080p · 10s | 40 |
 | `minimax-h3` — every reference image past the **fifth** | **+4** |
 
 **768p is the default for a reason.** It is the tier the model natively generates.

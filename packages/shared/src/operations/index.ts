@@ -299,13 +299,14 @@ export const ELEVEN_SFX_DEFAULT_SECONDS = 4
 // bucket of CHARACTERS instead, and the bucket exists because of the minimum
 // billable floor rather than for tidiness.
 //
-// At $20.8/M characters and a 1.5× markup, a 200-character line is $0.006 of
-// basis — under `MIN_AUDIO_BILLABLE_DOLLARS` ($0.01), so it bills the floor.
-// The floor stops biting at 321 characters. A bucket SMALLER than that would be
-// entirely floor-bound (every bucket the same price, so the displayed rate stops
-// tracking cost and becomes a lie); a much LARGER one over-bills the short lines
-// this feature is mostly for. 250 splits that difference and divides 2,000
-// exactly, giving eight buckets and no ragged last one.
+// At $25/M characters (Inworld On-Demand, read 2026-09-28) and a 1.5× markup,
+// a 200-character line is $0.0075 of basis — under `MIN_AUDIO_BILLABLE_DOLLARS`
+// ($0.01), so it bills the floor. The floor stops biting at 267 characters, so
+// the 250 bucket is floor-bound. A narrower bucket would put several buckets on
+// the one floor price, and the displayed rate would stop tracking cost; a much
+// WIDER one over-bills the short lines this feature is mostly for. 250 splits
+// that difference and divides 2,000 exactly, giving eight buckets and no ragged
+// last one.
 //
 // 🚨 THE CAP IS READ FROM THE CAPABILITY SSOT, NEVER TYPED. 2,000 is the
 // vendor's MEASURED limit (the API rejects 2,001 by name), and this module
@@ -532,6 +533,8 @@ interface ViewShape {
   cut: { open: boolean; full: boolean; side: 'bottom' | 'left' | 'right'; height: number; width: number }
   leftDock: { open: boolean; width: number }
   studioAgent: { enabled: boolean; open: boolean; width: number }
+  /** Absent from a desktop older than 1.5.9. */
+  script?: { details: boolean }
   /** When the desktop last reported it. */
   updatedAt: string
 }
@@ -551,7 +554,8 @@ const describeView = (v: ViewShape): string => {
     : 'the Studio Agent is switched off in Settings'
   return (
     `The ${v.lens} lens is showing. The Cut (the timeline) is ${where}. ` +
-    `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.`
+    `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
+    (v.script ? ` The Script page shows ${v.script.details ? 'All details (each shot\'s picture beside its words)' : 'Dialogue (the words alone)'}.` : '')
   )
 }
 
@@ -563,7 +567,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "How the Slates window is arranged: the lens showing, where the Cut (timeline) sits, and which side panels are open.",
+    "How the Slates window is arranged: the lens showing, where the Cut (timeline) sits, which side panels are open, and whether the Script page shows All details.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -595,10 +599,11 @@ export const setView: Operation<{
   cut?: { open?: boolean; full?: boolean; side?: 'bottom' | 'left' | 'right'; height?: number; width?: number }
   leftDock?: { open?: boolean; width?: number }
   studioAgent?: { open?: boolean; width?: number }
+  script?: { details?: boolean }
 }> = {
   id: 'slates_set_view',
   description:
-    "Rearrange the Slates window: switch lens, open/close the Cut (timeline) or park it along the bottom or as a left/right column, and open/close or resize the side panels. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
+    "Rearrange the Slates window: switch lens, open/close the Cut (timeline) or park it along the bottom or as a left/right column, open/close or resize the side panels, and switch the Script page between Dialogue and All details. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
   input: z
     .object({
       lens: z.enum(['board', 'media', 'script']).optional().describe('Which lens the centre shows.'),
@@ -631,12 +636,19 @@ export const setView: Operation<{
         .strict()
         .optional()
         .describe('The Studio Agent panel on the right. It cannot be opened while the agent is off in Settings.'),
+      script: z
+        .object({
+          details: z.boolean().optional().describe('All details (true): each shot\'s picture beside its words on the Script page. Dialogue (false): the words alone.'),
+        })
+        .strict()
+        .optional()
+        .describe('The Script page.'),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
     if (Object.keys(input).length === 0) {
-      throw new Error('Name at least one of lens, cut, leftDock or studioAgent — there is nothing to change otherwise.')
+      throw new Error('Name at least one of lens, cut, leftDock, studioAgent or script — there is nothing to change otherwise.')
     }
     const r = await ctx.desktop().post<{ view: ViewShape | null; reason?: string }>('/agent/view', input)
     if (!r.view) {
@@ -721,18 +733,21 @@ export const VIDEO_MODELS = [
   // Flash ones.
   'seedance-2.5',
   'omni-flash',
-  // MiniMax H3, two seats in one family (2026-08-27). Base H3 is the AUTHORED-
-  // AUDIO seat — three directable sound layers in one pass, declared reference
-  // relationships, 480p to 4K, and the cheapest 768-class second we sell.
-  // H3 Max is fal's self-hosted post-train: faster, capped at 768p, takes NO
-  // references, and costs MORE than base H3 at the tier they share — a
-  // premium-speed seat, never a cheap H3.
+  // MiniMax H3, three seats in one family. Base H3 (2026-08-27) is the
+  // AUTHORED-AUDIO seat — three directable sound layers in one pass, declared
+  // reference relationships, 480p to 4K. H3 Max (2026-08-27) is fal's
+  // self-hosted post-train: faster, 480p to a 1080p refinement, the same
+  // omni-reference set, and dearer than base H3 at the tier they share. H3 Max
+  // Turbo (2026-09-29) is a second fal post-train at half Max's rate, with NO
+  // reference endpoint.
   //
-  // NEVER PREFIX-MATCH: 'minimax-h3-max' starts with 'minimax-h3'. Every
-  // branch keyed on these ids matches EXACTLY; a prefix test silently bills
-  // the Max row at base rates and offers it 2K/4K it cannot render.
+  // NEVER PREFIX-MATCH: 'minimax-h3-max-turbo' starts with 'minimax-h3-max',
+  // which starts with 'minimax-h3'. Every branch keyed on these ids matches
+  // EXACTLY; a prefix test bills one row at another's rates and offers it a
+  // ladder it cannot render.
   'minimax-h3',
   'minimax-h3-max',
+  'minimax-h3-max-turbo',
   // LTX-2.5, two seats in one family (2026-08-29). Base is the VOLUME seat —
   // cheapest native 1080p second we sell, free native audio at every tier, the
   // only row reaching 1440p, and the longest clips in the catalogue (20s).
@@ -792,7 +807,7 @@ const VIDEO_RESOLUTION_VOCAB = VIDEO_RESOLUTIONS
 // $0.080 x 1.5 x 100 = 12 cents, and 12 is divisible by CENTS_PER_CREDIT (3),
 // so every extra image is 4 credits at every resolution and every duration with
 // zero drift. A rate that is not a multiple of 2 cents breaks that property.
-const MINIMAX_MODELS = new Set<string>(['minimax-h3', 'minimax-h3-max'])
+const MINIMAX_MODELS = new Set<string>(['minimax-h3', 'minimax-h3-max', 'minimax-h3-max-turbo'])
 /** Reference images fal does not charge for. */
 const MINIMAX_FREE_REF_IMAGES = 5
 /** Per-row free allowance. The Max row's is FOUR — fal prices its references by
@@ -3007,7 +3022,7 @@ export function videoCostKey(input: {
     // × vref × res × duration). AI-face route bills the `-face-` key (~45% over
     // faceless); consented real-person route bills the premium `-realface-` key
     // (fal partner endpoint). A reference video flips to `-vref-{res}-{T}s`,
-    // T = in + out.
+    // T = in + out, or max(in, out) + out on the AI-face route.
     //
     // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 runs 480p/720p/1080p (no 4K),
     // reaches 30s, and takes references to 30s combined — so its vref total
@@ -3022,9 +3037,9 @@ export function videoCostKey(input: {
       // ceil(x - 0.05) matches the server's probe rounding — quote = bill.
       const maxTotal = v25 ? SEEDANCE_25_VREF_MAX_TOTAL : SEEDANCE_20_VREF_MAX_TOTAL
       // EvoLink (the AI-face rail) bills a reference on max(input, output) +
-      // output on 2.5. Mirrors seedanceBilledRefSeconds in slate pricing.ts.
+      // output on 2.0 and 2.5. Mirrors seedanceBilledRefSeconds in slate pricing.ts.
       const inSecs = Math.ceil(vrefSecs - 0.05)
-      const billedIn = v25 && face === '-face' ? Math.max(inSecs, input.duration) : inSecs
+      const billedIn = face === '-face' ? Math.max(inSecs, input.duration) : inSecs
       const total = Math.min(maxTotal, Math.max(6, billedIn + input.duration))
       return `${input.model}${face}-vref-${res}-${total}s`
     }
@@ -3272,9 +3287,14 @@ function resolveVideoModel(raw: string): {
     'gemini-omni-flash': 'omni-flash',
     'gemini-omni-flash-preview': 'omni-flash',
     'omni-flash-preview': 'omni-flash',
-    // The MAX spellings must come out as MAX. Bare `minimax`, `h3` and
-    // `hailuo-3` all mean the BASE row — it holds the full ladder and the
-    // references, and it is cheaper at the tier they share.
+    // The MAX and TURBO spellings must come out as themselves. Bare `minimax`,
+    // `h3` and `hailuo-3` all mean the BASE row — it holds the full ladder and
+    // the references, and it is cheaper than Max at the tier they share.
+    'minimax-h3-max-turbo': 'minimax-h3-max-turbo',
+    'minimax-h3-turbo': 'minimax-h3-max-turbo',
+    'h3-max-turbo': 'minimax-h3-max-turbo',
+    'h3-turbo': 'minimax-h3-max-turbo',
+    'hailuo-3-max-turbo': 'minimax-h3-max-turbo',
     'minimax-h3-max': 'minimax-h3-max',
     'minimax-h3max': 'minimax-h3-max',
     'h3-max': 'minimax-h3-max',
@@ -3604,7 +3624,9 @@ export const generateVideo: Operation<{
     // not a number the registry models: fal publishes text-to-video,
     // image-to-video and reference-to-video for `minimax/h3`, and only the
     // all three for `minimax/h3-max` as well (corrected 2026-09-09 — its
-    // reference-to-video was wrongly believed to 404). The
+    // reference-to-video was wrongly believed to 404). `minimax/h3-max-turbo`
+    // has text-to-video and image-to-video only; its caps declare no references,
+    // so the first branch below refuses them. The
     // reference endpoint has no frame parameters at all, so frames and
     // references are mutually exclusive — a shape mismatch, not a preference.
     if (MINIMAX_MODELS.has(input.model)) {

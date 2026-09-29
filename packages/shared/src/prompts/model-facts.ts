@@ -394,7 +394,19 @@ export const MODEL_FACTS: ModelFact[] = [
     // from the base row: "Audio cannot be the only reference input; provide at
     // least one reference image or video with it."
     audioRefNeedsCompanion: true,
-    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It gives up the upper resolution tiers. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call: its reference endpoint has no start/end-frame fields, where base H3\'s does. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
+    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call: its reference endpoint has no start/end-frame fields, where base H3\'s does. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
+  },
+  {
+    id: 'minimax-h3-max-turbo',
+    route: 'generate',
+    tier: 'specialist',
+    label: 'MiniMax H3 Max Turbo',
+    kind: 'video',
+    // Added 2026-09-29. No reference caps: fal publishes text-to-video and
+    // image-to-video for Turbo and its reference-to-video returns 404, so
+    // `caps()` returns nulls and the composer refuses references.
+    ...caps('minimax-h3-max-turbo'),
+    notes: 'THE BUDGET SEAT of the MiniMax family: a second fal post-train of the H3 weights, billed at half H3 Max\'s rate at every tier. Its 1080p is a refinement of the native 768p render, not a native 1080p generation. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video and start/end frames only, with no reference endpoint, so reference-driven consistency goes to H3 Max or base H3. Route here for drafts, volume and cheap coverage, then re-run the keeper on H3 Max or a hero seat.',
   },
   {
     id: 'ltx-2-5',
