@@ -42,7 +42,7 @@ The user's request is one of:
 | Aesthetic / compositional | `slates_generate_image` with the original in `referenceAssetIds` + a refined prompt. Don't re-roll from scratch. |
 | Wholesale | New prompt, no reference, fresh generation. Treat as a new brief. |
 
-**`slates_edit_image` shape:** `projectId` + `sourceAssetId` + `prompt` (the edit instruction). Default model `nano-banana-2` — the only edit model that also takes extra `referenceAssetIds`; `flux-2-max` / `seedream-5-lite` use their own edit endpoints and ignore references. The result lands as a NEW asset (prompt prefixed `[Edit]`); the source is untouched. Cost above ~17 credits gates on `confirm=true`.
+**`slates_edit_image` shape:** `projectId` + `sourceAssetId` + `prompt` (the edit instruction). Omit `editModel` for the app's Edit seat (the default image model). Every edit model also takes `referenceAssetIds`, up to its reference cap less one: the source is image 1. The result lands as a NEW asset (prompt prefixed `[Edit]`); the source is untouched. Cost above ~17 credits gates on `confirm=true`.
 
 ### 4. Generate, evaluate, decide
 - Estimate cost first.

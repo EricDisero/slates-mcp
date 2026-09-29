@@ -2763,13 +2763,13 @@ export const editImage: Operation<{
   id: 'slates_edit_image',
   billable: true,
   description:
-    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the one the app uses; only the Nano Banana models also accept referenceAssetIds); flux-2-max / seedream-5-lite use their own edit endpoints and ignore references. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
+    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the model the app\'s Edit box opens on). Every model also takes referenceAssetIds, up to its reference cap less one: the source is image 1 of the request. Before first use call slates_get_prompting_guide with topic \'slates-edit-and-iterate\'.',
   input: z.object({
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
     prompt: z.string().min(1).max(4000).describe('The change, not the whole image.'),
-    editModel: z.enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst', 'flux-2-max', 'seedream-5-lite']).optional(),
-    referenceAssetIds: z.array(z.string().uuid()).max(13).optional().describe('Nano-Banana only (NB Pro 13, NB2 Lite 3).'),
+    editModel: zEnum(IMAGE_MODELS).optional(),
+    referenceAssetIds: z.array(z.string().uuid()).max(Math.max(...IMAGE_MODELS.map((m) => (MODEL_CAPABILITIES[m].maxRefImages ?? 1) - 1))).optional().describe("Images beside the source: each model's reference cap less one (the source is image 1)."),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),

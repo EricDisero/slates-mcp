@@ -33,11 +33,17 @@ export const DEFAULT_IMAGE_SEAT = 'default-image' as const
 export const TOOL_SEAT: Record<BuiltInTool, typeof DEFAULT_IMAGE_SEAT | string> = {
   'character-sheet': DEFAULT_IMAGE_SEAT,
   'environment-plate': DEFAULT_IMAGE_SEAT,
-  // Pinned: the image viewer offers these two tools a fixed short list of seats,
-  // and the cell-extraction prompt has a variant per seat family. Moving either
-  // is a picker and a prompt change first.
+  // Pinned: the image viewer offers grid extraction a fixed short list of seats,
+  // and the cell-extraction prompt has a variant per seat family. Moving it is a
+  // picker and a prompt change first.
   'grid-extract': 'nano-banana-2',
-  'image-edit': 'nano-banana-2',
+  // Follows the default image model (2026-09-29). The viewer's Edit box lists
+  // every image model from the registry, and the edit handler sends references
+  // to each one up to its own cap, so nothing ties this tool to one family. Until
+  // then it was pinned to Nano Banana 2 while the app's default was GPT Image 2.5
+  // Sunburst, so Edit and the prompt bar opened on different models for the
+  // same picture.
+  'image-edit': DEFAULT_IMAGE_SEAT,
 }
 
 /** Both sheet tools frame one wide image. On GPT Image the aspect is part of the price. */
