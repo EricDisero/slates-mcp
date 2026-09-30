@@ -524,14 +524,25 @@ export const getSelection: Operation<Record<string, never>> = {
   },
 }
 
+// The view's three lists, mirrored from the desktop's `@shared/types/view`
+// (`LENSES`, `CUT_SIDES`, `DOCK_SECTIONS`), which this package cannot import.
+// Lockstep check 12 fails when they differ.
+const VIEW_LENSES = ['board', 'media', 'script'] as const
+const VIEW_CUT_SIDES = ['bottom', 'left', 'right'] as const
+const VIEW_DOCK_SECTIONS = ['storyboards', 'library', 'folders', 'pinned'] as const
+type DockSection = (typeof VIEW_DOCK_SECTIONS)[number]
+/** What each dock section is called on screen. */
+const DOCK_SECTION_NAMES: Record<DockSection, string> = { storyboards: 'Boards', library: 'Library', folders: 'Folders', pinned: 'Pinned' }
+
 /** The shape both view ops speak. Mirrors `ViewReport` in the desktop's
  *  `@shared/types/view`; the desktop is the only writer, and it answers every
  *  call with what its own stores settled on. */
 interface ViewShape {
   projectId: string | null
-  lens: 'board' | 'media' | 'script'
-  cut: { open: boolean; full: boolean; side: 'bottom' | 'left' | 'right'; height: number; width: number }
-  leftDock: { open: boolean; width: number }
+  lens: (typeof VIEW_LENSES)[number]
+  cut: { open: boolean; full: boolean; side: (typeof VIEW_CUT_SIDES)[number]; height: number; width: number }
+  /** `folded` is absent from a desktop whose view predates folding. */
+  leftDock: { open: boolean; width: number; folded?: DockSection[] }
   studioAgent: { enabled: boolean; open: boolean; width: number }
   /** Absent from a desktop older than 1.5.9. */
   script?: { details: boolean }
@@ -555,6 +566,7 @@ const describeView = (v: ViewShape): string => {
   return (
     `The ${v.lens} tab is showing. The timeline is ${where}. ` +
     `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
+    (v.leftDock.folded?.length ? ` Folded in the navigator: ${v.leftDock.folded.map((f) => DOCK_SECTION_NAMES[f] ?? f).join(', ')}.` : '') +
     (v.script ? ` The Script page shows ${v.script.details ? 'Words + shots (each shot\'s picture beside its words)' : 'Words (the words alone)'}.` : '')
   )
 }
@@ -595,24 +607,24 @@ export const getView: Operation<Record<string, never>> = {
  * the timeline full-screen instead, and says so.
  */
 export const setView: Operation<{
-  lens?: 'board' | 'media' | 'script'
-  cut?: { open?: boolean; full?: boolean; side?: 'bottom' | 'left' | 'right'; height?: number; width?: number }
-  leftDock?: { open?: boolean; width?: number }
+  lens?: (typeof VIEW_LENSES)[number]
+  cut?: { open?: boolean; full?: boolean; side?: (typeof VIEW_CUT_SIDES)[number]; height?: number; width?: number }
+  leftDock?: { open?: boolean; width?: number; folded?: DockSection[] }
   studioAgent?: { open?: boolean; width?: number }
   script?: { details?: boolean }
 }> = {
   id: 'slates_set_view',
   description:
-    "Rearrange the Slates window: switch tab (Media, Script or Board), open/close the timeline or park it along the bottom or as a left/right column, open/close or resize the side panels, and switch the Script page between Words and Words + shots. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
+    "Rearrange the Slates window: switch tab (Media, Script or Board), open/close the timeline or park it along the bottom or as a left/right column, open/close or resize the side panels, fold the navigator's sections, and switch the Script page between Words and Words + shots. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
   input: z
     .object({
-      lens: z.enum(['board', 'media', 'script']).optional().describe('Which tab the centre shows.'),
+      lens: z.enum(VIEW_LENSES).optional().describe('Which tab the centre shows.'),
       cut: z
         .object({
           open: z.boolean().optional().describe('Show or hide the timeline.'),
           full: z.boolean().optional().describe('Give the timeline the whole workspace.'),
           side: z
-            .enum(['bottom', 'left', 'right'])
+            .enum(VIEW_CUT_SIDES)
             .optional()
             .describe('Where the timeline is parked. A column suits a wide monitor; picking a side opens the timeline.'),
           height: z.number().optional().describe('The bottom band\'s height in px.'),
@@ -624,6 +636,10 @@ export const setView: Operation<{
         .object({
           open: z.boolean().optional(),
           width: z.number().optional().describe('Width in px.'),
+          folded: z
+            .array(z.enum(VIEW_DOCK_SECTIONS))
+            .optional()
+            .describe('Every section to fold to its title (storyboards is Boards); a section not named unfolds. Applies to the open project.'),
         })
         .strict()
         .optional()
@@ -654,7 +670,11 @@ export const setView: Operation<{
     if (!r.view) {
       return { text: r.reason ? `Nothing was rearranged (${r.reason}).` : 'Nothing was rearranged.', data: { view: null } }
     }
-    return { text: describeView(r.view), data: { view: r.view } }
+    // A desktop whose view predates folding takes the patch and ignores `folded`.
+    const noFolds = input.leftDock?.folded !== undefined && r.view.leftDock.folded === undefined
+      ? " This Slates cannot fold the navigator's sections; update Slates."
+      : ''
+    return { text: describeView(r.view) + noFolds, data: { view: r.view } }
   },
 }
 
@@ -2351,7 +2371,9 @@ export const generateImage: Operation<{
     // that echoes a prompt -- the clarification and confirm gates are PRE-spend,
     // which is where a rewrite is still free.
     // Omitted model: the default seat when there is a project to route through,
-    // nano-banana-2 without one, because it is the only headless seat.
+    // nano-banana-2 without one, because it is the only headless seat. The
+    // desktop's pre-flight guard (`estimateOpCostCents`, src/main/studio-agent/
+    // ops.ts) picks the same seat: change both together.
     const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : 'nano-banana-2')
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
@@ -2747,6 +2769,11 @@ async function pollProxyJob(
 
 // ── Edit image ──────────────────────────────────────────────────
 
+/** References an edit carries beside the source, which is image 1 of the same request. */
+const editReferenceCap = (model: string): number => Math.max(0, (MODEL_CAPABILITIES[model]?.maxRefImages ?? 1) - 1)
+/** The models a 1.5.8 desktop sends edit references on, frozen with that build: on every other model it drops them and bills the edit in full. */
+const LEGACY_EDIT_REFERENCE_MODELS: readonly string[] = ['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro']
+
 export const editImage: Operation<{
   projectId: string
   sourceAssetId: string
@@ -2769,7 +2796,7 @@ export const editImage: Operation<{
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
     prompt: z.string().min(1).max(4000).describe('The change, not the whole image.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
-    referenceAssetIds: z.array(z.string().uuid()).max(Math.max(...IMAGE_MODELS.map((m) => (MODEL_CAPABILITIES[m].maxRefImages ?? 1) - 1))).optional().describe("Images beside the source: each model's reference cap less one (the source is image 1)."),
+    referenceAssetIds: z.array(z.string().uuid()).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
@@ -2796,8 +2823,15 @@ export const editImage: Operation<{
     } else if (editModel === 'nano-banana-pro' || editModel === 'nano-banana-2-lite') {
       await desktop.requireCapability('image-models-v2', `${editModel} editing`)
     }
+    if (input.referenceAssetIds?.length && !LEGACY_EDIT_REFERENCE_MODELS.includes(editModel)) {
+      await desktop.requireCapability('edit-references-all-models', `references on a ${editModel} edit`)
+    }
+    // Past the model's cap the desktop sends the first ones and says so in its reply (`note`).
+    const referencesOver = (input.referenceAssetIds?.length ?? 0) - editReferenceCap(editModel)
     // Nano-Banana family + GPT Image 2.5 edits charge the same key as gen;
     // FLUX / Seedream route to dedicated edit endpoints priced under '-edit' keys.
+    // Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts, which
+    // this package cannot import: change both together.
     const costKey =
       editModel === 'flux-2-max' || editModel === 'seedream-5-lite'
         ? `${imageCostKey(editModel, resolution)}-edit`
@@ -2819,6 +2853,7 @@ export const editImage: Operation<{
         source_ref: sourceRef,
         message:
           `Cost: ${fmtCredits(totalCents)} to edit ${sourceRef} with ${editModel} (${costKey}). ` +
+          (referencesOver > 0 ? `${editModel} takes ${editReferenceCap(editModel)} references beside the source; ${referencesOver} would not be sent. ` : '') +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
       })
@@ -2831,6 +2866,8 @@ export const editImage: Operation<{
       generationId?: string
       generationIds?: string[]
       error?: string
+      /** References past the model's cap that the desktop left out, in words. */
+      note?: string
     }>('/agent/generation/edit-image', {
       projectId: input.projectId,
       sourceAssetId: input.sourceAssetId,
@@ -2852,7 +2889,8 @@ export const editImage: Operation<{
         sourceAssetId: input.sourceAssetId,
         cost_cents: totalCents,
         cost_credits: totalCents,
-      })
+        ...(result.note ? { note: result.note } : {}),
+      }, result.note ? `${result.note}.` : undefined)
     }
 
     // Inline the edited result so the LLM sees whether the surgery landed —
@@ -2874,7 +2912,8 @@ export const editImage: Operation<{
       text:
         `Edited image saved as a new asset in project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)} via ${editModel}. ` +
-        `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
+        `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
+        (result.note ? ` ${result.note}.` : ''),
       images,
       data: {
         editModel,
@@ -2886,6 +2925,7 @@ export const editImage: Operation<{
         cost_credits: totalCents,
         asset: result.asset,
         generationId: result.generationId,
+        ...(result.note ? { note: result.note } : {}),
       },
     }
   },
@@ -5164,6 +5204,36 @@ export const removeClip: Operation<{ clipId: string }> = {
   },
 }
 
+export const manageTimelineMarker: Operation<{
+  action: 'create' | 'update' | 'delete'
+  projectId: string
+  timelineId?: string
+  markerId?: string
+  frame?: number
+  name?: string
+  color?: string
+}> = {
+  id: 'slates_manage_timeline_marker',
+  description:
+    "Add, change or delete a marker on the timeline, as the Cut's ruler and marker menus do (slates_get_timeline lists them under timeline.markers). create: frame, optional name and color. update: markerId plus any of frame, name, color. delete: markerId. The color is one of the app's marker colours by name (e.g. Red); any other is refused with the list. The open Cut shows the change.",
+  input: z.object({
+    action: z.enum(['create', 'update', 'delete']),
+    projectId: z.string().uuid(),
+    timelineId: z.string().uuid().optional().describe("A named cut; omit for the project's timeline."),
+    markerId: z.string().uuid().optional(),
+    frame: z.number().int().min(0).optional().describe('Where the marker sits, in timeline frames.'),
+    name: z.string().max(120).optional(),
+    color: z.string().optional(),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-markers', 'timeline markers')
+    if (input.action === 'create' && input.frame === undefined) throw new Error('create needs a frame.')
+    if (input.action !== 'create' && !input.markerId) throw new Error(`${input.action} needs a markerId (slates_get_timeline lists them).`)
+    return ok(await desktop.post('/agent/timeline/markers', input))
+  },
+}
+
 export const addTimelineTrack: Operation<{
   projectId: string; timelineId?: string
   type?: 'video' | 'audio'
@@ -5400,6 +5470,41 @@ export const getProjectDirectory: Operation<{ id: string }> = {
   input: z.object({ id: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().get('/agent/projects/location', { id: input.id }))
+  },
+}
+
+/** What both relocation routes answer: the folder the project now uses, and
+ *  the one its files could not all be removed from, when that happened. */
+function relocated(r: { directory?: string; leftBehind?: string }, done: string): OperationResult {
+  const text = r.leftBehind
+    ? `${done} to ${r.directory}. Some files could not be removed from ${r.leftBehind}, so both folders exist and the project uses the new one; tell the user, and delete the old folder once nothing holds it open. There is no undo for this move.`
+    : `${done} to ${r.directory}.`
+  return ok(r, text)
+}
+
+export const relocateProject: Operation<{ id: string }> = {
+  id: 'slates_relocate_project',
+  description:
+    "Move a project stored in an older folder into the current projects folder (Settings › Storage's move): its files are copied, every path is pointed at the copy, then the old folder is removed. slates_get_project_directory says where it is now. slates_undo_relocate_project puts it back while Slates stays open. Refused while the project is generating.",
+  input: z.object({ id: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('project-relocate', 'moving a project into the current projects folder')
+    const r = await desktop.post<{ directory?: string; leftBehind?: string }>('/agent/projects/relocate', { id: input.id })
+    const moved = relocated(r, 'Moved the project')
+    return r.leftBehind ? moved : { ...moved, text: `${moved.text} slates_undo_relocate_project puts it back until Slates quits.` }
+  },
+}
+
+export const undoRelocateProject: Operation<{ id: string }> = {
+  id: 'slates_undo_relocate_project',
+  description:
+    "Put a project moved by slates_relocate_project (or Settings › Storage) back in the folder it came from. Works only for the last move, in the same run of Slates, and only while nothing has moved it since.",
+  input: z.object({ id: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('project-relocate', 'moving a project back')
+    return relocated(await desktop.post<{ directory?: string; leftBehind?: string }>('/agent/projects/relocate-undo', { id: input.id }), 'Moved the project back')
   },
 }
 
@@ -7865,6 +7970,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,
   removeClip as unknown as Operation<unknown>,
+  manageTimelineMarker as unknown as Operation<unknown>,
   addTimelineTrack as unknown as Operation<unknown>,
   updateTimelineTrack as unknown as Operation<unknown>,
   removeTimelineTrack as unknown as Operation<unknown>,
@@ -7875,6 +7981,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   updateProject as unknown as Operation<unknown>,
   deleteProject as unknown as Operation<unknown>,
   getProjectDirectory as unknown as Operation<unknown>,
+  relocateProject as unknown as Operation<unknown>,
+  undoRelocateProject as unknown as Operation<unknown>,
   deleteAsset as unknown as Operation<unknown>,
   renameFolder as unknown as Operation<unknown>,
   deleteFolder as unknown as Operation<unknown>,

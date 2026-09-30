@@ -78,6 +78,8 @@ const DESTRUCTIVE_IDS = new Set([
   'slates_move_assets_to_folder',
   'slates_move_assets_to_project',
   'slates_move_entity_to_project',
+  'slates_relocate_project',
+  'slates_undo_relocate_project',
   'slates_merge_shots',
   'slates_split_shot',
 ])
@@ -161,6 +163,8 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_export_template',
     'slates_import_template',
     'slates_get_project_directory',
+    'slates_relocate_project',
+    'slates_undo_relocate_project',
     'slates_reveal_file',
   ],
   // The cut and the export. A generation session never touches these.
@@ -171,6 +175,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_add_clip_to_timeline',
     'slates_reorder_clips',
     'slates_remove_clip',
+    'slates_manage_timeline_marker',
     'slates_add_timeline_track',
     'slates_update_timeline_track',
     'slates_remove_timeline_track',
@@ -235,9 +240,9 @@ export function tierFor(id: string): OperationTier {
 
 /** One-line summary of each group, for `slates_load_tools`' own description. */
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
-  library: 'folders, the Library (user-named categories of saved references: characters, locations, products, looks), moving and copying assets and Library items between projects, revealing files on disk',
+  library: 'folders, the Library (user-named categories of saved references: characters, locations, products, looks), moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
-  timeline: 'named cuts and selected exports; the timeline (tracks, clips, settings), video export and export for DaVinci, Premiere or Final Cut (XML), clip trimming',
+  timeline: 'named cuts and selected exports; the timeline (tracks, clips, markers, settings), video export and export for DaVinci, Premiere or Final Cut (XML), clip trimming',
   admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }

@@ -91,6 +91,8 @@ so nothing downstream has to restate them in prose (which is how they went stale
 | 8 | Every per-model skill carries a craft card (under its ceiling, leading the file, naming ≥5 levers) and its own never-use list |
 | 9 | Desktop routes ↔ callers, BOTH directions: every `r.add` route in slate has a caller (an op, slate itself, or a trailing `// legacy:` marker naming the published client it still serves), and every route an op calls EXISTS in slate — the direction that deleted a live route on 2026-09-05 |
 | 10 | slate's `PROD_API_URL` literal equals `SLATES_API_URL` — the one host the renderer cannot import from the package and must mirror |
+| 11 | An op on a route the last released desktop lacks checks a capability token that desktop lacks; `doctor` lists every token |
+| 12 | The view ops' lenses, timeline sides and navigator sections equal slate's `@shared/types/view` |
 
 **Every one is mutation-tested** — break it, confirm red, restore, confirm green. A checker nobody has
 seen fail is not a checker. `scripts/mcp-instructions-smoke.mjs` then spawns the real stdio server and

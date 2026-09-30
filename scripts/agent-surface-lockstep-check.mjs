@@ -39,6 +39,8 @@
 //  10. API HOST MIRROR  — slate's PROD_API_URL equals shared SLATES_API_URL.
 //  11. CAPABILITY GATES — an op reaching a route the last released desktop
 //                         lacks checks a token that desktop lacks.
+//  12. VIEW LISTS       — the view ops' lenses, timeline sides and navigator
+//                         sections equal slate's `@shared/types/view`.
 //
 // 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of them has been
 // mutation-tested (break it, confirm red, restore, confirm green). If you add
@@ -771,8 +773,8 @@ function zodDescriptions(op) {
 // REQUIRED_CAPABILITIES names exactly the tokens the ops check.
 // NOT covered: an old route whose MEANING changed (a new field the previous
 // desktop ignores, a new default it does not share). Those need a reading of
-// the previous desktop's handler; sheet-tool-seats, image-variations and
-// shot-position are the 1.5.9 examples.
+// the previous desktop's handler; sheet-tool-seats, image-variations,
+// shot-position and edit-references-all-models are the 1.5.9 examples.
 {
   const CHECK = '11 capability gates'
   const { execFileSync } = await import('node:child_process')
@@ -846,6 +848,35 @@ function zodDescriptions(op) {
     if (!ungated.length && !unknown.length && !doctorMissing.length && !doctorExtra.length) {
       pass(CHECK, `every op on a route newer than ${released} checks a token ${released} lacks; ${used.size} tokens in use, all advertised, all in doctor`)
     }
+  }
+}
+
+// ── 12. the view's lists, mirrored exactly ─────────────────────────────────
+// `slates_get_view` / `slates_set_view` speak the desktop's `ViewReport`, whose
+// lists (the lenses, the timeline's sides, the navigator's sections) live in
+// slate's `src/shared/types/view.ts`. This package cannot import that file, so
+// the ops carry a copy; a list that drifts is a schema refusing a value the app
+// takes, or offering one it rejects.
+{
+  const CHECK = '12 view-lists-mirror'
+  const viewFile = join(desktopRoot, 'src', 'shared', 'types', 'view.ts')
+  if (!existsSync(viewFile)) {
+    warn(`${CHECK}: slate not on disk beside slates-mcp; skipped`)
+  } else {
+    const view = readFileSync(viewFile, 'utf8')
+    const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
+    const list = (src, name) => {
+      const m = new RegExp(`const ${name}\\b[^=]*=\\s*\\[([^\\]]*)\\]`).exec(src)
+      return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).join(',') : null
+    }
+    const pairs = [['LENSES', 'VIEW_LENSES'], ['CUT_SIDES', 'VIEW_CUT_SIDES'], ['DOCK_SECTIONS', 'VIEW_DOCK_SECTIONS']]
+    const drift = pairs.flatMap(([desk, mine]) => {
+      const a = list(view, desk)
+      const b = list(opsSrc, mine)
+      return a === null || b === null ? [`${a === null ? desk : mine} not found`] : a === b ? [] : [`${mine} [${b}] ≠ slate ${desk} [${a}]`]
+    })
+    if (drift.length) fail(CHECK, drift.join('; '))
+    else pass(CHECK, `${pairs.length} view lists equal slate's`)
   }
 }
 
