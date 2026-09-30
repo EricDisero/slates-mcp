@@ -19,7 +19,7 @@ const row = await desktop.get('/agent/generation/status', { id: requestId })
 assert.equal(row.generation?.status ?? row.status, 'completed', 'Only replay a completed request')
 const client = new Client({ name: 'slates-chatgpt-desktop-smoke', version: '1.0.0' })
 const transport = new StdioClientTransport({ command: process.execPath,
-  args: [fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url)), '--tools=flat'], stderr: 'pipe' })
+  args: [fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))], stderr: 'pipe' })
 try {
   await client.connect(transport)
   const call = async (name, args) => {

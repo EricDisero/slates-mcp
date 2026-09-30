@@ -89,10 +89,12 @@ The timeline, export, background-generation, edit-image, and image-reference too
 
 ### Context on demand
 
-The server starts with a small workspace/discovery tool set. Use `slates_load_tools` with `query`
-to find a capability, then `names` to load its exact schemas. A named/group load replaces the optional
-selection and emits `tools/list_changed`; existing direct operation names remain callable.
-`--tools=flat` restores the complete listing for clients that need it.
+The server lists every tool, and the list stays the same for the whole connection. Your client
+decides how much of it to load: Claude Code and Codex send the model the tool names only and fetch a
+tool's full definition when it is needed. `slates_load_tools` with `query` finds a tool by task.
+`--tools=compact` starts with a small workspace/discovery set instead and adds tools through
+`tools/list_changed`, for a client that re-reads its list mid-chat (Claude Desktop, Claude Code in the
+Claude app and Codex do not).
 
 `slates_get_prompting_guide` returns a short readable card by default. Use `query` for a section or
 cinematic technique ID, `depth: "index"` for headings, or `depth: "full"` for the complete guide.

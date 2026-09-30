@@ -115,10 +115,20 @@ const server = new Server(
 // of the ID SET and unproven of the BYTES. `toolDefinitions()` in shared is now
 // the only renderer either one calls, and the lockstep check compares them.
 //
-// Render once; listing filters startup + connection selection below. Direct calls
-// retain access to every operation for clients that do not refresh their listing.
+// 🚨 THE LIST IS EVERY TOOL, AND IT NEVER CHANGES DURING A CONNECTION.
+// 0.6.0 started with nine and added the rest when `slates_load_tools` sent
+// `tools/list_changed`. Claude Desktop, Claude Code inside the Claude app and
+// Codex never re-read the list, and a host will not call a tool it cannot see,
+// so their users could not generate at all (user report 2026-09-30; both apps
+// re-tested that day). The MCP spec (2026-07-28) now forbids a list that varies
+// "as a side effect of other requests on the connection". Hiding definitions is
+// the HOST's job: Claude Code and Codex send the model names only and fetch a
+// schema on use, so the full list cost about 3,100 tokens up front in Claude
+// Code and nothing measurable in Codex. `--tools=compact` keeps the old
+// nine-tool start for a host that honors list_changed; `--tools=flat` is
+// accepted as the default it now is.
 const TOOLS = toolDefinitions(ops, { surface: 'mcp' })
-const flatTools = process.argv.includes('--tools=flat')
+const compactTools = process.argv.includes('--tools=compact')
 let selectedTools = new Set<string>()
 
 /**
@@ -186,7 +196,7 @@ const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
 }
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOLS.filter((t) => flatTools || STARTUP_TOOL_IDS.has(t.name) || selectedTools.has(t.name)).map((t) => ({
+  tools: TOOLS.filter((t) => !compactTools || STARTUP_TOOL_IDS.has(t.name) || selectedTools.has(t.name)).map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema,
@@ -333,7 +343,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     }
 
     let data = result.data as Record<string, unknown> | undefined
-    if (op.id === 'slates_load_tools' && Array.isArray(data?.tools)) {
+    if (compactTools && op.id === 'slates_load_tools' && Array.isArray(data?.tools)) {
       selectedTools = new Set((data.tools as Array<{ name: string }>).map((t) => t.name))
       await server.sendToolListChanged().catch(() => {})
     }

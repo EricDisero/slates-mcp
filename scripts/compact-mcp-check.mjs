@@ -8,7 +8,33 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ALL_OPERATIONS, toolDefinitions } from '../packages/shared/dist/index.js'
 
-const transport = new StdioClientTransport({ command: process.execPath, args: [fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))], stderr: 'pipe' })
+const serverPath = fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))
+
+// THE DEFAULT IS WHAT USERS GET: every tool, one list for the whole connection.
+// Until 0.6.1 this file asserted the default started SHORT, so the checks
+// certified the bug that left Claude Desktop, Claude Code in the Claude app and
+// Codex users with nine tools and no generation (2026-09-30).
+{
+  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], stderr: 'pipe' })
+  const client = new Client({ name: 'default-surface-check', version: '1.0.0' })
+  let changed = 0
+  client.setNotificationHandler(ToolListChangedNotificationSchema, () => { changed++ })
+  try {
+    await client.connect(transport)
+    const initial = (await client.listTools()).tools
+    assert.equal(initial.length, ALL_OPERATIONS.length, 'the default list carries every operation')
+    for (const name of ['slates_generate_image', 'slates_generate_video', 'slates_create_shot', 'slates_generate_from_shots']) {
+      assert.ok(initial.some((t) => t.name === name), `${name} is listed by default`)
+    }
+    await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_list_shots'] } })
+    assert.deepEqual((await client.listTools()).tools, initial, 'a load does not change the list (MCP 2026-07-28, server/tools)')
+    assert.equal(changed, 0, 'the default server never sends tools/list_changed')
+    console.log(`default-mcp: ${initial.length} tools / ${Buffer.byteLength(JSON.stringify(initial))} bytes, stable across a load`)
+  } finally { await client.close(); await transport.close() }
+}
+
+// `--tools=compact`: the opt-in nine-tool start, for a host that honors list_changed.
+const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath, '--tools=compact'], stderr: 'pipe' })
 const client = new Client({ name: 'compact-surface-check', version: '1.0.0' })
 let changed = 0
 client.setNotificationHandler(ToolListChangedNotificationSchema, () => { changed++ })

@@ -274,8 +274,11 @@ Four new locks, each replacing a fact that was stated in prose with one the buil
   desktop turn, across 90 ops. `Operation.tier` defers four groups — `library`, `timeline`, `admin`,
   `blender` — behind `slates_load_tools`, which retrieves named tools or a legacy group; each load replaces the optional selection; `check:agent-surface` § 7 pins a ceiling on what is left and prints the per-turn total.
   **A GROUP IS A BUDGET, NOT A LAW:** if a task regresses because a tool arrives a turn late, move it
-  back to core. MCP lists the same small startup set, updates it per connection, and emits `tools/list_changed`.
-  All operation names remain callable for older clients; `--tools=flat` restores the full listing.
+  back to core. **Tiers are desktop-only.** The MCP server lists every op and never changes its list
+  mid-connection: 0.6.0 started MCP with the nine core tools and added more through `tools/list_changed`,
+  which Claude Desktop, Claude Code in the Claude app and Codex ignore, so their users could not generate
+  (2026-09-30). The host hides definitions (Claude Code and Codex send names only). `--tools=compact`
+  keeps the nine-tool start as an opt-in; `compact-mcp-check` asserts the full default.
 - **🚨 THE PROTOCOL IS THE PRODUCT SURFACE.** `packages/mcp/src/server.ts` used exactly one MCP
   feature until 2026-09-02, so a host could not tell `slates_list_assets` from
   `slates_delete_project`. It now emits **annotations** (derived in `surface.ts`, re-derived

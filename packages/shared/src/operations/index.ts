@@ -7781,7 +7781,10 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: GuideDepth; q
  */
 export const loadTools: Operation<{ group?: OperationGroup; query?: string; names?: string[] }> = {
   id: 'slates_load_tools',
-  description: 'Discover and load tools on demand. query searches operation names and descriptions and returns a compact list. names loads up to five exact tools with their schemas. group loads a whole task group. A load replaces the previous optional selection; query alone does not change it. Call the discovered tools by their own names. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
+  // Worded to be true on both surfaces: the desktop agent must load an
+  // extended tool before calling it, while the MCP server lists every tool, so
+  // "missing from your list" never happens there by default.
+  description: 'Find Slates tools by task. query searches tool names and descriptions and returns a compact list. names returns up to five exact tools with their schemas; group returns a whole task group. Call the tools by their own names. If a tool you need is missing from your tool list, a names or group load adds it; a load replaces the previous optional selection, and query alone does not change it. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
   input: z.object({
     group: z.enum(['script', 'library', 'timeline', 'admin', 'blender']).optional(),
     query: z.string().min(1).max(160).optional().describe('Search for a task such as generate image, create shot, or edit video.'),

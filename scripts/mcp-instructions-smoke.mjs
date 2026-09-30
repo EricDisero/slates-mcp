@@ -30,6 +30,28 @@ if (!existsSync(serverPath)) {
   process.exit(1)
 }
 
+// Claude Code keeps the first 2,048 characters of a server's instructions
+// (code.claude.com/docs/en/mcp, § Scale with MCP tool search). 0.6.0's cut fell
+// mid-sentence in the spend-approval step, so the whole Essentials section must
+// end inside it, including when the UPDATE AVAILABLE notice sits in front.
+const CLAUDE_CODE_INSTRUCTIONS_CUT = 2048
+function essentialsInCut(label, text) {
+  const start = text.indexOf('## Essentials')
+  const next = start < 0 ? -1 : text.indexOf('\n## ', start + 1)
+  check(`${label}: instructions carry an Essentials section`, start >= 0 && next > start)
+  if (start < 0 || next < 0) return
+  check(
+    `${label}: Essentials end inside Claude Code's ${CLAUDE_CODE_INSTRUCTIONS_CUT}-character cut`,
+    next <= CLAUDE_CODE_INSTRUCTIONS_CUT,
+    `they end at character ${next}`
+  )
+  const kept = text.slice(0, CLAUDE_CODE_INSTRUCTIONS_CUT)
+  for (const marker of ['FINDING TOOLS', 'slates_estimate_generation_cost', 'confirm: true', 'REAL NUMBERS ONLY', 'slates_get_workspace_state', 'slates_get_prompting_guide']) {
+    check(`${label}: "${marker}" survives the cut`, kept.includes(marker))
+  }
+  console.log(`  ..  ${label}: Essentials end at character ${next} of ${CLAUDE_CODE_INSTRUCTIONS_CUT}`)
+}
+
 let failures = 0
 const check = (name, cond, detail = '') => {
   if (cond) {
@@ -40,9 +62,11 @@ const check = (name, cond, detail = '') => {
   console.error(`  !! ${name}${detail ? ` — ${detail}` : ''}`)
 }
 
+// No flag: the smoke reads what a user's client gets. It ran with `--tools=flat`
+// until 0.6.1, so it never saw the nine-tool default that shipped in 0.6.0.
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [serverPath, '--tools=flat'],
+  args: [serverPath],
   stderr: 'pipe',
 })
 const client = new Client({ name: 'slates-instructions-smoke', version: '1.0.0' })
@@ -92,11 +116,13 @@ if (typeof instructions === 'string') {
     instructions.includes('Working without skill files')
   )
   console.log(`  ..  ${instructions.length} chars of instructions on the wire`)
+  essentialsInCut('the current run', instructions)
 }
 
 check('tool list is non-empty', tools.length > 0, `${tools.length}`)
 const generateImage = tools.find((t) => t.name === 'slates_generate_image')
 check('slates_generate_image is exposed', !!generateImage)
+check('slates_generate_video is listed by default', tools.some((t) => t.name === 'slates_generate_video'))
 if (generateImage) check('no cross-model blacklist in the schema', !generateImage.description.includes('"photorealistic"'))
 
 // ── the enforcement, end to end, through the real MCP call path ────────────
@@ -277,7 +303,7 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   )
   const staleTransport = new StdioClientTransport({
     command: process.execPath,
-    args: [serverPath, '--tools=flat'],
+    args: [serverPath],
     stderr: 'pipe',
     env: { ...process.env, HOME: home, USERPROFILE: home },
   })
@@ -286,6 +312,7 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   const stale = staleClient.getInstructions() ?? ''
   check('a behind server puts UPDATE AVAILABLE in its instructions', stale.includes('UPDATE AVAILABLE'))
   check('the notice tells the agent to have the user restart the client', /quit and reopen the MCP client/.test(stale))
+  essentialsInCut('a behind server (notice in front)', stale)
   check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
   await staleClient.close()
 }

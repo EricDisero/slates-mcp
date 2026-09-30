@@ -11,9 +11,12 @@
 //
 //   2. TIERS. 90 ops is 112 KB of descriptions and JSON schemas on EVERY
 //      desktop Studio Agent turn. `core` is what a session needs to work;
-//      `extended` is selected through `slates_load_tools`. Both surfaces replace
-//      the optional selection on a named/group load. MCP keeps every direct
-//      operation callable for compatibility and notifies when its listing changes.
+//      `extended` is selected through `slates_load_tools`. Tiers are a DESKTOP
+//      mechanism: we build every turn there, so a load reaches the model. The
+//      MCP server lists every op and leaves hiding definitions to the host
+//      (tiering there left Claude and Codex users unable to generate in 0.6.0;
+//      see the TOOLS comment in packages/mcp/src/server.ts). `--tools=compact`
+//      is the opt-in exception.
 //
 //   3. ONE SCHEMA RENDERER. The desktop rendered `$refStrategy: 'none'` and
 //      the MCP server rendered `target: 'openApi3'`, so "the two surfaces
@@ -283,7 +286,8 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
  * Render a tool surface.
  *
  * `desktop` sends `core` plus whatever groups have been loaded this run; `mcp`
- * renders all definitions; the MCP server filters its connection listing from that set.
+ * renders all definitions, and the MCP server lists all of them unless started with
+ * `--tools=compact`.
  */
 export function toolDefinitions(
   ops: readonly SurfaceOp[],
