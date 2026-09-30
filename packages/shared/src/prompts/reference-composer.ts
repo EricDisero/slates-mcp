@@ -118,11 +118,12 @@ export interface ComposedReferences {
   unresolvedTokens: string[]
 }
 
-// Normalize a name/token for matching: drop the sigil, lowercase, strip
-// spaces/underscores/hyphens. "@big_red" / "@Big Red" / "#Big-Red" all collapse
-// to the same key. Identical to the agent-side resolver's `norm`.
+// A mention's matching key: lowercase, spaces/underscores/hyphens stripped, and
+// the SIGIL KEPT. "@big_red" / "@Big Red" / "@Big-Red" are one key, and "@red"
+// and "#red" are two: names are unique per sigil, so a subject and a look may
+// share one, and a sigil-free key bound both mentions to whichever came last.
 function normToken(s: string): string {
-  return s.toLowerCase().replace(/[@#]/g, '').replace(/[\s_-]+/g, '')
+  return s.toLowerCase().replace(/[\s_-]+/g, '')
 }
 
 // Free-reference IMAGE kinds get an "image N" number. Frames are transported in
@@ -627,10 +628,12 @@ export function composeVoiceCitations(
     if (v?.token) byNorm.set(normToken(v.token), { n: i + 1, name: v.name })
   })
 
+  // The one mention grammar (TOKEN_RE), so `joe@sarah.com` and `@sarah.extra`
+  // stay prose. A `#` token is a look, never a voice.
   const seen = new Set<string>()
-  const body = rawPrompt.replace(/@([\w-]+)/g, (full, tok: string) => {
-    const key = normToken(`@${tok}`)
-    const v = byNorm.get(key)
+  const body = rawPrompt.replace(TOKEN_RE, (full, sigil: string, tok: string) => {
+    const key = normToken(`${sigil}${tok}`)
+    const v = sigil === '@' ? byNorm.get(key) : undefined
     if (!v) return full
     if (seen.has(key)) return v.name
     seen.add(key)
@@ -698,7 +701,12 @@ export function composeKlingEdit(rawPrompt: string, groups: ReferenceGroup[]): K
   const elements: KlingEditElement[] = []
   const styleImages: string[] = []
   const styleNums: number[] = []
-  let body = rawPrompt
+  // Each mention's citation, by key. The prompt is walked ONCE with the one
+  // mention grammar (TOKEN_RE), so `joe@marcus.com` and `@marcus.extra` stay
+  // prose, as they do in `composeReferences`.
+  const citations = new Map<string, string>()
+  const inPrompt = new Set([...rawPrompt.matchAll(TOKEN_RE)].map((t) => normToken(`${t[1]}${t[2]}`)))
+  const keyLines: string[] = []
 
   // Subjects first — they own the @ElementN numbering.
   const subjectGroups = groups.filter(
@@ -710,18 +718,11 @@ export function composeKlingEdit(rawPrompt: string, groups: ReferenceGroup[]): K
     if (imgs.length === 0) continue
     const n = elements.length + 1
     elements.push({ frontal: imgs[0], angles: imgs.slice(1, 4), name: g.name })
-    if (g.token) {
-      // Replace every @token occurrence with the element citation.
-      const escaped = g.token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      const re = new RegExp(`${escaped}\\b`, 'gi')
-      if (re.test(body)) {
-        body = body.replace(re, `@Element${n}`)
-      } else {
-        body = `${body}\n@Element${n} is ${g.name}.`
-      }
-    } else {
-      body = `${body}\n@Element${n} is ${g.name}.`
-    }
+    // Every mention of the subject becomes its element citation; a subject the
+    // prompt never names gets a key line.
+    const key = g.token ? normToken(g.token) : null
+    if (key && inPrompt.has(key) && !citations.has(key)) citations.set(key, `@Element${n}`)
+    else keyLines.push(`@Element${n} is ${g.name}.`)
   }
 
   // Style / pinned refs take the remaining slots as @ImageN.
@@ -733,12 +734,14 @@ export function composeKlingEdit(rawPrompt: string, groups: ReferenceGroup[]): K
       styleImages.push(m.path)
       const n = styleImages.length
       if (g.kind === 'style') styleNums.push(n)
-      if (g.token) {
-        const escaped = g.token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        body = body.replace(new RegExp(`${escaped}\\b`, 'gi'), `@Image${n}`)
-      }
+      // A group's mention cites its FIRST image.
+      const key = g.token ? normToken(g.token) : null
+      if (key && !citations.has(key)) citations.set(key, `@Image${n}`)
     }
   }
+
+  let body = rawPrompt.replace(TOKEN_RE, (full, sigil: string, tok: string) => citations.get(normToken(`${sigil}${tok}`)) ?? full)
+  for (const line of keyLines) body = `${body}\n${line}`
 
   if (styleNums.length > 0) {
     const cites = styleNums.map((n) => `@Image${n}`).join(' and ')

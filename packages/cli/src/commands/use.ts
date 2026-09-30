@@ -17,15 +17,15 @@ interface ProjectRow {
   name: string
 }
 
-export async function runUse(target: string | undefined): Promise<void> {
+export async function runUse(target: string | undefined, opts: { clear?: boolean } = {}): Promise<void> {
+  if (opts.clear || target === 'none') {
+    setDefaultProjectId(null)
+    console.log('Default project cleared.')
+    return
+  }
   if (!target) {
     const current = readDefaultProjectId()
     console.log(current ? `Default project: ${current}` : 'No default project set.')
-    return
-  }
-  if (target === '--clear' || target === 'none') {
-    setDefaultProjectId(null)
-    console.log('Default project cleared.')
     return
   }
 

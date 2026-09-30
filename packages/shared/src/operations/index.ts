@@ -1097,7 +1097,7 @@ export const estimateGenerationCost: Operation<{
             defaultVideoResolutionFor(resolved.model),
           sound: input.sound ?? resolved.sound,
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
-          seedanceRealFace: input.seedanceRealFace,
+          seedanceRealFace: input.seedanceRealFace ?? resolved.seedanceRealFace,
           referenceImages: input.referenceImages ?? resolved.referenceImages,
           videoRefSeconds: input.videoRefSeconds, audioRefSeconds: input.audioRefSeconds,
         })
@@ -1775,7 +1775,7 @@ export const moveEntityToProject: Operation<{
 }> = {
   id: 'slates_move_entity_to_project',
   description:
-    "Move a Library item (a character, location, product, look…) into another project, taking every image it references with it; it lands in the target's category of the same name. This is the fix when slates_move_assets_to_project refuses an asset because a Library item still uses it: the image can't leave on its own, but the whole item can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. Board frames are not movable this way; moving a frame's image out would empty the shot.",
+    "Move a Library item (a character, location, product, look…) into another project, taking every image it references with it; it lands in the target's category of the same name. This is the fix when slates_move_assets_to_project refuses an asset because a Library item still uses it: the image can't leave on its own, but the whole item can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. mentioningShots lists this project's Shots that mention it: they keep the words and fire without it until it comes back. Board frames are not movable this way; moving a frame's image out would empty the shot.",
   input: z.object({
     kind: z
       .enum(['library', 'character', 'environment', 'style'])
@@ -3261,6 +3261,7 @@ function resolveVideoModel(raw: string): {
   videoResolution?: VideoResolution
   sound?: boolean
   seedanceFace?: boolean
+  seedanceRealFace?: boolean
   referenceImages?: number
 } | null {
   let s = raw.trim().toLowerCase()
@@ -3293,9 +3294,13 @@ function resolveVideoModel(raw: string): {
     out!.sound = true
     s = s.replace(/-audio\b/, '')
   }
-  if (/-(realface|face)\b/.test(s)) {
-    out!.seedanceFace = true
-    s = s.replace(/-(realface|face)\b/, '')
+  // Two routes, two keys: `-realface` is the real-person route (still refused
+  // without realFaceConsent), `-face` the AI-face one.
+  const face = /-(realface|face)\b/.exec(s)
+  if (face) {
+    if (face[1] === 'realface') out!.seedanceRealFace = true
+    else out!.seedanceFace = true
+    s = s.replace(face[0], '')
   }
   const direct = (VIDEO_MODELS as readonly string[]).find((m) => m === s)
   if (direct) {
@@ -3309,8 +3314,8 @@ function resolveVideoModel(raw: string): {
     'kling-v3': 'kling-v3.0-std',
     'kling-v3-pro': 'kling-v3.0-pro',
     'kling-v3-omni': 'kling-v3.0-omni',
-    'kling-v3-omni-pro': 'kling-v3.0-omni',
-    'kling-v3.0-omni-pro': 'kling-v3.0-omni',
+    // No Omni Pro spelling here: Omni Pro is not a seat on this surface, and
+    // aliasing it to Omni ran a cheaper model after a Pro quote.
     'seedance-2.0': 'seedance-2',
     'seedance-2-0': 'seedance-2',
     // ⚠️ The 2.5 spellings must resolve to 2.5, and the BARE `seedance` keeps
@@ -3548,6 +3553,8 @@ export const generateVideo: Operation<{
     if (input.sound == null && resolved.sound != null) input.sound = resolved.sound
     if (input.seedanceFace == null && resolved.seedanceFace != null)
       input.seedanceFace = resolved.seedanceFace
+    if (input.seedanceRealFace == null && resolved.seedanceRealFace != null)
+      input.seedanceRealFace = resolved.seedanceRealFace
     // projectId is required for video — without it there's no UI feedback,
     // no asset to reference later, and a failed gen leaves the user with
     // nothing. The MCP-only headless path that exists for image gen is
@@ -4427,6 +4434,45 @@ export const generateAudio: Operation<{
   },
 }
 
+// ── The Kling tools' quote (lip-sync, motion transfer) ─────────
+
+/** The server bills the tools in blocks of this many seconds (slates-api `TOOL_BLOCK_SECONDS`). */
+const TOOL_BLOCK_SECONDS = 5
+
+/** A project asset's recorded length in seconds, or null when its row has none. */
+async function recordedSeconds(desktop: SlatesDesktopClient, projectId: string, assetId: string): Promise<number | null> {
+  const { assets } = await desktop.get<{ assets: Array<{ id?: string; duration?: number | null }> }>('/agent/assets', { projectId })
+  const row = (assets ?? []).find((a) => String(a.id).toLowerCase() === assetId.toLowerCase())
+  const seconds = Number(row?.duration)
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : null
+}
+
+/**
+ * Whole blocks of the media the output follows, priced as the server bills
+ * them: `${stem}-${blocks × 5}s` measured from that media (slates-api
+ * `tool-keys.ts`), plus one flat block for a voice step. An unknown length
+ * quotes one block, the floor. A flat one-block quote approved a 30s Motion
+ * Control Pro at 42 credits that billed 252.
+ */
+async function quoteToolBlocks(
+  ctx: OperationContext,
+  stem: string,
+  seconds: number | null,
+  voiceStep: boolean
+): Promise<{ costKey: string; totalCents: number; blocks: number }> {
+  const blocks = Math.max(1, Math.ceil((seconds ?? 0) / TOOL_BLOCK_SECONDS))
+  const costKey = `${stem}-${blocks * TOOL_BLOCK_SECONDS}s`
+  const byKey = new Map<string, number>()
+  const price = async (key: string): Promise<number> => {
+    await loadDynamicPrice(ctx, byKey, key)
+    const credits = byKey.get(key)
+    if (credits == null) throw new Error(`Model variant not in registry: ${key}`)
+    return credits
+  }
+  const totalCents = (await price(costKey)) + (voiceStep ? await price(`${stem}-${TOOL_BLOCK_SECONDS}s`) : 0)
+  return { costKey, totalCents, blocks }
+}
+
 // ── Generate lip-sync ───────────────────────────────────────────
 
 export const generateLipSync: Operation<{
@@ -4447,7 +4493,7 @@ export const generateLipSync: Operation<{
   id: 'slates_generate_lip_sync',
   billable: true,
   description:
-    'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Always 5 seconds. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
+    'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Billed per 5s of the output (the clip, or on a still the voice track). For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-lip-sync skills. projectId is REQUIRED.',
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
     sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
@@ -4479,27 +4525,29 @@ export const generateLipSync: Operation<{
       })
     }
 
-    let costKey: string
-    if (input.sourceType === 'video') {
-      costKey = 'kling-lip-sync-video-5s'
-    } else {
-      costKey = input.avatarModel === 'avatar-pro'
-        ? 'kling-lip-sync-avatar-pro-5s'
-        : 'kling-lip-sync-avatar-5s'
-    }
-
-    const cloud = ctx.cloud()
-    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey) ??
-      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
-    if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
-    const totalCents = creditCost(entry)
+    const stem = input.sourceType === 'video'
+      ? 'kling-lip-sync-video'
+      : input.avatarModel === 'avatar-pro' ? 'kling-lip-sync-avatar-pro' : 'kling-lip-sync-avatar'
+    // Billed per 5s block of the output: the clip's length on a video source;
+    // on a still, the voice track's — typed words at the desktop's reading pace
+    // (`lipSyncEstimate`, 13 characters a second, so this quote is the Generate
+    // button's), an uploaded file unknown until the desktop measures it. Typed
+    // words on a still are two billed calls: the voice step adds one flat block.
+    const seconds = input.sourceType === 'video'
+      ? await recordedSeconds(ctx.desktop(), input.projectId, input.sourceAssetId)
+      : input.audioMethod === 'tts'
+        ? (input.ttsText ?? '').trim().length / (13 * (input.ttsSpeed ?? 1))
+        : null
+    const voiceStep = input.sourceType === 'image' && input.audioMethod === 'tts'
+    const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, stem, seconds, voiceStep)
+    const length = `${blocks * TOOL_BLOCK_SECONDS}s${voiceStep ? ' + voice' : ''}`
 
     // Cost confirm gate. Lip-sync is mechanical — the model re-syncs the
     // user-chosen source to the user-chosen audio. The agent doesn't
     // write a prompt that depends on what the source looks like, so we
     // skip the inline preview and just announce the source code in text.
-    if (totalCents > CONFIRM_CREDITS && !input.confirm) {
+    // An unknown length quotes one block, a floor, so it always asks.
+    if ((totalCents > CONFIRM_CREDITS || seconds == null) && !input.confirm) {
       const sourceRef = await lookupAssetRef(ctx.desktop(), input.sourceAssetId)
       const audioPreview = input.audioMethod === 'tts'
         ? `Audio: TTS — "${(input.ttsText ?? '').slice(0, 120)}"`
@@ -4511,7 +4559,7 @@ export const generateLipSync: Operation<{
         estimated_credits: totalCents,
         source_ref: sourceRef,
         message:
-          `Cost: ${fmtCredits(totalCents)} for 5s lip-sync (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)}${seconds == null ? ' or more' : ''} for ${length} lip-sync (${costKey}). ` +
           `Source: ${sourceRef}. ${audioPreview}. ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
@@ -4547,7 +4595,7 @@ export const generateLipSync: Operation<{
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-      return backgroundSubmitted(`5s lip-sync (${costKey})`, ids, {
+      return backgroundSubmitted(`${length} lip-sync (${costKey})`, ids, {
         variant: costKey,
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
@@ -4558,7 +4606,7 @@ export const generateLipSync: Operation<{
 
     return {
       text:
-        `Generated 5s lip-sync (${costKey}) into project ${input.projectId} ` +
+        `Generated ${length} lip-sync (${costKey}) into project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)}. ` +
         (input.audioMethod === 'tts'
           ? `Spoken: "${(input.ttsText ?? '').slice(0, 60)}${(input.ttsText ?? '').length > 60 ? '...' : ''}"`
@@ -4593,7 +4641,7 @@ export const generateMotionTransfer: Operation<{
   id: 'slates_generate_motion_transfer',
   billable: true,
   description:
-    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, always 5s. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. ' +
+    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, billed per 5s of the driving clip. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. REQUIRED before calling: slates-cost-discipline + slates-prompting-motion-transfer skills. projectId is REQUIRED — both assets must exist in the project. ' +
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
@@ -4608,20 +4656,18 @@ export const generateMotionTransfer: Operation<{
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
-    const costKey = motionModel === 'kling-mc-std' ? 'kling-mc-std-5s' : 'kling-mc-pro-5s'
-
-    const cloud = ctx.cloud()
-    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const entry = registry.models.find((m) => m.model === costKey) ??
-      (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
-    if (!entry) throw new Error(`Model variant not in registry: ${costKey}`)
-    const totalCents = creditCost(entry)
+    // Billed per 5s block of the driving clip, which the output follows, up to
+    // the orientation's maximum (the desktop's `motionTransferEstimate`).
+    const clipSeconds = await recordedSeconds(ctx.desktop(), input.projectId, input.sourceVideoAssetId)
+    const seconds = clipSeconds == null ? null : Math.min(clipSeconds, (input.characterOrientation ?? 'video') === 'video' ? 30 : 10)
+    const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, motionModel, seconds, false)
 
     // Cost confirm gate. Motion transfer is mechanical — the model
     // applies source motion to target image deterministically. We don't
     // burn tokens previewing assets the user already chose; codes in the
-    // text are enough to keep the chat unambiguous.
-    if (totalCents > CONFIRM_CREDITS && !input.confirm) {
+    // text are enough to keep the chat unambiguous. A clip with no recorded
+    // length quotes one block, a floor, so it always asks.
+    if ((totalCents > CONFIRM_CREDITS || seconds == null) && !input.confirm) {
       const desktop = ctx.desktop()
       const [source, target] = await Promise.all([
         lookupAssetRef(desktop, input.sourceVideoAssetId),
@@ -4635,15 +4681,15 @@ export const generateMotionTransfer: Operation<{
         source_ref: source,
         target_ref: target,
         message:
-          `Cost: ${fmtCredits(totalCents)} for 5s ${motionModel} (${costKey}). ` +
+          `Cost: ${fmtCredits(totalCents)}${seconds == null ? ' or more' : ''} for ${blocks * TOOL_BLOCK_SECONDS}s ${motionModel} (${costKey}). ` +
           `Transferring motion from ${source} onto ${target}. ` +
           // The saving is READ from the registry, never guessed: "~10 credits"
           // was hand-typed and is a rate change away from being a lie.
           `Re-call with confirm=true after the user explicitly OKs the spend${
             motionModel === 'kling-mc-pro'
-              ? (() => {
-                  const std = registry.models.find((m) => m.model === 'kling-mc-std-5s')
-                  const saving = std ? totalCents - creditCost(std) : 0
+              ? await (async () => {
+                  const std = await quoteToolBlocks(ctx, 'kling-mc-std', seconds, false)
+                  const saving = totalCents - std.totalCents
                   return saving > 0 ? `, or pick kling-mc-std to save ${fmtCredits(saving)}` : ''
                 })()
               : ''
@@ -4678,7 +4724,7 @@ export const generateMotionTransfer: Operation<{
     if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
-      return backgroundSubmitted(`5s motion transfer (${motionModel})`, ids, {
+      return backgroundSubmitted(`motion transfer (${motionModel})`, ids, {
         variant: costKey,
         motionModel,
         projectId: input.projectId,
@@ -4691,7 +4737,7 @@ export const generateMotionTransfer: Operation<{
 
     return {
       text:
-        `Generated 5s motion transfer (${motionModel}) into project ${input.projectId} ` +
+        `Generated motion transfer (${motionModel}) into project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)}.` +
         (input.prompt ? ` Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` : ''),
       data: {
@@ -5092,6 +5138,16 @@ export const saveTimeline: Operation<{ projectId: string; timelineId?: string; n
  return ok(await ctx.desktop().post('/agent/timelines', input)) },
 }
 
+/**
+ * A `timelineId` names a cut only on a desktop with named cuts. Its read, clip,
+ * track and settings routes predate them and ignore the field, so a 1.5.8
+ * desktop would act on the default timeline instead of the one named. The
+ * exports resolved a timeline id before named cuts and need no gate.
+ */
+async function requireNamedCut(desktop: SlatesDesktopClient, timelineId: string | undefined): Promise<void> {
+  if (timelineId) await desktop.requireCapability('named-cuts', 'named cuts')
+}
+
 export const getTimeline: Operation<{ projectId: string; timelineId?: string }> = {
   id: 'slates_get_timeline',
   description:
@@ -5100,6 +5156,7 @@ export const getTimeline: Operation<{ projectId: string; timelineId?: string }> 
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
+    await requireNamedCut(desktop, input.timelineId)
     const r = await desktop.get<TimelineView & { success: boolean }>('/agent/timeline', {
       projectId: input.projectId, timelineId: input.timelineId,
     })
@@ -5140,6 +5197,7 @@ export const addClipToTimeline: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
+    await requireNamedCut(desktop, input.timelineId)
     const r = await desktop.post<
       TimelineView & {
         success: boolean
@@ -5250,6 +5308,7 @@ export const addTimelineTrack: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
+    await requireNamedCut(desktop, input.timelineId)
     return ok(await desktop.post('/agent/timeline/add-track', input))
   },
 }
@@ -5315,6 +5374,7 @@ export const updateTimelineSettings: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
+    await requireNamedCut(desktop, input.timelineId)
     return ok(await desktop.post('/agent/timeline/update-settings', input))
   },
 }
@@ -6194,6 +6254,10 @@ const SHOT_ASPECT_RATIOS = [...new Set([...VIDEO_ASPECT_RATIOS, ...IMAGE_ASPECT_
 // The vocabulary is still ENFORCED (a Zod enum built from MODEL_CAPABILITIES),
 // and the per-model narrowing is enforced by `assertShotCapabilities` at save
 // time — which is stronger than prose, not weaker.
+//
+// 🚨 EVERY `ShotParams` FIELD, OR A COMPILE ERROR. A plain `z.object` strips
+// what it does not declare, so a field missing here was dropped on save while
+// the op reported success; `satisfies` makes the next new param fail to build.
 function shotParamsShape(described: boolean): z.ZodRawShape {
   const d = <T extends z.ZodTypeAny>(node: T, text: string): T =>
     (described ? node.describe(text) : node) as T
@@ -6230,7 +6294,23 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
     voiceId: d(z.string().optional(), `${TTS_MODEL}: preset voiceId (slates_list_voices).`),
     voiceReferenceAssetId: d(z.string().optional(), `${TTS_MODEL}: audio asset to clone.`),
     voiceDescription: d(z.string().optional(), `${TTS_MODEL}: the voice in words.`),
-  }
+    quality: z.string().optional(),
+    gridMode: d(z.enum(['off', '2x2', '3x3']).optional(), 'Image models: a grid of takes in one picture.'),
+    audioLanguage: d(z.enum(['en', 'zh', 'ja', 'ko', 'es']).optional(), 'Kling with sound: dialogue language.'),
+    audioAccent: d(z.enum(['american', 'british', 'indian']).optional(), 'Kling with sound: English accent.'),
+    generateMusic: d(z.boolean().optional(), 'Kling Omni: background music.'),
+    multiShot: d(z.boolean().optional(), 'Several cuts in one take (multiShotSegments).'),
+    multiShotSegments: z
+      .array(z.object({ prompt: z.string(), duration: z.number(), camera: z.string(), shotSize: z.string() }))
+      .nullable()
+      .optional(),
+    cameraControls: z
+      .object({ horizontal: z.number(), vertical: z.number(), pan: z.number(), tilt: z.number(), roll: z.number(), zoom: z.number() })
+      .optional(),
+    audioLoop: d(z.boolean().optional(), 'eleven-sfx: seamless loop.'),
+    audioPromptInfluence: d(z.number().min(0).max(1).optional(), 'eleven-sfx: how literally the prompt is followed.'),
+    audioMultilingual: d(z.boolean().optional(), 'seed-audio: mixed-language casting.'),
+  } satisfies Record<keyof ShotParams, z.ZodTypeAny>
 }
 
 const shotParamsSchema = z.object(shotParamsShape(true)).optional()
@@ -6321,11 +6401,8 @@ interface ShotOpRefs {
   styleIds?: string[]
 }
 
-type ShotOpParams = Pick<ShotParams,
-  'aspectRatio' | 'duration' | 'videoResolution' | 'imageResolution' | 'gptQuality' |
-  'imageQuantity' | 'negativePrompt' | 'sound' | 'seedanceFace' | 'audioDurationSeconds' |
-  'voiceId' | 'voiceReferenceAssetId' | 'voiceDescription'
-> & { aspectRatio?: AspectRatio; videoResolution?: VideoResolution; imageResolution?: '1k' | '2k' | '3k' | '4k' }
+type ShotOpParams = Omit<ShotParams, 'aspectRatio' | 'videoResolution' | 'imageResolution'>
+  & { aspectRatio?: AspectRatio; videoResolution?: VideoResolution; imageResolution?: '1k' | '2k' | '3k' | '4k' }
 
 /**
  * The `params` half of a spec patch — ONLY the keys the caller actually named.
@@ -6657,7 +6734,7 @@ export const updateShot: Operation<
     environmentIds: z.array(z.string().uuid()).optional(),
     styleIds: z.array(z.string().uuid()).optional(),
     attachFrameId: z.string().uuid().optional().describe('Attach this Shot to a board frame.'),
-    detachFrameId: z.string().uuid().optional().describe('Detach it from a frame. The Shot itself survives.'),
+    detachFrameId: z.string().uuid().optional().describe('Detach it from a frame. Not its last one: pass attachFrameId too, or delete the Shot.'),
     posterAssetId: z.string().nullable().optional().describe('Which reference represents this Shot as a thumbnail. Defaulted automatically (first frame, else the first image reference, else the newest take) — only set it to OVERRIDE, and pass null to go back to the default.'),
     ...shotScriptSchemaTerse,
   }),
@@ -7142,7 +7219,7 @@ const sectionInput = z.object({
   fragments: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0) })).optional(),
 })
 export const changeScriptSection: Operation<z.infer<typeof sectionInput>> = {
-  id: 'slates_update_script_section', description: 'Create a free-named section from a selected passage, save the words now on the page as a new version (action alternative), save changes to the shown version (save) or choose another (choose), insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one version (alternativeId), or set its free tags. Switching saves the current text to the version that was showing first; archiving a section keeps its words, shots and media on the page. Uses the current document revision and never generates media. Partial crossing sections are refused.',
+  id: 'slates_update_script_section', description: 'Create a free-named section from a selected passage, save the words now on the page as a new version (action alternative), save changes to the shown version (save) or choose another (choose), insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one version (alternativeId), or set its free tags. Choosing, archiving a section, reuse and updateUses first save the page\'s words and shot bindings into the version that was showing (the page is never unsaved; save remains for an explicit save), and only alternative starts a new version; archiving a section keeps its words, shots and media on the page. Uses the current document revision and never generates media. Partial crossing sections are refused.',
   input: sectionInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')

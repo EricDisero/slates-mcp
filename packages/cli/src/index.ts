@@ -110,7 +110,8 @@ program
   .command('use')
   .description('Set the default project for this machine, by id or name. Ops that take projectId fill it when you omit one; an explicit --projectId always wins. No argument prints the current default; `slates use --clear` removes it.')
   .argument('[project]', 'Project id or name')
-  .action((project: string | undefined) => runUse(project))
+  .option('--clear', 'Remove the default project', false)
+  .action((project: string | undefined, opts: { clear: boolean }) => runUse(project, opts))
 
 program
   .command('completion')

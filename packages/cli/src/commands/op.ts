@@ -460,7 +460,7 @@ function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<
     // Array fields: a single `--ids X` produced a bare string; repeated
     // `--ids X --ids Y` produced an array. Accept either, plus comma-split
     // (`--ids a,b,c`). Coerce each element to the array's element type.
-    if (fieldType === 'ZodArray' && typeof value !== 'object') {
+    if (fieldType === 'ZodArray' && (typeof value !== 'object' || Array.isArray(value))) {
       const elemType = (unwrap(leaf?._def?.type)?._def?.typeName ?? '') as string
       const arr = Array.isArray(value)
         ? value

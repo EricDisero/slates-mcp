@@ -352,7 +352,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         typeof data.message === 'string' ? data.message : result.text
       )
       if (answer === true) {
-        result = await op.run({ ...(args as object), confirm: true } as never, {
+        // A quote that carries a fingerprint (`slates_generate_from_shots`) is
+        // fired only with it: the user approved THAT quote, and a changed
+        // recipe must still refuse.
+        const fingerprint = typeof data.fingerprint === 'string' ? { fingerprint: data.fingerprint } : {}
+        result = await op.run({ ...(args as object), ...fingerprint, confirm: true } as never, {
           ...defaultContext(),
           signal: extra?.signal,
         })

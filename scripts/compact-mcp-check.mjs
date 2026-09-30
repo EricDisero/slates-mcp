@@ -55,7 +55,11 @@ writeFileSync(fixture, `import { ALL_OPERATIONS } from ${JSON.stringify(new URL(
 globalThis.fetch = async () => { throw Error('Network forbidden in MCP approval test') };
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_image').run = async input => input.confirm
   ? {text: 'Completed fixture generation', data: {status: 'completed', assetId: 'fixture-only'}}
-  : {text: 'Approve fixture spend', data: {requires_confirm: true}};`)
+  : {text: 'Approve fixture spend', data: {requires_confirm: true}};
+// The batch refuses a confirm that does not carry the fingerprint of the quote the user approved.
+ALL_OPERATIONS.find(o => o.id === 'slates_generate_from_shots').run = async input => input.confirm && input.fingerprint === 'quote-1'
+  ? {text: 'Completed fixture batch', data: {results: [], total: 0}}
+  : {text: 'Approve fixture batch', data: {requires_confirm: true, fingerprint: 'quote-1', total_credits: 30}};`)
 const approvalTransport = new StdioClientTransport({command: process.execPath, args: ['--import', pathToFileURL(fixture).href, fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))], stderr: 'pipe'})
 const approvalClient = new Client({name: 'approval-shape-check', version: '1.0.0'}, {capabilities: {elicitation: {}}})
 let approvalRequests = 0
@@ -66,5 +70,8 @@ try {
   assert.equal(approvalRequests, 1)
   assert.equal(result.content[0].text, 'Completed fixture generation')
   assert.deepEqual(result.structuredContent, {status: 'completed', assetId: 'fixture-only'})
-  console.log('MCP approval: text and structured content both describe the final operation result')
+  const batch = await approvalClient.callTool({name: 'slates_generate_from_shots', arguments: {shotIds: ['SHOT-A1']}})
+  assert.equal(approvalRequests, 2)
+  assert.equal(batch.content[0].text, 'Completed fixture batch', 'an approved batch fires with the fingerprint of the quote shown')
+  console.log('MCP approval: text and structured content both describe the final operation result; an approved batch carries the fingerprint of its quote')
 } finally { await approvalClient.close(); await approvalTransport.close() }
