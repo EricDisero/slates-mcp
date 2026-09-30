@@ -1,9 +1,9 @@
 {
   "version": "1.1.2",
-  "filename": "agentic-skills-pack-v1.1.2-5a92ab19e53639ea.zip",
-  "sha256": "5a92ab19e53639eab1e5f6619626c75e80b4f8d972389189f659e347a49ae4cc",
-  "bytes": 212285,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-5a92ab19e53639ea.zip",
+  "filename": "agentic-skills-pack-v1.1.2-bef006e4b1a75516.zip",
+  "sha256": "bef006e4b1a755162adbbfff50d78228277406eb267e9425005e7498ea3b7bdb",
+  "bytes": 212866,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.2-bef006e4b1a75516.zip",
   "skillCount": 39,
   "freeSkills": [
     "slates-blocking-to-prompt",
@@ -117,7 +117,7 @@
     {
       "key": "slates-one-prompt-film",
       "tier": "free",
-      "summary": "Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named Cut and a verified export."
+      "summary": "Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named cut and a verified export."
     },
     {
       "key": "slates-previs-blocking",
@@ -167,7 +167,7 @@
     {
       "key": "slates-prompting-minimax-h3",
       "tier": "free",
-      "summary": "How to prompt MiniMax H3 and MiniMax H3 Max."
+      "summary": "How to prompt MiniMax H3, H3 Max and H3 Max Turbo."
     },
     {
       "key": "slates-prompting-motion-transfer",
