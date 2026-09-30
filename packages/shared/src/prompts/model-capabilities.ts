@@ -159,6 +159,14 @@ export interface VideoResolutionCapability {
   fixed?: VideoResolution
   /** Default when this model is chosen (falls back to `options[0]`). */
   default?: VideoResolution
+  /**
+   * Tiers the provider makes by UPSCALING a smaller native render, keyed to that
+   * render. They stay selectable; every surface that offers one says so and says
+   * we do not recommend it (Eric, 2026-09-30: "more expensive and they actually
+   * look worse"). A refinement pass the provider documents as its own stage, such
+   * as H3 Max's 1080p, is not an upscale and is not listed.
+   */
+  upscaledFrom?: Partial<Record<VideoResolution, VideoResolution>>
 }
 
 /** Everything a model will ACCEPT. Capability only — never a price. */
@@ -704,7 +712,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // trained to output and the one every benchmark quotes; 2K is a 2.2x price
     // step and 4K a 2.7x step, and reaching a tier is a different decision from
     // defaulting to it (same reasoning that keeps Seedance 2.5 on 720p).
-    videoResolution: { options: ['480p', '768p', '2k', '4k'], default: '768p' },
+    videoResolution: { options: ['480p', '768p', '2k', '4k'], default: '768p', upscaledFrom: { '2k': '768p', '4k': '768p' } },
     // 5, not 4. MiniMax's own model card says 4-15s; fal's schema — which is
     // what our request actually hits — says `minimum: 5`. The endpoint wins.
     duration: { min: 5, max: 15, mode: 'continuous' },
@@ -942,6 +950,12 @@ export function aspectRatiosFor(model: string, provider?: string): AspectRatio[]
 }
 
 /** Video resolutions a model accepts. A FIXED model reports exactly its one value. */
+/** The native render an upscaled tier is made from, or undefined for a native tier. */
+export function upscaledFrom(model: string, resolution: string | undefined): VideoResolution | undefined {
+  if (!resolution) return undefined
+  return MODEL_CAPABILITIES[model]?.videoResolution?.upscaledFrom?.[resolution as VideoResolution]
+}
+
 export function videoResolutionsFor(model: string): VideoResolution[] {
   const vr = MODEL_CAPABILITIES[model]?.videoResolution
   if (!vr) return []

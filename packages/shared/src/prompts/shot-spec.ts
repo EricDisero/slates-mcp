@@ -188,7 +188,7 @@ export interface ShotSpec {
 
   // ── The script layer ─────────────────────────────────────────────
   //
-  // 🚨 THE SCRIPT IS THE SHOTS (1.5.9). Each scene holds its text, and a Shot
+  // 🚨 THE SCRIPT IS THE SHOTS (1.6.0). Each scene holds its text, and a Shot
   // with words holds a range into its own scene's text; `line` here mirrors
   // that range. Offsets are safe only because the desktop has ONE writer of the
   // text (`applyScriptEdit`, `main/storage/sceneScript.ts`), which shifts every

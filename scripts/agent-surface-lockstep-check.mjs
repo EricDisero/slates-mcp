@@ -765,7 +765,7 @@ function zodDescriptions(op) {
 // step 2 before step 5), so for a while every new op runs against the previous
 // desktop. `requireCapability` turns that into "Update Slates" only when the op
 // checks a token the previous desktop does NOT advertise; gating on an old
-// token passes and then 404s. 28 ops shipped to the 1.5.9 candidate that way.
+// token passes and then 404s. 28 ops shipped to the 1.6.0 candidate that way.
 // The previous desktop is derived, never typed: the highest vX.Y.Z tag in
 // ../slate, its routes and its AGENT_CAPABILITIES read with `git show`.
 // Also asserted: every token an op checks is one the current desktop
@@ -774,7 +774,7 @@ function zodDescriptions(op) {
 // NOT covered: an old route whose MEANING changed (a new field the previous
 // desktop ignores, a new default it does not share). Those need a reading of
 // the previous desktop's handler; sheet-tool-seats, image-variations,
-// shot-position and edit-references-all-models are the 1.5.9 examples.
+// shot-position and edit-references-all-models are the 1.6.0 examples.
 {
   const CHECK = '11 capability gates'
   const { execFileSync } = await import('node:child_process')

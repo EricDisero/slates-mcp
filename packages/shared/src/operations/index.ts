@@ -544,7 +544,7 @@ interface ViewShape {
   /** `folded` is absent from a desktop whose view predates folding. */
   leftDock: { open: boolean; width: number; folded?: DockSection[] }
   studioAgent: { enabled: boolean; open: boolean; width: number }
-  /** Absent from a desktop older than 1.5.9. */
+  /** Absent from a desktop older than 1.6.0. */
   script?: { details: boolean }
   /** When the desktop last reported it. */
   updatedAt: string
@@ -7128,7 +7128,7 @@ export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
 export const getScript: Operation<{ sceneId: string }> = {
   id: 'slates_get_script',
   description:
-    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet. `rev` names this exact text and `revision` the whole script document: pass either to slates_edit_script so an edit measured on it is refused, not misplaced, if the words changed in between (1.5.9 desktops; older ones return neither).",
+    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet. `rev` names this exact text and `revision` the whole script document: pass either to slates_edit_script so an edit measured on it is refused, not misplaced, if the words changed in between (1.6.0 desktops; older ones return neither).",
   input: z.object({
     sceneId: z.string().uuid().describe('The scene (slates_get_storyboard_with_frames lists them, each with its script).'),
   }),

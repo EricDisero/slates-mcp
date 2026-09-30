@@ -172,7 +172,7 @@ Each one moved a fact to a single home and left a rebuild-and-publish obligation
       composed prompt is a COMPOSER change and belongs with the `audioRefSpokenText` defect, not
       here — which is why in v1 an author states dialogue twice (as `line` for reading and the fit
       check, and inside the prompt where the model receives it) and the skill says so.
-    - **🚨 THE SCRIPT IS THE SHOTS (the 1.5.9 overhaul, superseding "a row owns its text").** Each
+    - **🚨 THE SCRIPT IS THE SHOTS (the 1.6.0 overhaul, superseding "a row owns its text").** Each
       scene holds its text, and a Shot with words holds a range into its OWN scene's text; `line`
       mirrors that range. It is safe for the two reasons the old rule said a blob could not be:
       there is ONE writer of the text (`applyScriptEdit` in the desktop's
