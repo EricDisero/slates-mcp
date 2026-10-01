@@ -1,0 +1,56 @@
+# Publish @slatesvideo/{shared,mcp-server,cli} to npm with Trusted Publishing: GitHub Actions proves who it
+# is to npm with a short-lived OIDC identity, so there is no npm token anywhere and no 2FA prompt, and each
+# version carries a provenance attestation. Eric's account keeps its security key for everything else.
+#
+# One-time setup on npmjs.com, per package (shared, mcp-server, cli): Settings → Trusted Publisher →
+# GitHub Actions, organization or user `EricDisero`, repository `slates-mcp`, workflow `publish.yml`.
+# Then: `gh workflow run publish.yml -R EricDisero/slates-mcp` publishes every package whose version in
+# packages/*/package.json is not on the registry yet, shared first (the other two depend on it).
+# Runbook: slates-api/docs/coordinated-release-runbook.md step 2.
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      # Trusted Publishing needs npm 11.5.1 or later.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Publish what the registry does not have yet
+        run: |
+          set -euo pipefail
+          for dir in packages/shared packages/mcp packages/cli; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "$name@$version is already published"
+              continue
+            fi
+            npm publish -w "$dir" --access public
+            # The registry can take a minute to serve a fresh version; the next package depends on it.
+            for i in $(seq 1 36); do
+              npm view "$name@$version" version --prefer-online >/dev/null 2>&1 && break
+              sleep 5
+            done
+            npm view "$name@$version" version --prefer-online
+          done

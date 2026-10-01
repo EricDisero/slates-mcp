@@ -11,11 +11,16 @@
 //
 // Decision: second-brain plans/2026-09-30-slates-manual-for-llms-1-6-1-decisions.md § 0.
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { manualReader } from '../packages/shared/dist/index.js'
 import { desktopSource } from './desktop-source.mjs'
 
-const manual = readFileSync(desktopSource('docs/slates-llm-manual.md'), 'utf8')
+// Single-repo CI has no desktop checkout: there it reads the manual this package ships, which
+// build:llm-docs generated from that same file.
+const source = desktopSource('docs/slates-llm-manual.md')
+const manual = existsSync(source)
+  ? readFileSync(source, 'utf8')
+  : (await import('../packages/shared/dist/manual/content.js')).APP_MANUAL
 const reader = manualReader(manual)
 const verbose = process.argv.includes('--verbose')
 
