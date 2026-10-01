@@ -169,6 +169,9 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_relocate_project',
     'slates_undo_relocate_project',
     'slates_reveal_file',
+    'slates_reorder_folders',
+    'slates_reorder_pins',
+    'slates_link_asset_source',
   ],
   // The cut and the export. A generation session never touches these.
   script: ['slates_get_script_document', 'slates_update_script_document', 'slates_get_script_sections', 'slates_update_script_section', 'slates_get_script_suggestions', 'slates_update_script_suggestions', 'slates_get_script_uses', 'slates_preview_script_variation', 'slates_create_script_variation', 'slates_get_shot_inputs', 'slates_reuse_shot_take'],
@@ -206,6 +209,9 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_duplicate_shot',
     'slates_split_shot',
     'slates_merge_shots',
+    'slates_get_usage',
+    'slates_get_app_settings',
+    'slates_set_app_settings',
   ],
   // A third transport nobody without Blender installed can reach.
   blender: [

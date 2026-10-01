@@ -1,5 +1,5 @@
 import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
-import { retrieveGuide, guideSections, type GuideDepth } from '../prompts/guide-retrieval.js'
+import { retrieveGuide, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
@@ -18,7 +18,7 @@ import { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type Model
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
-import { appManualSections } from '../manual/index.js'
+import { appManualIndex, appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
 import {
@@ -355,6 +355,16 @@ function creditsFromDollars(dollars: number): number {
 const BACKGROUND_DESCRIBE =
   'Return generationId(s) now instead of blocking; poll slates_get_generation_status. Recommended for video.'
 
+// `folderId` on the generate and upload ops (1.6.1, decision 17 in second-brain
+// plans/2026-09-30-slates-manual-for-llms-1-6-1-decisions.md). The folder dot in Media means "new pictures go
+// here", the user's own generations and drops follow it, and so does an agent's: the DESKTOP resolves an absent
+// folderId to the folder chosen in the window, so every op and the Studio Agent get it at once.
+const FOLDER_DESCRIBE =
+  "Folder the result lands in (slates_list_folders). Omit it to follow the folder chosen in the user's Slates window, else the project root; null is the root, on purpose."
+const folderIdField = z.string().uuid().nullable().optional().describe(FOLDER_DESCRIBE)
+/** The `folderId` part of a generate or upload body: present only when the caller named one (null is the root). */
+const folderBody = (folderId: string | null | undefined): { folderId?: string | null } => (folderId === undefined ? {} : { folderId })
+
 // ── Vision QC pointers (the "quality-check with vision" rule, made structural) ──
 //
 // QUALITY-CHECK is a POST-condition, so it cannot be gated the way a
@@ -524,12 +534,61 @@ export const getSelection: Operation<Record<string, never>> = {
   },
 }
 
+// 1.6.1: what is ticked. Mirrors slate's `SELECTION_TARGETS` and `SELECTION_MODES` in `@shared/types/view`
+// (lockstep check 12), which this package cannot import.
+const SELECTION_TARGETS = ['media', 'board'] as const
+const SELECTION_MODES = ['replace', 'add', 'remove', 'clear', 'all'] as const
+
+/**
+ * SET what is selected, as the user's clicks do: the cards ticked in Media, the Shots ticked on the Board.
+ * Pairs with `slates_get_selection`, which reads it: "tick the shots with no clip, then price them" is this op
+ * and then the quote. The desktop applies it through the stores the grids write and answers with what SETTLED.
+ */
+export const setSelection: Operation<{
+  surface: (typeof SELECTION_TARGETS)[number]
+  mode: (typeof SELECTION_MODES)[number]
+  ids?: string[]
+}> = {
+  id: 'slates_set_selection',
+  description:
+    "Tick or untick cards in Media or Shots on the Board, as clicks, Shift-click, Escape and Ctrl/Cmd+A do: replace makes the ids the whole selection, add and remove change only them, clear empties it, all ticks everything the tab shows (Media: the grid as filtered, folded rounds left out; Board: every Shot on the open board). Media needs its grid showing and the Board needs the Board or Script tab; slates_set_view switches. Ids are asset ids or badge codes (Media) or Shot ids or SHOT-A codes (Board). Answers with the selection as it settled and names any id it could not tick. slates_get_selection reads it back; what is selected is what the user means by 'these'.",
+  input: z
+    .object({
+      surface: z.enum(SELECTION_TARGETS),
+      mode: z.enum(SELECTION_MODES),
+      ids: z.array(z.string().min(1)).max(500).optional().describe('Asset ids or codes (media) or Shot ids or codes (board). Not used by clear or all.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('selection-set', 'setting what is selected')
+    if ((input.mode === 'add' || input.mode === 'remove') && !input.ids?.length) throw new Error(`${input.mode} needs ids.`)
+    const r = await ctx.desktop().post<{
+      selection: { surface: string; projectId: string; ids: string[]; items: Array<{ id: string; code: string | null; label: string | null }> } | null
+      reason?: string
+      notes?: string[]
+    }>('/agent/selection', input)
+    if (!r.selection) return { text: `Nothing was changed (${r.reason ?? 'no answer'}).`, data: { selection: null } }
+    const where = r.selection.surface === 'media' ? 'Media' : 'the Board'
+    const named = (row: { id: string; code: string | null; label: string | null }): string => (row.code ? (row.label ? `${row.code} — ${row.label}` : row.code) : row.id)
+    const notes = r.notes?.length ? ` Not applied: ${r.notes.join('; ')}.` : ''
+    return {
+      text: (r.selection.items.length ? `${r.selection.items.length} selected on ${where}: ${r.selection.items.map(named).join(', ')}.` : `Nothing is selected on ${where}.`) + notes,
+      data: { selection: r.selection, notes: r.notes ?? [] },
+    }
+  },
+}
+
 // The view's three lists, mirrored from the desktop's `@shared/types/view`
 // (`LENSES`, `CUT_SIDES`, `DOCK_SECTIONS`), which this package cannot import.
 // Lockstep check 12 fails when they differ.
 const VIEW_LENSES = ['board', 'media', 'script'] as const
 const VIEW_CUT_SIDES = ['bottom', 'left', 'right'] as const
 const VIEW_DOCK_SECTIONS = ['storyboards', 'library', 'folders', 'pinned'] as const
+// 1.6.1: what the user is looking at. Mirrors slate's `@shared/types/view` (lockstep check 12).
+const VIEW_BOARD_LEVELS = ['film', 'scenes', 'shot'] as const
+const VIEW_BOARD_FILTERS = ['all', 'with-clip', 'without-clip'] as const
+const VIEW_MEDIA_TABS = ['all', 'images', 'videos', 'audio'] as const
+const VIEW_SETTINGS_PANES = ['account', 'ai', 'storage', 'logs', 'general', 'keys'] as const
 type DockSection = (typeof VIEW_DOCK_SECTIONS)[number]
 /** What each dock section is called on screen. */
 const DOCK_SECTION_NAMES: Record<DockSection, string> = { storyboards: 'Boards', library: 'Library', folders: 'Folders', pinned: 'Pinned' }
@@ -545,9 +604,51 @@ interface ViewShape {
   leftDock: { open: boolean; width: number; folded?: DockSection[] }
   studioAgent: { enabled: boolean; open: boolean; width: number }
   /** Absent from a desktop older than 1.6.0. */
-  script?: { details: boolean }
+  script?: { details: boolean; textScale?: number; panelShotId?: string | null }
+  // 1.6.1 (absent from older desktops)
+  board?: { id: string | null; level: string; cardWidth: number; filter: string; linkedClips: boolean; scriptFollowsDrag: boolean; collapsedSceneIds: string[] }
+  media?: { tab: string | null; folderId: string | null; unfiledOnly: boolean; search: string; favoritesOnly: boolean; linkedOnly: boolean; rounds: boolean; cardSize: number; sourcesShown: string[]; hiddenCategoryIds: string[] }
+  library?: { categoryId: string | null }
+  viewer?: { assetId: string | null }
+  compare?: { open: boolean; assetIds: string[] }
+  animatic?: { open: boolean }
+  settings?: { open: boolean }
+  composer?: { open: boolean }
+  layers?: string[]
+  notes?: string[]
   /** When the desktop last reported it. */
   updatedAt: string
+}
+
+/** 1.6.1: what the user is looking at, in the words on screen. Empty parts are left out. */
+const describeLooking = (v: ViewShape): string => {
+  const parts: string[] = []
+  if (!v.projectId) parts.push('Home (the project list) is showing.')
+  if (v.board?.id) {
+    const level = v.board.level === 'film' ? 'Film' : v.board.level === 'shot' ? 'Shot' : 'Scenes'
+    const filter = v.board.filter === 'with-clip' ? ', Filter: With a linked clip' : v.board.filter === 'without-clip' ? ', Filter: Without a linked clip' : ''
+    parts.push(`The open board is ${v.board.id} (View: ${level}${filter}).`)
+  }
+  if (v.library?.categoryId) parts.push(`A Library page is in Media's place (category ${v.library.categoryId}).`)
+  else if (v.media) {
+    const narrowing = [
+      v.media.unfiledOnly && 'No folder only',
+      v.media.search && `search "${v.media.search}"`,
+      v.media.favoritesOnly && 'favorites only',
+      v.media.linkedOnly && 'only with linked videos',
+    ].filter(Boolean)
+    parts.push(`Media's tab is ${v.media.tab}${narrowing.length ? `, narrowed to ${narrowing.join(', ')}` : ''}.`)
+  }
+  if (v.media?.folderId) parts.push(`Folder ${v.media.folderId} is chosen: new pictures land in it.`)
+  if (v.viewer?.assetId) parts.push(`The picture viewer is open on ${v.viewer.assetId}.`)
+  if (v.compare?.open) parts.push(`Compare is open on ${v.compare.assetIds.length} items.`)
+  if (v.animatic?.open) parts.push('The animatic is up.')
+  if (v.settings?.open) parts.push('Settings is open.')
+  if (v.composer && !v.composer.open) parts.push("The prompt box is hidden (the ' key shows it).")
+  if (v.script?.panelShotId) parts.push(`The Script page's shot panel is open on Shot ${v.script.panelShotId}.`)
+  if (v.layers?.length) parts.push(`Open over the page: ${v.layers.join(', ')}.`)
+  if (v.notes?.length) parts.push(`Not applied: ${v.notes.join('; ')}.`)
+  return parts.length ? ' ' + parts.join(' ') : ''
 }
 
 const describeView = (v: ViewShape): string => {
@@ -567,7 +668,8 @@ const describeView = (v: ViewShape): string => {
     `The ${v.lens} tab is showing. The timeline is ${where}. ` +
     `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
     (v.leftDock.folded?.length ? ` Folded in the navigator: ${v.leftDock.folded.map((f) => DOCK_SECTION_NAMES[f] ?? f).join(', ')}.` : '') +
-    (v.script ? ` The Script page shows ${v.script.details ? 'Words + shots (each shot\'s picture beside its words)' : 'Words (the words alone)'}.` : '')
+    (v.script ? ` The Script page shows ${v.script.details ? 'Words + shots (each shot\'s picture beside its words)' : 'Words (the words alone)'}.` : '') +
+    describeLooking(v)
   )
 }
 
@@ -579,7 +681,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "How the Slates window is arranged: the tab showing (Media, Script or Board), where the timeline sits, which side panels are open, and whether the Script page shows Words or Words + shots.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -607,17 +709,27 @@ export const getView: Operation<Record<string, never>> = {
  * the timeline full-screen instead, and says so.
  */
 export const setView: Operation<{
+  projectId?: string | null
   lens?: (typeof VIEW_LENSES)[number]
-  cut?: { open?: boolean; full?: boolean; side?: (typeof VIEW_CUT_SIDES)[number]; height?: number; width?: number }
+  cut?: { open?: boolean; full?: boolean; side?: (typeof VIEW_CUT_SIDES)[number]; height?: number; width?: number; timelineId?: string }
   leftDock?: { open?: boolean; width?: number; folded?: DockSection[] }
   studioAgent?: { open?: boolean; width?: number }
-  script?: { details?: boolean }
+  script?: { details?: boolean; textScale?: number; panelShotId?: string | null }
+  board?: { id?: string; sceneId?: string; level?: (typeof VIEW_BOARD_LEVELS)[number]; cardWidth?: number; filter?: (typeof VIEW_BOARD_FILTERS)[number]; linkedClips?: boolean; scriptFollowsDrag?: boolean; collapsedSceneIds?: string[] }
+  media?: { tab?: (typeof VIEW_MEDIA_TABS)[number]; folderId?: string | null; unfiledOnly?: boolean; search?: string; favoritesOnly?: boolean; linkedOnly?: boolean; rounds?: boolean; cardSize?: number; revealAssetId?: string }
+  library?: { categoryId: string | null }
+  viewer?: { assetId: string | null }
+  compare?: { open?: boolean; assetIds?: string[] }
+  animatic?: { open: boolean; fromShotId?: string }
+  settings?: { open: boolean; pane?: (typeof VIEW_SETTINGS_PANES)[number] }
+  composer?: { open: boolean }
 }> = {
   id: 'slates_set_view',
   description:
-    "Rearrange the Slates window: switch tab (Media, Script or Board), open/close the timeline or park it along the bottom or as a left/right column, open/close or resize the side panels, fold the navigator's sections, and switch the Script page between Words and Words + shots. Only the fields you name change; sizes are clamped by the app and the reply says what it settled on.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, the picture viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
+      projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
       lens: z.enum(VIEW_LENSES).optional().describe('Which tab the centre shows.'),
       cut: z
         .object({
@@ -627,8 +739,9 @@ export const setView: Operation<{
             .enum(VIEW_CUT_SIDES)
             .optional()
             .describe('Where the timeline is parked. A column suits a wide monitor; picking a side opens the timeline.'),
-          height: z.number().optional().describe('The bottom band\'s height in px.'),
-          width: z.number().optional().describe('The side column\'s width in px.'),
+          height: z.number().optional().describe("The bottom band's height in px."),
+          width: z.number().optional().describe("The side column's width in px."),
+          timelineId: z.string().optional().describe('The named cut to show on the timeline (slates_list_timelines).'),
         })
         .strict()
         .optional(),
@@ -654,27 +767,448 @@ export const setView: Operation<{
         .describe('The Studio Agent panel on the right. It cannot be opened while the agent is off in Settings.'),
       script: z
         .object({
-          details: z.boolean().optional().describe('Words + shots (true): each shot\'s picture beside its words on the Script page. Words (false): the words alone.'),
+          details: z.boolean().optional().describe("Words + shots (true): each shot's picture beside its words on the Script page. Words (false): the words alone."),
+          textScale: z.number().optional().describe("The page's text size; 1 is the default."),
+          panelShotId: z.string().nullable().optional().describe("Open this Shot's details panel on the Script page (it binds the Shot to the prompt box, as a click does); null closes it."),
         })
         .strict()
         .optional()
         .describe('The Script page.'),
+      board: z
+        .object({
+          id: z.string().optional().describe('Open this board (on Board and Script).'),
+          sceneId: z.string().optional().describe('Scroll the Board to this scene.'),
+          level: z.enum(VIEW_BOARD_LEVELS).optional().describe('View: Film (posters), Scenes (the working card) or Shot (each card open).'),
+          cardWidth: z.number().optional().describe('Card width in px, anywhere between the stops.'),
+          filter: z.enum(VIEW_BOARD_FILTERS).optional().describe('Filter: every shot, only shots with a linked clip, or only shots without one.'),
+          linkedClips: z.boolean().optional().describe('Show the row of linked clips under each shot.'),
+          scriptFollowsDrag: z.boolean().optional().describe("The board menu's Script follows a drag."),
+          collapsedSceneIds: z.array(z.string()).optional().describe('Every scene to fold; a scene not named unfolds.'),
+        })
+        .strict()
+        .optional(),
+      media: z
+        .object({
+          tab: z.enum(VIEW_MEDIA_TABS).optional(),
+          folderId: z.string().nullable().optional().describe('Choose this folder (new pictures land in it), or null for all media.'),
+          unfiledOnly: z.boolean().optional().describe('Show only media in no folder.'),
+          search: z.string().optional().describe("Media's search box (matches prompts)."),
+          favoritesOnly: z.boolean().optional(),
+          linkedOnly: z.boolean().optional().describe('Images tab: only pictures with a linked video.'),
+          rounds: z.boolean().optional().describe('Group by generation.'),
+          cardSize: z.number().optional().describe('Card size in px.'),
+          revealAssetId: z.string().optional().describe('Jump to this card in Media, undoing only what hides it (the app says what it changed).'),
+        })
+        .strict()
+        .optional(),
+      library: z.object({ categoryId: z.string().nullable() }).strict().optional().describe("Open a Library category's page in Media's place; null goes back to the grid."),
+      viewer: z.object({ assetId: z.string().nullable() }).strict().optional().describe('Open the picture viewer on a picture; null closes it.'),
+      compare: z
+        .object({ open: z.boolean().optional(), assetIds: z.array(z.string()).max(4).optional().describe('The compare set, two to four items.') })
+        .strict()
+        .optional(),
+      animatic: z.object({ open: z.boolean(), fromShotId: z.string().optional() }).strict().optional().describe('Play the board as a rough cut from a Shot (the Board or Script tab must be showing).'),
+      settings: z.object({ open: z.boolean(), pane: z.enum(VIEW_SETTINGS_PANES).optional() }).strict().optional().describe('Open Settings, on a pane (ai is AI tools, keys is API keys).'),
+      composer: z.object({ open: z.boolean() }).strict().optional().describe('Show or hide the prompt box.'),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
     if (Object.keys(input).length === 0) {
-      throw new Error('Name at least one of lens, cut, leftDock, studioAgent or script — there is nothing to change otherwise.')
+      throw new Error('Name at least one field to change, e.g. lens, board, media, viewer or settings.')
     }
+    // The 1.6.1 fields need a desktop that knows them; an older one would drop them without a word.
+    const LOOKING = ['projectId', 'board', 'media', 'library', 'viewer', 'compare', 'animatic', 'settings', 'composer'] as const
+    const widened =
+      LOOKING.some((k) => input[k] !== undefined) ||
+      input.cut?.timelineId !== undefined ||
+      input.script?.textScale !== undefined ||
+      input.script?.panelShotId !== undefined
+    if (widened) await ctx.desktop().requireCapability('view-v2', 'showing and opening things in the window')
     const r = await ctx.desktop().post<{ view: ViewShape | null; reason?: string }>('/agent/view', input)
     if (!r.view) {
-      return { text: r.reason ? `Nothing was rearranged (${r.reason}).` : 'Nothing was rearranged.', data: { view: null } }
+      return { text: r.reason ? `Nothing was changed (${r.reason}).` : 'Nothing was changed.', data: { view: null } }
     }
     // A desktop whose view predates folding takes the patch and ignores `folded`.
     const noFolds = input.leftDock?.folded !== undefined && r.view.leftDock.folded === undefined
       ? " This Slates cannot fold the navigator's sections; update Slates."
       : ''
     return { text: describeView(r.view) + noFolds, data: { view: r.view } }
+  },
+}
+
+/**
+ * SHOW AND POINT (1.6.1). The manual's pictures and a ring around a live control, so an agent can
+ * answer "where is it?" with the thing itself instead of a paragraph. Neither changes the project or
+ * the view. The pictures come from the INSTALLED app (it ships them), so they show the user's version;
+ * the public URL is for a client that renders only links. Decisions 13-16 in second-brain
+ * plans/2026-09-30-slates-manual-for-llms-1-6-1-decisions.md.
+ */
+export const getManualPicture: Operation<{ id?: string }> = {
+  id: 'slates_get_manual_picture',
+  description:
+    'A picture of a Slates screen from the app manual, with numbered callouts and their legend, taken from the version the user runs. Pass the picture id the manual names (app-manual sections show "Picture `id`"); no id lists them. Show one when the user cannot find something or asks what a screen looks like; never unasked. When the control is on screen, slates_highlight_control points at the real thing instead.',
+  input: z
+    .object({ id: z.string().min(1).optional().describe('Picture id from the manual, e.g. "window-overview". Omit to list.') })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('manual-pictures', "the manual's pictures")
+    if (!input.id) {
+      const r = await ctx.desktop().get<{ appVersion: string; pictures: Array<{ id: string; title: string; url: string }> }>('/agent/manual/pictures')
+      return ok(r, r.pictures.length ? r.pictures.map((p) => `${p.id}: ${p.title}`).join('\n') : 'This Slates ships no manual pictures.')
+    }
+    const p = await ctx.desktop().get<{
+      id: string
+      title: string
+      data: string
+      mimeType: string
+      url: string
+      appVersion: string
+      callouts: Array<{ n: number; target: string; name: string }>
+    }>('/agent/manual/picture', { id: input.id })
+    const legend = p.callouts.length ? '\n' + p.callouts.map((c) => `${c.n}. ${c.name} (${c.target})`).join('\n') : ''
+    return {
+      text: `${p.title} (Slates ${p.appVersion}). Link: ${p.url}${legend}`,
+      images: [{ data: p.data, mimeType: p.mimeType }],
+      data: { id: p.id, title: p.title, url: p.url, appVersion: p.appVersion, callouts: p.callouts },
+    }
+  },
+}
+
+export const highlightControl: Operation<{ target?: string; caption?: string; list?: boolean }> = {
+  id: 'slates_highlight_control',
+  description:
+    "Point at a control in the user's Slates window: a grey outline around it for a few seconds, with your caption beside it. It clicks nothing and never changes the view; the user's next click clears it. Target ids are listed at the end of each app-manual surface section (\"controls you can point at\"), or pass list:true to get every id with whether it is on screen now. shown:false means it is not on screen: tell the user the way there, or open that view with slates_set_view if they want you to.",
+  input: z
+    .object({
+      target: z.string().min(1).optional().describe('Control id, e.g. "shell.titlebar.search".'),
+      caption: z.string().max(140).optional().describe('A few words shown beside it, e.g. "Click here to open the timeline".'),
+      list: z.boolean().optional().describe('Return every target id, its on-screen name, where it is, and whether it is on screen now.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ui-pointer', 'pointing at controls')
+    if (input.list || !input.target) {
+      const r = await ctx.desktop().get<{ targets: Array<{ id: string; name: string; where: string; onScreen: boolean }> }>('/agent/ui/targets')
+      const on = r.targets.filter((t) => t.onScreen)
+      return ok(r, `${r.targets.length} controls; on screen now: ${on.map((t) => `${t.id} (${t.name})`).join(', ') || 'none reported'}.`)
+    }
+    const r = await ctx.desktop().post<{ target: string; shown: boolean; reason?: string; name: string; where: string }>('/agent/ui/highlight', {
+      target: input.target,
+      caption: input.caption,
+    })
+    return ok(
+      r,
+      r.shown
+        ? `Pointing at ${r.name} (${r.where}) in the user's window.`
+        : `${r.name} is not on screen (${r.reason ?? 'not shown'}). It is at: ${r.where}. Tell the user the way there, or open that view with slates_set_view if they ask you to.`
+    )
+  },
+}
+
+/**
+ * THE PROMPT BOX (1.6.1, decision 20): read what it holds and stage a change in it, so an agent can fill
+ * in the model, words, settings and references and leave the user to press Generate on the exact request.
+ * Staging never spends. The desktop builds the report from what the box draws and applies a patch through
+ * the box's own setters (`slate/src/renderer/src/components/prompt/agentComposer.ts`); this is its shape.
+ */
+interface ComposerReport {
+  projectId: string
+  open: boolean
+  lane: 'image' | 'video' | 'audio'
+  tool: 'lip-sync' | 'motion-transfer' | null
+  model: { id: string; label: string; face: boolean }
+  destination: 'slates' | 'chatgpt'
+  bound: { shotId: string; code: string | null; name: string } | null
+  draftFrom: { assetId: string; code: string | null } | null
+  prompt: string
+  promptMax: number | null
+  params: Array<{ id: string; label: string; value: string; options: Array<{ value: string; label: string; locked?: string }> }>
+  tiles: Array<{ badge: string; kind: string; role: string | null; name: string; token: string | null; assetId: string | null; code: string | null; sent: boolean; voice?: boolean }>
+  composedPrompt: string
+  unresolved: string[]
+  dangling: string[]
+  toolInputs?: { sourceAssetId: string | null; sourceType: 'image' | 'video' | null; speechText: string; drivingVideoAssetId: string | null; characterImageAssetId: string | null }
+  notice: { tone: 'error' | 'note'; text: string } | null
+  generate: string
+  canRestoreDraft: boolean
+  canRestoreSetup: boolean
+  running: number
+}
+
+const COMPOSER_ROLES = Object.keys(ATTACHMENT_ROLE_DESCRIPTION) as [string, ...string[]]
+
+function describeComposer(r: ComposerReport): string {
+  const lines: string[] = []
+  const where = r.bound
+    ? `editing Shot ${r.bound.code ?? r.bound.shotId}${r.bound.name ? ` "${r.bound.name}"` : ''} (every change is saved to it)`
+    : r.draftFrom
+      ? `a draft from ${r.draftFrom.code ?? r.draftFrom.assetId}`
+      : 'an unsaved draft'
+  lines.push(`Prompt box (${r.open ? 'showing' : 'hidden'}), ${r.lane} lane, ${r.model.label}${r.destination === 'chatgpt' ? ' (ChatGPT)' : ''}; ${where}.`)
+  lines.push(`Words (${r.prompt.length}${r.promptMax ? `/${r.promptMax}` : ''}): ${r.prompt ? JSON.stringify(r.prompt) : 'none'}`)
+  if (r.params.length) lines.push(`Settings: ${r.params.map((p) => `${p.label} ${p.value || '(none)'}`).join(' · ')}`)
+  if (r.tiles.length) {
+    const tiles = r.tiles.map(
+      (t) => `${t.badge} ${t.code ?? t.name}${t.role ? ` (${t.role})` : t.token ? ` (${t.token})` : ''}${t.voice ? ' voice' : ''}${t.sent ? '' : ' NOT SENT'}`
+    )
+    lines.push(`References: ${tiles.join(', ')}`)
+  }
+  const ti = r.toolInputs
+  if (ti && r.tool === 'lip-sync') lines.push(`Lip Sync source: ${ti.sourceAssetId ?? 'none'}${ti.sourceType ? ` (${ti.sourceType})` : ''}; Speech Text: ${ti.speechText ? JSON.stringify(ti.speechText) : 'none'}`)
+  if (ti && r.tool === 'motion-transfer') lines.push(`Motion: ${ti.drivingVideoAssetId ?? 'none'}; Character: ${ti.characterImageAssetId ?? 'none'}`)
+  if (r.composedPrompt !== r.prompt) lines.push(`Sent as: ${JSON.stringify(r.composedPrompt)}`)
+  if (r.unresolved.length) lines.push(`Match nothing (sent as plain words): ${r.unresolved.join(', ')}`)
+  if (r.dangling.length) lines.push(`Point past what is sent: ${r.dangling.join(', ')}`)
+  if (r.notice) lines.push(`Notice line: ${r.notice.text}`)
+  lines.push(`Button: ${r.generate}.${r.running ? ` ${r.running} generating.` : ''}`)
+  return lines.join('\n')
+}
+
+export const getComposer: Operation<Record<string, never>> = {
+  id: 'slates_get_composer',
+  description:
+    "What the prompt box holds right now, as the user sees it: the lane and model, whether it is editing a Shot or a draft, the words, every setting with the values it offers, each reference tile with its number, role and whether the model's limit leaves it out, the exact text the model receives (See what gets sent), mentions that match nothing, the notice line, and the Generate button's price. Read it before telling the user what a press will do, or before staging with slates_set_composer.",
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    await ctx.desktop().requireCapability('composer', 'reading the prompt box')
+    const r = await ctx.desktop().get<{ report: ComposerReport | null; reason?: string }>('/agent/composer')
+    if (!r.report) return { text: r.reason ?? 'The prompt box did not answer.', data: { report: null } }
+    return { text: describeComposer(r.report), data: r.report }
+  },
+}
+
+export const setComposer: Operation<{
+  projectId?: string
+  bindShotId?: string | null
+  clear?: boolean
+  restoreDraft?: boolean
+  restoreSetup?: boolean
+  fromAssetId?: string
+  editSourceAssetId?: string
+  lane?: 'image' | 'video' | 'audio'
+  model?: string
+  prompt?: string
+  addMentions?: string[]
+  attach?: Array<{ assetId: string; role?: string }>
+  detach?: string[]
+  setRole?: Array<{ assetId: string; role: string }>
+  params?: Record<string, string | number | boolean>
+  voice?: { presetId: string } | { clipAssetId: string } | { description: string }
+  tool?: { sourceAssetId?: string | null; speechText?: string; drivingVideoAssetId?: string | null; characterImageAssetId?: string | null }
+}> = {
+  id: 'slates_set_composer',
+  description:
+    "Stage a request in the user's prompt box, as their own clicks would, and leave it for them to press Generate: edit a Shot in it or stop, clear or restore the draft, reuse a result's prompt, edit a clip, pick the lane and model, write the words, attach pictures, clips or audio with roles, re-file or remove them, set settings and the voice, fill Lip Sync or Motion Control's inputs. It never generates and never spends; the answer is the box as it settled (the same report as slates_get_composer) plus a line for anything it could not apply and why. Use it when the user wants a setup ready to look at; to generate yourself, quote with slates_estimate_generation_cost and use the generate ops.",
+  input: z
+    .object({
+      projectId: z.string().uuid().optional().describe('The project you expect the box to be in; refused if another is open.'),
+      bindShotId: z
+        .string()
+        .min(1)
+        .nullable()
+        .optional()
+        .describe('Edit this Shot in the box (id or code; every change is saved to it); null stops editing and brings the draft back.'),
+      clear: z.boolean().optional().describe('Empty the unsaved draft; restoreDraft undoes it. Not while a Shot is bound.'),
+      restoreDraft: z.boolean().optional().describe('Put back the draft that Clear, Reuse prompt or Edit with AI replaced (they swap).'),
+      restoreSetup: z.boolean().optional().describe('On a bound Shot, swap back the setup Continue replaced (writes the Shot; again swaps back).'),
+      fromAssetId: z.string().min(1).optional().describe("Reuse prompt: this result's recipe replaces the box (id or code)."),
+      editSourceAssetId: z.string().min(1).optional().describe('Edit with AI: this clip becomes the canvas and the box starts clean.'),
+      lane: z.enum(['image', 'video', 'audio']).optional().describe('The Image / Video / Audio tab; it lands on the last model used there.'),
+      model: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('A model id (slates_list_available_models), `<id>::face` for a face route, `chatgpt`, `lip-sync` or `motion-transfer`.'),
+      prompt: z.string().optional().describe('Replaces the words. @name and #name attach what they name, as typing does.'),
+      addMentions: z
+        .array(z.string().regex(/^[@#]\S+$/))
+        .optional()
+        .describe('@name / #name added at the end of the words (slates_list_library gives each item its mention).'),
+      attach: z
+        .array(z.object({ assetId: z.string().min(1), role: z.enum(COMPOSER_ROLES).optional() }).strict())
+        .optional()
+        .describe(
+          'Pictures, clips or audio from the project (id or code). A picture with no role goes in as a dropped one does; a clip is a video-reference, audio an audio-reference.'
+        ),
+      detach: z
+        .array(z.string().min(1))
+        .optional()
+        .describe("Take these out of the box: asset ids or codes, or a character's id to drop the voice her @mention brought."),
+      setRole: z
+        .array(z.object({ assetId: z.string().min(1), role: z.enum(COMPOSER_ROLES) }).strict())
+        .optional()
+        .describe("Re-file pictures already in the box, as a tile's role menu does."),
+      params: z
+        .record(z.union([z.string(), z.number(), z.boolean()]))
+        .optional()
+        .describe('Settings by id, each to a value it offers (slates_get_composer lists both), applied after the model.'),
+      voice: z
+        .union([
+          z.object({ presetId: z.string().min(1) }).strict(),
+          z.object({ clipAssetId: z.string().min(1) }).strict(),
+          z.object({ description: z.string().min(1) }).strict(),
+        ])
+        .optional()
+        .describe('The voice on a voice model: a preset (slates_list_voices), an audio clip in the project, or described in words.'),
+      tool: z
+        .object({
+          sourceAssetId: z.string().min(1).nullable().optional().describe('Lip Sync: the picture or clip with the face; null clears it.'),
+          speechText: z.string().max(120).optional().describe('Lip Sync, Text to speech: the words spoken (Speech Text).'),
+          drivingVideoAssetId: z.string().min(1).nullable().optional().describe('Motion Control: the clip whose motion is copied (Motion).'),
+          characterImageAssetId: z.string().min(1).nullable().optional().describe('Motion Control: the picture to animate (Character).'),
+        })
+        .strict()
+        .optional()
+        .describe('Lip Sync and Motion Control inputs (pick model lip-sync or motion-transfer first). An uploaded audio file is only the user.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('composer', 'staging the prompt box')
+    if (Object.keys(input).filter((k) => k !== 'projectId').length === 0) {
+      throw new Error('Name at least one change, e.g. model, prompt, attach or params. To read the box, use slates_get_composer.')
+    }
+    const r = await ctx.desktop().post<{ report: ComposerReport | null; reason?: string; skipped?: string[] }>('/agent/composer', input)
+    if (!r.report) return { text: `Nothing was staged (${r.reason ?? 'no answer'}).`, data: { report: null } }
+    const skipped = r.skipped?.length ? `\nNot applied:\n- ${r.skipped.join('\n- ')}` : ''
+    return { text: `${describeComposer(r.report)}${skipped}`, data: { report: r.report, skipped: r.skipped ?? [] } }
+  },
+}
+
+/**
+ * AGENT PARITY (1.6.1): what a user could do in the window and an agent could not. Each calls a desktop
+ * route that runs the window's own function (`slate/src/main/agent/routes-parity.ts`). Plan step 5b,
+ * second-brain plans/2026-09-30-slates-manual-for-llms-1-6-1.md.
+ */
+export const reorderFolders: Operation<{ projectId: string; folderIds: string[] }> = {
+  id: 'slates_reorder_folders',
+  description:
+    "Reorder the Folders section of the left dock, as dragging a row does. Pass folder ids in the new order; ones you leave out keep their order after them.",
+  input: z.object({ projectId: z.string().uuid(), folderIds: z.array(z.string().min(1)).min(1) }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('reorder', 'reordering folders and pins')
+    return ok(await ctx.desktop().post('/agent/folders/reorder', input))
+  },
+}
+
+export const reorderPins: Operation<{ projectId: string; assetIds: string[] }> = {
+  id: 'slates_reorder_pins',
+  description:
+    "Reorder the Pinned section of the left dock, as dragging a pin does. Pass the pinned images (UUIDs or badge codes) in the new order; ones you leave out keep their order after them.",
+  input: z.object({ projectId: z.string().uuid(), assetIds: z.array(z.string().min(1)).min(1) }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('reorder', 'reordering folders and pins')
+    const resolved = await resolveAssetRefs(ctx, input.projectId, input.assetIds)
+    return ok(await ctx.desktop().post('/agent/pins/reorder', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.get(r)!.id) }))
+  },
+}
+
+export const getUsage: Operation<{ period?: 'week' | 'month' | 'all' }> = {
+  id: 'slates_get_usage',
+  description:
+    'What Settings → Account → Usage shows: estimated spend across every project for this month (default), the last 7 days or all time, the image and video counts, video seconds and the models spent on most.',
+  input: z.object({ period: z.enum(['week', 'month', 'all']).optional() }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('usage', 'usage')
+    return ok(await ctx.desktop().get('/agent/usage', { period: input.period ?? 'month' }))
+  },
+}
+
+export const getAppSettings: Operation<Record<string, never>> = {
+  id: 'slates_get_app_settings',
+  description:
+    "The app's own settings an agent may read: the app version, the projects folder, which tab a never-opened project lands on (newProjectLens), whether ChatGPT images is on, and (from Slates 1.6.1) who does the Studio Agent's thinking (studioAgentHost: slates, codex or claude) with each host's model and thinking level ('' is its default). Never keys or sign-in.",
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    await ctx.desktop().requireCapability('app-settings', 'app settings')
+    return ok(await ctx.desktop().get('/agent/app-settings'))
+  },
+}
+
+type AppSettingsPatch = {
+  newProjectLens?: 'media' | 'script' | 'board'
+  chatGptImagesEnabled?: boolean
+  studioAgentHost?: 'slates' | 'codex' | 'claude'
+  studioAgentCodexModel?: string
+  studioAgentCodexEffort?: string
+  studioAgentClaudeModel?: string
+  studioAgentClaudeEffort?: string
+}
+
+const HOST_KEYS = ['studioAgentHost', 'studioAgentCodexModel', 'studioAgentCodexEffort', 'studioAgentClaudeModel', 'studioAgentClaudeEffort'] as const
+
+export const setAppSettings: Operation<AppSettingsPatch> = {
+  id: 'slates_set_app_settings',
+  description:
+    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does the Studio Agent's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
+  input: z
+    .object({
+      newProjectLens: z.enum(['media', 'script', 'board']).optional(),
+      chatGptImagesEnabled: z.boolean().optional(),
+      studioAgentHost: z.enum(['slates', 'codex', 'claude']).optional(),
+      studioAgentCodexModel: z.string().max(120).optional(),
+      studioAgentCodexEffort: z.string().max(120).optional(),
+      studioAgentClaudeModel: z.string().max(120).optional(),
+      studioAgentClaudeEffort: z.string().max(120).optional(),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('app-settings', 'app settings')
+    // An older desktop has the route but not these keys: ask it by capability, so it says "update Slates".
+    if (HOST_KEYS.some((key) => input[key] !== undefined)) {
+      await ctx.desktop().requireCapability('agent-host', "choosing who does the Studio Agent's thinking")
+    }
+    return ok(await ctx.desktop().post('/agent/app-settings', input))
+  },
+}
+
+export const getAsset: Operation<{ projectId: string; assetId: string }> = {
+  id: 'slates_get_asset',
+  description:
+    'One asset in full (UUID or badge code): its recorded prompt, model, settings and inputs, its source picture and linked clips, and how many clips and board shots use it. slates_list_assets rows are compact; read this before reusing or explaining one card.',
+  input: z.object({ projectId: z.string().uuid(), assetId: z.string().min(1) }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('asset-detail', 'reading one asset in full')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    return ok(await ctx.desktop().get('/agent/assets/get', { id }))
+  },
+}
+
+export const linkAssetSource: Operation<{ projectId: string; assetId: string; imageAssetId: string | null }> = {
+  id: 'slates_link_asset_source',
+  description:
+    "Link a clip to the picture it came from, as the clip card's Link video to image does (it adds a link; a clip can have several), or pass imageAssetId null to unlink it from every picture. UUIDs or badge codes.",
+  input: z
+    .object({ projectId: z.string().uuid(), assetId: z.string().min(1).describe('The clip.'), imageAssetId: z.string().min(1).nullable().describe('The picture, or null to unlink.') })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('asset-link', 'linking a clip to its picture')
+    const refs = [input.assetId, ...(input.imageAssetId ? [input.imageAssetId] : [])]
+    const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
+    return ok(
+      await ctx.desktop().post('/agent/assets/link-source', {
+        assetId: resolved.get(input.assetId)!.id,
+        imageAssetId: input.imageAssetId ? resolved.get(input.imageAssetId)!.id : null,
+      })
+    )
+  },
+}
+
+export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
+  id: 'slates_extract_video_frame',
+  description:
+    "Save one frame of a clip as a new picture in Media, as the clip card's camera does: at 'first', 'last' (default 'first') or a second. Free. The usual continuity move: extract a clip's last frame and use it as the next clip's first frame.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).describe('The clip, UUID or badge code.'),
+      at: z.union([z.enum(['first', 'last']), z.number().min(0)]).optional(),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('frame-extract', 'extracting a frame')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    return ok(await ctx.desktop().post('/agent/assets/extract-frame', { assetId: id, at: input.at ?? 'first' }))
   },
 }
 
@@ -1471,16 +2005,18 @@ export const connectChatGpt: Operation<Record<string, never>> = {
 }
 
 export const generateChatGptImage: Operation<{
-  projectId: string; requestId: string; prompt: string; aspectRatio?: string; referenceAssetIds?: string[]; background?: boolean
+  projectId: string; requestId: string; prompt: string; aspectRatio?: string; referenceAssetIds?: string[]; background?: boolean; folderId?: string | null
 }> = {
   id: 'slates_generate_chatgpt_image',
   description: 'Generate an image through the local Codex host using the connected ChatGPT account, then save it in Slates with its exact submitted prompt, reference lineage and measured dimensions. Uses ChatGPT account limits, never Slates credits or a paid API fallback. Check slates_get_chatgpt_status first. Supply a new UUID requestId once per intended generation; reuse it for retries to avoid duplicate generation/import. No explicit image model, quality or size controls are exposed. Prompt may request visual properties without guaranteeing them. Background returns a generationId for slates_get_generation_status.',
   input: z.object({ projectId: z.string().uuid(), requestId: z.string().uuid(), prompt: z.string().min(1),
     aspectRatio: z.enum(CHATGPT_FRAMING_RATIOS as [string, ...string[]]).optional().describe('Optional framing request appended verbally to the prompt, not an exact output-size guarantee.'),
-    referenceAssetIds: z.array(z.string().min(1)).optional(), background: z.boolean().optional() }),
+    referenceAssetIds: z.array(z.string().min(1)).optional(), background: z.boolean().optional(), folderId: folderIdField }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('chatgpt-image-generation', 'ChatGPT image generation')
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await desktop.requireCapability('media-folder', 'choosing the folder a result lands in')
     const refs = await resolveAssetRefs(ctx, input.projectId, input.referenceAssetIds ?? [])
     const result = await desktop.post<Record<string, unknown>>('/agent/generation/chatgpt-image', {
       ...input, referenceAssetIds: (input.referenceAssetIds ?? []).map(id => refs.get(id)!.id),
@@ -1539,6 +2075,7 @@ export const uploadReferenceImage: Operation<{
   filePath?: string
   dataUrl?: string
   type?: 'image' | 'video' | 'audio'
+  folderId?: string | null
 }> = {
   id: 'slates_upload_reference_image',
   description:
@@ -1552,17 +2089,21 @@ export const uploadReferenceImage: Operation<{
         .enum(['image', 'video', 'audio'])
         .optional()
         .describe('Asset kind for a filePath import — "image" (default), "video", or "audio". A dataUrl is always an image.'),
+      folderId: folderIdField,
     })
     .refine((d) => !!d.filePath !== !!d.dataUrl, {
       message: 'Pass exactly one of filePath or dataUrl',
     }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await desktop.requireCapability('media-folder', 'choosing the folder a result lands in')
     if (input.filePath) {
       const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload', {
         projectId: input.projectId,
         filePath: input.filePath,
         type: input.type ?? 'image',
+        ...folderBody(input.folderId),
       })
       return ok(r)
     }
@@ -1574,6 +2115,7 @@ export const uploadReferenceImage: Operation<{
     const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload-base64', {
       projectId: input.projectId,
       dataUrl: input.dataUrl,
+      ...folderBody(input.folderId),
     })
     return ok(r)
   },
@@ -2329,6 +2871,7 @@ export const generateImage: Operation<{
   referenceAssetIds?: string[]
   background?: boolean
   confirm?: boolean
+  folderId?: string | null
 }> = {
   id: 'slates_generate_image',
   billable: true,
@@ -2361,8 +2904,11 @@ export const generateImage: Operation<{
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
+    folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // Clarification gate: aspectRatio + resolution must be deliberate.
     // Mirrors the cost confirm gate — defaults silently wasted credits
     // (1:1 when user wanted 16:9, 4k when 1k would have done). The LLM
@@ -2560,6 +3106,7 @@ export const generateImage: Operation<{
         count: input.count ?? 1,
         ...(isGptImageModel(imageModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
+        ...folderBody(input.folderId),
         background: input.background,
       })
       // Partial multi-image failure: the desktop attaches an error message
@@ -2926,6 +3473,141 @@ export const editImage: Operation<{
         asset: result.asset,
         generationId: result.generationId,
         ...(result.note ? { note: result.note } : {}),
+      },
+    }
+  },
+}
+
+/**
+ * The picture viewer's EXTRACT (its Cells tab): a 2x2 or 3x3 grid picture, cells cropped out and re-rendered
+ * at full resolution, each as its own new picture. BILLABLE, and priced by the DESKTOP: its quote is the
+ * `imageCost` the viewer's Extract button prints, for this seat, rung and cell count, so the price an agent
+ * is shown cannot differ from the button's. The confirm gate is every billable op's: above CONFIRM_CREDITS
+ * with no `confirm`, the op answers with the price and the exact prompt, and spends nothing.
+ */
+
+/** The seats the viewer's Cells box offers. Mirrors slate's `GRID_EXTRACT_MODELS` (`shared/prompts/storyboard-grids.ts`), which this package cannot import. */
+const GRID_EXTRACT_SEATS = ['nano-banana-2', 'flux-2-max', 'seedream-5-lite'] as const
+
+interface ExtractQuote {
+  gridCode: string | null
+  cells: string[]
+  model: string
+  modelLabel: string
+  resolution: string
+  aspectRatio: string
+  credits: number
+  creditsPerCell: number
+  referencesSent: number
+  prompt: string
+  notes: string[]
+}
+
+export const extractGridCells: Operation<{
+  projectId: string
+  assetId: string
+  cells: string[]
+  model?: (typeof GRID_EXTRACT_SEATS)[number]
+  resolution?: '1k' | '2k' | '3k' | '4k'
+  aspectRatio?: string
+  prompt?: string
+  referenceAssetIds?: string[]
+  confirm?: boolean
+  background?: boolean
+}> = {
+  id: 'slates_extract_grid_cells',
+  billable: true,
+  description:
+    "Pull cells out of a 2x2 or 3x3 grid picture, as the picture viewer's Cells tab does: each named cell is cropped and re-rendered at full resolution as its own NEW picture (the grid is untouched). Name cells as they read on screen, row number then column letter: 1A top-left, 2C second row third column. Default seat " +
+    toolModelFor('grid-extract') +
+    " (the grid-extract tool seat, what the viewer opens on); resolution and aspect ratio default as the viewer does (the seat's own rung, the ratio nearest the grid's shape). prompt adds words to every cell; on the default seat @name and #look in it attach their pictures, and referenceAssetIds adds pictures, as in the viewer. " +
+    CONFIRM_GATE_SENTENCE +
+    " The confirm answer carries the price the viewer's Extract button prints and the exact prompt that will be sent.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    assetId: z.string().min(1).describe('The grid picture — UUID or badge code. Must be a 2x2 or 3x3 grid.'),
+    cells: z.array(z.string().regex(/^[1-3][A-Ca-c]$/, 'a cell is its row number then column letter, e.g. 1A')).min(1).max(9).describe('Cells to extract, e.g. ["1A","2C"].'),
+    model: zEnum(GRID_EXTRACT_SEATS).optional(),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe("Default and ceiling are the seat's own, as in the viewer."),
+    aspectRatio: z.string().optional().describe("Output aspect ratio, one the seat offers. Default: the ratio nearest the grid's own shape."),
+    prompt: z.string().max(2500).optional().describe('Words for every cell (what the shot is). On the default seat @name and #look attach their pictures; the crop is image 1.'),
+    referenceAssetIds: z.array(z.string()).max(13).optional().describe('Pictures added beside the crop (default seat only), UUIDs or badge codes.'),
+    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
+    background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('grid-extract', 'extracting grid cells')
+    if (input.background) await desktop.requireCapability('background-generation', 'background generation')
+    const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId, ...(input.referenceAssetIds ?? [])])
+    const grid = refs.get(input.assetId)!
+    const request = {
+      projectId: input.projectId,
+      assetId: grid.id,
+      cells: input.cells.map((c) => c.toUpperCase()),
+      model: input.model,
+      resolution: input.resolution,
+      aspectRatio: input.aspectRatio,
+      prompt: input.prompt,
+      referenceAssetIds: input.referenceAssetIds?.map((r) => refs.get(r)!.id),
+    }
+    // The desktop prices it: the viewer's own `imageCost`, for this seat, rung and cell count. The desktop also
+    // refuses what the viewer would (not a grid, a cell the grid lacks, a seat it does not offer) before any spend.
+    const quote = await desktop.get<ExtractQuote>('/agent/generation/extract-quote', { request: JSON.stringify(request) })
+    const gridName = grid.code ?? grid.id
+    if (quote.credits > CONFIRM_CREDITS && !input.confirm) {
+      return ok({
+        requires_confirm: true,
+        estimated_credits: quote.credits,
+        estimated_cents: quote.credits,
+        cells: quote.cells,
+        model: quote.model,
+        resolution: quote.resolution,
+        aspectRatio: quote.aspectRatio,
+        credits_per_cell: quote.creditsPerCell,
+        prompt_sent: quote.prompt,
+        ...(quote.notes.length ? { notes: quote.notes } : {}),
+        message:
+          `Cost: ${fmtCredits(quote.credits)} to extract ${quote.cells.length} cell${quote.cells.length === 1 ? '' : 's'} (${quote.cells.join(', ')}) of ${gridName} with ${quote.modelLabel} at ${quote.resolution}, ${fmtCredits(quote.creditsPerCell)} each. ` +
+          (quote.notes.length ? `${quote.notes.join('. ')}. ` : '') +
+          `Re-call with confirm=true after the user explicitly OKs the spend. When discussing with the user, refer to the grid by its code (matches the gallery badge).`,
+      })
+    }
+    const result = await desktop.post<{
+      success?: boolean
+      background?: boolean
+      assets?: Array<Record<string, unknown>>
+      generationIds?: string[]
+      cells: string[]
+      error?: string
+    }>('/agent/generation/extract-cells', { ...request, background: input.background })
+    if (result.background) {
+      return backgroundSubmitted(`extraction of ${quote.cells.join(', ')} from ${gridName}`, result.generationIds ?? [], {
+        projectId: input.projectId,
+        gridAssetId: grid.id,
+        cells: quote.cells,
+        model: quote.model,
+        cost_credits: quote.credits,
+      })
+    }
+    const assets = result.assets ?? []
+    if (assets.length === 0) throw new Error(result.error ?? 'Extraction failed')
+    const codes = assets.map((a) => (a.code as string | undefined) ?? (a.id as string)).join(', ')
+    const partial = result.success === false ? ` Only ${assets.length} of ${quote.cells.length} cells came back; the rest failed (slates_list_generations shows why).` : ''
+    return {
+      text:
+        `Extracted ${assets.length} cell${assets.length === 1 ? '' : 's'} (${quote.cells.join(', ')}) of ${gridName} as ${codes} via ${quote.modelLabel} at ${quote.resolution}, ${fmtCredits(quote.credits)}.${partial} ` +
+        BACKGROUND_REVIEW_POINTER,
+      data: {
+        projectId: input.projectId,
+        gridAssetId: grid.id,
+        cells: quote.cells,
+        model: quote.model,
+        resolution: quote.resolution,
+        aspectRatio: quote.aspectRatio,
+        cost_credits: quote.credits,
+        assets,
+        generationIds: result.generationIds,
       },
     }
   },
@@ -3442,6 +4124,7 @@ export const generateVideo: Operation<{
   negativePrompt?: string
   background?: boolean
   confirm?: boolean
+  folderId?: string | null
 }> = {
   id: 'slates_generate_video',
   billable: true,
@@ -3532,8 +4215,11 @@ export const generateVideo: Operation<{
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the confirm gate (which fires for almost every video gen since they\'re expensive).'),
+    folderId: folderIdField,
   }),
   async run(input, ctx) {
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // Resolve the model FIRST — forgiving normalization (cost keys, alias
     // spellings) with a teaching error, so a wrong id never costs the agent
     // a retry spiral. Anything the key encoded (duration/res/audio) fills
@@ -4029,6 +4715,7 @@ export const generateVideo: Operation<{
       seedanceRealFace: input.seedanceRealFace,
       realFaceConsent: input.realFaceConsent,
       negativePrompt: input.negativePrompt,
+      ...folderBody(input.folderId),
       background: input.background,
     })
     if (!result.success) {
@@ -4172,6 +4859,7 @@ export const generateAudio: Operation<{
   imageReferenceAssetId?: string
   background?: boolean
   confirm?: boolean
+  folderId?: string | null
 }> = {
   id: 'slates_generate_audio',
   billable: true,
@@ -4242,8 +4930,11 @@ export const generateAudio: Operation<{
       .describe('seed-audio only — ONE image asset to score what is in frame. MUTUALLY EXCLUSIVE with audioReferenceAssetIds.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
+    folderId: folderIdField,
   }),
   run: async (input, ctx) => {
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // ── Per-surface clarification + constraint gates ──
     //
     // `null` for the TTS seat is load-bearing rather than a placeholder: that
@@ -4401,6 +5092,7 @@ export const generateAudio: Operation<{
       promptInfluence: input.promptInfluence,
       audioReferenceAssetIds: (input.audioReferenceAssetIds ?? []).map((r) => rid(r)),
       imageReferenceAssetId: rid(input.imageReferenceAssetId),
+      ...folderBody(input.folderId),
       background: input.background,
     })
 
@@ -4774,6 +5466,7 @@ export const editVideo: Operation<{
   seedanceFace?: boolean
   background?: boolean
   confirm?: boolean
+  folderId?: string | null
 }> = {
   id: 'slates_edit_video',
   billable: true,
@@ -4807,9 +5500,12 @@ export const editVideo: Operation<{
     seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Faceless edits run on BytePlus; faces are blocked there and must route to the relaxed provider, which costs ~35% more. A face edit submitted without this flag is rejected by the provider, not silently downgraded.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
+    folderId: folderIdField,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await desktop.requireCapability('media-folder', 'choosing the folder a result lands in')
     await desktop.requireCapability('edit-video', 'video editing (Kling O3 edit)')
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
@@ -4930,6 +5626,7 @@ export const editVideo: Operation<{
       keepAudio: input.keepAudio !== false,
       videoResolution: input.videoResolution,
       seedanceFace: input.seedanceFace,
+      ...folderBody(input.folderId),
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Video edit failed')
@@ -4973,10 +5670,11 @@ export const trimVideo: Operation<{
   assetId: string
   inSec?: number
   outSec: number
+  pieces?: { splitsAtSec?: number[]; longestSec?: number; shareSec?: number }
 }> = {
   id: 'slates_trim_video',
   description:
-    'Trim a video asset to an exact [inSec, outSec] window and save the result as a NEW clip linked to the original (the original is untouched). This is the fit-to-model primitive: an 11s clip will not run on omni-flash-edit (3–10s) or Kling edit (3–15s), and a Seedance video reference must be 2–15s — trim it first, then edit/relocate the trimmed clip. EXACT re-encode (not a keyframe-snapped cut) so the result honors hard duration caps to the frame; any phone rotation flag is baked into the pixels in the same pass. The new clip lands with correct duration/width/height immediately. inSec defaults to 0.',
+    'Trim a video asset to an exact [inSec, outSec] window and save the result as a NEW clip linked to the original (the original is untouched). This is the fit-to-model primitive: an 11s clip will not run on omni-flash-edit (3–10s) or Kling edit (3–15s), and a Seedance video reference must be 2–15s — trim it first, then edit/relocate the trimmed clip. EXACT re-encode (not a keyframe-snapped cut) so the result honors hard duration caps to the frame; any phone rotation flag is baked into the pixels in the same pass. The new clip lands with correct duration/width/height immediately. inSec defaults to 0. Pass pieces to cut the window into SEVERAL clips in one call, as the Trim & split dialog does (split points, or Auto-split by longest piece, with seconds shared between neighbours); every new clip comes back.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the clip lives in.'),
     assetId: z
@@ -4984,6 +5682,15 @@ export const trimVideo: Operation<{
       .describe('The VIDEO asset to trim — UUID or badge code ("VID-V3", bare "V3"); resolves against the project at call time.'),
     inSec: z.number().min(0).optional().describe('Trim start in seconds (default 0).'),
     outSec: z.number().positive().describe('Trim end in seconds. Must be greater than inSec.'),
+    pieces: z
+      .object({
+        splitsAtSec: z.array(z.number().positive()).max(60).optional().describe('Cut the window at these seconds of the clip (Split here): each at least 0.15 s inside inSec and outSec and 0.2 s from the next.'),
+        longestSec: z.number().min(1).max(60).optional().describe('Auto-split: even pieces, none longer than this (Longest piece). Use instead of splitsAtSec.'),
+        shareSec: z.number().min(0).max(5).optional().describe('Pieces share: each piece also holds this many seconds of the next (default 0), so an edit can carry on into the next clip.'),
+      })
+      .strict()
+      .optional()
+      .describe('Cut the window into several clips instead of one. Needs splitsAtSec or longestSec.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -4992,6 +5699,24 @@ export const trimVideo: Operation<{
     const inSec = input.inSec ?? 0
     if (input.outSec - inSec < 0.05) {
       throw new Error('outSec must be at least ~0.1s after inSec.')
+    }
+    if (input.pieces) {
+      // 1.6.0 would cut the one window and ignore pieces without a word.
+      await desktop.requireCapability('trim-pieces', 'cutting a clip into pieces')
+      if (input.pieces.splitsAtSec === undefined && input.pieces.longestSec === undefined) {
+        throw new Error('pieces needs splitsAtSec (where to cut) or longestSec (Auto-split by longest piece).')
+      }
+      const cut = await desktop.post<{ assets: Array<Record<string, unknown>>; pieces: Array<{ start: number; end: number }> }>('/agent/assets/trim-video', {
+        assetId,
+        inSec,
+        outSec: input.outSec,
+        pieces: input.pieces,
+      })
+      const named = cut.assets.map((a, i) => `${(a.code as string | undefined) ?? (a.id as string)} (${cut.pieces[i].start.toFixed(1)}–${cut.pieces[i].end.toFixed(1)}s)`)
+      return {
+        text: `Cut ${cut.assets.length} clip${cut.assets.length === 1 ? '' : 's'} from the ${inSec.toFixed(1)}–${input.outSec.toFixed(1)}s window: ${named.join(', ')}. Edit or generate from them by id/code.`,
+        data: { assets: cut.assets, pieces: cut.pieces },
+      }
     }
     const r = await desktop.post<{ asset?: Record<string, unknown> }>('/agent/assets/trim-video', {
       assetId,
@@ -6082,6 +6807,7 @@ export const updateFrame: Operation<{
   assetId?: string | null
   sceneId?: string | null
   position?: number
+  preferredClipId?: string | null
 }> = {
   id: 'slates_update_frame',
   description:
@@ -6089,7 +6815,7 @@ export const updateFrame: Operation<{
     // of what the Shot in this slot already encodes — the image's role and the
     // beat's words — and they were backfilled into Shots on 2026-08-31. Use
     // slates_update_shot for either.
-    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. A scene or position change carries the words in this slot with it on the Script page. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
+    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. A scene or position change carries the words in this slot with it on the Script page. preferredClipId picks the clip the timeline takes for this slot (a video asset id or VID code; null goes back to the slot\'s most recent linked clip), as the take menu\'s "Use in the timeline" does. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
   input: z.object({
     frameId: z.string().uuid(),
     shotLabel: z.string().optional(),
@@ -6097,8 +6823,11 @@ export const updateFrame: Operation<{
     assetId: z.string().uuid().nullable().optional(),
     sceneId: z.string().uuid().optional(),
     position: z.number().int().min(0).optional(),
+    preferredClipId: z.string().min(1).nullable().optional().describe('The clip the timeline takes for this slot: a video asset id or badge code in the project; null clears it.'),
   }),
   async run(input, ctx) {
+    // 1.6.0 takes the call and drops preferredClipId without a word.
+    if (input.preferredClipId !== undefined) await ctx.desktop().requireCapability('frame-preferred-clip', 'choosing the clip a slot uses')
     return ok(
       await ctx.desktop().post('/agent/frames/update', {
         id: input.frameId,
@@ -6108,6 +6837,7 @@ export const updateFrame: Operation<{
           assetId: input.assetId,
           sceneId: input.sceneId,
           position: input.position,
+          preferredClipId: input.preferredClipId,
         },
       })
     )
@@ -6135,11 +6865,12 @@ export const batchUpdateFrames: Operation<{
     assetId?: string | null
     sceneId?: string | null
     position?: number
+    preferredClipId?: string | null
   }[]
 }> = {
   id: 'slates_batch_update_frames',
   description:
-    'Update MANY slots in one call — shot labels, notes, asset binding, scene/position. Prefer this over repeated slates_update_frame when re-arranging a scene: it is one round-trip and one UI refresh, and every id is validated before anything is written, so the batch never lands half-applied. A scene or position change carries the words in each slot with it on the Script page. To write the BEATS themselves, use slates_create_shot / slates_update_shot.',
+    'Update MANY slots in one call — shot labels, notes, asset binding, scene/position, and preferredClipId (the clip the timeline takes for the slot: a video asset id or VID code, null to clear). Prefer this over repeated slates_update_frame when re-arranging a scene: it is one round-trip and one UI refresh, and every id is validated before anything is written, so the batch never lands half-applied. A scene or position change carries the words in each slot with it on the Script page. To write the BEATS themselves, use slates_create_shot / slates_update_shot.',
   input: z.object({
     updates: z
       .array(
@@ -6150,11 +6881,14 @@ export const batchUpdateFrames: Operation<{
           assetId: z.string().uuid().nullable().optional(),
           sceneId: z.string().uuid().optional(),
           position: z.number().int().min(0).optional(),
+          preferredClipId: z.string().min(1).nullable().optional().describe('A video asset id or badge code in the project; null clears it.'),
         })
       )
       .min(1),
   }),
   async run(input, ctx) {
+    // 1.6.0 takes the call and drops preferredClipId without a word.
+    if (input.updates.some((u) => u.preferredClipId !== undefined)) await ctx.desktop().requireCapability('frame-preferred-clip', 'choosing the clip a slot uses')
     return ok(
       await ctx.desktop().post('/agent/frames/batch-update', {
         updates: input.updates.map((u) => ({
@@ -6165,6 +6899,7 @@ export const batchUpdateFrames: Operation<{
             assetId: u.assetId,
             sceneId: u.sceneId,
             position: u.position,
+            preferredClipId: u.preferredClipId,
           },
         })),
       })
@@ -6521,6 +7256,53 @@ async function buildShotSpecInput(
 }
 
 /**
+ * The spec fields the caller NAMED, read out of the COMPLETE spec `buildShotSpecInput` built from the whole
+ * input. Only those go to a route that merges a partial spec over a stored one (`slates_update_shot`, and
+ * `slates_create_shot` from a result), so anything the caller omitted is left exactly as it was.
+ */
+function namedSpecPatch(
+  input: ShotOpRefs & ShotOpScript & { prompt?: string; model?: string; params?: ShotOpParams },
+  spec: Record<string, unknown>
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {}
+  if (input.prompt !== undefined) patch.prompt = input.prompt
+  if (input.model !== undefined) {
+    patch.model = input.model
+    // 🚨 `authoredFor` is NOT re-stamped on a model swap. The whole point of
+    // recording it is that the prompt stays written for the model it was
+    // written for — the grammars genuinely differ — so the card can say so.
+  }
+  if (input.params !== undefined) patch.params = spec.params
+  // 🚨 ONLY THE ROLES THE CALLER NAMED. `buildShotSpecInput` always returns a
+  // COMPLETE refs record, and the route merges one level deep — so sending all
+  // five would clear every role the caller never mentioned. Clearing a role is
+  // explicit: send `[]`.
+  if (input.refs !== undefined) {
+    const built = spec.refs as Record<string, string[]>
+    const named: Record<string, string[]> = {}
+    for (const role of ORDERED_ATTACHMENT_ROLES) {
+      if (input.refs[role] !== undefined) named[role] = built[role]
+    }
+    if (Object.keys(named).length > 0) patch.refs = named
+  }
+  if (input.firstFrameAssetId !== undefined) patch.firstFrameAssetId = spec.firstFrameAssetId
+  if (input.lastFrameAssetId !== undefined) patch.lastFrameAssetId = spec.lastFrameAssetId
+  if (input.audioRefSpokenText !== undefined) patch.audioRefSpokenText = spec.audioRefSpokenText
+  Object.assign(patch, shotScriptPatch(input))
+  // Same rule for the three mention lists — naming one must not clear the
+  // other two.
+  {
+    const built = spec.mentions as Record<string, string[]>
+    const named: Record<string, string[]> = {}
+    if (input.characterIds !== undefined) named.characterIds = built.characterIds
+    if (input.environmentIds !== undefined) named.environmentIds = built.environmentIds
+    if (input.styleIds !== undefined) named.styleIds = built.styleIds
+    if (Object.keys(named).length > 0) patch.mentions = named
+  }
+  return patch
+}
+
+/**
  * The capability gate, applied to a SAVED recipe.
  *
  * It enforces exactly what the matching generate op enforces and no more: video
@@ -6573,6 +7355,8 @@ interface ShotSummary {
   sceneId: string | null
   sceneName: string | null
   position: number | null
+  /** Where the window puts it on the board ("2C": scene number, slot letter). Absent from a desktop older than 1.6.1. */
+  place?: string | null
 }
 
 /**
@@ -6641,7 +7425,8 @@ export const createShot: Operation<
     ShotOpScript & {
       projectId: string
       name?: string
-      prompt: string
+      prompt?: string
+      fromAssetId?: string
       model?: string
       params?: ShotOpParams
       frameId?: string
@@ -6657,7 +7442,8 @@ export const createShot: Operation<
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().max(120).optional().describe('What to call it. Shown on the card; the prompt supplies one if you omit it.'),
-    prompt: z.string().min(1).max(4000).describe('The RAW prompt, @mentions intact. Never write "image 1" yourself — the composer numbers references, and a hand-written number is wrong the moment one moves.'),
+    prompt: z.string().min(1).max(4000).optional().describe('The RAW prompt, @mentions intact. Never write "image 1" yourself — the composer numbers references, and a hand-written number is wrong the moment one moves. Required unless fromAssetId supplies the recipe.'),
+    fromAssetId: z.string().optional().describe("Save as shot: start from this asset's RECORDED recipe (UUID or badge code) — its prompt, model, settings and references — as Media's Save as shot does. That result becomes the Shot's first take unless another Shot already holds it. Anything else you pass overrides the recipe."),
     model: z.string().optional().describe('Model id — the same ids slates_generate_image / slates_generate_video / slates_generate_audio take, and their descriptions carry the routing. Optional: a Shot can be planned before the model is decided.'),
     params: shotParamsSchema,
     refs: shotRefsSchema,
@@ -6674,29 +7460,38 @@ export const createShot: Operation<
     ...shotScriptSchema,
   }),
   async run(input, ctx) {
+    if (!input.prompt && !input.fromAssetId) throw new Error('Pass a prompt, or fromAssetId to save a result\'s recorded recipe as the Shot.')
     const capErr = assertShotCapabilities(input.model, input.params)
     if (capErr) return capErr
     const alignErr = checkSpokenTextAlignment(input)
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    // 1.6.0 ignores fromAssetId, and would then refuse the missing prompt.
+    if (input.fromAssetId) await desktop.requireCapability('shot-from-asset', 'saving a result as a Shot')
     // 1.5.8 ignores `position` and files the Shot last.
     if (input.position !== undefined) await desktop.requireCapability('shot-position', 'placing a new Shot at a slot')
     const { spec, refEcho } = await buildShotSpecInput(ctx, input.projectId, input)
-    const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots', {
+    const r = await desktop.post<{ shot: Record<string, unknown>; unsavedPaths?: string[] }>('/agent/shots', {
       projectId: input.projectId,
       name: input.name,
-      spec: { ...spec, ...shotScriptPatch(input) },
+      // From a result, only what the caller NAMED goes over its recorded recipe: the route merges it.
+      spec: input.fromAssetId ? namedSpecPatch(input, spec) : { ...spec, ...shotScriptPatch(input) },
+      fromAssetId: input.fromAssetId,
       frameId: input.frameId ?? null,
       sceneId: input.sceneId ?? null,
       storyboardId: input.storyboardId ?? null,
       position: input.position,
     })
+    const fromNote = input.fromAssetId
+      ? ` Saved from ${input.fromAssetId}: its recorded recipe is the Shot's, and that result is its first take (unless another Shot already holds it).` +
+        (r.unsavedPaths?.length ? ` ${r.unsavedPaths.length} recorded attachment(s) are not project assets and are not on the Shot.` : '')
+      : ''
     // The CODE is the address the user sees on the row — say it back so the
     // next call, and the next sentence to the user, can point at it.
     return ok(
       r.shot,
-      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}`.trim()
+      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}`.trim()
     )
   },
 }
@@ -6748,41 +7543,7 @@ export const updateShot: Operation<
     const { spec } = await buildShotSpecInput(ctx, input.projectId, input)
     // Only send the halves the caller actually named; the route merges a PARTIAL
     // spec over the stored one, so an omitted field is never silently cleared.
-    const patch: Record<string, unknown> = {}
-    if (input.prompt !== undefined) patch.prompt = input.prompt
-    if (input.model !== undefined) {
-      patch.model = input.model
-      // 🚨 `authoredFor` is NOT re-stamped on a model swap. The whole point of
-      // recording it is that the prompt stays written for the model it was
-      // written for — the grammars genuinely differ — so the card can say so.
-    }
-    if (input.params !== undefined) patch.params = (spec as Record<string, unknown>).params
-    // 🚨 ONLY THE ROLES THE CALLER NAMED. `buildShotSpecInput` always returns a
-    // COMPLETE refs record, and the route merges one level deep — so sending all
-    // five would clear every role the caller never mentioned. Clearing a role is
-    // explicit: send `[]`.
-    if (input.refs !== undefined) {
-      const built = (spec as Record<string, unknown>).refs as Record<string, string[]>
-      const named: Record<string, string[]> = {}
-      for (const role of ORDERED_ATTACHMENT_ROLES) {
-        if (input.refs[role] !== undefined) named[role] = built[role]
-      }
-      if (Object.keys(named).length > 0) patch.refs = named
-    }
-    if (input.firstFrameAssetId !== undefined) patch.firstFrameAssetId = (spec as Record<string, unknown>).firstFrameAssetId
-    if (input.lastFrameAssetId !== undefined) patch.lastFrameAssetId = (spec as Record<string, unknown>).lastFrameAssetId
-    if (input.audioRefSpokenText !== undefined) patch.audioRefSpokenText = (spec as Record<string, unknown>).audioRefSpokenText
-    Object.assign(patch, shotScriptPatch(input))
-    // Same rule for the three mention lists — naming one must not clear the
-    // other two.
-    {
-      const built = (spec as Record<string, unknown>).mentions as Record<string, string[]>
-      const named: Record<string, string[]> = {}
-      if (input.characterIds !== undefined) named.characterIds = built.characterIds
-      if (input.environmentIds !== undefined) named.environmentIds = built.environmentIds
-      if (input.styleIds !== undefined) named.styleIds = built.styleIds
-      if (Object.keys(named).length > 0) patch.mentions = named
-    }
+    const patch = namedSpecPatch(input, spec)
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/update', {
       id: input.shotId,
       data: {
@@ -6894,7 +7655,7 @@ function describeVarietyReport(v: VarietyReport | null | undefined): string {
 export const listShots: Operation<{ projectId: string; storyboardId?: string; frameId?: string }> = {
   id: 'slates_list_shots',
   description:
-    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with the piece's cut count, runtime, saved-recipe price and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
+    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with its place on the board (2C: scene number and slot letter, as the window shows it and the user says it), the piece's cut count, runtime, saved-recipe price and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
   input: z.object({
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid().optional().describe('Only Shots attached to a frame in this board.'),
@@ -6938,6 +7699,7 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
         name: s.name,
         scene: s.sceneName,
         position: s.position,
+        ...(s.place !== undefined ? { place: s.place } : {}),
         model: s.model,
         references: s.referenceCount,
         cuts: s.cuts,
@@ -6967,7 +7729,7 @@ ${describeVarietyReport(r.variety)}` : '')
 export const getShot: Operation<{ shotId: string }> = {
   id: 'slates_get_shot',
   description:
-    'Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, and its exact credit quote. Audit your own work here before firing.',
+    'Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, its exact credit quote, and its place on the board (2C, as the window shows it). Audit your own work here before firing.',
   input: z.object({
     shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
   }),
@@ -6982,13 +7744,43 @@ export const getShot: Operation<{ shotId: string }> = {
 
     return ok(
       { ...r.shot, credits: q.credits, quoteFingerprint: quote.fingerprint },
-      `"${r.shot.name || 'Untitled'}" — ${r.shot.model ?? 'no model set'}, ` +
+      `${r.shot.place ? `${r.shot.place} ` : ''}"${r.shot.name || 'Untitled'}" — ${r.shot.model ?? 'no model set'}, ` +
         (q.credits != null && !r.shot.blocked
           ? `${fmtCredits(q.credits ?? 0)}.`
           : `CANNOT FIRE YET: ${r.shot.blocked ?? 'not priceable — set a model and a duration.'}`) +
         (r.shot.blocked ? '' : ` Fires with ${JSON.stringify(r.shot.firesWith)}.`) +
         `\nCOMPOSED PROMPT (what the model is told): ${r.shot.composedPrompt}`
     )
+  },
+}
+
+/**
+ * The Board's "Use pictures as first frames": each video Shot with a picture and no first frame starts its
+ * video from that picture. The desktop runs the command's own pick and write (`firstFrameCandidate`,
+ * `withFirstFrame`), so the recipe changes exactly as a click changes it. Free: nothing is generated.
+ */
+export const usePicturesAsFirstFrames: Operation<{ projectId: string; shotIds?: string[] }> = {
+  id: 'slates_use_pictures_as_first_frames',
+  description:
+    "The Board's 'Use pictures as first frames': each video Shot that has a picture and no first frame starts its video from that picture (its tile picture, else its newest picture take; a picture that was its only plain Reference moves into the frame slot). Nothing is generated and nothing is charged. Pass shotIds (ids or SHOT-A codes) to act on those Shots; omit them to act on every Shot of the board open in the window, as the command does (open one with slates_set_view first). Returns, per Shot, the picture it set or why it had none.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      shotIds: z.array(z.string().min(1)).min(1).max(200).optional().describe('Only these Shots. Omit for every Shot of the board open in the window.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('first-frames', 'using pictures as first frames')
+    const r = await ctx.desktop().post<{
+      set: number
+      results: Array<{ shotId: string; code: string | null; place: string | null; set: boolean; firstFrameAssetId?: string; reason?: string | null }>
+    }>('/agent/shots/first-frames', input)
+    const name = (row: { code: string | null; place: string | null; shotId: string }): string => row.place ?? row.code ?? row.shotId
+    const lines = r.results.map((row) => `${name(row)}: ${row.set ? 'first frame set' : (row.reason ?? 'nothing to set')}`)
+    return {
+      text: `${r.set} of ${r.results.length} Shot${r.results.length === 1 ? '' : 's'} now start from their picture.${lines.length ? `\n${lines.join('\n')}` : ''}`,
+      data: r,
+    }
   },
 }
 
@@ -7732,7 +8524,7 @@ function describeGuideTopics(): string {
 export const getPromptingGuide: Operation<{ topic: string; depth?: GuideDepth; query?: string }> = {
   id: 'slates_get_prompting_guide',
   description:
-    'For app help and exact UI instructions use topic "app-manual" with a query such as "voice recording". This returns the canonical product manual, shared by every agent surface. ' +
+    'For app help and exact UI instructions use topic "app-manual" with the words of the question (query "export an mp4", "where is the timeline"): it returns the ONE best section of the canonical product manual and the headings of related ones to ask for next. No query returns the map of surfaces; a surface asked for by name (query "THE TIMELINE (CUT) AND EXPORT") returns its opening and its section names. depth "full" is the whole manual and large; avoid it. ' +
     // 🚨 NO "ALWAYS READ THIS FIRST" SENTENCE. It stood here for months and was
     // MEASURED at 13% compliance before and after the enforcement work — pointer
     // prose is the shape that does not move the agent. What replaced it is
@@ -7754,8 +8546,7 @@ export const getPromptingGuide: Operation<{ topic: string; depth?: GuideDepth; q
     if (input.topic.trim().toLowerCase() === 'app-manual') {
       const content = input.query || input.depth === 'full'
         ? appManualSections(input.query)
-        : 'App manual sections. Pass query to read a section, or depth "full" for the complete manual.\n\n' +
-          guideSections(appManualSections()).map((s) => `- ${s.title}`).join('\n')
+        : appManualIndex()
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
     const resolved = resolveGuideTopic(input.topic)
@@ -7991,8 +8782,21 @@ export const blenderRenderBlocking: Operation<{
 export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getWorkspaceState as unknown as Operation<unknown>,
   getSelection as unknown as Operation<unknown>,
+  setSelection as unknown as Operation<unknown>,
   getView as unknown as Operation<unknown>,
   setView as unknown as Operation<unknown>,
+  getManualPicture as unknown as Operation<unknown>,
+  highlightControl as unknown as Operation<unknown>,
+  getComposer as unknown as Operation<unknown>,
+  setComposer as unknown as Operation<unknown>,
+  reorderFolders as unknown as Operation<unknown>,
+  reorderPins as unknown as Operation<unknown>,
+  getUsage as unknown as Operation<unknown>,
+  getAppSettings as unknown as Operation<unknown>,
+  setAppSettings as unknown as Operation<unknown>,
+  getAsset as unknown as Operation<unknown>,
+  linkAssetSource as unknown as Operation<unknown>,
+  extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
   listAvailableModels as unknown as Operation<unknown>,
@@ -8041,6 +8845,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   editVideo as unknown as Operation<unknown>,
   trimVideo as unknown as Operation<unknown>,
   editImage as unknown as Operation<unknown>,
+  extractGridCells as unknown as Operation<unknown>,
   getGenerationStatus as unknown as Operation<unknown>,
   listGenerations as unknown as Operation<unknown>,
   listTimelines as unknown as Operation<unknown>,
@@ -8126,6 +8931,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   pasteScript as unknown as Operation<unknown>,
   listShots as unknown as Operation<unknown>,
   getShot as unknown as Operation<unknown>,
+  usePicturesAsFirstFrames as unknown as Operation<unknown>,
   generateFromShots as unknown as Operation<unknown>,
   quoteBoard as unknown as Operation<unknown>,
   getBoardProgress as unknown as Operation<unknown>,

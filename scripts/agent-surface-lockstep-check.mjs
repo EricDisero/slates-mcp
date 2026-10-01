@@ -869,9 +869,20 @@ function zodDescriptions(op) {
       const m = new RegExp(`const ${name}\\b[^=]*=\\s*\\[([^\\]]*)\\]`).exec(src)
       return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).join(',') : null
     }
-    const pairs = [['LENSES', 'VIEW_LENSES'], ['CUT_SIDES', 'VIEW_CUT_SIDES'], ['DOCK_SECTIONS', 'VIEW_DOCK_SECTIONS']]
-    const drift = pairs.flatMap(([desk, mine]) => {
-      const a = list(view, desk)
+    // 1.6.1: the selection op's surfaces and modes (`slates_set_selection`), and the seats the viewer's Cells
+    // box offers (`slates_extract_grid_cells`), which live beside the cell prompt in storyboard-grids.ts.
+    const gridFile = join(desktopRoot, 'src', 'shared', 'prompts', 'storyboard-grids.ts')
+    const grids = existsSync(gridFile) ? readFileSync(gridFile, 'utf8') : ''
+    const pairs = [
+      ['LENSES', 'VIEW_LENSES', view],
+      ['CUT_SIDES', 'VIEW_CUT_SIDES', view],
+      ['DOCK_SECTIONS', 'VIEW_DOCK_SECTIONS', view],
+      ['SELECTION_TARGETS', 'SELECTION_TARGETS', view],
+      ['SELECTION_MODES', 'SELECTION_MODES', view],
+      ['GRID_EXTRACT_MODELS', 'GRID_EXTRACT_SEATS', grids],
+    ]
+    const drift = pairs.flatMap(([desk, mine, from]) => {
+      const a = list(from, desk)
       const b = list(opsSrc, mine)
       return a === null || b === null ? [`${a === null ? desk : mine} not found`] : a === b ? [] : [`${mine} [${b}] ≠ slate ${desk} [${a}]`]
     })

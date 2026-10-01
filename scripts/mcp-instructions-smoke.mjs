@@ -249,7 +249,8 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   const manual = await client.readResource({ uri: 'slates://manual' })
   check(
     'and reading one returns the actual product manual',
-    (manual.contents?.[0]?.text ?? '').includes('### Generate Audio')
+    // The manual's first line, which installed builds test and which can never change.
+    (manual.contents?.[0]?.text ?? '').startsWith('# Slates — Complete Reference for AI Assistants')
   )
   const templates = (await client.listResourceTemplates()).resourceTemplates
   check(

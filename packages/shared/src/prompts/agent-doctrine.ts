@@ -126,7 +126,7 @@ const PREAMBLE: Record<AgentSurface, string> = fork(
 
 export const WORKING_METHOD: ReadonlyArray<Record<AgentSurface, string>> = [
   both(
-    `For HOW/WHERE questions, load slates_get_prompting_guide with topic "app-manual" and relevant query keywords. Teach the documented buttons and tabs, preserving model-specific conditions; do not invent UI paths or mutate the project when the user only asks for instructions. Slates is a sandbox of optional tools, not a required pipeline.`
+    `For HOW/WHERE questions, load slates_get_prompting_guide with topic "app-manual" and relevant query keywords. Teach the documented buttons and tabs, preserving model-specific conditions; do not invent UI paths or mutate the project when the user only asks for instructions. When the control is on screen, offer to point at it (slates_highlight_control); show a picture of a screen (slates_get_manual_picture) only when the user cannot find something or asks what it looks like. Slates is a sandbox of optional tools, not a required pipeline.`
   ),
   both(
     `1. UNDERSTAND the outcome the user wants. If intent is clear, act with sane defaults — don't interrogate. If genuinely ambiguous, batch every question into ONE message.`
