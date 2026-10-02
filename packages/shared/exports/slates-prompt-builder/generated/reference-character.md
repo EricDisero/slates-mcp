@@ -1,6 +1,6 @@
 <!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
 
-> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
+> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
 # Character identity sheet — Slates workflow
 
@@ -32,7 +32,7 @@ Slates generates **one identity sheet per character**, bound as the character's 
 
 The rule is **kill every competing rendering of the FACE, not every head** — which is why exactly one body panel is headless.
 
-On a deep neutral-grey plate (hex `3a3a3c`, emitted without the `#` — see the sigil warning in Don'ts), flat and shadowless, with catchlights in the eyes, irises never crushed to black, surface texture at the medium's own natural level of detail, broken symmetry, and no over-clean 3D-game-model look. Expression is **a slight natural smile with the teeth just visible** — a closed mouth carries no dental information, so every downstream smiling shot invents teeth, and teeth are person-specific.
+On a deep neutral-grey plate (hex `3a3a3c`, written bare; since the composer fix `#3a3a3c` reads the same — see the resolved composer hazard in Don'ts), flat and shadowless, with catchlights in the eyes, irises never crushed to black, surface texture at the medium's own natural level of detail, broken symmetry, and no over-clean 3D-game-model look. Expression is **a slight natural smile with the teeth just visible** — a closed mouth carries no dental information, so every downstream smiling shot invents teeth, and teeth are person-specific.
 
 **Two carve-outs, scoped differently on purpose.** Non-human characters get a natural neutral expression instead of a smile — that one is scoped by *having a human mouth*, so a bipedal robot or humanoid alien is covered. Quadrupeds and non-bipedal characters get a natural standing stance with the head shown on both body panels — that one is *anatomical*. **Both are conditionals the image model evaluates against your reference; neither is a code branch, because the op has no character-kind input.**
 
@@ -52,16 +52,17 @@ If text only: generate from prompt-only — less consistent, so warn the user.
 
 ### Generate the sheet
 
-<!-- @inject:sheet-tool-defaults -->
-**What the sheet tools render on** (you do not pick these; omit `model`):
+Attach the source portrait to your image generator and submit this canonical sheet prompt. For a text-only character, add the user's visual description.
 
-- **Character identity sheet:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
-- **Establishing image:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
+```text
+A single character identity reference sheet of one character, three panels side by side on one plate: a large chest-up portrait on the left at a three-quarter angle (never dead-on), a full-body front view in a relaxed A-pose in the centre, cropped at the collarbone — an invisible-mannequin presentation with just the face cropped out, and a full-body back view on the right with the head and hair fully visible. The portrait is the largest panel and occupies roughly a quarter to a third of the sheet — it is the sole authority for the face, so render it at maximum facial detail. No second rendering of the face anywhere on the sheet. A slight natural smile with the teeth just visible, and identical appearance, wardrobe and hair across all three panels. Preserve the artistic medium and visual style of the reference image (photograph, anime, illustration, 3D render, painterly, etc.). Render on a plain, deep neutral-grey background (hex 3a3a3c) with flat, even, shadowless lighting so the sheet captures the character's identity, not scene lighting. Crisp catchlights in the eyes and open, readable irises — never crushed to black. Render surface texture at the medium's own natural level of detail — skin, hair and fabric should read as material, not airbrushed or plastic. Break perfect symmetry — avoid a mirrored face or dead-square framing. Whatever the medium, avoid the over-clean 3D-game-model look. For non-human characters, use a natural neutral expression instead of a smile. For quadruped or non-bipedal characters, replace the A-pose with a natural standing stance, show the whole animal including the head on both body panels, and keep the same three-panel layout. No text, no labels, no captions, no panel borders.
+```
 
-Price a sheet for that model at 16:9, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.
-<!-- @end:sheet-tool-defaults -->
+If the user requests a style transform, replace `Preserve the artistic medium and visual style of the reference image (photograph, anime, illustration, 3D render, painterly, etc.).` with that explicit transform; do not ask for both preservation and transformation. Append only user-specific identity details.
 
-- When the result returns inline, **evaluate it before binding**:
+After inspection, save one approved sheet under the character's name. Attach that same sheet to every shot containing the character and name its reference inline using the selected model's syntax. Keep the attachment order stable and inspect the target tool's reference limits.
+
+- When the result returns inline, **evaluate the sheet before reuse**:
   - Is the portrait clearly the largest panel, and is it off-frontal?
   - **Is the front body panel cleanly headless** — an empty collar above a normally rendered body, no partial face, no floating jaw, no smeared neck stump? A botched crop is worse than no crop.
   - **Is the body still there?** Neck, forearms and hands rendered as skin, not an empty outfit floating on nothing. A hollow garment means the invisible-mannequin genre ran unbounded.
@@ -80,12 +81,10 @@ Critically, the app injects **no** wardrobe, expression, or lighting directive. 
 ## Anti-patterns
 
 - **Don't** studio-light, white-background, or black-background the sheet. White bleeds into the video and washes out the location; black eats edge detail. Flat, even, shadowless light on a deep neutral grey.
-- **Don't** hand-write the sheet prompt when the op will build it — that is how the template and the shipped prompt fork.
 - **Don't** create a second character image. One canonical identity is what the storyboard pipeline reads.
-- **Don't** skip binding. An unbound asset doesn't help downstream.
 - **Don't** invent character details. Stick to what's in the reference image and the user's description.
 - **Don't** describe the front panel's crop as an absent head — in `userNotes` or any hand-written variant. The template asks for it as *framing*: **"cropped at the collarbone, an invisible-mannequin presentation with just the face cropped out"**, a standard e-commerce genre with deep training data. **"the head not shown" is a hard 422 on GPT Image** (measured on `gpt-image-2`, the model 2.5 replaced; the classifier is OpenAI's, not the version's, so the rule carries — but nobody has re-run it on Flare or Sunburst) — fal returns `content_policy_violation` with `loc: ["body","prompt"]`, so the text is rejected before any image is read, because an anatomical absence reads as gore to OpenAI's classifier. It passed NB2, which is why the original receipt looked safe: **it was model-scoped.** State an exclusion as a framing choice, never as a missing body part.
 - **Don't** invoke the invisible-mannequin genre without bounding it to the face. **"an invisible-mannequin presentation where the clothing holds its own shape" removed all the skin** — no neck, no hands, no forearms, a garment floating on nothing — because that *is* the e-commerce genre in full: an empty outfit. **"with just the face cropped out"** keeps the anchor and bounds it. Generalises: a genre anchor imports the whole genre, so name what STAYS, not only what goes.
-- **Don't** put `#` or `@` anywhere in prompt text. Both are reference-token sigils in the desktop prompt composer and an unresolved one is **silently deleted** — no error, no log, just missing words. `#3a3a3c` reached fal as `background ()` on a real 2026-07-30 request, meaning the plate value had never been delivered to any model since the composer shipped. Write hex values bare.
+**Resolved composer hazard:** on 2026-07-30, `#3a3a3c` reached fal as `background ()` because unresolved sigils were deleted. The composer now preserves unresolved `#` and `@` text byte-for-byte; a token binds a reference only when it resolves. Literal hex colours and handles are safe. The sheet template keeps its bare hex as a wording choice, not a workaround.
 - **Don't** use 4K — wastes credits, no quality gain at sheet scale.
-- **Don't** feed a multi-view sheet into a Seedance shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint — ByteDance documents multi-view assets as a cause of duplicate characters. See `reference-seedance.md`.
+- **Don't** feed a multi-view sheet into a Seedance 2.0 shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint; ByteDance documents multi-view assets as a cause of duplicate characters on 2.0. See `reference-seedance.md`. Seedance 2.5 supports multi-view subject references; see `reference-seedance-2-5.md`.

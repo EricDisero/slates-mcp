@@ -18,6 +18,7 @@ import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { strToU8, unzipSync, zipSync } from 'fflate'
+import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
@@ -25,6 +26,13 @@ const exportRoot = join(pkgRoot, 'exports', 'slates-prompt-builder')
 const generatedDir = join(exportRoot, 'generated')
 const modelFactsPath = join(pkgRoot, 'src', 'prompts', 'model-facts.ts')
 const checkOnly = process.argv.includes('--check')
+const validateOnly = process.argv.includes('--validate')
+const canonicalSources = new Map()
+const onSource = (path, raw) => canonicalSources.set(path, raw)
+const { parseSkillMetadata } = loadTypeScriptModule(join(pkgRoot, 'src/skills/metadata.ts'))
+const { MODEL_FACTS } = loadTypeScriptModule(modelFactsPath, { onSource })
+const { buildCharacterIdentityPrompt } = loadTypeScriptModule(join(pkgRoot, 'src/prompts/character-sheet.ts'), { onSource })
+const { INHERIT_SOURCE_STYLE } = loadTypeScriptModule(join(pkgRoot, 'src/prompts/reference-rules.ts'), { onSource })
 const archiveName = 'slates-prompt-builder.skill'
 const manifestName = 'slates-prompt-builder-manifest.json'
 // DOS ZIP timestamps are local-time and reject anything before 1980. Using
@@ -58,6 +66,7 @@ const leakPatterns = [
   /\b[a-z][a-zA-Z0-9]*AssetId\b/,
   // Cross-references to sibling production skills — dead pointers in a download.
   /\bslates-(?:prompting|model|cost|content)[a-z0-9-]*/,
+  /\b(?:the op will build it|skip binding|omit `model`)\b/i,
 ]
 
 const specs = [
@@ -87,6 +96,21 @@ const specs = [
     kind: 'production-skill',
   },
   {
+    output: 'reference-seedance-2-5.md',
+    source: join(pkgRoot, 'skills', 'slates-prompting-seedance-2-5.md'),
+    kind: 'production-skill',
+  },
+  {
+    output: 'reference-gpt-image-2-5.md',
+    source: join(pkgRoot, 'skills', 'slates-prompting-gpt-image-2-5.md'),
+    kind: 'production-skill',
+  },
+  {
+    output: 'reference-omni-flash.md',
+    source: join(pkgRoot, 'skills', 'slates-prompting-omni-flash.md'),
+    kind: 'production-skill',
+  },
+  {
     output: 'reference-content-policy.md',
     source: join(pkgRoot, 'skills', 'slates-content-policy.md'),
     kind: 'production-skill',
@@ -94,10 +118,22 @@ const specs = [
 ]
 
 const portableModels = [
-  { id: 'kling-v3', guide: 'reference-kling.md' },
-  { id: 'seedance-2', guide: 'reference-seedance.md' },
+  { id: 'gpt-image-2-5-sunburst', guide: 'reference-gpt-image-2-5.md' },
+  { id: 'gpt-image-2-5-flare', guide: 'reference-gpt-image-2-5.md' },
   { id: 'nano-banana-2', guide: 'reference-nano-banana.md' },
+  { id: 'seedance-2.5', guide: 'reference-seedance-2-5.md' },
+  { id: 'seedance-2', guide: 'reference-seedance.md' },
+  { id: 'kling-v3', guide: 'reference-kling.md' },
+  { id: 'omni-flash', guide: 'reference-omni-flash.md' },
+  { id: 'omni-flash-edit', guide: 'reference-omni-flash.md' },
+  { id: 'kling-v3-edit', guide: 'reference-kling.md' },
+  { id: 'seedance-2.5-edit', guide: 'reference-seedance-2-5.md' },
 ]
+for (const fact of MODEL_FACTS.filter((fact) => fact.tier === 'default' && fact.kind !== 'audio')) {
+  if (!portableModels.some(({ id }) => id === fact.id)) {
+    throw new Error(`portable routing omits the current ${fact.kind}/${fact.route} default ${fact.id}`)
+  }
+}
 
 function normalize(text) {
   return text.replace(/\r\n/g, '\n').replace(/\s+$/u, '') + '\n'
@@ -111,6 +147,10 @@ function sha256(value) {
 // not a leak — rewrite it to the portable filename instead of deleting it.
 // Longest-first so `slates-prompting-kling-v3` cannot be partly eaten.
 const crossRefs = [
+  ['slates-prompting-seedance-2-5', 'reference-seedance-2-5.md'],
+  ['slates-prompting-gpt-image-2-5', 'reference-gpt-image-2-5.md'],
+  ['slates-prompting-omni-flash', 'reference-omni-flash.md'],
+  ['slates-model-selection', 'SKILL.md'],
   ['slates-prompting-nano-banana-2', 'reference-nano-banana.md'],
   ['slates-prompting-kling-v3', 'reference-kling.md'],
   ['slates-character-identity', 'reference-character.md'],
@@ -172,33 +212,22 @@ function stripFrontmatter(text, file) {
   return normalized.slice(end + '\n---\n'.length).trimStart()
 }
 
-function modelFact(source, id) {
-  const marker = `id: '${id}'`
-  const markerIndex = source.indexOf(marker)
-  if (markerIndex < 0) throw new Error(`model-facts.ts: missing ${id}`)
-  const blockStart = source.lastIndexOf('\n  {', markerIndex)
-  const nextBlock = source.indexOf('\n  {', markerIndex + marker.length)
-  const blockEnd = nextBlock < 0 ? source.indexOf('\n]', markerIndex) : nextBlock
-  const block = source.slice(blockStart, blockEnd)
-  const label = /label:\s*'((?:\\'|[^'])+)'/.exec(block)?.[1]?.replace(/\\'/g, "'")
-  const notes = /notes:\s*'((?:\\'|[^'])+)'/s.exec(block)?.[1]?.replace(/\\'/g, "'")
-  if (!label || !notes) throw new Error(`model-facts.ts: could not parse label/notes for ${id}`)
-  return { label, notes: notes.replace(/\s+/g, ' ').trim() }
-}
-
-function routingTable(modelFactsSource) {
+function routingTable() {
   const rows = portableModels.map(({ id, guide }) => {
-    const fact = modelFact(modelFactsSource, id)
-    return `| **${fact.label}** | ${fact.notes} | \`${guide}\` |`
+    const fact = MODEL_FACTS.find((fact) => fact.id === id)
+    if (!fact) throw new Error(`model-facts.ts: missing ${id}`)
+    // Remove the transport name, keeping the model's actual routing criteria.
+    const notes = rewriteCrossRefs(fact.notes.replace(/\s+via slates_[a-z][a-z0-9_]*/g, '').replace(/\s+A bare \"seedance\"[^.]*\./g, '').replace(/\([^)]*PRO_REQUIRED[^)]*\)/g, '(Pro required in Slates)'))
+    return `| **${fact.label}** | ${fact.kind} ${fact.route}; ${fact.tier} | ${notes} | \`${guide}\` |`
   })
   return [
-    '| Model | Canonical route | Guide |',
-    '|---|---|---|',
+    '| Model | Lane | Canonical route | Guide |',
+    '|---|---|---|---|',
     ...rows,
   ].join('\n')
 }
 
-function stampRouter(text, file, modelFactsSource) {
+function stampRouter(text, file) {
   const normalized = normalize(text)
   if (!normalized.startsWith('---\n')) {
     throw new Error(`${file}: router must start with YAML frontmatter`)
@@ -218,7 +247,7 @@ function stampRouter(text, file, modelFactsSource) {
   }
   const resolved =
     normalized.slice(0, openIndex + open.length) +
-    '\n' + routingTable(modelFactsSource) + '\n' +
+    '\n' + routingTable() + '\n' +
     normalized.slice(closeIndex)
   return normalize(
     resolved.slice(0, boundary) + '\n' + generatedComment + '\n\n' + resolved.slice(boundary).trimStart()
@@ -236,17 +265,53 @@ function stampRouter(text, file, modelFactsSource) {
  * of the machine that made it.
  */
 function stripBuildMarkers(text) {
-  return text.replace(/^<!-- @banned:(?:start|end) -->\n/gm, '')
+  return text.replace(/^<!-- @(?:banned|card):(?:start|end) -->\n/gm, '')
 }
 
-function render(spec, raw, modelFactsSource) {
-  if (spec.kind === 'router') return stampRouter(raw, spec.source, modelFactsSource)
-  const body = rewriteCrossRefs(
+function addContents(text) {
+  if (text.split('\n').length <= 100 || /^#{1,3} (?:Contents|Table of contents)\s*$/mi.test(text)) return text
+  const seen = new Map()
+  const rows = []
+  let fenced = false
+  for (const line of text.split('\n')) {
+    if (/^```/.test(line)) { fenced = !fenced; continue }
+    if (fenced) continue
+    const heading = /^(#{2,3}) (.+)$/.exec(line)
+    if (!heading) continue
+    const label = heading[2].replace(/<!--.*?-->/g, '').replace(/[*`]/g, '').trim()
+    const base = label.toLowerCase().replace(/[^\p{L}\p{N}_ -]/gu, '').replace(/ /g, '-')
+    const count = seen.get(base) ?? 0
+    seen.set(base, count + 1)
+    rows.push(`${heading[1].length === 3 ? '  ' : ''}- [${label}](#${base}${count ? `-${count}` : ''})`)
+  }
+  const title = /^# .+$/m.exec(text)
+  if (!title || !rows.length) throw new Error('long portable reference has no navigable headings')
+  const boundary = title.index + title[0].length
+  return text.slice(0, boundary) + `\n\n## Contents\n\n${rows.join('\n')}` + text.slice(boundary)
+}
+
+function portableCharacterGuide(body) {
+  const heading = '### Generate the sheet'
+  if (!body.includes(heading)) throw new Error('character source has no sheet generation section')
+  const prompt = buildCharacterIdentityPrompt()
+  const manual = `Attach the source portrait to your image generator and submit this canonical sheet prompt. For a text-only character, add the user's visual description.\n\n\`\`\`text\n${prompt}\n\`\`\`\n\nIf the user requests a style transform, replace \`${INHERIT_SOURCE_STYLE}\` with that explicit transform; do not ask for both preservation and transformation. Append only user-specific identity details.\n\nAfter inspection, save one approved sheet under the character's name. Attach that same sheet to every shot containing the character and name its reference inline using the selected model's syntax. Keep the attachment order stable and inspect the target tool's reference limits.`
+  return body.replace(heading, `${heading}\n\n${manual}`).replace('evaluate it before binding', 'evaluate the sheet before reuse')
+}
+
+function render(spec, raw) {
+  parseSkillMetadata(raw, spec.kind === 'router' ? 'slates-prompt-builder' : spec.source.split(/[\\/]/).pop().replace(/\.md$/, ''))
+  if (spec.kind === 'router') {
+    const output = stampRouter(raw, spec.source)
+    assertPortable(output, spec.source)
+    return output
+  }
+  let body = rewriteCrossRefs(
     stripBuildMarkers(stripSlatesOnly(stripFrontmatter(raw, spec.source), spec.source))
   )
+  if (spec.output === 'reference-character.md') body = portableCharacterGuide(body)
   const note =
-    '> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.'
-  const output = normalize(`${generatedComment}\n\n${note}\n\n${body}`)
+    '> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.'
+  const output = normalize(addContents(`${generatedComment}\n\n${note}\n\n${body}`))
   assertPortable(output, spec.source)
   return output
 }
@@ -260,7 +325,7 @@ function assertCharacterContract(renderedText) {
   const builder = readFileSync(builderPath, 'utf8')
   const match = /export const IDENTITY_PLATE_HEX = ['"]([^'"]+)['"]/.exec(rules)
   if (!match) throw new Error('reference-rules.ts: could not resolve IDENTITY_PLATE_HEX')
-  const plate = match[1]
+  const plate = match[1].replace('#', '')
   const required = [
     'one identity sheet per character',
     plate,
@@ -268,6 +333,8 @@ function assertCharacterContract(renderedText) {
     'portrait, three-quarter angle, largest panel',
     'full-body front',
     'full-body back',
+    buildCharacterIdentityPrompt(),
+    'Attach that same sheet',
   ]
   const lower = renderedText.toLowerCase()
   for (const phrase of required) {
@@ -306,12 +373,11 @@ function validateArchive(archive, outputs) {
 
 const rendered = new Map()
 const sources = []
-const modelFactsSource = readFileSync(modelFactsPath, 'utf8')
 
 for (const spec of specs) {
   if (!existsSync(spec.source)) throw new Error(`missing source: ${spec.source}`)
   const raw = readFileSync(spec.source, 'utf8')
-  const output = render(spec, raw, modelFactsSource)
+  const output = render(spec, raw)
   if (spec.output === 'reference-character.md') assertCharacterContract(output)
   rendered.set(spec.output, output)
   sources.push({
@@ -319,10 +385,18 @@ for (const spec of specs) {
     sha256: sha256(normalize(raw)),
   })
 }
-sources.push({
-  path: relative(pkgRoot, modelFactsPath).replace(/\\/g, '/'),
-  sha256: sha256(normalize(modelFactsSource)),
+for (const [path, raw] of canonicalSources) sources.push({
+  path: relative(pkgRoot, path).replace(/\\/g, '/'),
+  sha256: sha256(normalize(raw)),
 })
+sources.sort((a, b) => a.path.localeCompare(b.path))
+
+// Every generated local reference must ship in this same archive.
+for (const [name, text] of rendered) {
+  for (const [reference] of text.matchAll(/\b(?:reference-[a-z0-9-]+\.md|SKILL\.md)\b/g)) {
+    if (!rendered.has(reference)) throw new Error(`${name}: missing portable reference ${reference}`)
+  }
+}
 
 const archive = makeArchive(rendered)
 validateArchive(archive, rendered)
@@ -389,7 +463,9 @@ function checkGenerated() {
   return failures
 }
 
-if (checkOnly) {
+if (validateOnly) {
+  console.log(`[prompt-builder] validated ${rendered.size} portable files, current defaults, canonical character prompt and archive entries without writing`)
+} else if (checkOnly) {
   const failures = checkGenerated()
   if (failures.length) {
     console.error('[prompt-builder] generated export is out of sync:')

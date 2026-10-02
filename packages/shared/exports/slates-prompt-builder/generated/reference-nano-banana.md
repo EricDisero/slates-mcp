@@ -1,10 +1,25 @@
 <!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
 
-> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
+> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
 # Nano Banana 2 — cinematic & photorealistic prompting
 
-<!-- @card:start -->
+## Contents
+
+- [Google's 4 official rules (verbatim)](#googles-4-official-rules-verbatim)
+- [Official prompt formula](#official-prompt-formula)
+- [Photorealism positives — what consistently works](#photorealism-positives--what-consistently-works)
+- [The anti-list — phrases that DEGRADE realism](#the-anti-list--phrases-that-degrade-realism)
+- [Negative prompting — there is no field](#negative-prompting--there-is-no-field)
+- [Reference images](#reference-images)
+  - [Reference rules (the verified ones)](#reference-rules-the-verified-ones)
+  - [For Nano Banana 2 specifically](#for-nano-banana-2-specifically)
+- [Common failure modes + fixes](#common-failure-modes--fixes)
+- [Resolution tactics](#resolution-tactics)
+- [Boring vs cinema — examples](#boring-vs-cinema--examples)
+- [Diagnose repeated failures](#diagnose-repeated-failures)
+- [Family variants — Lite and Pro](#family-variants--lite-and-pro)
+
 **Card — Nano Banana 2 (Gemini 3.1 Flash Image).** Brief it like a creative director, not a tag list. Structure: `Film still from [director] [genre]. Shot on [camera] with [lens]. [Subject and action]. [3-5 specific visual details]. [Lighting — direction + quality]. [Color palette]. [Film stock]. [1-2 word tone].`
 
 **The five levers**
@@ -25,7 +40,6 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 <!-- @end:cinematic-card -->
 
 **Hard constraint:** there is no `negativePrompt` field. Suppress by reframing positively, or inline `without` / `free of`. Knowledge cutoff January 2025 — anything later needs reference images.
-<!-- @card:end -->
 
 Nano Banana 2 is **Gemini 3.1 Flash Image**. It is **not** Gemini 3 Pro Image; that is Nano Banana **Pro** (`nano-banana-pro`), a separate model with its own seat. NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
 
@@ -199,13 +213,17 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 ✅ **Cinema:** "Extreme close on subject's mouth and nose, 135mm f/2.8, shallow depth of field. Breath pluming out, catching cold light from upper-left key. Lips slightly parted, peach fuzz visible. The breath holds. CineStill 800T halation around catchlights. Waiting."
 
-## The 3-strike rule
+<!-- @inject:iteration-diagnosis -->
+## Diagnose repeated failures
 
-If three iterations on the same prompt haven't produced what the user wants, stop. Hand back to the user with what you tried and what isn't working. The slot machine doesn't converge — the prompt structure is wrong, not the seed.
+After three failed attempts at the same requirement, pause unchanged re-rolls and diagnose the source reference, prompt structure, model fit and tool result. Three is a review checkpoint, not a universal limit or proof that the seed cannot matter. Preserve the attempts and name what each test changed.
+
+Continue autonomously when the brief is clear, a specific correction is supported and the next request is already authorized. Hand control back when taste or intent cannot be inferred, the next request needs fresh consent, or the available tool cannot meet the requirement. A failed roll never authorizes an additional charge. Follow the existing batch and per-request cost policy.
+<!-- @end:iteration-diagnosis -->
 
 ## Family variants — Lite and Pro
 
 Everything in this skill applies to the whole Nano Banana family; two variants trade speed/ceiling around NB2 full:
 
 - **nano-banana-2-lite** — ~half the price, ~2.7× faster, **1K output only**, max 4 refs. The draft/iteration seat: explore compositions here, then re-run the winner on NB2 full at 2K/4K. Same Gemini filter.
-- **nano-banana-pro** — the hero-frame/typography ceiling (~2× NB2, 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs — it takes a full subject library in one call.
+- **nano-banana-pro**: the hero-frame/typography ceiling (2× NB2 at 1K, 1.33× at 2K, about 1.9× at 4K; 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs; it takes a full subject library in one call.

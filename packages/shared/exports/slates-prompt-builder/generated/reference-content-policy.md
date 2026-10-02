@@ -1,10 +1,10 @@
 <!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
 
-> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
+> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
 # Content-policy-safe construction — read before any risk-surface prompt
 
-**Never use** — each one is a filter tripwire with a substitution in the table above:
+**Never use**: each one is a filter tripwire with a substitution in the table below:
 - `civilians in panic`, `crowds fleeing`, `blood`, `gore`, `corpse`
 - `ignite`, `catch fire`, `on fire` applied to a person — frame body-contact effects as magical or harmless VFX
 - `candle-like`, `flame-like` and any real object used as a metaphor for an effect

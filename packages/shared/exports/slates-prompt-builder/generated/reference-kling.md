@@ -1,11 +1,31 @@
 <!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
 
-> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
+> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
 # Kling V3.0 — prompting
 
-<!-- @card:start -->
-**Card — Kling V3.0.** The general default. Define the core subjects clearly at the START and keep those descriptions identical across shots. Up to 15s, up to 6 cuts, and the strongest image-to-video identity hold in the catalogue.
+## Contents
+
+- [Subject definition rule (verbatim, fal blog)](#subject-definition-rule-verbatim-fal-blog)
+- [Dialogue syntax](#dialogue-syntax)
+- [Voice direction formula (Omni)](#voice-direction-formula-omni)
+- [The Immediately keyword (Omni only)](#the-immediately-keyword-omni-only)
+- [Speaker label discipline](#speaker-label-discipline)
+- [Multi-character dialogue (Omni)](#multi-character-dialogue-omni)
+- [Sound effects, ambient noise, music](#sound-effects-ambient-noise-music)
+- [Image-to-video guidance](#image-to-video-guidance)
+- [Multi-shot — what makes them hit](#multi-shot--what-makes-them-hit)
+- [Element references](#element-references)
+- [Reference discipline (character / environment refs)](#reference-discipline-character--environment-refs)
+  - [For Kling specifically](#for-kling-specifically)
+- [Negative prompting — has a real field](#negative-prompting--has-a-real-field)
+- [Cinematic tactics](#cinematic-tactics)
+- [Tier choice](#tier-choice)
+- [Benchmark prompt structure](#benchmark-prompt-structure)
+- [Video-to-video EDIT — @Video1 / @ElementN / @ImageN](#video-to-video-edit--video1--elementn--imagen)
+- [Sources](#sources)
+
+**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.
 
 **The five levers**
 1. **Dialogue in quotes** — `Character says, "exact words here"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: "I've seen this before."`
@@ -19,14 +39,13 @@
 - `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`
 
 **Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.
-<!-- @card:end -->
 
 **Never use:**
 - `SFX: footsteps` and any label-only effect — physical-cause specificity or nothing
 - a pronoun or synonym for a speaker after the first introduction (`he`, `the agent`) — it causes voice drift; repeat the full label
 - `single continuous take` — Seedance's phrase, and it fights Kling's multi-shot
 
-Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, no audio), `kling-v3.0-pro` (higher visual quality, no audio), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
+Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, sound supported), `kling-v3.0-pro` (higher visual quality, sound supported), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
 
 Up to 15s. Multi-shot supported (up to 6 cuts in 15s total). Strong on image-to-video — preserves identity, layout, and text from the input image well.
 
@@ -116,7 +135,9 @@ Miss conditions:
 - Mixing camera moves within a shot ("pan then orbit then push in")
 - Extreme wide → extreme close in adjacent shots without reference images
 
-## Element references (Omni)
+## Element references
+
+Standard and Pro take element references with a first frame; Omni also takes references without one. 4K refuses reference images.
 
 Upload 2-4 multi-angle reference photos per character/object. Tag inline:
 
@@ -181,11 +202,11 @@ Layer scene-specific suppressions on top, and never suppress something the promp
 
 ## Tier choice
 
-- **Standard**: general use, no audio
-- **Pro**: higher visual quality, no audio
-- **Omni**: multi-character dialogue, audio-visual co-gen, language codes, `@elementN` references
+- **Standard**: general use, sound supported
+- **Pro**: higher visual quality, sound supported
+- **Omni**: multi-character dialogue, audio-visual co-gen, language codes, references without a first frame
 
-Pick by capability: need dialogue/audio → Omni; need maximum visual quality silent → Pro; everything else → Standard. Prices change — check current numbers before choosing a tier.
+Every tier can generate dialogue and sound. Sound is on unless `sound: false` is passed; below 4K it bills the audio key, while 4K includes audio. Pick by visual quality and reference needs. Prices change; check current numbers before choosing a tier.
 
 ## Benchmark prompt structure
 
@@ -224,7 +245,7 @@ Rules:
 - One edit intent per pass. Chain passes for compound changes (each output is itself an editable clip, linked to its parent).
 - Billing is per second of OUTPUT ≈ the clip length, rounded UP to the next second. A 7.3s clip bills as 8s.
 - Clip constraints: 3-15s, 720-3840px, MP4/MOV. Agents can pre-trim on the timeline when a clip runs long.
-- Routing: Kling edit is the default edit tool (element lock + audio intact); Seedance edit/relocate wins style-transfer-heavy re-imaginings.
+- Route by the required change: this edit seat supports element/style-reference control and original-audio retention. Read the current catalogue for defaults and competing seats.
 
 ## Sources
 

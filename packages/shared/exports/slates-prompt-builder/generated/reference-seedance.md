@@ -1,10 +1,41 @@
 <!-- Generated from the Slates production prompting guides. Do not edit — this file is rebuilt from source. -->
 
-> **This is the real thing.** Every rule below is the working doctrine Slates runs in production against this model — not a summary written for a handout. Slates automates it end to end; the doctrine works by hand too.
+> Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
 # Seedance 2.0 — prompting
 
-<!-- @card:start -->
+## Contents
+
+- [What Seedance actually is [official :1450-1452]](#what-seedance-actually-is-official-1450-1452)
+- [The advanced formula — 8 slots [official :1455]](#the-advanced-formula--8-slots-official-1455)
+- [Task-type sentence patterns [official :1389-1425]](#task-type-sentence-patterns-official-1389-1425)
+  - [⚠️ Edit / extend phrasing landmine [official :1431]](#-edit--extend-phrasing-landmine-official-1431)
+- [Shot structure — "Shot 1 / Shot 2 / Shot 3" [official :1563-1598]](#shot-structure--shot-1--shot-2--shot-3-official-1563-1598)
+- [Subject binding — names + image indexes [official :1488-1556]](#subject-binding--names--image-indexes-official-1488-1556)
+- [Action description [official :1602-1621]](#action-description-official-1602-1621)
+- [Externalize emotion [official :1623-1636]](#externalize-emotion-official-1623-1636)
+- [Camera [official :1643-1648]](#camera-official-1643-1648)
+- [Image quality, style, and constraints [official :1656-1679]](#image-quality-style-and-constraints-official-1656-1679)
+- [🔴 Duplicated characters — the twin problem [official :1948-1994]](#-duplicated-characters--the-twin-problem-official-1948-1994)
+- [Worked examples [official :1689-1745]](#worked-examples-official-1689-1745)
+- [Other official notes](#other-official-notes)
+- [Reference media — caps and transport](#reference-media--caps-and-transport)
+  - [All three modalities go in ONE call](#all-three-modalities-go-in-one-call)
+  - [Motion transfer & lip-sync recipes (reference video / audio)](#motion-transfer--lip-sync-recipes-reference-video--audio)
+- [Reference rules (the verified ones)](#reference-rules-the-verified-ones)
+  - [For Seedance specifically](#for-seedance-specifically)
+- [Length](#length)
+- [Pin the subject in the first 20-30 words](#pin-the-subject-in-the-first-20-30-words)
+- [Lighting is a top quality lever](#lighting-is-a-top-quality-lever)
+- [Camera and subject motion — separate sentences](#camera-and-subject-motion--separate-sentences)
+- [Slow-motion works; "fast" is a known bad token](#slow-motion-works-fast-is-a-known-bad-token)
+- [Style block at the end](#style-block-at-the-end)
+- [⚠️ Don't cross-pollinate image-model syntax](#-dont-cross-pollinate-image-model-syntax)
+- [Negative prompting — inline only](#negative-prompting--inline-only)
+- [Image-to-video / first-frame guidance](#image-to-video--first-frame-guidance)
+- [Common failure modes + fixes](#common-failure-modes--fixes)
+- [Sources](#sources)
+
 **Card — Seedance 2.0.** Not copywriting — an ENGINEERING instruction to a spatial layer and a temporal layer: who, in what scene, doing what, how the camera moves, and in what order. Multi-beat work is a `Shot 1 / Shot 2 / Shot 3` storyboard.
 
 **The five levers**
@@ -19,7 +50,6 @@
 - `Single continuous take. Wide shot of a fishing skiff crossing a grey swell, camera tracks from the starboard rail. Spray hits the lens once. Soft lighting, natural colors, film-grain texture. Avoid jitter and bent limbs.`
 
 **Hard constraint:** NO timestamps — 2.0 ignores them and answers only to shot numbers (2.5 acts on them). No lens, aperture, film stock or camera body: that is image-model vocabulary and a Seedance anti-pattern. There is no negativePrompt field.
-<!-- @card:end -->
 
 ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
@@ -235,7 +265,7 @@ using the voice timbre from audio 1. Preserve his identity, appearance and outfi
 
 ### Motion transfer & lip-sync recipes (reference video / audio)
 
-These aren't separate Seedance features — they're prompting strategies over reference media.
+These aren't separate Seedance features; they're prompting strategies over reference media.
 
 - **Motion transfer:** subject image as a reference + the driving clip (2–15s) + `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.`
 - **Lip-sync / dialogue:** write the line in the prompt — `The person in video 1 says: "…"` — with audio generation on (always on in Slates). A **video** source's own voice is cloned natively; an **audio** reference (≤15s) drives speech from an existing recording: `…speaks the dialogue from audio 1 with accurate lip sync.`

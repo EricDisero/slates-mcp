@@ -4,75 +4,129 @@
   "sourceFiles": [
     {
       "path": "exports/slates-prompt-builder/prompt-builder.md",
-      "sha256": "d7510c28be9453ab1bb1be062ff04a79a75ede5150ac4564a978d4a80d6315c5"
+      "sha256": "ec5a8002eec5438f092f9f4df5e60cbcbfbea73238a4b5ce89e2cbcc26665afe"
     },
     {
       "path": "skills/slates-character-identity.md",
-      "sha256": "0f8d2a51ad2b8f1504d5e554384a97ad28e27603c1404dc27d234c73680e8b57"
-    },
-    {
-      "path": "skills/slates-prompting-seedance.md",
-      "sha256": "426bd046a9ce8f2f0e466772e6f032d65ea773bbb96729e2161ac61c0d040135"
-    },
-    {
-      "path": "skills/slates-prompting-kling-v3.md",
-      "sha256": "ca609eddaa82fbccf103e9fdf91f2c68f4c28e3d9aa8d1e073b9fc6c8d0fe0bd"
-    },
-    {
-      "path": "skills/slates-prompting-nano-banana-2.md",
-      "sha256": "1295e2be027cab84f0d96fd86d9cbcd6606e67c0537272ec916a8ed7c582ce3d"
+      "sha256": "144beb0c551201b9ba55aa6ed441928d6494860c1c0ee2eacfe5681c179421f0"
     },
     {
       "path": "skills/slates-content-policy.md",
-      "sha256": "68566e6431864f075f6397013f040fb41e0559b19b11a15e860a4da80068a9a6"
+      "sha256": "89ed04fb8d4d7e7aa23d1706d36055cfa7b1e8b7acb09c860c966bb848a4c9ca"
+    },
+    {
+      "path": "skills/slates-prompting-gpt-image-2-5.md",
+      "sha256": "501276dd45d5d8f8faae199680bfb5c78c9e4cc083d9fcde76a49e3cf674600e"
+    },
+    {
+      "path": "skills/slates-prompting-kling-v3.md",
+      "sha256": "e247bf2ba2999a57ee2255cd31c197d1391c0b24acef0508e948bce7bad1650c"
+    },
+    {
+      "path": "skills/slates-prompting-nano-banana-2.md",
+      "sha256": "1912a693c668a14f03acc039abe497c3920906aa1bf14d52e3e40d61037464d2"
+    },
+    {
+      "path": "skills/slates-prompting-omni-flash.md",
+      "sha256": "887551ad854a05d0065a08fc15c654153803486ffda7ee1dcea23ad31219afd2"
+    },
+    {
+      "path": "skills/slates-prompting-seedance-2-5.md",
+      "sha256": "6e8b17b81bef5ba50a10e46610268f718c2941b6e78c18a2cae4393332337c49"
+    },
+    {
+      "path": "skills/slates-prompting-seedance.md",
+      "sha256": "e65776d8d803f10d6eac57f2a4742a634f55699e9d725d3cbec24e1099552a40"
+    },
+    {
+      "path": "src/prompts/character-sheet.ts",
+      "sha256": "2c07fb6e15c6a226f759eb10d812518401dfdf7804cdb221784252e87581df75"
+    },
+    {
+      "path": "src/prompts/generation-policy.ts",
+      "sha256": "8910685e757d86f7d25f52d2f1e606b69936d97ebad4b8a695b33ee551bbfbe2"
+    },
+    {
+      "path": "src/prompts/model-capabilities.ts",
+      "sha256": "abf78613f8210e80a67e1ccbb8d4a93fc094baa23b075b0043fa98b3974d9324"
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "92f42aa5befd60cc7f2aa058fcd50c720278008b4665a2bb14a6c7892db280a3"
+      "sha256": "e7298b62ff4562b60808d7c5addff2737d648b4ae89b95c84796bb0238986bba"
+    },
+    {
+      "path": "src/prompts/partials.generated.ts",
+      "sha256": "8051b8cc02ce38f8fa35eea2b2db55ac948faf4c6a1728632bf68534004b676b"
+    },
+    {
+      "path": "src/prompts/reference-rules.ts",
+      "sha256": "bb7cae0a613976303274b3f96b2bc85dca6c8fdd83f31ae368676325450a8efe"
+    },
+    {
+      "path": "src/prompts/style-library.ts",
+      "sha256": "138ec5301839bff15a2144bd57474a8b4481b31c6b56f5245ea37923ea52f583"
     }
   ],
   "outputs": [
     {
       "path": "SKILL.md",
-      "bytes": 4630,
-      "sha256": "416dce585f5ff042f4f83107ac907b0b10d77db171e34e4c5d3c6dfc51e50d75"
+      "bytes": 9157,
+      "sha256": "c8946925df07e853a446d84b18df65c5bb82ea2f14ca269bf1f8fd42de183166"
     },
     {
       "path": "reference-character.md",
-      "bytes": 10639,
-      "sha256": "cdf991fd220d5bf0240ae21f15acb238d8970c89a27c5e5434f034160732752d"
+      "bytes": 12614,
+      "sha256": "09bc878dd5618ceaa954019b676dea79357ae2e8dcda3a611d4381380cbfa0e4"
     },
     {
       "path": "reference-seedance.md",
-      "bytes": 35163,
-      "sha256": "46a4d6ae707bf5dffe622d62dbcc385dd29e9d2ffb3e270b5f91db5fecd5940e"
+      "bytes": 37635,
+      "sha256": "910cb83f446f0264c4b3a1bc0fe545aecfc1057394ab2a5870cd6f2eac6491b8"
     },
     {
       "path": "reference-kling.md",
-      "bytes": 16192,
-      "sha256": "964ca2bc79d4e1b5fb0902293780c9cb7e46a0b3fc7cbfc6e1998fa04661e768"
+      "bytes": 17639,
+      "sha256": "6fbea11e3dc2e0e592e426a07e533e43baebe1eb949c6230848e72dfbb8d59df"
     },
     {
       "path": "reference-nano-banana.md",
-      "bytes": 19415,
-      "sha256": "2146e05141da197be429ff50cbf6b16bd31fe081cfb74a3a73ca12e450277447"
+      "bytes": 20888,
+      "sha256": "93be71144d74d89bc6080fa6e19d4529730f69fa188af4a0b0cb529dc2065022"
+    },
+    {
+      "path": "reference-seedance-2-5.md",
+      "bytes": 22995,
+      "sha256": "8a3b9fe96f7a03fcd861fd943555c40fbf82d1fb7a50d349c0fd0b9cbb85b265"
+    },
+    {
+      "path": "reference-gpt-image-2-5.md",
+      "bytes": 23072,
+      "sha256": "459494344b294ed269c8c3dc2aec2d686357497fe9d5f8fa1c25a9f9c7a91020"
+    },
+    {
+      "path": "reference-omni-flash.md",
+      "bytes": 8639,
+      "sha256": "d54bf97d0f88b1f288a40571638e7c6a05f7dc4b23fdcb2a8aa5cdbfef45882b"
     },
     {
       "path": "reference-content-policy.md",
-      "bytes": 7169,
-      "sha256": "26439b2948313ee9eed10cbbe9e3ede60d53a453c41af96c3928840b0a4f6212"
+      "bytes": 7194,
+      "sha256": "66bb27b46e10696c42fad1660f8e6a37d2b54c14b4901297fc244efa6a3e6d3a"
     }
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 41393,
-    "sha256": "0d9310955ad7e869d1caf195edafc20802944d238fa2350a832290400985b174",
+    "bytes": 69638,
+    "sha256": "2fa30156c21241d4bf27dc6db462245d8f8f9bcab7e88ff1b792aebf02a22795",
     "entries": [
       "SKILL.md",
       "reference-character.md",
       "reference-content-policy.md",
+      "reference-gpt-image-2-5.md",
       "reference-kling.md",
       "reference-nano-banana.md",
+      "reference-omni-flash.md",
+      "reference-seedance-2-5.md",
       "reference-seedance.md"
     ]
   }
