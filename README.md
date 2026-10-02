@@ -56,7 +56,7 @@ For **Claude Desktop or Cursor**, add to your MCP config:
 
 Restart your client. Slates tools appear in the tool palette.
 
-**Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → AI tools → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients and writes their config. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
+**Don't want to edit JSON?** The Slates desktop app writes the config for you — **Settings → AI tools → Connect** (one click per tool, no terminal). Or, from a terminal, `npx -y @slatesvideo/cli mcp --write` detects your clients, writes Claude Desktop/Cursor configs, and prints the Codex/Claude Code setup commands. For Claude Desktop you can also drop in the one-click **`.mcpb` bundle** from the [latest GitHub release](https://github.com/EricDisero/slates-mcp/releases/latest).
 
 ### CLI (Codex, Claude Code, terminal scripts)
 
@@ -71,8 +71,8 @@ Or step by step:
 ```bash
 npm i -g @slatesvideo/cli
 slates login                  # only if you haven't connected via Settings
-slates install-skills         # installs skills to ./.claude/skills/<name>/SKILL.md
-slates mcp --write            # detect MCP clients, write their config
+slates install-skills         # installs the same skills for Claude Code and Codex
+slates mcp --write            # detect clients, configure or print setup commands
 slates status                 # show connection state
 slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
@@ -80,7 +80,7 @@ slates run slates_create_project --name "neon samurai"
 
 In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->157<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
 
-The <!-- gen:skill-count -->37<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->21<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, chatgpt-images, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, script-craft, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->16<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, MiniMax H3 Max Turbo, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
+The <!-- gen:skill-count -->36<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->21<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, chatgpt-images, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, script-craft, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->15<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, MiniMax H3 Max Turbo, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
 
 ## Architecture
 
@@ -104,7 +104,7 @@ The <!-- gen:skill-count -->37<!-- /gen:skill-count --> bundled skills provide h
     src/index.ts                         ← commander entry
     src/commands/login.ts                ← magic-link polling
     src/commands/op.ts                   ← `slates run <op>` dispatcher
-    src/commands/install-skills.ts       ← writes embedded skills to .claude/skills/
+    src/commands/install-skills.ts       ← installs portable skills for Claude Code and Codex
 ```
 
 Operations choose their transport internally. `slates_get_credit_balance` hits the cloud. `slates_create_project` hits the desktop. `slates_generate_image` hits the cloud, then the desktop client writes the resulting asset to the local project folder. The user watches it appear in the Slates UI as it lands.
@@ -135,10 +135,9 @@ MIT — see [LICENSE](LICENSE). Copyright Blueprint Online Learning Inc.
 The server lists every tool, and the list stays the same for the whole connection. Your client
 decides how much of it to load: Claude Code and Codex send the model the tool names only and fetch a
 tool's full definition when it is needed. `slates_load_tools` with `query` finds a tool by task.
-`--tools=compact` starts with a small workspace/discovery set instead and adds tools through
-`tools/list_changed`, for a client that re-reads its list mid-chat (Claude Desktop, Claude Code in the
-Claude app and Codex do not).
+Legacy `--tools=compact` and `--tools=flat` launch flags are accepted; both expose the full fixed list.
 
-`slates_get_prompting_guide` returns a short readable card by default. Use `query` for a section or
+`slates_get_prompting_guide` with no topic discovers guides from a brief in `query`, or lists the
+catalog without a query. With a topic it returns a short card by default. Use `query` for a section or
 cinematic technique ID, `depth: "index"` for headings, or `depth: "full"` for the complete guide.
 Both text and structured content include the actual guide body. No extra loading hook is required.

@@ -4,7 +4,7 @@ export type GuideDepth = 'card' | 'index' | 'section' | 'full'
 
 /** Parse headings outside code fences; maintainer comments never reach agents. */
 export function guideSections(content: string): Array<{ title: string; body: string }> {
-  const clean = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').replace(/<!--[\s\S]*?-->/g, '').trim()
+  const clean = content.replace(/<!--[\s\S]*?-->/g, '').trimStart().replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim()
   const sections: Array<{ title: string; body: string }> = []
   let current = { title: 'Overview', body: '' }
   let fenced = false

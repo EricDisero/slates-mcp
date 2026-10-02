@@ -1,7 +1,7 @@
 // Prebuild step: embed packages/shared/skills/*.md into a generated TS
 // module so both surfaces can serve skill content without shipping (or
 // resolving) loose .md files at runtime. The CLI's `slates install-skills`
-// writes these to .claude/skills/<name>/SKILL.md; the MCP-only path reads
+// writes these to Claude Code and Codex skill directories; the MCP-only path reads
 // them via the slates_get_prompting_guide op.
 //
 // Output: packages/shared/src/skills/content.ts (gitignored, regenerated
@@ -11,6 +11,9 @@
 import { readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
+
+const { parseSkillMetadata } = loadTypeScriptModule(new URL('../src/skills/metadata.ts', import.meta.url))
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
@@ -33,6 +36,7 @@ out += 'export const SKILLS: Record<string, string> = {\n'
 for (const f of files) {
   const name = basename(f, '.md')
   const content = readFileSync(join(skillsDir, f), 'utf8')
+  parseSkillMetadata(content, name)
   out += `  ${JSON.stringify(name)}: ${JSON.stringify(content)},\n`
 }
 out += '}\n'

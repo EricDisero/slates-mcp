@@ -15,8 +15,7 @@
 //      mechanism: we build every turn there, so a load reaches the model. The
 //      MCP server lists every op and leaves hiding definitions to the host
 //      (tiering there left Claude and Codex users unable to generate in 0.6.0;
-//      see the TOOLS comment in packages/mcp/src/server.ts). `--tools=compact`
-//      is the opt-in exception.
+//      see the TOOLS comment in packages/mcp/src/server.ts).
 //
 //   3. ONE SCHEMA RENDERER. The desktop rendered `$refStrategy: 'none'` and
 //      the MCP server rendered `target: 'openApi3'`, so "the two surfaces
@@ -30,6 +29,7 @@
 // mutation, so the check has to be able to catch it, and it is mutation-tested.
 // ============================================================
 
+import { searchTerms } from '../prompts/search-terms.js'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 import type { z } from 'zod'
 import type { OperationAnnotations, OperationGroup, OperationTier } from './index.js'
@@ -251,7 +251,7 @@ export function tierFor(id: string): OperationTier {
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, the Library (user-named categories of saved references: characters, locations, products, looks), moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
-  timeline: 'named cuts and selected exports; the timeline (tracks, clips, markers, settings), video export and export for DaVinci, Premiere or Final Cut (XML), clip trimming',
+  timeline: 'named cuts and selected exports; the timeline (tracks, clips, markers, settings), video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
   admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }
@@ -292,8 +292,7 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
  * Render a tool surface.
  *
  * `desktop` sends `core` plus whatever groups have been loaded this run; `mcp`
- * renders all definitions, and the MCP server lists all of them unless started with
- * `--tools=compact`.
+ * renders every definition for the fixed MCP list.
  */
 export function toolDefinitions(
   ops: readonly SurfaceOp[],
@@ -307,4 +306,31 @@ export function toolDefinitions(
       return STARTUP_TOOL_IDS.has(op.id) || !!opts.names?.includes(op.id) || (group !== undefined && loaded.has(group))
     })
     .map(toolDefinition)
+}
+
+// Natural brief words for capabilities whose API names use technical terms.
+const TASK_ALIASES: Readonly<Record<string, string>> = {
+  slates_generate_video: 'create animate photo picture film movie ad advert advertisement',
+  slates_generate_from_shots: 'create make film movie ad advert advertisement',
+  slates_generate_image: 'photo picture illustration',
+  slates_edit_image: 'photo picture',
+  slates_use_pictures_as_first_frames: 'photo animate',
+  slates_generate_audio: 'voiceover narration speech ambience sound effect',
+}
+
+/** Rank exact task words by rarity across the current registry, returning at most ten. */
+export function searchTools<T extends Pick<SurfaceOp, 'id' | 'description'>>(operations: readonly T[], query: string): Array<{ op: T; score: number }> {
+  const terms = searchTerms(query)
+  const documents = operations.map(op => ({
+    op,
+    name: new Set(searchTerms(op.id)),
+    words: new Set(searchTerms(`${op.description} ${TASK_ALIASES[op.id] ?? ''}`)),
+  }))
+  const frequency = new Map(terms.map(term => [term, documents.filter(doc => doc.name.has(term) || doc.words.has(term)).length]))
+  return documents.map(doc => ({
+    op: doc.op,
+    score: terms.reduce((sum, term) => sum + (doc.name.has(term) || doc.words.has(term)
+      ? Math.log(1 + documents.length / (1 + (frequency.get(term) ?? 0))) * (doc.name.has(term) ? 2 : 1)
+      : 0), 0),
+  })).filter(match => match.score > 0).sort((a, b) => b.score - a.score || a.op.id.localeCompare(b.op.id)).slice(0, 10)
 }

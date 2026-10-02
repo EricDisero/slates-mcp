@@ -37,6 +37,8 @@ import { createHash } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve, basename } from 'node:path';
+import { loadTypeScriptModule } from './load-typescript.mjs';
+const { parseSkillMetadata } = loadTypeScriptModule(new URL('../packages/shared/src/skills/metadata.ts', import.meta.url));
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
@@ -165,8 +167,7 @@ function buildZip(entries) {
  * sentence end or em dash (the website bans em dashes in visible copy).
  */
 function summary(body) {
-  const fm = body.toString('utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  const desc = fm?.[1].match(/^description:\s*(.+)$/m)?.[1].trim() ?? '';
+  const desc = parseSkillMetadata(body.toString('utf8')).description;
   let first = desc.split(/\s+—\s+|(?<=[.!?])\s/)[0].replace(/[.!?]$/, '');
   if (!first) throw new Error('a skill has no description: frontmatter; the chart cannot describe it');
   // A cut inside a parenthesis ("(ByteDance image model — the cheap…") closes it.
@@ -181,6 +182,7 @@ function collect(dir, tier) {
     .sort()
     .map((f) => {
       const body = readFileSync(join(dir, f));
+      parseSkillMetadata(body.toString('utf8'), basename(f, '.md'));
       return { key: basename(f, '.md'), tier, body, summary: summary(body) };
     });
 }
@@ -242,7 +244,7 @@ The full chart of what is free and what is paid: https://slates.video/docs/skill
 
 ---
 
-## Setup (about two minutes)
+## Setup
 
 **Before you start:** your AI tool needs to be connected to Slates. If it isn't yet, follow
 https://slates.video/docs/connect-claude first. It's one click from inside the app
@@ -254,9 +256,10 @@ https://slates.video/docs/connect-claude first. It's one click from inside the a
 npx -y @slatesvideo/cli install-skills --global
 \`\`\`
 
-That installs the free skills for Claude Code account-wide (drop \`--global\` to install into
-just the current project folder). **It does not install the paid ad playbooks listed above**,
-so use Option B for those. Restart your AI tool; skills load at startup.
+That installs the free skills for Claude Code and Codex account-wide (drop \`--global\` for the current
+project). For Codex use \`install-skills --client codex --global\`; \`--client both\` installs
+the same sources for both clients. **It does not install the paid ad playbooks listed above**,
+so use Option B for those. Start a new session after installation.
 
 ### Option B: copy the folders (required for the ad playbooks)
 
@@ -265,6 +268,8 @@ Each skill in this pack's \`skills/\` folder is a ready-to-use folder
 
 - **Claude Code (this project):** \`.claude/skills/\` inside your project folder
 - **Claude Code (everywhere):** \`~/.claude/skills/\` (Windows: \`C:\\Users\\<you>\\.claude\\skills\\\`)
+- **Codex (this project):** \`.agents/skills/\` inside your project folder
+- **Codex (everywhere):** \`~/.agents/skills/\` (Windows: \`C:\\Users\\<you>\\.agents\\skills\\\`)
 - **Other MCP clients (Claude Desktop, Cursor, etc.):** the skills also work as plain
   instructions. Open any \`SKILL.md\` and paste its contents into your conversation or your
   tool's custom-instructions/rules area when you want that workflow.
@@ -275,7 +280,8 @@ Restart your AI tool after copying.
 
 ## Using them
 
-Just ask. Skills trigger automatically when your request matches, so you never invoke them by name:
+In Claude Code and Codex, installed skills are selected from the ordinary-language request.
+You do not need to name a skill or choose a model:
 
 > "Make me a 30-second UGC-style ad for my coffee brand in Slates."
 
@@ -283,8 +289,10 @@ Just ask. Skills trigger automatically when your request matches, so you never i
 
 > "Create a consistent character named Mara and put her in five different scenes."
 
-The agent opens a Slates project, generates the assets, and assembles everything while you watch
-the app fill in live. Every generation shows its credit cost before it runs.
+The agent chooses the workflow and relevant craft for your brief, works in the connected
+Slates project and shows generation costs before spending. Other MCP clients can use the
+authenticated members feed or the instructions you supplied; they do not discover local
+skill folders through the Claude Code or Codex installer.
 
 ---
 

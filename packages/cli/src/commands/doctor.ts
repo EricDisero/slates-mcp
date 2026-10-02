@@ -14,6 +14,8 @@ import {
   compareVersions,
 } from '@slatesvideo/shared'
 import { EXIT } from '../exit-codes.js'
+import { skillInstallTargets, inspectSkillInstallation } from './install-skills.js'
+import { CODEX_MCP_SETUP, inspectCodexMcpConfig } from './mcp-config.js'
 
 // `slates doctor` — every setup precondition, in one command, each failure
 // printing its own fix.
@@ -28,14 +30,6 @@ interface Check {
   ok: boolean
   detail: string
   fix?: string
-}
-
-function frontmatterName(markdown: string, fallback: string): string {
-  if (!markdown.startsWith('---')) return fallback
-  const end = markdown.indexOf('\n---', 3)
-  if (end === -1) return fallback
-  const m = markdown.slice(3, end).match(/^name:\s*(.+?)\s*$/m)
-  return m ? m[1].trim() : fallback
 }
 
 /** Every capability an op checks with `requireCapability`, and what needs it.
@@ -177,30 +171,18 @@ export async function runDoctor(): Promise<void> {
     })
   }
 
-  // 5. Installed skills vs what this CLI ships.
-  const bundled = new Set(Object.entries(SKILLS).map(([k, v]) => frontmatterName(v, k)))
-  const roots = [join(process.cwd(), '.claude', 'skills'), join(homedir(), '.claude', 'skills')]
-  const installedRoot = roots.find((r) => existsSync(r))
-  if (!installedRoot) {
+  // Native skill files are optional with MCP. Inspect both scopes for each client.
+  for (const target of skillInstallTargets('both', process.cwd())) {
+    const globalTarget = skillInstallTargets(target.client, homedir())[0]
+    const state = inspectSkillInstallation([target.path, globalTarget.path])
+    const absent = state.installed === 0
     checks.push({
-      name: 'Agent skills',
-      ok: false,
-      detail: 'none installed',
-      fix: 'Run `slates install-skills` (add --global for ~/.claude/skills), then restart Claude Code.',
-    })
-  } else {
-    const installed = new Set(
-      readdirSync(installedRoot).filter((d) => existsSync(join(installedRoot, d, 'SKILL.md')))
-    )
-    const missing = [...bundled].filter((s) => !installed.has(s))
-    checks.push({
-      name: 'Agent skills',
-      ok: missing.length === 0,
-      detail:
-        missing.length === 0
-          ? `${bundled.size} of ${bundled.size} installed in ${installedRoot}`
-          : `${bundled.size - missing.length} of ${bundled.size} installed — missing ${missing.length}`,
-      fix: 'Run `slates install-skills` to bring them up to this CLI version, then restart Claude Code.',
+      name: `Agent skills (${target.client})`,
+      ok: absent || (!state.missing.length && !state.stale.length),
+      detail: absent
+        ? 'not installed; MCP guides remain available'
+        : `${state.installed} of ${Object.keys(SKILLS).length} installed; ${state.missing.length} missing, ${state.stale.length} outdated, ${state.duplicates.length} duplicate names`,
+      fix: `Run slates install-skills --client ${target.client}; also add --global if you have a global copy.`,
     })
   }
 
@@ -218,14 +200,19 @@ export async function runDoctor(): Promise<void> {
       return false
     }
   })
+  const codex = inspectCodexMcpConfig()
   checks.push({
     name: 'MCP client config',
-    ok: wired.length > 0,
+    ok: codex.configured || wired.length > 0,
     detail:
-      wired.length > 0
-        ? `slates entry found in ${wired.length} of ${mcpConfigs.length} detected config(s)`
-        : `${mcpConfigs.length} client config(s) detected, none mentions slates`,
-    fix: 'Run `slates mcp --write` (or `slates setup`), then restart the client.',
+      codex.configured
+        ? 'Slates entry found in Codex config (configuration only; connection checked separately)'
+        : wired.length > 0
+          ? `slates entry found in ${wired.length} of ${mcpConfigs.length} detected JSON config(s)`
+          : codex.invalid.length
+            ? `Codex config could not be parsed: ${codex.invalid.join(', ')}`
+            : `${mcpConfigs.length + codex.files.length} client config(s) detected; no enabled Slates entry found`,
+    fix: `For Codex, run ${CODEX_MCP_SETUP}; for Claude Desktop or Cursor, run slates mcp --write. Restart the client.`,
   })
 
   // ── Package version ──

@@ -1,23 +1,24 @@
 import { readConnection } from '@slatesvideo/shared'
 import { runMcp } from './mcp.js'
-import { runInstallSkills } from './install-skills.js'
+import { runInstallSkills, type SkillClient } from './install-skills.js'
 
 interface SetupOptions {
   global?: boolean
   skipSkills?: boolean
+  client?: SkillClient
 }
 
 // `slates setup` — the one-command onboarding. Does the three setup steps in
 // order so a user (or an agent following a single instruction) can go from
 // "nothing" to "connected":
-//   1. Write the Slates MCP config into every detected client (Claude Desktop,
-//      Claude Code, Cursor) — no manual JSON editing.
-//   2. Install the bundled agent skills into the current project.
+//   1. Detect MCP clients, write Claude Desktop/Cursor configs, and print the
+//      supported setup commands for Codex and Claude Code.
+//   2. Install the same bundled skills for Claude Code and Codex.
 //   3. Point at the account-connect step (magic link — interactive, so it
 //      happens in the Slates desktop app or via `slates login`, not here).
 //
-// Steps 1-2 are mechanical and run automatically; step 3 is auth and only ever
-// guided, never silently performed.
+// Config writes and skill installation run automatically; terminal setup and
+// account sign-in remain visible instructions.
 export function runSetup(opts: SetupOptions): void {
   console.log('Slates setup — getting you connected.')
 
@@ -30,7 +31,7 @@ export function runSetup(opts: SetupOptions): void {
     console.log('\n② Skills — skipped (--skip-skills). Run `slates install-skills` when ready.')
   } else {
     console.log('\n② Installing agent skills')
-    runInstallSkills({ global: !!opts.global })
+    runInstallSkills({ global: !!opts.global, client: opts.client })
   }
 
   // 3. Account connection — interactive (magic link), so guide rather than block.

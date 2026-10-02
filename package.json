@@ -7,7 +7,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli && node scripts/app-manual-check.mjs && node scripts/app-manual-retrieval-check.mjs && node scripts/agent-surface-lockstep-check.mjs && node scripts/mcp-instructions-smoke.mjs && node scripts/shot-voice-check.mjs && node scripts/render-readmes.mjs --check && node scripts/env-example-check.mjs && node scripts/cinematic-catalogue-check.mjs && node scripts/script-craft-provenance-check.mjs && node scripts/prompt-control-check.mjs && node scripts/compact-mcp-check.mjs && node scripts/server-json-check.mjs",
+    "build": "npm run build -w packages/shared && npm run build -w packages/mcp && npm run build -w packages/cli && node scripts/app-manual-check.mjs && node scripts/app-manual-retrieval-check.mjs && node scripts/agent-surface-lockstep-check.mjs && node scripts/mcp-instructions-smoke.mjs && node scripts/shot-voice-check.mjs && node scripts/render-readmes.mjs --check && node scripts/env-example-check.mjs && node scripts/cinematic-catalogue-check.mjs && node scripts/script-craft-provenance-check.mjs && node scripts/prompt-control-check.mjs && node scripts/compact-mcp-check.mjs && node scripts/server-json-check.mjs && node scripts/skill-install-check.mjs && node scripts/guide-discovery-check.mjs && node scripts/cost-key-check.mjs",
     "check:agent-surface": "node scripts/agent-surface-lockstep-check.mjs",
     "check:cinematic-catalogue": "node scripts/cinematic-catalogue-check.mjs",
     "check:script-craft-provenance": "node scripts/script-craft-provenance-check.mjs",
@@ -21,7 +21,9 @@
     "clean": "rimraf --glob \"packages/*/dist\" \"packages/*/tsconfig.tsbuildinfo\"",
     "publish:all": "npm run build && npm publish -w packages/shared --access public && npm publish -w packages/mcp --access public && npm publish -w packages/cli --access public",
     "render-readmes": "node scripts/render-readmes.mjs",
-    "check:env": "node scripts/env-example-check.mjs"
+    "check:env": "node scripts/env-example-check.mjs",
+    "check:guides": "node scripts/guide-discovery-check.mjs",
+    "check:skills": "node scripts/skill-install-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

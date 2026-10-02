@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { Command } from 'commander'
+import { Command, Option } from 'commander'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -8,7 +8,7 @@ import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
 import { runOp } from './commands/op.js'
-import { runInstallSkills } from './commands/install-skills.js'
+import { runInstallSkills, SKILL_CLIENTS } from './commands/install-skills.js'
 import { runMcp } from './commands/mcp.js'
 import { runSetup } from './commands/setup.js'
 import { runDoctor } from './commands/doctor.js'
@@ -35,7 +35,7 @@ import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 //   slates run slates_generate_image --prompt "..." --resolution 1k --aspectRatio 16:9
 //
 // Run `slates install-skills` to copy the bundled skills into
-// .claude/skills/<name>/SKILL.md for higher-level recipes.
+// Claude Code and Codex skill directories for higher-level recipes.
 
 // Version comes from this package's own package.json (dist/index.js → ../package.json)
 // so the CLI never drifts from the published version.
@@ -85,7 +85,8 @@ program
 program
   .command('setup')
   .description('One-command onboarding: write the MCP config into every detected client, install the skills, and point you at the account-connect step.')
-  .option('--global', 'Install skills into ~/.claude/skills instead of the current project', false)
+  .option('--global', 'Install skills for every project instead of the current project', false)
+  .addOption(new Option('--client <client>', 'Choose native skill clients').choices(SKILL_CLIENTS).default('both'))
   .option('--skip-skills', 'Only write MCP configs; do not install skills', false)
   .action((opts) => runSetup(opts))
 
@@ -97,8 +98,9 @@ program
 
 program
   .command('install-skills')
-  .description('Install the bundled skills into .claude/skills/<name>/SKILL.md (Claude Code layout).')
-  .option('--global', 'Install into ~/.claude/skills instead of the current project', false)
+  .description('Install bundled skills for Claude Code and Codex from one portable source.')
+  .option('--global', 'Install skills for every project instead of the current project', false)
+  .addOption(new Option('--client <client>', 'Choose native skill clients').choices(SKILL_CLIENTS).default('both'))
   .action((opts) => runInstallSkills(opts))
 
 program

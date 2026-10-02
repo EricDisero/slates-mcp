@@ -46,6 +46,10 @@ export const DEFAULT_CLOUD_BASE_URL = resolveCloudBaseUrl()
 const CLOUD_READ_TIMEOUT_MS = 30_000
 const CLOUD_SUBMIT_TIMEOUT_MS = 120_000
 
+export class SlatesCloudHttpError extends Error {
+  constructor(message: string, readonly status: number) { super(message); this.name = 'SlatesCloudHttpError' }
+}
+
 export class SlatesCloudClient {
   constructor(
     private readonly token: string = requireCloudToken(),
@@ -104,16 +108,17 @@ export class SlatesCloudClient {
       // (Disconnect in Slates Settings kills it server-side). Point at the
       // two recovery paths instead of echoing an opaque auth error.
       if (res.status === 401) {
-        throw new Error(
+        throw new SlatesCloudHttpError(
           `slates-api ${path} rejected the auth token (401) — it's expired or was revoked. ` +
-            'To reconnect, run `slates login` (CLI) or reconnect in Slates → Settings → AI tools'
+            'To reconnect, run `slates login` (CLI) or reconnect in Slates → Settings → AI tools',
+          res.status
         )
       }
       const detail =
         parsed && typeof parsed === 'object' && 'error' in parsed
           ? (parsed as { error: string }).error
           : text || res.statusText
-      throw new Error(`slates-api ${path} failed (${res.status}): ${detail}`)
+      throw new SlatesCloudHttpError(`slates-api ${path} failed (${res.status}): ${detail}`, res.status)
     }
     return parsed as T
   }

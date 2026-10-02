@@ -47,6 +47,7 @@
     "node": ">=18"
   },
   "dependencies": {
+    "@iarna/toml": "^2.2.5",
     "@slatesvideo/shared": "^0.7.2",
     "commander": "^12.1.0",
     "zod": "^3.23.0"

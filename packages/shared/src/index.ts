@@ -2,6 +2,7 @@ export * from './auth.js'
 export { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from './clients/cloud.js'
 export { SlatesDesktopClient, type DesktopHealth } from './clients/desktop.js'
 export { SKILLS } from './skills/content.js'
+export { parseSkillMetadata, type SkillMetadata } from './skills/metadata.js'
 export * as operations from './operations/index.js'
 export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, IMAGE_MODELS, defaultContext, OperationCancelledError, type Operation, type OperationContext, type OperationResult, type OperationAnnotations, type OperationTier, type OperationGroup } from './operations/index.js'
 // The spend thresholds the DESKTOP and the SKILLS both quote. `CONFIRM_CREDITS`
