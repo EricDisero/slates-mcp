@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-motion-transfer
-description: How to set up motion transfer — Kling Motion Control only (std and pro tiers, 5-second outputs). Read before calling slates_generate_motion_transfer. Reference image (character) + driving video (motion source) → new video of the character performing the motion. Asset selection rules, character_orientation, tiers, and prompt usage. Also covers the Seedance alternative, which is a normal video generation rather than a mode of this tool.
+description: "Prepare Kling Motion Control with slates_generate_motion_transfer: a character image plus a driving clip. Covers orientation, source selection, tiers and the separate Seedance video-reference alternative."
 ---
 
 # Motion transfer — setup guide
@@ -15,7 +15,7 @@ description: How to set up motion transfer — Kling Motion Control only (std an
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Motion transfer (Kling Motion Control only).** A target IMAGE (your character) plus a source VIDEO (the motion) produces your character performing that motion. Always 5 seconds.
+**Card: Motion transfer (Kling Motion Control only).** A target IMAGE (your character) plus a source VIDEO (the motion) produces your character performing that motion. Output follows the driving clip, up to 30s with video orientation or 10s with image orientation, billed per 5s block.
 
 **The five levers**
 1. **The target image must show body proportions clearly** and the character must occupy more than about 5% of the frame. A tiny figure in a wide shot has nothing to drive.
@@ -23,7 +23,7 @@ description: How to set up motion transfer — Kling Motion Control only (std an
 3. **Choose `characterOrientation` on purpose** — `video` takes the source clip's framing, `image` preserves the portrait's. It is the most-missed choice here.
 
 4. **The prompt is atmosphere only** — `Soft afternoon sunlight, dust motes in the air, vintage warm color grade.` Motion verbs are ignored; the motion is already in the driving video.
-5. **Pick the best 5 seconds of the source up front**, and write only atmosphere: `soft afternoon sunlight`, `vintage warm color grade`, `clean studio backdrop`. The output is 5s regardless, so a long driving clip just wastes the choice.
+5. **Pick the source section up front**, and write only atmosphere: `soft afternoon sunlight`, `vintage warm color grade`, `clean studio backdrop`. The output follows that section, up to the orientation's limit; longer clips cost more blocks.
 
 **Examples**
 - `Soft afternoon sunlight, dust motes in the air, vintage warm color grade.`
@@ -63,8 +63,8 @@ movement from video 1. Preserve the character's identity, appearance, and outfit
 
 That is the same endpoint the old `motionModel=seedance-2` branch called — it just wrote that sentence for you, invisibly. Add style/setting/camera direction freely; Seedance re-generates the whole shot.
 
-- **Driving clip must be 2–15s** (all providers cap reference video at 15s). Longer clips: trim first, or use Kling MC (`characterOrientation: 'video'` takes up to 30s).
-- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key — quote via the confirm gate before spending. On Seedance 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
+- **Reference videos must total 2–15s on 2.0, or 2–30s on 2.5.** Longer clips: trim first. Kling MC (`characterOrientation: 'video'`) takes up to 30s.
+- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key; quote via the confirm gate before spending. On both Seedance 2.0 and 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
 - **Faces route through the face cascade**: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → confirm consent → `seedanceRealFace=true, realFaceConsent=true` (premium realface vref pricing).
 - `characterOrientation` has no Seedance equivalent; framing follows the prompt + `aspectRatio`.
 
@@ -180,13 +180,13 @@ Leave it empty if you don't have a specific atmospheric note.
 - Pro tier on first iteration — waste, switch to it once the motion + framing combo is locked
 - Cartoon driving videos — guaranteed failure
 - Cropped or partial target characters — identity will drift
-- Long driving videos when output is 5s — pick the best 5s of the source upfront
+- Driving videos longer than the needed motion; pick the source section upfront, within the orientation's limit
 
 ## Cost discipline
 
-- 5 seconds, no shorter option
+- Output follows the driving clip, up to 30s with video orientation or 10s with image orientation; billed per 5s block
 - Both tiers trip the confirm gate — every call needs explicit user OK
-- Iteration is expensive: 4 takes at pro ≈ 168 credits. Lock framing + driving video before tier-up to pro.
+- Iteration is expensive: 4 five-second takes at pro ≈ 168 credits. Lock framing + driving video before tier-up to pro.
 - Always run a single std take first to validate the motion + framing combo before committing to pro
 
 ## Confirm gate: cost + codes, no inline preview

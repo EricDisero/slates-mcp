@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-inworld-tts
-description: How to use Inworld Realtime TTS-2, the VOICE seat. Read before calling slates_generate_audio with model inworld-tts-2. Speech in a SPECIFIC voice, billed per character - the prompt is the words spoken, verbatim. Covers the identity-versus-acoustics rule (what a reference clip does and does not carry), how to write a line so it is performed rather than read, when to reach for seed-audio instead, and the voice-consent rule.
+description: "Direct speech with Inworld Realtime TTS-2 (inworld-tts-2). Use with slates_generate_audio on this model; covers voice identity, reference acoustics, delivery tags, punctuation and voice consent."
 ---
 
 # Inworld Realtime TTS-2 — the voice seat

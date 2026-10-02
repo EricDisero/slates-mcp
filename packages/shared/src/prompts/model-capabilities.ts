@@ -98,8 +98,6 @@ const KLING_DIRECT_ASPECT_RATIOS: AspectRatio[] = [
 /** Kling carried on fal: three. This is the set the CREDITS route uses. */
 const KLING_FAL_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1']
 
-/** Veo carried on fal: two. The credits route again — Veo direct takes all ten. */
-const VEO_FAL_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
 
 /** Gemini Omni Flash (fal schema, 16:9 default): two. */
 const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
@@ -126,7 +124,7 @@ const MINIMAX_H3_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '
 /**
  * LTX-2.5, all four integrated endpoints: TWO. Read off fal's live OpenAPI
  * 2026-08-29 — `text-to-video/{fast,pro}` declare exactly `['16:9','9:16']`,
- * the narrowest video set in the roster alongside Veo-on-fal.
+ * the narrowest video set in the roster.
  *
  * `image-to-video/{fast,pro}` additionally offer `auto` (follow the start
  * frame). We never send it and it is not an `AspectRatio` in this vocabulary —
@@ -146,9 +144,9 @@ export interface DurationCapability {
   mode: 'continuous' | 'discrete'
   /** For discrete mode: the exact allowed durations. */
   values?: number[]
-  /** Resolution-dependent narrowing (Veo forces 8s at 1080p AND 4k). */
+  /** Resolution-dependent narrowing (retired Veo forced 8s at 1080p AND 4k). */
   resolutionOverrides?: Record<string, Pick<DurationCapability, 'min' | 'max' | 'mode' | 'values'>>
-  /** Prompt-mode narrowing (Veo's reference-to-video endpoint is 8s only). */
+  /** Prompt-mode narrowing (retired Veo's reference-to-video endpoint was 8s only). */
   modeOverrides?: Record<string, Pick<DurationCapability, 'min' | 'max' | 'mode' | 'values'>>
 }
 
@@ -366,15 +364,14 @@ export interface ModelCapability {
 }
 
 /**
- * The provider every AGENT generation actually lands on for Kling and Veo.
+ * The provider every AGENT generation actually lands on for Kling.
  *
  * 🚨 THIS IS WHY `providerAspectRatios` MATTERS TO THE OP. MCP/CLI/Studio-Agent
  * generations are credits-only (BYOK is retired on the agent surface), and the
- * credits route carries Kling and Veo on fal: `slate/src/main/agent/routes.ts`
- * never sends `klingProvider`, so `handlers/video.ts` defaults it to `'fal'`,
- * and `generateVeoVideo`'s proxy arm builds a fal request
- * (`buildFalVeoRequest`). So an agent gets Kling's THREE fal ratios and Veo's
- * TWO — not the eight and ten those models take on their direct APIs. Validating
+ * credits route carries Kling on fal: `slate/src/main/agent/routes.ts`
+ * never sends `klingProvider`, so `handlers/video.ts` defaults it to `'fal'`.
+ * So an agent gets Kling's THREE fal ratios, not the eight it takes on its
+ * direct API (retired Veo had the same split, two against ten). Validating
  * against the direct sets would accept a ratio fal rejects, which is the exact
  * failure this module exists to delete.
  */
@@ -550,46 +547,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     videoResolution: { options: ['720p'], fixed: '720p' },
     duration: { min: 3, max: 10, mode: 'continuous' },
     maxIngredientImages: 0,
-  },
-
-  // ── Veo ────────────────────────────────────────────────────────────────────
-
-  'veo-3.1-fast': {
-    aspectRatios: FULL_ASPECT_RATIOS,
-    providerAspectRatios: { fal: VEO_FAL_ASPECT_RATIOS },
-    videoResolution: { options: ['720p', '1080p', '4k'] },
-    duration: {
-      min: 4, max: 8, mode: 'discrete',
-      values: [4, 6, 8],
-      // BOTH 1080p and 4k force 8s. The op said "4K only at 8s" and quoted 4s
-      // at 1080p, which the provider rejects.
-      resolutionOverrides: {
-        '1080p': { min: 8, max: 8, mode: 'discrete', values: [8] },
-        '4k': { min: 8, max: 8, mode: 'discrete', values: [8] },
-      },
-      modeOverrides: {
-        ingredients: { min: 8, max: 8, mode: 'discrete', values: [8] },
-      },
-    },
-    maxIngredientImages: 3,
-  },
-
-  'veo-3.1-standard': {
-    aspectRatios: FULL_ASPECT_RATIOS,
-    providerAspectRatios: { fal: VEO_FAL_ASPECT_RATIOS },
-    videoResolution: { options: ['720p', '1080p', '4k'] },
-    duration: {
-      min: 4, max: 8, mode: 'discrete',
-      values: [4, 6, 8],
-      resolutionOverrides: {
-        '1080p': { min: 8, max: 8, mode: 'discrete', values: [8] },
-        '4k': { min: 8, max: 8, mode: 'discrete', values: [8] },
-      },
-      modeOverrides: {
-        ingredients: { min: 8, max: 8, mode: 'discrete', values: [8] },
-      },
-    },
-    maxIngredientImages: 3,
   },
 
   // ── Seedance ───────────────────────────────────────────────────────────────
@@ -1142,7 +1099,7 @@ function fmtWindow(d: Pick<DurationCapability, 'min' | 'max' | 'mode' | 'values'
   return d.mode === 'discrete' && d.values ? `${d.values.join('s/')}s` : `${d.min}-${d.max}s`
 }
 
-/** e.g. "kling-v3.0-std: 3-15s · veo-3.1-fast: 4s/6s/8s (1080p/4k: 8s only; with reference images: 8s only)" */
+/** e.g. "kling-v3.0-std: 3-15s · ltx-2-5: 6s/8s/10s/12s/14s/16s/18s/20s (1440p/4k: 6s/8s/10s only)" */
 export function describeDurations(models: readonly string[]): string {
   return groupBy(models, (m) => {
     const d = MODEL_CAPABILITIES[m]?.duration
@@ -1168,9 +1125,10 @@ export function describeReferenceImageCaps(models: readonly string[]): string {
   return groupBy(models, (m) => {
     const cap = MODEL_CAPABILITIES[m]
     if (!cap) return ''
-    const n = cap.maxIngredientImages ?? cap.maxRefImages
-    if (n == null) return ''
-    return n === 0 ? '0 (prompt + source clip only)' : String(n)
+    // A generate row with no reference cap (LTX) takes none: say so rather than
+    // dropping the row, which read as "no limit stated".
+    const n = cap.maxIngredientImages ?? cap.maxRefImages ?? 0
+    return n === 0 ? '0 (prompt and frames only)' : String(n)
   })
 }
 

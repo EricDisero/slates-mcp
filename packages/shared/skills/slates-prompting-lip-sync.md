@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-lip-sync
-description: How to set up lip-sync — Kling-only (dedicated lip-sync and avatar endpoints, 5-second outputs). Read before calling slates_generate_lip_sync. Two flows — video→video re-dub and image→video avatar — with different inputs, pricing, and gotchas. Voice catalog, framing rules, audio file constraints, and which tier to pick. Also covers the Seedance alternative, which is a normal video generation rather than a mode of this tool.
+description: "Prepare Kling lip-sync or avatar generation with slates_generate_lip_sync. Covers source selection, voice, framing, audio constraints and the separate Seedance video-reference alternative."
 ---
 
 # Lip-sync — setup guide
@@ -15,7 +15,7 @@ description: How to set up lip-sync — Kling-only (dedicated lip-sync and avata
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Lip-sync (Kling only).** Two different flows with different inputs and different prices; every output is 5 seconds.
+**Card: Lip-sync (Kling only).** Two different flows with different inputs and different prices; output follows the source clip for video or the voice track for a still, billed per 5s block.
 
 **The five levers**
 1. **Pick `sourceType` deliberately** — `video` re-dubs an existing talking head (cheapest); `image` animates a still portrait (avatar-standard, then avatar-pro only on the final selected take).
@@ -28,7 +28,7 @@ description: How to set up lip-sync — Kling-only (dedicated lip-sync and avata
 - `Soft rim light, warm office, gentle confident smile between sentences.`
 - `Cool blue evening light through a window, focused intent expression.` (Or `.` — an empty prompt is fine when you have nothing to add.)
 
-**Hard constraint:** it is Kling-only and always 5 seconds. For a generated PERFORMANCE instead — head movement, gesture, delivery energy, with the dialogue as a native conditioning signal — that is a normal Seedance video generation with the clip attached as a video reference, not a mode of this tool. A real recording, or a cloned/cast voice rendered on `inworld-tts-2`, for production; this tool's built-in TTS is for scratch.
+**Hard constraint:** it is Kling-only; output follows the media and bills per 5s block. For a generated PERFORMANCE instead (head movement, gesture, delivery energy, with the dialogue as a native conditioning signal), that is a normal Seedance video generation with the clip attached as a video reference, not a mode of this tool. A real recording, or a cloned/cast voice rendered on `inworld-tts-2`, for production; this tool's built-in TTS is for scratch.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -43,13 +43,13 @@ description: How to set up lip-sync — Kling-only (dedicated lip-sync and avata
 - `reader_en_m-v1` — listed in fal's docs, returns "Voice id not found" in production
 <!-- @banned:end -->
 
-**This tool is Kling-only.** It wraps Kling's dedicated lip-sync and avatar endpoints; every entry is a real endpoint and every output is 5 seconds.
+**This tool is Kling-only.** It wraps Kling's dedicated lip-sync and avatar endpoints; output follows the source clip for video or the voice track for a still, billed per 5s block.
 
 | Flow | Source | Model | Cost | Use case |
 |------|--------|-------|-----------|----------|
-| Re-dub | video clip | kling-lip-sync-video | ~4 credits / 5s | Replace dialogue on an existing talking head |
-| Avatar standard | still image | ai-avatar/v2/standard | ~14 credits / 5s | Animate a portrait into a talking avatar |
-| Avatar pro | still image | ai-avatar/v2/pro | ~29 credits / 5s | Higher facial fidelity for hero shots |
+| Re-dub | video clip | kling-lip-sync-video | ~4 credits / 5s block | Replace dialogue on an existing talking head |
+| Avatar standard | still image | ai-avatar/v2/standard | ~14 credits / 5s block with uploaded audio; typed text adds one flat voice block | Animate a portrait into a talking avatar |
+| Avatar pro | still image | ai-avatar/v2/pro | ~29 credits / 5s block with uploaded audio; typed text adds one flat voice block | Higher facial fidelity for hero shots |
 
 Pick `sourceType` deliberately — it decides the pricing tier and the underlying endpoint.
 
@@ -60,7 +60,7 @@ Seedance can generate the performance rather than bolting a mouth onto finished 
 That is the same endpoint the old `engine=seedance-2` branch called — it just built the sentence for you, invisibly, and it presupposed a "video 1" that might not exist. Writing the prompt is the whole difference, and it is the part you want control of.
 
 - Driving clips must be 2–15s; output duration is whatever you set (4–15s).
-- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys) — pass the clip duration and quote before confirming. On Seedance 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
+- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys); pass the clip duration and quote before confirming. On both Seedance 2.0 and 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
 - Faces go through the normal cascade: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent` for a real person.
 
 Everything below is about the Kling tool.
@@ -81,7 +81,7 @@ Use **avatar** when:
 
 ### Video flow (`sourceType: 'video'`)
 - Format: mp4 or mov
-- Duration: 2–10s (lip-sync output is always 5s — long videos get trimmed)
+- Duration: 2–10s (output follows the source clip)
 - Resolution: 720p or 1080p (480p will be rejected)
 - Max file size: 100MB
 - Face must be visible and roughly facing camera. Profile shots fail.
@@ -107,7 +107,7 @@ Two ways to drive the lips:
 - Pass `audioFilePath` — absolute path to an audio file on the user's machine
 - Format: mp3, wav, m4a, ogg, aac
 - Max 5MB
-- Duration: 2–60s (output is 5s — longer audio gets trimmed)
+- Duration: 2–60s (avatar output follows the voice track)
 - Single clean voice. Music underneath, multiple speakers, or noisy mics produce garbage lips.
 
 Prefer upload for production-quality voice. TTS for fast iteration / placeholder dialogue.
@@ -181,15 +181,15 @@ Don't default to pro. The ~15-credit delta per take adds up across iteration.
 
 ## Cost discipline
 
-- Video re-dub at ~4 credits is the cheapest dialogue iteration in the entire Slates stack — use it for voice A/B testing
-- Avatar standard at ~14 credits is fine for medium use
-- Avatar pro at ~29 credits trips the confirm gate — explicit user OK required every time
-- All 5s. There is no shorter option.
+- Video re-dub at ~4 credits per 5s block is the cheapest dialogue iteration in the entire Slates stack; use it for voice A/B testing
+- Avatar standard at ~14 credits per 5s block is fine for medium use; typed text on a still adds one flat voice block
+- Avatar pro at ~29 credits per 5s block trips the confirm gate; explicit user OK required every time
+- Output follows the media; billing rounds up to whole 5s blocks.
 
 ## Workflow patterns
 
 **Voice A/B test (cheap):**
-1. Generate one base talking-head video clip with Veo or Seedance (~40 credits)
+1. Generate one base talking-head video clip with Seedance (~40 credits)
 2. Run `slates_generate_lip_sync` with `sourceType: 'video'` against 3–5 different `ttsVoice` values
 3. Total cost: ~40 + (5 × ~4) ≈ 60 credits to compare voices
 

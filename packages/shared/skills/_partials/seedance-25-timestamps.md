@@ -30,5 +30,5 @@ pacing you are happy to leave to the model, timestamps when a beat has to land a
   from 4-6 seconds in Video 1, and leave the rest of the content unchanged."* Without a range, a
   whole-clip instruction is applied to the whole clip.
 
-Do **not** carry this back to 2.0, and do not carry Veo's `[00:00-00:02]` bracket syntax into
-either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
+Do **not** carry this back to 2.0, and do not write `[00:00-00:02]` minute-second brackets (another
+vendor's syntax) into either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.

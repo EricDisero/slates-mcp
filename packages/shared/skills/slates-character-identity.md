@@ -1,6 +1,6 @@
 ---
 name: slates-character-identity
-description: Build a Slates character from a reference image — generate one identity sheet and bind it to the character so the card updates live. Use when the user wants to create a character, build a character from an image, or starts a storyboard flow that needs consistent character references.
+description: "Prepare and bind a reusable character identity sheet from an image or description. Use when creating cast or preserving the same character across shots."
 ---
 
 # Character identity sheet — Slates workflow
@@ -33,7 +33,7 @@ Slates generates **one identity sheet per character**, bound as the character's 
 
 The rule is **kill every competing rendering of the FACE, not every head** — which is why exactly one body panel is headless.
 
-On a deep neutral-grey plate (hex `3a3a3c`, emitted without the `#` — see the sigil warning in Don'ts), flat and shadowless, with catchlights in the eyes, irises never crushed to black, surface texture at the medium's own natural level of detail, broken symmetry, and no over-clean 3D-game-model look. Expression is **a slight natural smile with the teeth just visible** — a closed mouth carries no dental information, so every downstream smiling shot invents teeth, and teeth are person-specific.
+On a deep neutral-grey plate (hex `3a3a3c`, written bare; since the composer fix `#3a3a3c` reads the same — see the resolved composer hazard in Don'ts), flat and shadowless, with catchlights in the eyes, irises never crushed to black, surface texture at the medium's own natural level of detail, broken symmetry, and no over-clean 3D-game-model look. Expression is **a slight natural smile with the teeth just visible** — a closed mouth carries no dental information, so every downstream smiling shot invents teeth, and teeth are person-specific.
 
 **Two carve-outs, scoped differently on purpose.** Non-human characters get a natural neutral expression instead of a smile — that one is scoped by *having a human mouth*, so a bipedal robot or humanoid alien is covered. Quadrupeds and non-bipedal characters get a natural standing stance with the head shown on both body panels — that one is *anatomical*. **Both are conditionals the image model evaluates against your reference; neither is a code branch, because the op has no character-kind input.**
 
@@ -68,6 +68,7 @@ If text only: generate from prompt-only — less consistent, so warn the user.
 - Estimate cost first with `slates_estimate_generation_cost` and announce in **credits** — never quote a price from memory.
 <!-- /slates-only -->
 
+<!-- slates-only -->
 <!-- @inject:sheet-tool-defaults -->
 **What the sheet tools render on** (you do not pick these; omit `model`):
 
@@ -76,6 +77,7 @@ If text only: generate from prompt-only — less consistent, so warn the user.
 
 Price a sheet for that model at 16:9, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.
 <!-- @end:sheet-tool-defaults -->
+<!-- /slates-only -->
 
 - When the result returns inline, **evaluate it before binding**:
   - Is the portrait clearly the largest panel, and is it off-frontal?
@@ -102,12 +104,12 @@ Critically, the app injects **no** wardrobe, expression, or lighting directive. 
 ## Anti-patterns
 
 - **Don't** studio-light, white-background, or black-background the sheet. White bleeds into the video and washes out the location; black eats edge detail. Flat, even, shadowless light on a deep neutral grey.
-- **Don't** hand-write the sheet prompt when the op will build it — that is how the template and the shipped prompt fork.
+<!-- slates-only -->- **Don't** hand-write the sheet prompt when the op will build it — that is how the template and the shipped prompt fork.<!-- /slates-only -->
 - **Don't** create a second character image. One canonical identity is what the storyboard pipeline reads.
-- **Don't** skip binding. An unbound asset doesn't help downstream.
+<!-- slates-only -->- **Don't** skip binding. An unbound asset doesn't help downstream.<!-- /slates-only -->
 - **Don't** invent character details. Stick to what's in the reference image and the user's description.
 - **Don't** describe the front panel's crop as an absent head — in `userNotes` or any hand-written variant. The template asks for it as *framing*: **"cropped at the collarbone, an invisible-mannequin presentation with just the face cropped out"**, a standard e-commerce genre with deep training data. **"the head not shown" is a hard 422 on GPT Image** (measured on `gpt-image-2`, the model 2.5 replaced; the classifier is OpenAI's, not the version's, so the rule carries — but nobody has re-run it on Flare or Sunburst) — fal returns `content_policy_violation` with `loc: ["body","prompt"]`, so the text is rejected before any image is read, because an anatomical absence reads as gore to OpenAI's classifier. It passed NB2, which is why the original receipt looked safe: **it was model-scoped.** State an exclusion as a framing choice, never as a missing body part.
 - **Don't** invoke the invisible-mannequin genre without bounding it to the face. **"an invisible-mannequin presentation where the clothing holds its own shape" removed all the skin** — no neck, no hands, no forearms, a garment floating on nothing — because that *is* the e-commerce genre in full: an empty outfit. **"with just the face cropped out"** keeps the anchor and bounds it. Generalises: a genre anchor imports the whole genre, so name what STAYS, not only what goes.
-- **Don't** put `#` or `@` anywhere in prompt text. Both are reference-token sigils in the desktop prompt composer and an unresolved one is **silently deleted** — no error, no log, just missing words. `#3a3a3c` reached fal as `background ()` on a real 2026-07-30 request, meaning the plate value had never been delivered to any model since the composer shipped. Write hex values bare.
+**Resolved composer hazard:** on 2026-07-30, `#3a3a3c` reached fal as `background ()` because unresolved sigils were deleted. The composer now preserves unresolved `#` and `@` text byte-for-byte; a token binds a reference only when it resolves. Literal hex colours and handles are safe. The sheet template keeps its bare hex as a wording choice, not a workaround.
 - **Don't** use 4K — wastes credits, no quality gain at sheet scale.
-- **Don't** feed a multi-view sheet into a Seedance shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint — ByteDance documents multi-view assets as a cause of duplicate characters. See `slates-prompting-seedance`.
+- **Don't** feed a multi-view sheet into a Seedance 2.0 shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint; ByteDance documents multi-view assets as a cause of duplicate characters on 2.0. See `slates-prompting-seedance`. Seedance 2.5 supports multi-view subject references; see `slates-prompting-seedance-2-5`.

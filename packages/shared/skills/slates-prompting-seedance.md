@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance
-description: How to prompt Seedance 2.0 (ByteDance video model). Read before calling slates_generate_video with model seedance-2. Seedance 2.0 structures multi-beat prompts as a "Shot 1 / Shot 2 / Shot 3" storyboard against an 8-slot advanced formula — never per-second time stamps, which 2.0 does not respond to (Seedance 2.5 does; see slates-prompting-seedance-2-5). Its syntax differs from Kling, Veo and the image models; don't cross-pollinate (in particular, no lens / aperture / film-stock vocabulary).
+description: "Prompt Seedance 2.0 (seedance-2), and retrieve the shared Seedance craft used by 2.5. Covers subject binding, shot-number storyboards, camera moves, physical action and inline constraints."
 ---
 
 # Seedance 2.0 — prompting
@@ -250,13 +250,13 @@ using the voice timbre from audio 1. Preserve his identity, appearance and outfi
 
 ### Motion transfer & lip-sync recipes (reference video / audio)
 
-These aren't separate Seedance features — they're prompting strategies over reference media.<!-- slates-only --> The Slates tools (`slates_generate_motion_transfer` / `slates_generate_lip_sync` with the seedance engine) compose them for you. When driving them by hand through `slates_generate_video`:<!-- /slates-only -->
+These aren't separate Seedance features; they're prompting strategies over reference media.<!-- slates-only --> Run `slates_generate_video` with the clip as a video reference and write the motion or dialogue into the prompt:<!-- /slates-only -->
 
 - **Motion transfer:** subject image as a reference + the driving clip<!-- slates-only --> via `videoReferenceAssetId`<!-- /slates-only --> (2–15s) + `The character from image 1 performs the exact motion, choreography, and camera movement from video 1. Preserve the character's identity, appearance, and outfit.`
 - **Lip-sync / dialogue:** write the line in the prompt — `The person in video 1 says: "…"` — with audio generation on (always on in Slates). A **video** source's own voice is cloned natively; an **audio** reference (≤15s) drives speech from an existing recording: `…speaks the dialogue from audio 1 with accurate lip sync.`
 - **Voice + face from one clip (the talking-head recipe):** ONE unedited 2–15s clip of the person speaking (clear voice, no music, no cuts) as the video reference + prompt with the new script → their likeness AND voice deliver the new line.
 <!-- slates-only -->
-- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = clip seconds + output seconds — quote before confirming. Audio references are free (audio is included on every route).
+- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = combined clip seconds + output seconds on faceless and real-face routes. The AI-face route bills max(combined input, output) + output on both 2.0 and 2.5; quote before confirming. Audio references are free (audio is included on every route).
 <!-- /slates-only -->
 
 <!-- slates-only -->
@@ -266,7 +266,7 @@ Seedance routes through **three tiers** depending on the face in the reference, 
 
 - **Faceless / object / environment refs → default route (cheapest).** Leave `seedanceFace` off.
 - **An AI-character's FACE in a reference → `seedanceFace: true`.** The default route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider. It costs **~45% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
-- **A REAL person's photo (the user themselves, an actor) → the consent-gated real-person route.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the provider classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, roughly 2× the AI-face rate — quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
+- **A REAL person's photo (the user themselves, an actor) → the consent-gated real-person route.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the provider classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, about 1.4× the AI-face rate, about 2× faceless; quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
 
 Rules:
 - **The real-vs-AI call is the PROVIDER'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass the standard face route (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively route to the real-face tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every route.

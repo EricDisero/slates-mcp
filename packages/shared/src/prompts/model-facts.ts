@@ -125,11 +125,10 @@ export interface ModelFact {
  * Reference caps for a fact, read out of the capability SSOT.
  *
  * The argument is a `MODEL_CAPABILITIES` key, which is a REGISTRY model id — and
- * three facts here are FAMILY-level (`kling-v3`, `kling-v3-edit`, `veo-3.1`)
+ * two facts here are FAMILY-level (`kling-v3`, `kling-v3-edit`)
  * with no registry row of their own, so they name a representative variant.
  * That is safe because the caps are identical across the variants in each
- * family (std/pro/omni/omni-pro all take 4; both edit rows take 4; both Veo
- * seats take 3) — and if a future variant diverges, this becomes a wrong number
+ * family (std/pro/omni/omni-pro all take 4; both edit rows take 4) — and if a future variant diverges, this becomes a wrong number
  * rather than a crash, so split the fact rather than picking a side.
  *
  * Throws on an unknown id: a typo must fail the build, not ship as `null` caps
@@ -283,7 +282,7 @@ export const MODEL_FACTS: ModelFact[] = [
     label: 'Seedream 5 Lite',
     kind: 'image',
     ...caps('seedream-5-lite'),
-    notes: 'CHEAPEST image seat, flat-priced. Less censored. Routes to its edit endpoint when references are present.',
+    notes: 'Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less censored. Routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedance-2',
@@ -314,7 +313,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // 0 ingredients: prompt + source clip only on slates_edit_video.
     ...caps('seedance-2.5-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT via slates_edit_video, and the only edit engine that takes a clip longer than the other two reach — that length is the whole reason to route here. Inside their range, compare on fidelity instead: Omni Flash edit won the prompt-only head-to-head, and Kling edit is the one that takes reference images. Edits audio on the same row (re-voice, re-accent, translate with re-fitted lips, replace BGM). Costs roughly double a plain 2.5 generation of the same length, because an edit bills input plus output seconds.',
+    notes: 'VIDEO-TO-VIDEO EDIT via slates_edit_video, and the only edit engine that takes a clip longer than the other two reach — that length is the whole reason to route here. Inside their range, compare on fidelity instead: Omni Flash edit won the prompt-only head-to-head, and Kling edit is the one that takes reference images. Edits audio on the same row (re-voice, re-accent, translate with re-fitted lips, replace BGM). Costs about 1.2x a plain 2.5 generation of the same length: an edit bills at twice the reduced video-reference rate.',
   },
   {
     id: 'kling-v3',
@@ -324,7 +323,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // Family-level fact — caps are identical across std/pro/omni/omni-pro.
     ...caps('kling-v3.0-std'),
-    notes: 'THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue, lip-sync and the widest aspect-ratio set; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.',
+    notes: 'THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue and lip-sync; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.',
   },
   {
     id: 'kling-v3-edit',
@@ -334,17 +333,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // Family-level fact; 4 = combined subject elements + style refs per edit.
     ...caps('kling-v3.0-omni-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keep_audio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
-  },
-  {
-    id: 'veo-3.1',
-    route: 'generate',
-    tier: 'niche',
-    label: 'Veo 3.1',
-    kind: 'video',
-    // Family-level fact — fast and standard declare the same caps.
-    ...caps('veo-3.1-fast'),
-    notes: 'NICHE, never the default — pick only when native synchronized audio must generate WITH the video in one pass, and the narrowest aspect-ratio and duration sets in the catalogue are acceptable. Otherwise Seedance 2.5 (the default) or Kling (cost-effective performance) win.',
+    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keepAudio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
   },
   {
     id: 'omni-flash',
@@ -354,7 +343,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // 7 ref2v image_urls — mirrors Google's own reference limit.
     ...caps('omni-flash'),
-    notes: 'CHEAP tier with native synced audio included. Route here for cheap drafts, audio-in-one-pass at low cost, and reference-to-video character-consistency trials. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.',
+    notes: '720p seat with native synced audio included. Route here for drafts with sound in one pass and reference-to-video character-consistency trials; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.',
   },
   {
     id: 'omni-flash-edit',
@@ -364,7 +353,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
     ...caps('omni-flash-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (head-to-head vs Kling edit on real talking footage: lips held, audio near-identical, both action beats landed) and the cheapest edit seat. Footage-synced prop, effect, environment and lighting swaps. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
+    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (head-to-head vs Kling edit on real talking footage: lips held, audio near-identical, both action beats landed), priced level with Kling O3 Edit Standard. Footage-synced prop, effect, environment and lighting swaps. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
   },
   {
     id: 'minimax-h3',
@@ -377,7 +366,7 @@ export const MODEL_FACTS: ModelFact[] = [
     // be the only reference input; provide at least one reference image or
     // video with it." Same behavioural rule as Seedance 2.0.
     audioRefNeedsCompanion: true,
-    notes: 'THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off; Veo generates it but gives you no way to direct the layers. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.',
+    notes: 'THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.',
   },
   {
     id: 'minimax-h3-max',
@@ -394,7 +383,7 @@ export const MODEL_FACTS: ModelFact[] = [
     // from the base row: "Audio cannot be the only reference input; provide at
     // least one reference image or video with it."
     audioRefNeedsCompanion: true,
-    notes: 'THE SPEED SEAT, and the DEARER one at the tier they share — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call: its reference endpoint has no start/end-frame fields, where base H3\'s does. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
+    notes: 'THE SPEED SEAT, dearer than base H3 at 768p and equal at 480p — never the cheap H3 and never the default. fal\'s post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call, the same as base H3: frames and references go to different endpoints. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.',
   },
   {
     id: 'minimax-h3-max-turbo',
@@ -418,7 +407,7 @@ export const MODEL_FACTS: ModelFact[] = [
     // and no reference endpoint at all, so `caps()` returns nulls and the
     // composer refuses references. Start/end FRAMES are unaffected.
     ...caps('ltx-2-5'),
-    notes: 'THE VOLUME SEAT — the cheapest native 1080p second in the catalogue, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It also reaches the highest resolution tier below 4K and makes the LONGEST clips in the catalogue. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.',
+    notes: 'THE VOLUME SEAT — the cheapest 1080p second with sound included, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It supports native high-resolution output and longer takes than most seats; use the capability surface for its resolution-dependent duration limits. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.',
   },
   {
     id: 'ltx-2-5-pro',
@@ -479,14 +468,17 @@ for (const kind of ['image', 'video', 'audio'] as const) {
 }
 
 /**
- * The one `default` seat for a kind on the generate route, READ from `tier`.
+ * The one `default` seat for a kind and route, READ from `tier`.
  * Anything that needs "the default image model" calls this instead of naming
  * one: the op surface and slates-web both hand-typed nano-banana-2 for six days
  * after the app picker moved to Sunburst.
  */
-export function defaultModelFor(kind: ModelFact['kind']): string {
-  const fact = MODEL_FACTS.find((f) => f.kind === kind && f.route === 'generate' && f.tier === 'default')
-  if (!fact) throw new Error(`MODEL_FACTS: no default ${kind} seat on the generate route`)
+export function defaultModelFor(
+  kind: ModelFact['kind'],
+  route: ModelFact['route'] = 'generate'
+): string {
+  const fact = MODEL_FACTS.find((f) => f.kind === kind && f.route === route && f.tier === 'default')
+  if (!fact) throw new Error(`MODEL_FACTS: no default ${kind} seat on the ${route} route`)
   return fact.id
 }
 

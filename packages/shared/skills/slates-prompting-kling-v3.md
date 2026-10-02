@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-kling-v3
-description: How to prompt Kling V3.0 (Kuaishou). Read before calling slates_generate_video with kling-v3.0-std, kling-v3.0-pro, or kling-v3.0-omni. Kling has dialogue + SFX + ambient native syntax (Omni adds multi-character dialogue and language codes). Multi-shot rules differ from Seedance/Veo — don't cross syntaxes.
+description: "Prompt Kling V3.0 video generation and Kling O3 video edits. Use with Kling models on slates_generate_video or slates_edit_video; covers subjects, dialogue, sound syntax, multi-shot direction and edit fidelity."
 ---
 
 # Kling V3.0 — prompting
@@ -15,7 +15,7 @@ description: How to prompt Kling V3.0 (Kuaishou). Read before calling slates_gen
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Kling V3.0.** The general default. Define the core subjects clearly at the START and keep those descriptions identical across shots. Up to 15s, up to 6 cuts, and the strongest image-to-video identity hold in the catalogue.
+**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.
 
 **The five levers**
 1. **Dialogue in quotes** — `Character says, "exact words here"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: "I've seen this before."`
@@ -44,7 +44,7 @@ description: How to prompt Kling V3.0 (Kuaishou). Read before calling slates_gen
 - `single continuous take` — Seedance's phrase, and it fights Kling's multi-shot
 <!-- @banned:end -->
 
-Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, no audio), `kling-v3.0-pro` (higher visual quality, no audio), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
+Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, sound supported), `kling-v3.0-pro` (higher visual quality, sound supported), `kling-v3.0-omni` (multi-character dialogue + audio-visual co-generation).
 
 Up to 15s. Multi-shot supported (up to 6 cuts in 15s total). Strong on image-to-video — preserves identity, layout, and text from the input image well.
 
@@ -134,7 +134,9 @@ Miss conditions:
 - Mixing camera moves within a shot ("pan then orbit then push in")
 - Extreme wide → extreme close in adjacent shots without reference images
 
-## Element references (Omni)
+## Element references
+
+Standard and Pro take element references with a first frame; Omni also takes references without one. 4K refuses reference images.
 
 Upload 2-4 multi-angle reference photos per character/object. Tag inline:
 
@@ -199,11 +201,11 @@ Layer scene-specific suppressions on top, and never suppress something the promp
 
 ## Tier choice
 
-- **Standard**: general use, no audio
-- **Pro**: higher visual quality, no audio
-- **Omni**: multi-character dialogue, audio-visual co-gen, language codes, `@elementN` references
+- **Standard**: general use, sound supported
+- **Pro**: higher visual quality, sound supported
+- **Omni**: multi-character dialogue, audio-visual co-gen, language codes, references without a first frame
 
-Pick by capability: need dialogue/audio → Omni; need maximum visual quality silent → Pro; everything else → Standard. Prices change — check current numbers before choosing a tier<!-- slates-only -->; call `slates_estimate_generation_cost` or `slates_list_available_models`<!-- /slates-only -->.
+Every tier can generate dialogue and sound. Sound is on unless `sound: false` is passed; below 4K it bills the audio key, while 4K includes audio. Pick by visual quality and reference needs. Prices change; check current numbers before choosing a tier<!-- slates-only -->; call `slates_estimate_generation_cost` or `slates_list_available_models`<!-- /slates-only -->.
 
 ## Benchmark prompt structure
 
@@ -253,7 +255,7 @@ Rules:
 - One edit intent per pass. Chain passes for compound changes (each output is itself an editable clip, linked to its parent).
 - Billing is per second of OUTPUT ≈ the clip length, rounded UP to the next second. A 7.3s clip bills as 8s.
 - Clip constraints: 3-15s, 720-3840px, MP4/MOV. Agents can pre-trim on the timeline when a clip runs long.
-- Routing: Kling edit is the default edit tool (element lock + audio intact); Seedance edit/relocate wins style-transfer-heavy re-imaginings<!-- slates-only --> — see `slates-model-selection`<!-- /slates-only -->.
+- Route by the required change: this edit seat supports element/style-reference control and original-audio retention. Read the current catalogue for defaults and competing seats<!-- slates-only --> — see `slates-model-selection`<!-- /slates-only -->.
 
 ## Sources
 

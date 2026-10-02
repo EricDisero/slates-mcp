@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seed-audio
-description: How to prompt Seed Audio 1.0 (ByteDance, via fal). Read before calling slates_generate_audio with model seed-audio. The one-pass audio SCENE model — dialogue, SFX and ambience together from ONE plain sentence. CRITICAL - it has NO duration parameter, so length must be named IN THE PROMPT TEXT and Slates bills the duration you request. Covers the one-sentence doctrine, the crowd-size rule, why Kling "SFX:" syntax hurts here, and the audio-refs-XOR-image input rule.
+description: "Prompt Seed Audio 1.0 (seed-audio) with slates_generate_audio. Covers scene sentences, dialogue, crowd size, spatial sound, duration in prompt text and mutually exclusive audio or image references."
 ---
 
 # Seed Audio 1.0 — prompting
@@ -43,7 +43,29 @@ description: How to prompt Seed Audio 1.0 (ByteDance, via fal). Read before call
 - shot language: `wide shot`, `slow push in`, `warm tungsten` — camera and lighting words are video-prompt words the model has to ignore
 <!-- @banned:end -->
 
-ByteDance's one-pass audio scene model, carried on fal (`bytedance/seed-audio-1.0`). It generates dialogue, sound effects and ambience **together**, from a single plain sentence. 1–120 seconds. It is the default audio model in Slates and the workhorse for continuity beds.
+ByteDance's one-pass audio scene model, carried on fal (`bytedance/seed-audio-1.0`). It generates dialogue, sound effects and ambience **together**, from a single plain sentence. Use the generated duration bounds below and the current catalogue for routing; it is useful for continuity beds.
+
+<!-- @inject:thresholds -->
+<!-- GENERATED from @slatesvideo/shared — do not edit between the markers.
+     Source: CONFIRM_CREDITS, DEVIATION_FACTOR and the audio bounds in
+     packages/shared/src/operations/index.ts. Every number here is REFUSED by an
+     op when a prompt gets it wrong, which is why none of them is typed by hand
+     any more: this block replaced four claims that contradicted the code. -->
+
+**The thresholds, from the code that enforces them:**
+
+- **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
+  proceed until you re-call with `confirm: true`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
+- **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
+  exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
+- **Seed Audio duration:** **3–120 seconds.** There is no duration
+  parameter on the model — the number you pass is written into the prompt AND is what the user is
+  billed. Outside that range the op refuses rather than clamping.
+- **Sound Effects duration:** **1–22 seconds**, billed per second, never left for the
+  model to pick.
+
+Never quote a credit figure from memory: `slates_estimate_generation_cost` returns the real one.
+<!-- @end:thresholds -->
 
 ## Where it routes
 
@@ -134,8 +156,6 @@ Set `multilingual: true` for non-English or mixed-language lines.
 | `volume` | 0.5–2.0 | Rarely — normalize on the timeline instead. |
 | `pitch` | −12…+12 semitones | Ageing or shifting a voice. Small moves only; ±3 is already a lot. |
 | `multilingual` | bool | Non-English or code-switched lines. |
-| `sampleRate` | 8k–48k | Leave at 24000 unless you are matching an existing stem. |
-| `outputFormat` | mp3 / wav / pcm / ogg_opus | wav when this is going into a mix; mp3 otherwise. |
 
 ## Iterating
 

@@ -1,6 +1,6 @@
 ---
 name: slates-one-prompt-film
-description: Deliver a finished video when the user explicitly asks for one, coordinating editable writing, selected media production, a named cut and a verified export. Preserve existing work and follow generation authorization.
+description: "Turn a video brief into a finished, editable Slates production and verified export. Use for requests to make a film, short, trailer, music video, ad or other complete video, entering through writing, imported footage or an existing edit."
 ---
 
 # Idea to finished video

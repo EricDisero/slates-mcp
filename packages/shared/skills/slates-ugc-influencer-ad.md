@@ -1,6 +1,6 @@
 ---
 name: slates-ugc-influencer-ad
-description: Direct a creator-style spoken performance when the brief calls for an ordinary camera-facing person or exchange. Use for performance and phone-camera craft, not as a universal rule for ads.
+description: "Direct a creator-style spoken ad when the brief calls for a camera-facing person or exchange. Covers activity, performance, phone-camera handling, speech, interaction and sound."
 ---
 
 # Creator-style performance

@@ -1,6 +1,6 @@
 ---
 name: slates-edit-and-iterate
-description: Iterate on an existing Slates asset — re-evaluate, refine prompt, regenerate or edit. Use when the user has an existing generated image in Slates and wants to "tweak it", "change one thing", "make it warmer", "remove the second person", or any other surgical refinement instead of full regeneration.
+description: "Refine an existing Slates image with a targeted edit or revised generation. Use for changes such as warmer light, removing a figure, reframing or a different look; preserve the original and its lineage."
 ---
 
 # Edit and iterate — Slates workflow
@@ -42,13 +42,21 @@ The user's request is one of:
 | Aesthetic / compositional | `slates_generate_image` with the original in `referenceAssetIds` + a refined prompt. Don't re-roll from scratch. |
 | Wholesale | New prompt, no reference, fresh generation. Treat as a new brief. |
 
-**`slates_edit_image` shape:** `projectId` + `sourceAssetId` + `prompt` (the edit instruction). Omit `editModel` for the app's Edit seat (the default image model). Every edit model also takes `referenceAssetIds`, up to its reference cap less one: the source is image 1. The result lands as a NEW asset (prompt prefixed `[Edit]`); the source is untouched. Cost above ~17 credits gates on `confirm=true`.
+**`slates_edit_image` shape:** `projectId` + `sourceAssetId` + `prompt` (the edit instruction). Omit `editModel` for the app's Edit seat (the default image model). Every edit model also takes `referenceAssetIds`, up to its reference cap less one: the source is image 1. The result lands as a NEW asset (prompt prefixed `[Edit]`); the source is untouched. Follow the current estimate and returned confirmation gate; an endpoint threshold does not grant consent to spend.
 
 ### 4. Generate, evaluate, decide
 - Estimate cost first.
 - After generation, the result is inline. Compare side-by-side with the original (`slates_get_asset_image` again).
 - If the delta is correct: bind to the same role (frame, character identity, etc.) the original was bound to.
-- If the delta missed: one focused refinement, then regenerate. Cap at 3 tries.
+- If the delta missed: diagnose the visible mismatch, refine the instruction and re-edit the master within the approved request or batch.
+
+<!-- @inject:iteration-diagnosis -->
+## Diagnose repeated failures
+
+After three failed attempts at the same requirement, pause unchanged re-rolls and diagnose the source reference, prompt structure, model fit and tool result. Three is a review checkpoint, not a universal limit or proof that the seed cannot matter. Preserve the attempts and name what each test changed.
+
+Continue autonomously when the brief is clear, a specific correction is supported and the next request is already authorized. Hand control back when taste or intent cannot be inferred, the next request needs fresh consent, or the available tool cannot meet the requirement. A failed roll never authorizes an additional charge. Follow the existing batch and per-request cost policy.
+<!-- @end:iteration-diagnosis -->
 
 ### 5. Hand back
 - "Asset updated. Frame 3 now uses {new_asset_id}."
@@ -60,4 +68,4 @@ The user's request is one of:
 - **Don't** mix surgical and wholesale changes in one regeneration. The user said "make it warmer" — don't also reframe the shot.
 - **Don't** re-generate when `slates_edit_image` would work. Edits preserve composition and identity; full regen rolls the dice.
 - **Don't** edit an edit — ever. Not once, not "just a small one." Go back to the master (see the master rule above). Every attempt re-renders the full frame and the degradation is cumulative and permanent.
-- **Don't** keep re-rolling the same failed edit. If three tries off the master didn't land, the brief is wrong, not the model — check in with the user.
+- **Don't** keep re-rolling the same failed edit. Inspect whether the reference, edit instruction or chosen model caused the miss; use the repeated-failure checkpoint above.

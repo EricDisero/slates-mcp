@@ -1,6 +1,6 @@
 ---
 name: slates-cost-discipline
-description: Mandatory pre-flight discipline before ANY generation call (image or video) — estimate cost, announce in credits, get confirmation, aggregate batches. Use its rules when planning generation; reload only when the rules are needed. Skipping this risks burning the user's credits on guesses.
+description: "Estimate and announce generation spend, aggregate batches, follow existing consent and inspect uncertain jobs before retrying. Use when planning or submitting paid media generation."
 ---
 
 # Slates cost discipline — read before every generation
@@ -30,7 +30,7 @@ Examples:
 - `About to spend 4 credits on 1 image at 1k 16:9. Proceed?`
 - `About to spend 24 credits on 4 images at 2k 9:16 (variants). Proceed?`
 
-Announce the cost once, then proceed for anything small. For anything the user would notice on their balance, wait for an explicit yes. Where the LINE is, exactly:
+Follow the user's and host's generation approval policy before spending. A cost estimate or a small charge does not override a required prompt approval. An approved enumerated batch covers its calls; added calls or changed inputs need the confirmation described below. The code's separate confirm threshold is:
 
 <!-- @inject:thresholds -->
 <!-- GENERATED from @slatesvideo/shared — do not edit between the markers.
@@ -42,7 +42,7 @@ Announce the cost once, then proceed for anything small. For anything the user w
 **The thresholds, from the code that enforces them:**
 
 - **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
-  proceed until you re-call with `confirm: true`. Below it, announce the cost once and go.
+  proceed until you re-call with `confirm: true`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
 - **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
   exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
 - **Seed Audio duration:** **3–120 seconds.** There is no duration
@@ -96,7 +96,7 @@ Use the model defaults below for ordinary work. For cheap exploration, choose a 
 | seedream-5-lite | 2k |
 <!-- @end:image-defaults -->
 
-**4K VIDEO is Pro-only (2026-07-07).** The ladder above is for IMAGES (open at every tier). For VIDEO — Kling, Seedance, Veo — 4K requires a Slates Pro account; a base-tier 4K video gen is rejected server-side with `PRO_REQUIRED`. Default video to 1080p or lower and only reach for 4K when the user is on Pro and explicitly asks. 4K *images* are never gated.
+**4K VIDEO is Pro-only (2026-07-07).** The ladder above is for IMAGES (open at every tier). For VIDEO, where the selected model supports 4K, it requires a Slates Pro account; a base-tier 4K video gen is rejected server-side with `PRO_REQUIRED`. Default video to 1080p or lower and only reach for 4K when the user is on Pro and explicitly asks. 4K *images* are never gated.
 
 ## Aspect ratio decision rules
 
@@ -107,9 +107,11 @@ Ask the user when ambiguous. Otherwise:
 | "cinematic", "film", "movie", "wide" | 16:9 |
 | "TikTok", "Reels", "Story", "mobile vertical", "phone" | 9:16 |
 | "square", "Instagram feed", "thumbnail" | 1:1 |
-| "ultra-wide", "anamorphic", "cinemascope" | 21:9 |
-| "portrait", "magazine cover", "vertical" | 4:5 or 2:3 |
-| "landscape photo", "horizontal" | 3:2 or 4:3 |
+| "ultra-wide", "anamorphic", "cinemascope" | 21:9 if supported; otherwise 16:9 |
+| "portrait", "magazine cover", "vertical" | 3:4 |
+| "landscape photo", "horizontal" | 4:3 |
+
+Pick a ratio the chosen model accepts; check its `aspectRatio` options before submitting.
 
 If the user prompt mixes signals (e.g. "cinematic Instagram post"), ask. Don't guess.
 
@@ -134,13 +136,17 @@ Video gens take minutes (Seedance 4K can run far longer). A client/CLI timeout o
 ## 🔴 The still-gate — the most expensive mistake in the pipeline
 
 <!-- @inject:still-gate -->
-**A visible defect in the still is already a STOP.** Do not animate it. Fix the frame first, then move to motion — and go to motion only when the crop passes the still scan and you genuinely need movement to confirm an uncertain edge, reflection, or object.
+**Inspect a start frame before animating it.** Repair a visible defect that would make the intended crop or performance unusable before spending on motion. A clean frame can be animated whenever the brief calls for movement; this check does not require an image stage for text-to-video.
 
-This is a **cost** rule as much as a craft rule: a 1080p/10s premium video generation costs many multiples of an image re-roll, and video is where a defect stops being fixable. Anything wrong in the still gets worse in motion — soft geometry mushes, broken-but-plausible objects fall apart, oily textures start crawling. **Animating a known-bad frame is the single most expensive mistake in the pipeline.** Re-rolling the image is the cheap move; re-rolling the video is not.
+This is a cost rule as well as craft: a premium video call can cost many times an image correction. Broken geometry can turn to mush, oily textures can crawl and malformed objects can fall apart in motion. Fix a known source defect at the source instead of buying a more expensive copy. Judge intentional stylisation against the brief, not a universal photoreal standard. Additional image or video requests still follow the existing generation authorization.
 <!-- @end:still-gate -->
 
-The check itself lives in `slates-vision-feedback-loop` (the four slop tells and the per-model accents). The **stop** is a cost rule and belongs here: before every image→video call, confirm the source frame passed the still scan. If it didn't, spending video credits on it is not iteration — it is buying a more expensive copy of a defect you already found.
+The check itself lives in `slates-vision-feedback-loop` (the five slop tells and the per-model accents). The **stop** is a cost rule and belongs here: before every image→video call, confirm the source frame passed the still scan. If it didn't, spending video credits on it is not iteration; it is buying a more expensive copy of a defect you already found.
 
-## The 3-strike rule
+<!-- @inject:iteration-diagnosis -->
+## Diagnose repeated failures
 
-Stop after 3 iterations on the same prompt. Hand back to the user with what you tried and what's not working. The slot machine doesn't converge — if it's not landing, the prompt structure is wrong, not the seed.
+After three failed attempts at the same requirement, pause unchanged re-rolls and diagnose the source reference, prompt structure, model fit and tool result. Three is a review checkpoint, not a universal limit or proof that the seed cannot matter. Preserve the attempts and name what each test changed.
+
+Continue autonomously when the brief is clear, a specific correction is supported and the next request is already authorized. Hand control back when taste or intent cannot be inferred, the next request needs fresh consent, or the available tool cannot meet the requirement. A failed roll never authorizes an additional charge. Follow the existing batch and per-request cost policy.
+<!-- @end:iteration-diagnosis -->

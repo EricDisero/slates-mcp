@@ -1,6 +1,6 @@
 ---
 name: slates-style-prompting
-description: Use when the user asks for a visual style ("make it anime", "painterly look", "like a Pixar film"), or when a style has to hold across several shots. Covers how photoreal, anime, painterly and 3d-render are prompted DIFFERENTLY per model, and the style-routing recipe (reference-first, styled start-frame → i2v).
+description: "Translate a visual-style brief into model-specific image or video direction and maintain the look across shots. Covers photoreal, anime, painterly and 3D styles, references and optional start-frame control."
 ---
 
 # Per-style prompting (photoreal · anime · painterly · 3d-render)
@@ -31,7 +31,7 @@ Never stack style buzzwords ("ARRI ALEXA, 35mm, film grain, depth-of-field maste
 - **NB2:** open with the medium — "A hand-drawn 2D anime cel illustration of…" — then normal narrative Subject/Setting/Action. Clean line art, flat-shaded color, expressive eyes. NB2 has no negative prompt: phrase exclusions positively ("flat cel shading with uniform focus", not "no depth of field").
 - **Seedance:** visual-style slot = "2D anime style, clean line art, flat cel shading". The slow/coherent-motion preference still applies — burst sakuga actions are the same instability trap as in photoreal.
 - **Kling:** weakest anime lane (its strength is live-action-like acting); expect style drift on long prose-only shots. Prefer ground rule 4: NB2 anime start-frame → i2v with a motion-only prompt. *(hypothesis: refs hold Kling's anime better than prose — verify before promising.)*
-- Anime faces drift under multiple references faster than photoreal — the named-entity two-sheet doctrine applies unchanged.
+- Anime faces drift under multiple references faster than photoreal; the named-entity one-sheet doctrine applies unchanged.
 
 ## Painterly
 
@@ -48,7 +48,9 @@ Never stack style buzzwords ("ARRI ALEXA, 35mm, film grain, depth-of-field maste
 
 ## Routing recipe (what to actually do)
 
-1. Style reference available → attach it, rely on inherit. Done.
-2. No reference, image request → styled NB2 prose per the section above.
-3. No reference, video request → NB2 styled start-frame first, then i2v with motion-only prompt. Direct styled text-to-video is the fallback when a start frame doesn't fit (e.g. dialogue-first Kling shots).
-4. Multi-shot run → byte-identical style clause per shot + shared references.
+1. Style reference available → inspect it, bind its look role, and describe any light or exposure needed in the new scene.
+2. Image request → use the current image default unless the brief supplies a reason for another seat; load that model's craft. The NB2 examples above apply when NB2 is selected, not to every image model.
+3. Video request → choose a styled start frame when composition, exact text or an approved look must hold. Use the image seat suited to that job, then the chosen video model's motion and sound grammar. Direct styled text-to-video is also valid when it serves the brief; an image pass is not mandatory.
+4. Multi-shot run → retain stable style references and descriptors, adapting action, light and model-specific wording to each scene.
+
+`slates-model-selection` and the current catalogue own routing. These style techniques supply craft after the production choice; no user needs to select a skill or workflow.

@@ -1,6 +1,6 @@
 ---
 name: slates-shot-variety
-description: Diagnose unintended visual sameness across a shot sequence while preserving deliberate repetition, continuing performance and the user's chosen format.
+description: "Shape visual rhythm across a shot sequence or diagnose unintended sameness. Use while planning or reviewing cuts; preserve deliberate repetition, continuing performance and the chosen format."
 ---
 
 # Visual rhythm across a sequence

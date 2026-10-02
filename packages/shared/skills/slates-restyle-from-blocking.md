@@ -1,6 +1,6 @@
 ---
 name: slates-restyle-from-blocking
-description: Render one blocking pass as several different visual worlds — live action, 2.5D painted, 2D ink, toybox — matching cut for cut. Use when a client needs style options, when someone wants to see the same edit in another look, or when an approved edit needs a new treatment without re-blocking.
+description: "Generate different visual treatments from one blocking pass while preserving its camera, cuts and choreography. Use when comparing looks or restyling an approved structure without rebuilding it."
 ---
 
 # Restyle — one edit, many worlds
@@ -27,7 +27,7 @@ You need a blocking clip whose structure you are happy with, and a finished prom
 Copy these across every style **verbatim**. Changing them is what desynchronises the outputs:
 
 - The blocking reference's own contract — that it is the master for all movement, the placement-only clause, the tie-break clause, the disambiguation clause
-- The shot count and every timestamp
+- The shot count and measured cut boundaries; translate prompt timestamps once to the chosen model's syntax and keep that translation across treatments
 - Every shot's camera position, angle, framing and cut point
 - Screen direction and seating
 - The `HOLD FOR THE FULL TIMELINE` block

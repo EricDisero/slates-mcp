@@ -58,7 +58,6 @@ export type PromptingTipsKey =
   | 'seedance-2-5-edit'
   | 'kling'
   | 'kling-edit'
-  | 'veo'
   | 'omni-flash'
   | 'omni-flash-edit'
   | 'minimax-h3'
@@ -226,14 +225,14 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
         critical: true,
       },
       {
-        heading: 'An edit costs about double a generation',
-        note: 'Every provider bills an edit on the input clip AND the output, so a 20-second edit is priced like 40 seconds of generation. Read the number on the Generate button rather than reasoning from the generation rate.',
+        heading: 'An edit costs about 1.2x a generation',
+        note: 'A Seedance edit bills at twice the reduced video-reference rate, so a 20-second edit costs about 1.2x a 20-second generation. Read the number on the Generate button rather than reasoning from the generation rate.',
       },
     ],
     [
       {
         heading: 'When to use it instead of the others',
-        note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner and the cheapest option, and Kling O3 Edit is the one that takes subject and style reference images.',
+        note: 'Length is the reason: it is the only engine that accepts a clip over 15 seconds. Inside the others\' range, choose on fidelity — Omni Flash Edit is the prompt-only fidelity winner, priced level with Kling O3 Edit Standard, and Kling O3 Edit is the one that takes subject and style reference images.',
       },
       {
         heading: 'It edits the audio too',
@@ -315,54 +314,10 @@ const KLING_EDIT: PromptingTipsEntry = {
   ],
 }
 
-const VEO: PromptingTipsEntry = {
-  label: 'Veo 3.1',
-  intro: [
-    'Veo 3.1 generates synchronized audio directly with video. Aspect ratio: 16:9 only (for 9:16 vertical, use Kling or Seedance). Native single-clip duration: 4, 6, or 8 seconds — longer durations require chaining clips via last-frame reuse.',
-    'Official Cloud formula: [Cinematography] + [Subject] + [Action] + [Context] + [Style & Ambiance]. Sweet spot ~50-150 words.',
-  ],
-  columns: [
-    [
-      {
-        heading: 'Dialogue',
-        example: 'Character says, "exact words"',
-        note: 'Use quotation marks for exact speech. Keep voice direction terse: "says in a weary voice", "whispers", "shouts". 2-3 speakers max — sync degrades past that.',
-      },
-      {
-        heading: 'Sound Effects — with cause',
-        example: 'SFX: thunder cracks in the distance',
-        note: 'Always specify direction or distance — "SFX: thunder" alone is too vague.',
-      },
-      {
-        heading: 'Ambient is mandatory',
-        example: 'Soft office ambience. · Wind on the open ridge.',
-        note: 'Include an ambience line in every scene — without it the audio mix feels dead.',
-      },
-    ],
-    [
-      {
-        heading: 'No subtitles — MANDATORY',
-        example: 'The founder says, "..." (no subtitles). Soft office ambience.',
-        note: 'Without (no subtitles) after every dialogue line, Veo bakes subtitle text into the video. This is genuinely critical and underspecified in most guides.',
-        critical: true,
-      },
-      {
-        heading: 'Cinematography vocabulary',
-        example: '85mm · shallow depth of field · Rembrandt lighting · dolly in · whip pan',
-        note: 'Veo responds to real lens, lighting, and camera-move terms — lead the prompt with them.',
-      },
-    ],
-  ],
-  footer: [
-    "First-frame + last-frame is Veo's strongest workflow. Generate a start frame, generate an end frame, then animate with both as anchors. Motion-Lock hack: keep ~60% of the same background pixels between start and end to prevent latent drift.",
-    'Keep dialogue under one natural breath — lines fit the 8s clip ceiling. Texture-realism phrases: fine skin pores, visible fabric weave, subtle contrast, no gloss or sharpening.',
-  ],
-}
-
 const OMNI_FLASH: PromptingTipsEntry = {
   label: 'Gemini Omni Flash',
   intro: [
-    'Gemini Omni Flash is the cheap 720p tier with native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, one start frame, or up to 7 reference images. No last frame, no video/audio references.',
+    'Gemini Omni Flash is the 720p tier with native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, one start frame, or up to 7 reference images. No last frame, no video/audio references.',
   ],
   columns: [
     [
@@ -395,7 +350,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
       },
       {
         heading: 'Know its role',
-        note: 'Cheap drafts, iteration volume, and audio-in-one-gen at low cost. For hero shots, Seedance 2.5 (the default) or Seedance 2.0 (4K, cheaper) still win.',
+        note: 'Drafts and audio in one pass; LTX, H3 and H3 Max Turbo cost less per second. For hero shots, Seedance 2.5 (the default) or Seedance 2.0 (4K, cheaper) still win.',
       },
     ],
   ],
@@ -562,7 +517,7 @@ const NANO_BANANA: PromptingTipsEntry = {
   ],
   footer: [
     'Boring vs Cinema. Boring: "Wide shot of man on dock looking at forest." Cinema: "Direct overhead drone shot on weathered dock. Single figure climbing up frame bottom. Boot prints leading toward shore. Pale winter light. Anamorphic flare. Desaturated blue/slate palette. Kodak Portra 400 grain. Map of threat."',
-    "3-strike rule. If three iterations on the same prompt haven't landed, stop. The slot machine doesn't converge — the prompt structure is wrong, not the seed.",
+    "Three-attempt checkpoint. If three iterations on the same prompt haven't landed, stop re-rolling and diagnose the reference, prompt structure and model fit before the next spend. Usually the structure is wrong, not the seed.",
   ],
 }
 
@@ -572,7 +527,9 @@ const NANO_BANANA_LITE: PromptingTipsEntry = {
   columns: [
     NANO_BANANA.columns[0],
     NANO_BANANA.columns[1].map((card) =>
-      card.heading === 'Resolution tactics'
+      card.heading === 'Reference images — name them, never label roles'
+        ? { ...card, note: `Up to 4 refs on Lite (the edit endpoint caps input images at 4). ${PARTIALS['reference-tips-short']}` }
+        : card.heading === 'Resolution tactics'
         ? {
             heading: 'Resolution tactics',
             example: '1k only on Lite',
@@ -647,7 +604,7 @@ const ELEVEN_SFX: PromptingTipsEntry = {
   label: 'ElevenLabs Sound Effects',
   intro: [
     'Sound Effects makes one short sound with an exact length — the lane for a hit that has to land on a specific frame, or a seamless loop you can lay under a whole scene.',
-    'Duration is always sent explicitly (0.5–22s). Billing is per second, so the length you pick is the price you pay.',
+    'Duration is always sent explicitly (1–22s). Billing is per second, so the length you pick is the price you pay.',
   ],
   columns: [
     [
@@ -663,7 +620,7 @@ const ELEVEN_SFX: PromptingTipsEntry = {
       },
       {
         heading: 'Duration is the edit',
-        example: '0.8s for an impact · 4s for a whoosh · 22s for a bed',
+        example: '1s for an impact · 4s for a whoosh · 22s for a bed',
         note: 'Ask for roughly the length you need. A 4-second request for a door slam pads the tail with room tone you then have to trim.',
       },
     ],
@@ -690,13 +647,13 @@ const MINIMAX_H3: PromptingTipsEntry = {
   label: 'MiniMax H3',
   intro: [
     'MiniMax H3 generates picture and sound in one pass — 24fps, 32kHz stereo, 5-15 seconds, 11 stably-supported languages. It is the only video model in Slates where audio is AUTHORED rather than switched on: synchronised dialogue and action sounds go in the body of the prompt, ambience goes in a soundscape section, and audience-only music goes in a score section. Put a sound in the wrong section and it is dropped, doubled, or attributed to the wrong source.',
-    'Three models. Base H3 runs 480p / 768p / 2K / 4K; H3 Max is fal\'s faster post-train and runs 480p / 768p / 1080p, dearer than base H3 at the tier they share - a deliberate speed pick, never the cheap one; H3 Max Turbo has Max\'s ladder at half Max\'s rate and takes NO references. Base H3 and Max read up to 9 reference images plus 3 video and 3 audio clips (12 files total, and audio never travels alone); all three animate a start frame and an end frame. 768p is the default on all three because it is the tier the model natively generates; base H3\'s 2K and 4K are upscales of a 768p base, and 1080p on Max and Turbo is a refinement of it. Reference images past the free allowance are billed and the allowances DIFFER: 5 free on base H3, 4 on Max.',
+    'Three models. Base H3 runs 480p / 768p / 2K / 4K; H3 Max is fal\'s faster post-train and runs 480p / 768p / 1080p, dearer than base H3 at 768p and equal at 480p - a deliberate speed pick, never the cheap one; H3 Max Turbo has Max\'s ladder at half Max\'s rate and takes NO references. Base H3 and Max read up to 9 reference images plus 3 video and 3 audio clips (12 files total, and audio never travels alone); all three animate a start frame and an end frame. 768p is the default on all three because it is the tier the model natively generates; base H3\'s 2K and 4K are upscales of a 768p base, and 1080p on Max and Turbo is a refinement of it. Reference images past the free allowance are billed and the allowances DIFFER: 5 free on base H3, 4 on Max.',
   ],
   columns: [
     [
       {
         heading: 'Three audio layers, three places',
-        example: 'body: "First batch of the morning."\nSoundscape: shutters scrape, trays clink\nScore: solo piano, slow, no swell',
+        example: 'body: "First batch of the morning."\noverall_soundscape: shutters scrape, trays clink\nnon_diegetic_music: solo piano, slow, no swell',
         note: 'Dialogue, singing and diegetic music (a radio in the scene) go in the BODY on the beat they land. Ambience goes in the soundscape. The score is audience-only — name instruments and tempo, not moods.',
         critical: true,
       },
@@ -729,7 +686,7 @@ const MINIMAX_H3: PromptingTipsEntry = {
       },
       {
         heading: 'Reference images past the fifth cost extra',
-        note: 'The first 5 are free; each one after that adds 4 credits at every resolution and length, and the model takes 9. Four extra images on a 10s 768p clip add 16 credits to a 30-credit generation. Attach what the shot needs, not the ceiling.',
+        note: 'On base H3 the first 5 are free; each one after that adds 4 credits at every resolution and length, and the model takes 9 (H3 Max prices references as a token pool instead). Four extra images on a 10s 768p clip add 16 credits to a 30-credit generation. Attach what the shot needs, not the ceiling.',
         critical: true,
       },
       {
@@ -752,7 +709,7 @@ const LTX_2_5: PromptingTipsEntry = {
   label: 'LTX-2.5',
   intro: [
     'LTX-2.5 scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE, not the last. Lightricks ranks the six parts of a prompt in this order: sound, camera, character detail, shot type and scene, then scene dressing — and scene dressing is the first thing to cut when a prompt sprawls. Everything goes in ONE flowing paragraph, not a list of labelled sections.',
-    'Two models. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest native 1080p second in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
+    'Two models. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest 1080p second with sound included in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
   ],
   columns: [
     [
@@ -877,7 +834,6 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'seedance-2-5-edit': SEEDANCE_25_EDIT,
   kling: KLING,
   'kling-edit': KLING_EDIT,
-  veo: VEO,
   'omni-flash': OMNI_FLASH,
   'omni-flash-edit': OMNI_FLASH_EDIT,
   'minimax-h3': MINIMAX_H3,

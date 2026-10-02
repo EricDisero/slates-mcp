@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-minimax-h3
-description: How to prompt MiniMax H3, H3 Max and H3 Max Turbo. Read before calling slates_generate_video with model minimax-h3, minimax-h3-max or minimax-h3-max-turbo. H3 is the only Slates video seat where AUDIO IS AUTHORED rather than toggled — synchronised dialogue, scene sound and an audience-only score are three separate sections of the prompt, generated in one pass — and the only one where a reference carries a DECLARED RELATIONSHIP (kept whole, partly kept, transferred onto a different subject, or a loose echo). Base minimax-h3 runs 480p/768p/2K/4K and reads 9 images + 3 video + 3 audio references; minimax-h3-max is fal's faster post-train, runs 480p/768p plus a 1080p refinement of its 768p render, and costs MORE than base H3 at 768p — a deliberate speed pick, never the default and never the cheap one; it animates start and end frames AND takes the same 9+3+3 omni-reference set (corrected 2026-09-09). minimax-h3-max-turbo is a second fal post-train with Max's ladder at half Max's rate; it takes start and end frames but has NO reference endpoint. Two hazards live here: reference images past the free allowance are billed (5 free then +4 credits on base H3; pooled media tokens on Max), and audio written into the wrong section is dropped or duplicated.
+description: "Prompt MiniMax H3, H3 Max or H3 Max Turbo with slates_generate_video. Covers separately authored dialogue, scene sound and score, declared reference relationships, frame inputs and variant-specific constraints."
 ---
 
 # MiniMax H3 — prompting
@@ -15,18 +15,18 @@ description: How to prompt MiniMax H3, H3 Max and H3 Max Turbo. Read before call
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — MiniMax H3.** The only seat where audio is AUTHORED rather than toggled: dialogue, scene sound and score are three separate sections of the prompt, generated in one pass, and putting a sound in the wrong section drops or doubles it.
+**Card: MiniMax H3.** The only seat with three separately authored audio layers: dialogue, scene sound and score are three separate sections of the prompt, generated in one pass, and putting a sound in the wrong section drops or doubles it.
 
 **The five levers**
-1. **Write the three audio layers separately** — `Scene sound:` for what is in the room, `Score:` for what only the audience hears, and the dialogue quoted inline. Section decides attribution.
+1. **Write the three audio layers separately**: `overall_soundscape:` for what is in the room, `non_diegetic_music:` for what only the audience hears, and the dialogue quoted inline. Section decides attribution.
 2. **Quote dialogue and name the language** — `says in English`, `speaks in Spanish`. Eleven languages are stably supported; the language is part of the instruction, not an afterthought.
 3. **Declare the reference RELATIONSHIP**, which no other seat has: `kept whole`, `partly kept`, `transferred`, or `a loose echo`. An undeclared reference is a guess.
 4. **Give a beat of stillness before a line** — `sits still for a beat, then looks up`. The sync needs something to lock against; a character already mid-motion when the line starts drifts.
 5. **Describe the beat structure** — `waits`, `then speaks`, `under the last three seconds`. H3 is a timeline, so write one.
 
 **Examples**
-- `A woman sits still at a kitchen table for a beat, then looks up. She says in English, "You said Tuesday." Scene sound: a fridge hum, a spoon set down on formica. Score: none.`
-- `Two mechanics either side of an open bonnet. The younger one wipes his hands, waits, then speaks in Spanish, "No es el alternador." Scene sound: a socket wrench, a radio two bays over. Score: a low sustained cello under the last three seconds, audience only.`
+- `A woman sits still at a kitchen table for a beat, then looks up. She says in English, "You said Tuesday." overall_soundscape: a fridge hum, a spoon set down on formica. non_diegetic_music: N/A.`
+- `Two mechanics either side of an open bonnet. The younger one wipes his hands, waits, then speaks in Spanish, "No es el alternador." overall_soundscape: a socket wrench, a radio two bays over. non_diegetic_music: a low sustained cello under the last three seconds, audience only.`
 
 **Hard constraint:** the three seats differ in what the ENDPOINT accepts, not in grammar. Base H3 reaches 2K/4K and takes references; `minimax-h3-max` tops out at 1080p, takes the same 9+3+3 references, and costs MORE at the tier they share — a speed pick, never the cheap one; `minimax-h3-max-turbo` has Max's ladder at half its rate and takes frames only, NO references. Every tier above 768p is built from the native 768p render: judge at native. Reference inputs affect the quote; include every attached modality when estimating.
 <!-- @card:end -->
@@ -61,7 +61,7 @@ what the endpoint accepts:
 | Price at 768p | **$0.060/s** | $0.080/s | $0.040/s |
 | Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) | **price** — half Max's rate at every tier |
 
-**Max is the premium seat, not the budget one.** It is 33% dearer at the one tier they share and it
+**Max is the premium seat, not the budget one.** It is 33% dearer at 768p, equal at 480p, and it
 tops out lower. Route there when a fast turnaround on a text-to-video or start-frame shot is worth
 paying for; route to base H3 for anything needing resolution, references, or the same tier cheaper.
 
@@ -91,15 +91,15 @@ reaching for 2K, which adds its own artifacting on top.
 
 ## The one thing that makes H3 different: audio is a THREE-LAYER instruction
 
-Every other video seat treats sound as on or off. H3 splits it, and the split is enforced by where
+Kling and Seedance have their own sound syntax. H3 splits audio into three separately authored layers, enforced by where
 you write each thing. Get the section wrong and the sound is dropped, doubled, or attributed to the
 wrong source.
 
 | Layer | What belongs in it | Where it goes |
 |---|---|---|
 | **Synchronised events** | dialogue, singing, and any sound tied to a specific shot or action | the **body** of the prompt, on the beat it lands |
-| **Scene sound** | ambience and physical sounds that run across the whole clip — room tone, rain, traffic, a ventilation hum | the **soundscape** section |
-| **Score** | music the characters cannot hear; audience-only | the **music** section |
+| **Scene sound** | ambience and physical sounds that run across the whole clip, room tone, rain, traffic, a ventilation hum | the **overall_soundscape** section |
+| **Score** | music the characters cannot hear; audience-only | the **non_diegetic_music** section |
 
 **Three rules, all from MiniMax's own guide:**
 
@@ -125,10 +125,10 @@ the middle-aged baker with a calm, slightly raspy voice places a fresh loaf on t
 says: "First batch of the morning." [Shot 2] At 00:05.000, the camera cuts to a close-up of
 steam rising from the sliced bread while his final words carry over from the previous shot.
 
-Soundscape: wooden shutters scrape open over a quiet street, trays clink softly inside, a
+overall_soundscape: wooden shutters scrape open over a quiet street, trays clink softly inside, a
 doorbell rings once, then light footsteps and the crisp sound of bread being sliced.
 
-Score: a soft acoustic-guitar pattern at a moderate tempo, joined by sparse upright-bass notes,
+non_diegetic_music: a soft acoustic-guitar pattern at a moderate tempo, joined by sparse upright-bass notes,
 gentle fade at the end.
 ```
 

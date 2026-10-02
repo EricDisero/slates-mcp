@@ -1,6 +1,6 @@
 ---
 name: slates-direct-response-ad
-description: Develop a product-led direct-response ad whose demonstration, argument and next action serve a supplied offer. Use for product-led creative direction; presenter performance belongs in slates-ugc-influencer-ad and general writing in slates-script-craft.
+description: "Develop a product-led direct-response ad from an offer and references. Use for demonstrations, proof, argument and the next action; combine with script craft and presenter direction as needed."
 ---
 
 # Product-led direct response

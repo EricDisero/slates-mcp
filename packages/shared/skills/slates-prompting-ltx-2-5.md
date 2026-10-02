@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-ltx-2-5
-description: How to prompt LTX-2.5 and LTX-2.5 Pro. Read before calling slates_generate_video with model ltx-2-5 or ltx-2-5-pro. LTX scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE — Lightricks ranks the prompt sound, camera, character detail, shot type and scene, then scene dressing, all in one flowing paragraph. It is also the catalogue's native MULTISHOT seat: one generation carries two to four connected shots holding character, light and voice across the cuts. Base ltx-2-5 is the distilled build — 720p/1080p/1440p/4K, clips of 6 to 20 seconds in EVEN steps, and the cheapest native 1080p second in Slates; ltx-2-5-pro is the full diffusion build and is NOT a superset, reaching only 1080p and 10 seconds for about a third more money. Three hazards live here: durations are even numbers only from six (there is no 5s or 7s clip), the model has NO reference endpoint at all so identity references are unavailable, and any sound not anchored to something in frame gets invented for you.
+description: "Prompt LTX-2.5 or LTX-2.5 Pro (ltx-2-5, ltx-2-5-pro) with slates_generate_video. Covers sound-first direction, connected shots, frame inputs, variant differences and duration constraints."
 ---
 
 # LTX-2.5 — prompting
@@ -125,11 +125,10 @@ The model renders actions. It does not render adjectives.
 
 ---
 
-## 4. Multishot — the thing this model is uniquely for
+## 4. Multishot
 
 **One LTX generation can carry several connected shots**, holding character, environment, lighting,
-voice and style across every cut. Nothing else in the catalogue does this natively; everywhere else
-you generate separate clips and stitch them, and identity drifts between them.
+voice and style across every cut. It is one of the seats that carry several shots in one generation.
 
 **Working range is two to four shots.** Three is the comfortable stopping point.
 
@@ -182,7 +181,7 @@ Choose the length the beat needs.
 
 ### Aspect ratios: 16:9 and 9:16, and nothing else
 
-The narrowest set in the catalogue alongside Veo. Square, 4:5 and 21:9 are not available on this
+The narrowest set in the catalogue. Square, 4:5 and 21:9 are not available on this
 model at any resolution.
 
 ### Frames, not references
@@ -210,7 +209,7 @@ Native synchronised audio is **included at every resolution on both seats**, wit
 no toggle that costs money — unlike Kling, where sound is a paid dimension. A 6-second 1080p LTX
 clip **with sound** is 39 credits.
 
-Combined with 1080p at $0.13/s — the cheapest native 1080p second in Slates — this makes LTX **the
+Combined with 1080p at $0.13/s, the cheapest native 1080p second with sound included in Slates, this makes LTX **the
 coverage seat**: the one to reach for when the job is many takes rather than one hero shot, when a
 sequence needs its own sound, or when the credit budget is the binding constraint.
 

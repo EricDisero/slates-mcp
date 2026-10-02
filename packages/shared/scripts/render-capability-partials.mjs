@@ -68,7 +68,7 @@ const thresholds = `<!-- GENERATED from @slatesvideo/shared — do not edit betw
 **The thresholds, from the code that enforces them:**
 
 - **Confirm gate:** above **${CONFIRM_CREDITS} credits** an op returns \`requires_confirm\` and will not
-  proceed until you re-call with \`confirm: true\`. Below it, announce the cost once and go.
+  proceed until you re-call with \`confirm: true\`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
 - **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
   exceeds the approved plan by more than **${deviationPct}%**. You do not trigger this; the app does.
 - **Seed Audio duration:** **${SEED_AUDIO_MIN_SECONDS}–${SEED_AUDIO_MAX_SECONDS} seconds.** There is no duration
@@ -100,7 +100,8 @@ ${sheetLine('character-sheet', 'Character identity sheet')}
 ${sheetLine('environment-plate', 'Establishing image')}
 
 Price a sheet for that model at ${SHEET_TOOL_ASPECT_RATIO}, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.`
-const files = { 'thresholds.md': thresholds, 'image-defaults.md': imageDefaults, 'sheet-tool-defaults.md': sheetToolDefaults }
+const modelRouting = ['**Current model routing, generated from the operation routing source:**', ...[['image', 'generate'], ['video', 'generate'], ['video', 'edit'], ['audio', 'generate']].map(([kind, route]) => `### ${kind} ${route}\n\n${shared.describeRouting(kind, route)}`)].join('\n\n')
+const files = { 'thresholds.md': thresholds, 'image-defaults.md': imageDefaults, 'sheet-tool-defaults.md': sheetToolDefaults, 'model-routing.md': modelRouting }
 
 let drift = 0
 mkdirSync(partialsDir, { recursive: true })

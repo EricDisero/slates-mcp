@@ -1,18 +1,16 @@
 ---
 name: slates-content-policy
-description: Read before writing any prompt involving conflict, creatures, crowds, destruction, weapons, or young characters. Builds the scene safe from the first word, so it hits full cinematic impact without depicting prohibited content — and without being silently rejected or degraded by the model's filter. Mirror of @slatesvideo/shared/prompts content-policy fragment — SSOT: second-brain business/projects/slates/product/prompting-ssot.md.
+description: "Check provider-sensitive content before prompting a brief with conflict, creatures, crowds, violence, destruction, weapons, real likenesses or young characters. Use its scoped refusal receipts and scene alternatives alongside the selected model guide."
 ---
 
 # Content-policy-safe construction — read before any risk-surface prompt
 
 <!-- @banned:start -->
 <!-- slates-only -->
-<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
-     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
-     estimate, and every submitted prompt is matched against it. Keep entries
-     backticked and prose outside the backticks. -->
+<!-- Content-policy guidance. Read this list alongside the selected model's
+     own prompting guide. -->
 <!-- /slates-only -->
-**Never use** — each one is a filter tripwire with a substitution in the table above:
+**Never use**: each one is a filter tripwire with a substitution in the table below:
 - `civilians in panic`, `crowds fleeing`, `blood`, `gore`, `corpse`
 - `ignite`, `catch fire`, `on fire` applied to a person — frame body-contact effects as magical or harmless VFX
 - `candle-like`, `flame-like` and any real object used as a metaphor for an effect

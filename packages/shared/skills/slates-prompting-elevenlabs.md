@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-elevenlabs
-description: How to prompt ElevenLabs Sound Effects v2 in Slates. Read before calling slates_generate_audio with model eleven-sfx — ONE short effect with an EXACT duration, or a seamless loop, billed per second. Covers describing an effect by its physical cause, the one-sound-per-generation rule, picking a duration, loops, prompt_influence, and when to use Seed Audio instead.
+description: "Prompt ElevenLabs Sound Effects v2 (eleven-sfx) for a single effect or loop. Use with slates_generate_audio on this model; covers physical causes, duration, material, space and prompt influence."
 ---
 
 # ElevenLabs Sound Effects v2 — prompting
@@ -15,7 +15,7 @@ description: How to prompt ElevenLabs Sound Effects v2 in Slates. Read before ca
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — ElevenLabs Sound Effects v2.** ONE short sound with an exact length, or a seamless loop. The only Slates audio surface with a real duration control and a real loop mode.
+**Card: ElevenLabs Sound Effects v2.** ONE short sound with an exact length, or a seamless loop. A Slates audio surface with a real duration control and a real loop mode.
 
 **The five levers**
 1. **Describe the physical CAUSE, not the label** — `heavy oak door slams shut`, `boot scuffs on grit`, `a latch drops home`.
@@ -42,7 +42,7 @@ description: How to prompt ElevenLabs Sound Effects v2 in Slates. Read before ca
 - `door sound`, `whoosh`, `footsteps`, `impact`, `ambience` standing alone
 <!-- @banned:end -->
 
-One short sound with an exact length, carried on fal (`fal-ai/elevenlabs/sound-effects/v2`). This is the only Slates audio surface with a real duration control and a real loop mode.
+One short sound with an exact length, carried on fal (`fal-ai/elevenlabs/sound-effects/v2`). This Slates audio surface has a real duration control and a real loop mode.
 
 ## Where it routes
 
@@ -87,7 +87,7 @@ Slates **always sends** `durationSeconds`. (Left null the model picks, which mak
 **The thresholds, from the code that enforces them:**
 
 - **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
-  proceed until you re-call with `confirm: true`. Below it, announce the cost once and go.
+  proceed until you re-call with `confirm: true`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
 - **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
   exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
 - **Seed Audio duration:** **3–120 seconds.** There is no duration

@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedream-5-lite
-description: How to prompt Seedream 5 Lite (ByteDance image model — the cheap volume option in Slates). Read before calling slates_generate_image with model seedream-5-lite, or slates_edit_image with editModel seedream-5-lite. Seedream front-loads attention, likes 30-100 focused words, and takes quoted strings for in-image text.
+description: "Prompt or edit images with Seedream 5 Lite (seedream-5-lite). Use with slates_generate_image or slates_edit_image on this model; covers attention order, focused descriptions, layout and quoted text."
 ---
 
 # Seedream 5 Lite — prompting
@@ -15,7 +15,7 @@ description: How to prompt Seedream 5 Lite (ByteDance image model — the cheap 
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — Seedream 5 Lite.** The cheap volume seat: flat-priced at every resolution, which makes it the right default for storyboard passes, variant grids and look-dev. Structure, most important first: `Subject + Style + Composition + Lighting/Atmosphere + Technical`.
+**Card — Seedream 5 Lite.** The cheap volume seat: flat-priced at every resolution, which makes it useful for storyboard passes, variant grids and look-dev when volume is the requirement. Structure, most important first: `Subject + Style + Composition + Lighting/Atmosphere + Technical`.
 
 **The five levers**
 1. **Lead with the subject.** Earlier words weigh more; close with the camera and technical detail.
@@ -35,7 +35,7 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 <!-- slates-only -->Use `slates-cinematic-look` with a technique ID or section query for more.<!-- /slates-only -->
 <!-- @end:cinematic-card -->
 
-**Hard constraint:** it is the DRAFTING seat, not the hero seat. Explore here, then re-run the winner on Nano Banana 2 or FLUX.2 Max for the locked shot.
+**Selection:** it is a volume option. Re-render a keeper on another image model only when an observed shortfall or the delivery brief justifies it; use the current catalogue for that choice.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -54,7 +54,7 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 - `Professional headshot of a female CEO, short blonde hair, confident expression, navy suit, neutral office background. Studio lighting, shallow depth of field, high-end corporate photography, shot on 85mm.`
 - `A rain-soaked night market stall, cinematic, rule of thirds with the vendor camera-right, foreground steam blurred, moody low-key lighting with practical neon, shot on 35mm.`
 
-ByteDance's Seedream image model, Lite tier, routed via fal.ai. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId — no headless path). **Flat-priced regardless of resolution** — the cheapest image model in Slates, which makes it the right default for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
+ByteDance's Seedream image model, Lite tier, routed via fal.ai. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId; no headless path). **Flat-priced regardless of resolution**, the cheapest flat-priced seat in Slates, which makes it a useful choice for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
 
 **When to pick it:** lots of frames cheap (storyboard passes, 3-4 variant exploration), posters/layouts with text, quick look-dev. Step up to NB2 or FLUX.2 Max for the locked hero shot.
 
@@ -101,7 +101,7 @@ Via `slates_edit_image` with `editModel: seedream-5-lite`. Seedream edits respon
 Change the bag to brown leather. Keep the person's face, pose, and the room unchanged.
 ```
 
-Note: Seedream edits in Slates ignore extra `referenceAssetIds` — that path is Nano Banana 2 only.
+Seedream edits accept extra `referenceAssetIds` within the current edit-reference cap, with the source occupying the first image slot. Read the tool schema for the cap. An older desktop without that capability refuses the request: update the desktop rather than claiming the extra references were sent.
 
 ## Common failure modes + fixes
 
@@ -115,7 +115,7 @@ Note: Seedream edits in Slates ignore extra `referenceAssetIds` — that path is
 
 ## Iterate cheap, lock expensive
 
-Flat pricing makes Seedream the iterate-fast model: run the 3-strike loop here (draft → evaluate inline → one specific delta → regenerate), and only re-render the winning composition on a pricier model if the project's hero shot demands it. Cost rules live in `slates-cost-discipline` — the batch-authorization pattern applies when generating variant grids.
+Flat pricing supports iteration: draft, evaluate inline, diagnose one specific delta, then generate only within the authorized set. Repeated failures trigger diagnosis rather than unchanged re-rolls; only re-render the winning composition on another model when the delivery requires it. Cost rules live in `slates-cost-discipline` — the batch-authorization pattern applies when generating variant grids.
 
 ## Sources
 

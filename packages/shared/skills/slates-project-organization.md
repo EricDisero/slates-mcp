@@ -1,13 +1,13 @@
 ---
 name: slates-project-organization
-description: Use when the user names an asset by code ("use IMG-A36"), asks what a code means, or is organizing or navigating a project. Covers the asset short-code system (IMG-A12 / VID-V3 / AUD-S1 badges on every gallery card), folders for film STRUCTURE, and the typed tabs for reusable references.
+description: "Navigate and organize Slates projects, asset codes such as IMG-A12 or VID-V3, folders, Library references and templates. Use when locating media, preparing a reusable production or keeping a project legible."
 ---
 
 # Organizing a Slates project
 
 Slates already gives every REUSABLE reference a home — the **Library**, in categories the user names (Characters, Locations, Products, Looks…; `slates_list_library`), each item used in a prompt as `@name`, or `#name` for a look. Do NOT recreate those as folders, and never invent a category the user did not ask for. Folders are for **structure**, never type.
 
-**Folders = where an asset sits in the FILM**, and they mirror to real subfolders on disk (`projects/<id>/…`), so a human can open the project in Resolve/Finder and navigate it like an edit. Use them for work product, not references.
+**Folders = where an asset sits in the FILM.** They are in-app structure only. Use them for work product, not references.
 
 Create with `slates_create_folder`; file assets with `slates_move_assets_to_folder`. Generations land in the project's active folder, so set it before a batch.
 

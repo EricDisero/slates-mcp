@@ -1,6 +1,6 @@
 ---
 name: slates-script-craft
-description: Write or revise script passages, develop distinct openings and bridges, and compare section variations while preserving the user's format, voice and fixed material. This is writing craft, not a request to generate media.
+description: "Write or revise script passages, openings, bridges and saved variations while preserving voice, format and fixed material. Use for writing within a production brief or a writing-only request."
 ---
 
 # Script craft and variations

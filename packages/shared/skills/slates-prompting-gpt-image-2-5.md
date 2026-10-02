@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-gpt-image-2-5
-description: Prompt and edit images with GPT Image 2.5 Flare or Sunburst. Covers reference roles, realistic lighting, text, grids, quality choices and targeted edits. Use with slates_generate_image or slates_edit_image on these models.
+description: "Prompt or edit images with GPT Image 2.5 Flare or Sunburst. Use with slates_generate_image or slates_edit_image on these models; covers reference roles, lighting, text, panels, quality choices and edits."
 ---
 
 # GPT Image 2.5 — sheets, grids, and text that actually reads
@@ -135,7 +135,7 @@ Reference images route through the edit endpoint, **up to 16** — fal's documen
 
 ## Transparent backgrounds
 
-If you need a cut-out rather than a scene, **ask for it explicitly and check the alpha**. OpenAI: request `background=transparent` and use PNG or WebP, then *"check the decoded image's alpha channel, including hair, glass, shadows, and object edges"* — a painted-white backdrop is the common failure and it is not transparency. Say what must NOT appear: *"no solid backdrop, no checkerboard, no scenery, no watermark"*, and do not let the product get restyled while the background is removed. **On every follow-up edit, repeat the transparency requirement** or it gets dropped. (Slates always requests PNG, so the format half is handled for you. **`background` IS surfaced now** — the Background control on the prompt bar, and `backgroundMode` on `slates_generate_image` / `slates_edit_image`. It is free: fal prices this family on size × quality alone.)
+If you need a cut-out rather than a scene, **ask for it explicitly and check the alpha**. OpenAI: request `background=transparent` and use PNG or WebP, then *"check the decoded image's alpha channel, including hair, glass, shadows, and object edges"* — a painted-white backdrop is the common failure and it is not transparency. Say what must NOT appear: *"no solid backdrop, no checkerboard, no scenery, no watermark"*, and do not let the product get restyled while the background is removed. **On every follow-up edit, repeat the transparency requirement** or it gets dropped. <!-- slates-only -->(Slates always requests PNG, so the format half is handled for you. **`background` IS surfaced now** — the Background control on the prompt bar, and `backgroundMode` on `slates_generate_image` / `slates_edit_image`. It is free: fal prices this family on size × quality alone.)<!-- /slates-only -->
 
 ## When an edit must not touch a region at all
 

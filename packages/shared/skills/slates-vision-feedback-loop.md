@@ -1,6 +1,6 @@
 ---
 name: slates-vision-feedback-loop
-description: Lower-level utility skill for any Slates workflow that needs to "generate, look at the result, refine, regenerate." Defines the standard inline-vision pattern. Other Slates skills compose this. Use when generating images and you need to confirm they match the brief before moving on, or when the user asks to "iterate" on an image.
+description: "Inspect generated media against the brief, diagnose defects and choose a targeted correction. Use during production or iteration; covers reference review, image defects and model-specific failure receipts."
 ---
 
 # Vision feedback loop — Slates utility skill
@@ -21,18 +21,18 @@ The code is the FORMAL reference. The label is human texture. Use both: `IMG-A12
 
 - `slates_get_asset_image` — pull one image into context. Returns its code+label.
 - `slates_get_assets_batch` — pull up to 8 images in one call. Use when picking from a candidate set; cheaper than N individual fetches.
-- `slates_get_asset_video_frames` — extract N keyframes (default 3) from a video and inline them as JPEGs. You can't see video natively; this is how you "look at" a clip before refining its motion prompt.
+- `slates_get_asset_video_frames` — extract N keyframes (default 3) from a video and inline them as JPEGs. These sampled stills support appearance, framing and identity checks. They do not verify continuous motion, lip sync or sound. Use actual playback or an audio-capable host for those claims when available; otherwise report them unreviewed and retain the saved asset.
 
 ## Pre-flight is automatic on the gen tools
 
-`slates_generate_video`, `slates_generate_motion_transfer`, and `slates_generate_lip_sync` now show you their reference assets **inline** on the confirm response. You don't need to fetch them yourself — but you DO need to look at what comes back, revise the prompt if the references suggest a different motion/framing, and only then re-call with `confirm=true`.
+`slates_generate_video` and `slates_generate_image` show you their reference assets **inline** on the confirm response. You don't need to fetch them yourself, but you DO need to look at what comes back, revise the prompt if the references suggest a different motion/framing, and only then re-call with `confirm=true`.
 
 ## 🔴 The still-gate — never animate a bad frame
 
 <!-- @inject:still-gate -->
-**A visible defect in the still is already a STOP.** Do not animate it. Fix the frame first, then move to motion — and go to motion only when the crop passes the still scan and you genuinely need movement to confirm an uncertain edge, reflection, or object.
+**Inspect a start frame before animating it.** Repair a visible defect that would make the intended crop or performance unusable before spending on motion. A clean frame can be animated whenever the brief calls for movement; this check does not require an image stage for text-to-video.
 
-This is a **cost** rule as much as a craft rule: a 1080p/10s premium video generation costs many multiples of an image re-roll, and video is where a defect stops being fixable. Anything wrong in the still gets worse in motion — soft geometry mushes, broken-but-plausible objects fall apart, oily textures start crawling. **Animating a known-bad frame is the single most expensive mistake in the pipeline.** Re-rolling the image is the cheap move; re-rolling the video is not.
+This is a cost rule as well as craft: a premium video call can cost many times an image correction. Broken geometry can turn to mush, oily textures can crawl and malformed objects can fall apart in motion. Fix a known source defect at the source instead of buying a more expensive copy. Judge intentional stylisation against the brief, not a universal photoreal standard. Additional image or video requests still follow the existing generation authorization.
 <!-- @end:still-gate -->
 
 ## The pattern
@@ -44,7 +44,7 @@ This is a **cost** rule as much as a craft rule: a 1080p/10s premium video gener
 3. **One of three outcomes:**
    - **Right** → save it (bind to a frame, character slot, etc.) and move on.
    - **Close, but adjustable** → refine with a specific delta, regenerate **once**.
-   - **Wrong direction** → ask the user before regenerating. Don't burn credits on prompt-thrashing.
+   - **Wrong direction** → diagnose the failed requirement. Refine within the supplied brief and existing authorization; ask only when the creative intent is unresolved or the next request needs fresh consent.
 
 ## The defect rubric — five slop tells
 
@@ -84,8 +84,8 @@ When the **character** is the question, keep the location out of it: test on a p
 ## Refinement rules
 
 - **One specific delta per regeneration.** Don't change five things at once — you won't know what helped.
-- **Rewrite the FULL prompt on every iteration — never a diff, never a fragment.** Change one decision, then re-emit the whole prompt so every slot still agrees with every other slot. This composes with the rule above rather than replacing it: *one delta* governs **what changes**, *full rewrite* governs **how you re-emit it**. A patched fragment leaves the old slots stale and silently contradicting the new one.
-  - On **Seedance**, a re-emit must keep the `Shot N` structure intact — see `slates-prompting-seedance`.
+- **A fresh generation needs a complete coherent prompt.** Change one decision and retain the unchanged requirements so old and new clauses do not conflict. An edit request uses its model's change-only grammar instead; do not turn a surgical edit into a full scene re-description.
+  - On **Seedance**, retain the selected model's structure: shot numbers for 2.0, whole-second timing where used for 2.5. See the matching model guide.
   - **Exception — Omni Flash Edit.** Long prompts documentedly destroy its fidelity. There the rule inverts: one short instruction plus *"Keep everything else the same."*
 - **Anchor with references.** If the result drifted from the user's intent, attach the *previous best* generation as a reference image alongside the original brief.
 - **Use `slates_get_asset_image`** to pull a previously-generated image back into context if you need to compare against a fresh generation.
@@ -94,13 +94,21 @@ When the **character** is the question, keep the location out of it: test on a p
 ## Cost discipline
 
 - Track total credits spent across the loop. Surface to the user every 3 iterations.
-- Stop after 3 failed iterations on the same prompt — escalate to the user with what you tried and what's not working. The slot machine never converges.
-- For a high-cost generation — anything past the confirm gate in `slates-cost-discipline` — confirm before *every* attempt, not just the first.
+- Use the repeated-failure checkpoint below; do not keep submitting an unchanged failed request.
+- **Follow the existing consent for every attempt.** An approved enumerated batch covers its listed calls. A retry or changed input outside that batch needs a new quote and the applicable confirmation; a timeout requires a status check before another submission.
+
+<!-- @inject:iteration-diagnosis -->
+## Diagnose repeated failures
+
+After three failed attempts at the same requirement, pause unchanged re-rolls and diagnose the source reference, prompt structure, model fit and tool result. Three is a review checkpoint, not a universal limit or proof that the seed cannot matter. Preserve the attempts and name what each test changed.
+
+Continue autonomously when the brief is clear, a specific correction is supported and the next request is already authorized. Hand control back when taste or intent cannot be inferred, the next request needs fresh consent, or the available tool cannot meet the requirement. A failed roll never authorizes an additional charge. Follow the existing batch and per-request cost policy.
+<!-- @end:iteration-diagnosis -->
 
 ## When to break the loop
 
 - The user said "good enough" or "ship it." Stop iterating.
-- You've burned >5 generations on one frame. Hand back and ask.
+- Repeated attempts show no progress. Diagnose the source, prompt or model before spending again; apply the scoped retry rule above.
 - The user changes brief mid-loop. Treat it as a new brief, not a continuation.
 
 ## Voice when narrating to the user

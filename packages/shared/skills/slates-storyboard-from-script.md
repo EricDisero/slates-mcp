@@ -1,6 +1,6 @@
 ---
 name: slates-storyboard-from-script
-description: Put supplied script or treatment into an editable Slates document and bind requested passages to production shots. Preserve the words and structure; generate media only within the user's requested scope.
+description: "Save a supplied script or treatment as an editable Slates document and bind production passages to shots. Use when preparing a storyboard while preserving the words, structure and requested scope."
 ---
 
 # Script into editable production

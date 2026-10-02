@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-seedance-2-5
-description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calling slates_generate_video with model seedance-2.5, or slates_edit_video with model seedance-2.5-edit. 2.5 is the DEFAULT video model (Eric, 2026-09-13) — against 2.0 it buys 30-second takes, 30 image references, audio-only references and INTEGER-SECOND TIMESTAMPS, and it gives up native 4K and costs more than 2.0 at every resolution they share. Timestamps are the one grammar difference that matters: 2.0 ignores them and answers only to shot numbers, 2.5 acts on them. Otherwise it shares 2.0's grammar (read slates-prompting-seedance for subject binding, camera and constraint vocabulary); this file covers what is different, plus the two hazards unique to 2.5 — the prompt-intent task classifier and the cost trap that comes with 30-second takes.
+description: "Prompt Seedance 2.5 generation (seedance-2.5) or edits (seedance-2.5-edit). Covers whole-second timing, shared Seedance craft, reference inputs, task-classifier hazards and long-take spend."
 ---
 
 # Seedance 2.5 — prompting
@@ -18,15 +18,15 @@ description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calli
 **Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.
 
 **The five levers**
-1. **Timestamps work here** — integer seconds, and the model acts on them: `[0-4] she reads the letter. [4-9] she folds it and looks up.` 2.0 ignores exactly this syntax.
-2. **Length is the reason to be here** — takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0-6]`, `[6-12]`, `[12-18]`; do not hope for them.
+1. **Timestamps work here**: integer seconds, and the model acts on them: `[0s-4s] she reads the letter. [4s-9s] she folds it and looks up.` 2.0 ignores exactly this syntax.
+2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.
 3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.
 4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.
 5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.
 
 **Examples**
-- `[0-6] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6-12] Medium, she stops as the driver's window comes down. [12-18] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`
-- `[0-10] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10-20] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`
+- `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`
+- `[0s-10s] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10s-20s] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`
 
 **Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.
 <!-- @card:end -->
@@ -38,7 +38,7 @@ description: How to prompt Seedance 2.5 and Seedance 2.5 Edit. Read before calli
      estimate, and every submitted prompt is matched against it. Keep entries
      backticked and prose outside the backticks. -->
 <!-- /slates-only -->
-**Never use** (2.5 reclassifies the task and fails a fresh generation on these):
+**Never use** (with a reference video, 2.5 can reclassify the task and fail a fresh generation on these):
 - `edit`, `extend`, `continue the video`, `same video but` — they make the provider read a fresh generation as an edit
 - `f/1.4`, `Portra 400` and any other aperture or film-stock token, or a stacked list of gear — image-model vocabulary. The 2.5 guide's own example names one camera body and one 35 mm lens in a single style line, so a lone lens there is not on this list
 <!-- @banned:end -->
@@ -64,7 +64,7 @@ So 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:
 | Resolution | 480p / 720p / 1080p / **native 4K** | 480p / 720p / 1080p — **no 4K** |
 | Price at 720p (faceless) | **$0.15/s** | $0.231/s |
 | Length | 4–15s | **4–30s in one take** |
-| Reference budget | 15 (9 image + 3 video + 3 audio) | **50 (30 image + 10 video + 10 audio)** |
+| Reference budget | 12 files total (9 image / 3 video / 3 audio caps) | **50 (30 image + 10 video + 10 audio)** |
 | Combined reference video/audio | ≤15s | **≤30s** |
 | Audio-only reference | ✗ (needs an image or video alongside) | **✓** |
 | **Timestamps in the prompt** | **✗ — ignored; shot numbers only** | **✓ — integer seconds, acted on** |
@@ -94,19 +94,19 @@ The trigger words are ordinary English:
 | **video edit** | `edit video` · `add` · `insert` · `remove` · `delete` · `modify` · `replace` · `change to` |
 | **video extend** | `extend forward` · `extend backward` · `continue` · `continue from` · `extend the story` |
 
-So a perfectly legitimate reference-to-video prompt — *"a wide shot of the workshop, **remove** the
+So a perfectly legitimate prompt with a reference video, *"a wide shot of the workshop, **remove** the
 tripod from frame"* — gets classified as an edit and fails on constraints it never set.
 
 **What to do:**
 
-1. **If you mean to edit an existing clip, say so with the MODEL, not the sentence.** Call
-   `slates_edit_video` with `model: 'seedance-2.5-edit'`. That routes to a dedicated
-   task-typed endpoint and the classifier never has to guess.
+1. **If you mean to edit an existing clip, choose its dedicated video-edit endpoint.** The
+   task-typed endpoint removes the classifier's ambiguity. <!-- slates-only -->In Slates, call
+   `slates_edit_video` with `model: 'seedance-2.5-edit'`.<!-- /slates-only -->
 2. **If you mean a fresh shot, describe the finished frame rather than an instruction to change
    one.** Not *"remove the tripod"* → *"the workshop bench, clear and uncluttered"*. Not
    *"add rain"* → *"heavy rain falling through the streetlight"*. This is better prompting anyway:
    the model renders what you describe, it does not take edits to an imagined draft.
-3. The trigger only fires when **references are attached**. A plain text-to-video prompt is safe
+3. The trigger needs **a reference video plus edit or extend intent**. Image references alone do not trigger it. A plain text-to-video prompt is safe
    however it is worded.
 
 **Slates will warn you, and it will never rewrite your prompt.** When a 2.5 reference generation's
@@ -142,8 +142,10 @@ real-face route has spent 71% of their welcome grant on one clip; **on the real-
 
 **Discipline:**
 
+<!-- slates-only -->
 - **Always quote with `slates_estimate_generation_cost` before a take over ~10 seconds,** and say
   the number out loud before generating.
+<!-- /slates-only -->
 - **Find the shot at short LENGTH, not at low resolution.** Length is what moves the price, so cut
   seconds while you are still exploring — 4–8s — and stay at the resolution you actually want.
   **A 480p pass does not de-risk a 720p or 1080p render.** Generation is stochastic: the higher-
@@ -153,7 +155,7 @@ real-face route has spent 71% of their welcome grant on one clip; **on the real-
 - **Length is a creative decision, not a default.** 30 seconds is available; it is rarely the right
   answer for a single shot. Multi-shot storyboards inside one 30s generation are what the length is
   actually for.
-- Read `slates-cost-discipline` — all of it applies, more sharply here.
+<!-- slates-only -->- Read `slates-cost-discipline` — all of it applies, more sharply here.<!-- /slates-only -->
 
 ---
 
@@ -192,8 +194,8 @@ pacing you are happy to leave to the model, timestamps when a beat has to land a
   from 4-6 seconds in Video 1, and leave the rest of the content unchanged."* Without a range, a
   whole-clip instruction is applied to the whole clip.
 
-Do **not** carry this back to 2.0, and do not carry Veo's `[00:00-00:02]` bracket syntax into
-either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
+Do **not** carry this back to 2.0, and do not write `[00:00-00:02]` minute-second brackets (another
+vendor's syntax) into either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
 <!-- @end:seedance-25-timestamps -->
 
 ---
@@ -235,7 +237,8 @@ billing dimension** on any Seedance route: audio is included.
 ### Video references
 
 Up to 10 clips, ≤30s combined (2.0: 3 clips, ≤15s). A reference VIDEO switches the cost key to
-`seedance-2.5*-vref-{res}-{T}s`, where **T = Σ input seconds + output seconds** — the sum is across
+`seedance-2.5*-vref-{res}-{T}s`, where **T = Σ input seconds + output seconds** on faceless and real-face routes;
+on the AI-face route, **T = max(Σ input seconds, output seconds) + output seconds** on both 2.0 and 2.5. The sum is across
 **every** clip attached, not just the longest. Three 6-second references on a 12-second output bills
 30 seconds, not 12 and not 18. Quote before confirming.
 
@@ -292,17 +295,22 @@ the citation, not a fallback — *"use her face and wardrobe from image 1, not i
 background"* is a stronger instruction than naming the positive alone, because an unscoped reference
 brings its whole frame with it.
 
-🚨 **The vendor writes `@Image 1`; Slates writes `image 1`, and that difference is deliberate.**
-BytePlus's API tutorial says *"Use `@Image 1`, `@Video 1`, and `@Audio 1`"*, while its own 2.5 prompt
-guide states the bare form (`Image 1 / Video 1 / Audio 1`) in the one normative sentence it has.
-**Two first-party docs, two forms** — the disagreement is recorded, not resolved, in
-`second-brain/business/projects/slates/research/model-prompting-research.md`. What settles it FOR US
-is neither: **`@` is a reference-token sigil in the Slates prompt composer, and an unresolved one is
-silently deleted from the prompt before it is sent.** Typing `@Image 1` here does not produce
-`@Image 1`, it produces nothing. The bare form is confirmed working on both models. Never hand-type
-the sigil.
+**BytePlus documents disagree on reference sigils.** Its API tutorial says *"Use `@Image 1`,
+`@Video 1`, and `@Audio 1`"*, while its 2.5 prompt guide uses the bare form
+(`Image 1 / Video 1 / Audio 1`) in its normative sentence. Both are first-party sources; the
+bare form is confirmed working on both Seedance models. Use the syntax accepted by the endpoint
+you are calling, and preserve each asset's role and scope.
 
-## Seedance 2.5 Edit (`slates_edit_video`, `model: 'seedance-2.5-edit'`)
+<!-- slates-only -->
+The disagreement is recorded in
+`second-brain/business/projects/slates/research/model-prompting-research.md`. Slates composes
+resolved reference tokens for the chosen model and now preserves unresolved sigils verbatim.
+The earlier composer silently deleted unresolved `@Image 1` tokens; that receipt explained the
+old bare-form workaround, and the fix removes its blanket prohibition. Prefer actual bound
+references when available so the composer supplies the canonical citation.
+<!-- /slates-only -->
+
+## Seedance 2.5 Edit (<!-- slates-only -->`slates_edit_video`, <!-- /slates-only -->`model: 'seedance-2.5-edit'`)
 
 Its own picker row and its own op call, deliberately: the task type is **the model you chose**,
 never something inferred from your sentence.
@@ -323,14 +331,14 @@ Kling O3 Edit is the one that takes element and style reference images.
   will need more attempts.
 - **The aspect ratio follows the source clip too.** No ratio control; the frame is the clip's frame.
 - **480p, 720p or 1080p output**, native audio — and an edit bills the video-reference tier ×2,
-  so 1080p on this row is the most expensive second in the app. Quote it.
+  so quote the 1080p edit before confirming.
 - **Prompt and source clip only** on this op. The MODEL takes reference images on an edit
   (ByteDance recommends 1–5 — *"replace the man in dark clothing in @Video 1 with @Image 2"*);
   **Slates has not wired that path**, so today an edit that must lock an identity from a photo
   goes to Kling O3 Edit. Constraint of our build, not of the model — worth revisiting.
-- **An edit bills roughly DOUBLE a plain 2.5 generation of the same length**, because every provider
-  charges an edit on input + output seconds. Read the confirm gate's number; do not reason from the
-  generation rate.
+- **An edit costs about 1.2x a plain 2.5 generation of the same length**: every Seedance provider
+  charges an edit on input + output seconds, at the reduced video-reference rate. Read the confirm
+  gate's number; do not reason from the generation rate.
 - **Set `seedanceFace: true` when a character's face is visible in the clip.** The faceless provider
   blocks faces outright — this is not a price optimisation, it is whether the job runs at all.
 - **There is no consented-real-face route for editing.** Real-person footage that the AI-face route
@@ -362,12 +370,14 @@ not a lip-sync job. Bill it like any other edit — on the source clip's length.
 
 ## Faces, and what does NOT change
 
+<!-- slates-only -->
 The three-tier face routing is identical to 2.0 — faceless → default route, an AI character's face →
 `seedanceFace: true` (the relaxed provider, a real cost premium), a real person's photo → the
 consent-gated real-person route after a `[REAL_FACE_DETECTED]` rejection, with `realFaceConsent: true`
 set **only** after the user explicitly confirms they hold the rights to the likeness. The full rules,
 including why the real-vs-AI call is the provider's and not yours, are in
 `slates-prompting-seedance`.
+<!-- /slates-only -->
 
 Also unchanged, and worth restating because 2.5's length makes each one more expensive to get wrong:
 

@@ -1,6 +1,6 @@
 ---
 name: slates-cinematic-look
-description: Use when a frame should look filmed, not generated (light, exposure, grade, lens, atmosphere, imperfection), or when an image came back too clean or studio-lit. The organized technique catalogue for every image model, and the rule for picking only what the shot needs.
+description: "Choose lighting, exposure, grade, lens, atmosphere and imperfection techniques for a filmed look. Use for photographic direction or an image that looks too clean, evenly exposed or studio-lit."
 ---
 
 # Cinematic look — make a generated frame read as filmed

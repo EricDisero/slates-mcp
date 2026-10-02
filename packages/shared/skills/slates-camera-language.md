@@ -1,6 +1,6 @@
 ---
 name: slates-camera-language
-description: Turn director vocabulary into real Blender camera rigs — orbits, floor rises, robo-arm whips, handheld, speed ramps, over-the-shoulder cuts — as bpy code. Use when building or refining the camera on a previs blocking pass, when a move needs to accelerate/hold/snap, or when someone asks for a "cinematic" camera and you need to convert that into an actual shot list.
+description: "Build or refine Blender camera rigs for a previs pass: orbits, floor rises, whip-and-lock moves, handheld, speed ramps and shot transitions. Use when the intended camera path needs deterministic control."
 ---
 
 # Camera language — from a shot list to a rig
@@ -71,6 +71,33 @@ curve.keyframe_insert("eval_time", frame=96)
 
 **Why a path and not raw location keys:** the user can drag a control point to retime or reshape the move without you regenerating anything. That is the difference between "re-prompt and hope" and "nudge it."
 
+<!-- @inject:blender-action-curves -->
+## Read animation curves from the active action layout
+
+Blender 5 uses layered actions: curves belong to the channelbag for `animation_data.action_slot`, inside each layer's strips. A direct `action.fcurves` lookup failed on Blender 5.2.1 in the 2026-08-28 blocking run. Feature-detect the layout before changing interpolation or noise; an unanimated object can legitimately have no curves.
+
+The snippets below use this small Blender-side iterator. It runs inside Blender; no add-on code is imported into the MCP package.
+
+```python
+def action_curves(datablock):
+    anim = getattr(datablock, "animation_data", None)
+    action = getattr(anim, "action", None)
+    if action is None:
+        return
+    if hasattr(action, "fcurves"):
+        yield from action.fcurves
+    elif getattr(anim, "action_slot", None) is not None:
+        for layer in action.layers:
+            for strip in layer.strips:
+                if hasattr(strip, "channelbag"):
+                    bag = strip.channelbag(anim.action_slot)
+                    if bag is not None:
+                        yield from bag.fcurves
+```
+
+Use the datablock that owns the keyed property: the curve data for `eval_time`, the object for location and rotation, the camera data for lens. Confirm a named channel exists before assuming a keyframe operation created it.
+<!-- @end:blender-action-curves -->
+
 ## Speed — the part that reads as production value
 
 Movement at one constant speed is the tell of a machine. Real moves accelerate, hold, and snap.
@@ -82,7 +109,11 @@ Speed lives in the **f-curve handles** of `eval_time` (or of location, if you ke
 - `interpolation = 'CONSTANT'` → no movement at all until the next key. This is how you get an absolute dead stop.
 
 ```python
-fc = curve.animation_data.action.fcurves.find("eval_time")
+# Add the middle key to the two-key path example above.
+curve.eval_time = 48
+curve.keyframe_insert("eval_time", frame=48)
+fc = next((f for f in action_curves(curve) if f.data_path == "eval_time"), None)
+assert fc is not None, "Key eval_time before shaping its motion"
 for kp in fc.keyframe_points:
     kp.interpolation = 'BEZIER'
     kp.handle_left_type = kp.handle_right_type = 'FREE'
@@ -122,12 +153,18 @@ Rotation during a rise destroys the effect. Leave it out.
 
 The whip-and-lock commercial move: a fast flight along a curved arc, an **absolute** dead stop at a completely different angle, repeat. Each relocation is roughly a third of a second; each stop is a distinct, readable frame.
 
-Build it as a path with a control point per stop, then make the stops real:
+Build it as a path with a control point per stop. On a fresh path action, key both ends of each hold and leave the flight between holds animated. At 24 fps, these eight-frame flights last a third of a second:
 
 ```python
-HOLD_FRAMES = 10
+for frame, progress in [(1, 0), (11, 0), (19, 32), (29, 32), (37, 64), (47, 64)]:
+    curve.eval_time = progress
+    curve.keyframe_insert("eval_time", frame=frame)
+fc = next(f for f in action_curves(curve) if f.data_path == "eval_time")
+assert [int(k.co[0]) for k in fc.keyframe_points] == [1, 11, 19, 29, 37, 47]
+HOLD_START_FRAMES = {1, 19, 37}
 for kp in fc.keyframe_points:
-    kp.interpolation = 'CONSTANT'      # hold dead still between flights
+    kp.interpolation = 'CONSTANT' if int(kp.co[0]) in HOLD_START_FRAMES else 'BEZIER'
+    kp.handle_left_type = kp.handle_right_type = 'AUTO_CLAMPED'
 ```
 
 Keep the target separate and slightly offset per stop, so each lock-off is a different composition of the same subject rather than six centred portraits.
@@ -139,7 +176,8 @@ Applied **last**, on top of a finished move. Slow organic sway, not jitter: long
 ```python
 for path in ("location", "rotation_euler"):
     for i in range(3):
-        fc = cam.animation_data.action.fcurves.find(path, index=i)
+        fc = next((f for f in action_curves(cam)
+                   if f.data_path == path and f.array_index == i), None)
         if fc is None:
             continue
         n = fc.modifiers.new('NOISE')
@@ -148,7 +186,7 @@ for path in ("location", "rotation_euler"):
         n.phase = i * 7.3    # decorrelate the axes or it reads as a slide
 ```
 
-**Never fast jitter, wobble or snap corrections.** Wrong-flavour handheld is more damaging than none.
+**For a restrained handheld register, avoid fast jitter, wobble or snap corrections.** Those motions can serve a deliberately frantic or phone-camera brief; choose them intentionally rather than adding them as a generic cinematic finish.
 
 ### Over-the-shoulder cuts
 

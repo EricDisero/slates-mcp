@@ -1,11 +1,11 @@
 ---
 name: slates-dialogue-blocking
-description: Keep multiple characters spatially consistent across cuts — seating, screen direction, eyelines, the 180-degree rule — by blocking the scene in 3D first. Use for any multi-character dialogue scene, conversations around a table or in a car, or when generated characters swap seats, change sides, or look the wrong way between shots.
+description: "Block a multi-character conversation (at a table, in a car, walking) in Blender when seating, eyelines or screen direction must hold across cuts, or generation has lost that continuity. Includes performance and off-screen dialogue direction."
 ---
 
 # Dialogue blocking — six people who stay where you put them
 
-The hardest thing to generate, and the case where previs beats raw prompting by the widest margin.
+Use this when fixed seating, eyelines or screen direction across cuts are part of the brief, or when generated shots have lost that continuity. A simple conversation can use ordinary shot and reference direction; 3D blocking is a tool for deterministic geography, not a prerequisite for dialogue.
 
 ## Why this is hard
 
@@ -15,7 +15,7 @@ Every cut is an independent guess unless something forces agreement. Prompt a si
 
 ## Build
 
-Follow `slates-previs-blocking` and add these.
+When a blocking pass serves the brief, follow `slates-previs-blocking` and add the relevant controls below. The examples show how to prevent observed seating and performance failures; choose controls for the scene rather than requiring every example in every conversation.
 
 ### Seated proxies, colour-coded
 
@@ -39,7 +39,7 @@ Place people once. Write down who sits where relative to the camera's opening po
 
 Per `slates-camera-language`, with two things specific to dialogue:
 
-- **Below shoulder height, slow rail glides.** Eye-level-and-above reads as surveillance.
+- **Below shoulder height, slow rail glides** suit the table-conversation register in these examples; higher angles can intentionally read as surveillance. Choose the height and movement that serve the intended performance.
 - **Decide who owns the near foreground in each cut and honour it.** A shoulder in frame is a spatial anchor; a different shoulder in the next cut relocates the whole room.
 
 The move that earns the most: **a gaze handoff without a cut** — the camera keeps gliding while the target hands off across the table, face to face, slowing on each but never stopping. Build it by keyframing the Track To target's position between subjects.
@@ -104,7 +104,7 @@ The hinge timestamp is what makes it a performance instead of a pose.
 
 ### Dialogue must not restructure the edit
 
-Both of these, verbatim, every time:
+When the blocking owns the cut list, include both constraints to prevent dialogue from inventing coverage:
 
 > DIALOGUE NEVER CREATES SHOTS: spoken lines happen inside the reference's takes exactly as blocked — no cutaways to a speaker, no reverse shots, no added close-ups. If a line plays while the camera is elsewhere, the line stays off-screen audio.
 
@@ -114,7 +114,7 @@ A sentence may cross a cut. Say so where it does: *the sentence does not pause f
 
 ## Model routing
 
-Dialogue directed as separate layers (voices, scene sound, score) is **minimax-h3**'s seat; it also takes declared reference relationships, which suits a colour-coded cast. Native synced audio is **Veo**'s niche. seedance-2.5 carries the reference-video capacity. Route per `slates-model-selection` and read the chosen model's prompting skill before writing the audio block.
+Dialogue directed as separate layers (voices, scene sound, score) is **minimax-h3**'s seat; it also takes declared reference relationships, which suits a colour-coded cast. seedance-2.5 carries the reference-video capacity. Route per `slates-model-selection` and read the chosen model's prompting skill before writing the audio block.
 
 ## Checklist
 

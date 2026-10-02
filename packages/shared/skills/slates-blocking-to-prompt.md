@@ -1,6 +1,6 @@
 ---
 name: slates-blocking-to-prompt
-description: Write the generation prompt that matches a blocking clip second by second, so the reference video and the text agree instead of fighting. Use after rendering a previs blocking pass, when a generated shot ignores the reference video, when timings drift, or when the model invents shots and camera angles that are not in the blocking.
+description: "Translate a rendered blocking clip into a video prompt that preserves its camera, cuts, timing and spatial relationships. Use for previs-guided generation or when output ignores the blocking."
 ---
 
 # Blocking → prompt
@@ -27,7 +27,9 @@ Those two sentences do more work than any other part of the prompt.
 slates_blender_scene
 ```
 
-Write timings from `cutSeconds`, never from the shot list you intended to build. It resolves to the marker frames on a multi-camera edit and to the camera's own keyframes otherwise, so it is the one field that is never empty on a rig that has cuts. At 24fps cuts land on frame boundaries and the honest values are not round — `7.79s`, `9.33s`, `19.875s`. **Use the exact ones.** Rounding to `7.8` is a tenth of drift you are handing the model for free.
+Read `cutSeconds` from the rendered scene, rather than using the shot list you intended to build. It resolves to markers on a multi-camera edit and camera keyframes otherwise. Preserve the exact frame boundaries in the blocking and edit record: at 24fps they can be `7.79s`, `9.33s` or `19.875s`.
+
+Translate those measurements into the selected model's timing grammar. Seedance 2.5 accepts whole-second timestamps; use those for its prompt while the reference clip carries the exact cuts. Seedance 2.0 uses shot numbers instead. The fractional examples below describe the measured blocking; they are not a universal request syntax. If frame-exact output is a delivery requirement, inspect the result and finish the timing in the edit rather than promising the model reproduces every frame.
 
 ## Structure
 
@@ -66,11 +68,11 @@ HOLD FOR THE FULL TIMELINE
 
 The single highest-leverage format in this whole workflow. Each reference is a **positive claim plus an exclusion list**, because a reference the model over-reads is as damaging as one it ignores.
 
-Label each by the badge code Slates echoes back (`IMG-A8`, `VID-C2`) or by an unmistakable role name, and use that same label everywhere below.
+Label each by the badge code Slates echoes back (`IMG-A8`, `VID-V2`) or by an unmistakable role name, and use that same label everywhere below.
 
 **The blocking clip:**
 
-> VID-C2 = the blocking previz (30s, 720 frames, 24fps) — the MASTER for everything that moves and everything that stands. It defines the full edit one-to-one: every cut point, every camera position, angle, move and framing, all action timing, screen direction, and the geometry of the world. Its untextured grey surfaces, flat colours and viewport grid are NOT inherited — every grey proxy is dressed into a real object in the exact position the previz puts it. Proxies give position, angle, scale and motion only; never surface, shape detail or design.
+> VID-V2 = the blocking previz (30s, 720 frames, 24fps), the MASTER for everything that moves and everything that stands. It defines the full edit one-to-one: every cut point, every camera position, angle, move and framing, all action timing, screen direction, and the geometry of the world. Its untextured grey surfaces, flat colours and viewport grid are NOT inherited; every grey proxy is dressed into a real object in the exact position the previz puts it. Proxies give position, angle, scale and motion only; never surface, shape detail or design.
 
 That last sentence is the **placement-only clause** and it is not optional. Without it the model renders grey boxes.
 
@@ -80,11 +82,11 @@ That last sentence is the **placement-only clause** and it is not optional. With
 
 **A location/style reference:**
 
-> IMG-B3 = the tunnel — defines location geometry, look and grade. Camera angle, framing and any people in it are NOT inherited; the camera comes exclusively from VID-C2.
+> IMG-A3 = the tunnel, defines location geometry, look and grade. Camera angle, framing and any people in it are NOT inherited; the camera comes exclusively from VID-V2.
 
 **An atmosphere or style master — a reference that is never a shot:**
 
-> IMG-D9 = ATMOSPHERE MASTER — NOT a keyframe, NOT a location to reproduce, NOT a frame that ever appears in the film: its own subject, framing and composition are never seen in any shot. It defines ONLY the weather, light, colour and grade: deep clean night just after rain, wet asphalt as a dark mirror, cool white-cyan lamps as the ambient key, teal-and-amber grade, deep clean blacks. Every shot is lit and graded in this regime for all 30 seconds.
+> IMG-A9 = ATMOSPHERE MASTER, NOT a keyframe, NOT a location to reproduce, NOT a frame that ever appears in the film: its own subject, framing and composition are never seen in any shot. It defines ONLY the weather, light, colour and grade: deep clean night just after rain, wet asphalt as a dark mirror, cool white-cyan lamps as the ambient key, teal-and-amber grade, deep clean blacks. Every shot is lit and graded in this regime for all 30 seconds.
 
 Without those three NOTs the model reproduces the reference's composition as an actual shot — you get its street corner in your film. The same wording covers a rendering-style master; see `slates-restyle-from-blocking`.
 
@@ -161,7 +163,7 @@ One block per shot or beat. Two notations; pick one and hold it.
 **For a continuous take**, ranges with a camera note and a closing state audit:
 
 ```
-8-12s — THE SWEEP (per VID-C2: elevated rear push, swinging to profile by 12s):
+8-12s: THE SWEEP (per VID-V2: elevated rear push, swinging to profile by 12s):
 <what happens, in prose, with sub-beats on tenths and → chaining cause to effect>
 END 12s: bodies 1 (behind him as he steps past) · standing — four ahead, holding.
 ```
@@ -169,7 +171,7 @@ END 12s: bodies 1 (behind him as he steps past) · standing — four ahead, hold
 **For a cut edit**, numbered shots ending on their cut:
 
 ```
-9.33-10.33s — SHOT 10 — Interior over the centre console as in VID-C2: <what the
+9.33-10.33s: SHOT 10, Interior over the centre console as in VID-V2: <what the
 frame contains>. Hard cut at 10.33s.
 ```
 
@@ -177,7 +179,7 @@ Three habits that separate a beat that works from one that does not:
 
 - **Declare the frame's contents as a closed set** when the shot is tight: *the frame holds exactly the console, the lever, his hand, and the edges of both seats.* An open description invites additions.
 - **Chain cause to effect inside one sentence** with `→`. `he overcommits a lunge → the Hero drops low and sweeps his standing leg → he hits the earth at 12s`.
-- **Put events on tenths.** `11.7s`, `19.5s`, `22.5s`. Vague beats generate vague timing.
+- **Pin every event to a moment**, in the finest unit the selected model accepts: whole seconds on Seedance 2.5 (`12s`, `19s`), shot numbers on 2.0. Vague beats generate vague timing. The production prompts behind this guide carried tenths (`11.7s`, `19.5s`, `22.5s`); whether 2.5 acts on the fraction is untested, and ByteDance documents integers only.
 
 Density: roughly 60–130 words per second of screen time is what these prompts actually run at. That is much denser than a normal video prompt, and it is the point.
 
@@ -205,7 +207,7 @@ Two rules that stop dialogue from breaking the edit:
 
 > A line marked off-screen must STAY off-screen — never show the speaker, never move him into frame, never route the camera to him because he spoke.
 
-Model note: dialogue direction as separate layers is minimax-h3's seat; native synced audio is Veo's. Route per `slates-model-selection` and read the model's own prompting skill before writing the audio block.
+Model note: dialogue direction as separate layers is minimax-h3's seat. Route per `slates-model-selection` and read the model's own prompting skill before writing the audio block.
 
 ## ENDING LOCK
 
@@ -219,17 +221,17 @@ Close with a terminal re-assertion of only the constraints most prone to drift �
 
 ```
 HOLD FOR THE FULL TIMELINE
-- VID-C2 camera path 1:1 — any deviation = failure.
+- VID-V2 camera path 1:1; any deviation = failure.
 - Six and only six figures; the count above holds at every second.
 - IMG-A8 identity constant at every distance and through motion blur.
-- The IMG-B3 location in every frame; no subtitles, no watermarks.
+- The IMG-A3 location in every frame; no subtitles, no watermarks.
 ```
 
 Restating is not redundancy here. It is the last thing the model reads.
 
 ## Checklist before you generate
 
-- [ ] Timings taken from `slates_blender_scene`'s `cutSeconds`, frame-exact, not rounded
+- [ ] Frame-exact timings retained from `slates_blender_scene`'s `cutSeconds`; model-facing timing translated to the selected guide's syntax
 - [ ] Every reference has an explicit "NOT inherited"
 - [ ] The placement-only clause is present
 - [ ] The tie-break clause is present

@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-flux-2-max
-description: How to prompt FLUX.2 Max (Black Forest Labs image model). Read before calling slates_generate_image with model flux-2-max, or slates_edit_image with editModel flux-2-max. FLUX.2 wants front-loaded structure, real camera vocabulary, and positive-only phrasing — no negative prompts, no tag soup.
+description: "Prompt or edit images with FLUX.2 Max (flux-2-max). Use with slates_generate_image or slates_edit_image on this model; covers word order, camera vocabulary, materials, colours and positive phrasing."
 ---
 
 # FLUX.2 Max — prompting
@@ -130,7 +130,7 @@ Use natural language for exploration, JSON when the layout is locked and you're 
 
 ## Reference images (edit path)
 
-In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Slates names each reference inline in the prompt ("the subject (image 1), the style (image 2)") in the order it sends them, so you don't hand-write role labels; the name carries the role and unnamed-by-position blending is avoided. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max` (note: FLUX edits ignore extra referenceAssetIds — that's NB2-only).
+In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Slates names each reference inline in the prompt ("the subject (image 1), the style (image 2)") in the order it sends them, so you don't hand-write role labels; the name carries the role and unnamed-by-position blending is avoided. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max`. Extra `referenceAssetIds` are supported within the current edit-reference cap, with the source occupying one slot; read the tool schema for that cap. An older desktop without this capability refuses the request rather than silently omitting references.
 
 ### Reference rules (the verified ones)
 
@@ -166,7 +166,6 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 ### For FLUX.2 Max specifically
 
 - **FLUX caps references well below NB2's 14, so rule 1's "2-4" is a ceiling here, not a starting point.** Be deliberate about which roles earn a slot.
-- **Rule 9 has a hard edge on this model:** `slates_edit_image` with `editModel: flux-2-max` ignores extra `referenceAssetIds` — that is NB2-only. A FLUX edit sees the source image and the prompt, nothing else.
 - **FLUX has no memory between generations, so rule 7 is enforced by repetition.** Define the character exhaustively once and repeat those exact descriptors verbatim in every subsequent prompt — see Character consistency across a series below.
 
 ## Character consistency across a series

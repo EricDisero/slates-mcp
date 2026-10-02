@@ -1,9 +1,15 @@
 ---
 name: slates-chatgpt-images
-description: Generate images using a connected ChatGPT account or the desktop host's built-in image tool, preserving Slates project context, exact prompts and reference lineage. Use when the user requests ChatGPT generation rather than Slates credits.
+description: "Generate and save images through a connected ChatGPT account or the host image tool, preserving Slates prompts, references and project context. Use when ChatGPT generation is requested."
 ---
 
 # ChatGPT images in Slates
+
+## Prerequisites
+
+Saving into a Slates project requires the Slates desktop app open and a connected Slates MCP server or CLI. Follow the [connection guide](https://slates.video/docs/connect-claude); CLI onboarding is `npx -y @slatesvideo/cli setup`. The host image tool alone does not expose Slates project tools. If the required tools or desktop connection are unavailable, report the missing connection and retain the prompt and references; do not invent operations.
+
+The connected generation path also needs the optional ChatGPT images add-on enabled and authenticated as described below. A host-tool path needs an actual image generator exposed by the host. These are distinct capabilities; a paid account alone establishes neither.
 
 Resolve the project with `slates_list_projects` and references with
 `slates_get_selection` or `slates_list_assets`. Badge codes are project-specific.

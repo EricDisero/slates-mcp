@@ -1,6 +1,6 @@
 ---
 name: slates-prompting-omni-flash
-description: How to prompt Gemini Omni Flash (Google, via fal). Read before calling slates_generate_video with omni-flash or slates_edit_video with omni-flash-edit. Cheap 720p tier with native synced audio included — 3-10s, 16:9/9:16 only; t2v, single-start-frame i2v, or reference-to-video with up to 7 reference images. The edit variant is the EDIT-FIDELITY WINNER for footage-synced VFX (receipt 2026-07-09) — but ONLY with short prompts: one change + "Keep everything else the same." Long descriptive prompts destroy fidelity.
+description: "Prompt Gemini Omni Flash video generation or Omni Flash edits (omni-flash, omni-flash-edit). Covers native sound, reference inputs and short change-only prompts that preserve edit fidelity."
 ---
 
 # Gemini Omni Flash — prompting
@@ -22,7 +22,7 @@ description: How to prompt Gemini Omni Flash (Google, via fal). Read before call
 2. **Editing: always end with `Keep everything else the same.`** — the one documented preservation lever.
 
 3. **Editing: describe the EFFECT, never a real object as a metaphor.** "Candle-like flame" rendered a literal candle in the subject's hand.
-4. **Editing: no conditional timing cues.** "…when he calls it, as he walks…" hard-fails with `invalid_request`. Collapse to one continuous action; the model syncs to the footage's own motion.
+4. **Editing: no chained stage directions.** Several beats cued to moments ("…flies onto his shoulder when he calls it, and perches as he walks…") hard-failed with `invalid_request`. One effect tied to an action already in the footage ("…when he snaps his fingers…") passed. Collapse to one continuous action; the model syncs to the footage's own motion.
 5. **Generation: the opposite — describe fully.** Subject, action, setting, `camera tracking alongside`, `overcast flat light`, tone. Audio is prompt-driven with no parameters: dialogue in quotes, sound in plain language — `rain patters on the tin roof`, `spray from tyres`, `a horn somewhere behind`.
 
 **Examples**
@@ -42,7 +42,7 @@ description: How to prompt Gemini Omni Flash (Google, via fal). Read before call
 **Never use in an EDIT prompt** (each one has a receipt above):
 - a long preservation preamble — it produces WORSE drift than `Keep everything else the same.`
 - a real object as a metaphor: `candle-like`, `flame-like`, `laser-like`
-- a conditional timing cue: `when he`, `as she`, `once they` — these hard-fail, they do not merely drift
+- several staged beats cued to moments (`when he calls it, and perches as he walks`): these hard-fail, they do not merely drift. One effect tied to an action already in the clip (`when he snaps his fingers`) passed
 - harm-to-person framing: `ignite`, `catch fire`, `on fire` applied to a person trips the safety filter
 <!-- @banned:end -->
 
@@ -51,15 +51,15 @@ Google's fast video generation + editing model ("Nano Banana Pro for video" in c
 ## Where it routes
 
 - **Video editing (`omni-flash-edit`) — its headline strength and the edit-lane default** for footage-synced VFX: verified 2026-07-09 head-to-head vs Kling O3 Edit on real phone footage (fire-on-fingertips on a talking take) — Omni Flash held lip movement perfectly, audio near-identical, and executed both action beats; Kling kept audio verbatim but drifted lips and missed the second beat. Full routing: slates-model-selection.
-- **Cheap drafts and iteration volume** — lowest-cost audio-native video seat (~6.4 cr/s at 720p).
-- **NOT hero GENERATION shots** — Kling 3.0 stays the general gen default, Seedance 2.0 the premium tier; Omni Flash's *generation* quality seat is still unproven.
+- **Drafts and iteration volume with sound**: an audio-native video seat (~6.4 cr/s at 720p).
+- **Hero-generation quality is still unproven.** Use the current model-routing guide for the final generation seat; the edit-fidelity receipt does not establish generation quality.
 
-## Editing (`slates_edit_video`, model `omni-flash-edit`) — THE RULES (receipts, not theory)
+## Editing (<!-- slates-only -->`slates_edit_video`, <!-- /slates-only -->model `omni-flash-edit`) — THE RULES (receipts, not theory)
 
 1. **SHORT PROMPT. One change. Nothing else.** Google's own doc: *"Simple prompts work best for video editing. Overly descriptive prompts can lead to unintended changes."* Live receipt 2026-07-09: a long "keep every frame/word/movement identical…" preamble produced WORSE drift (re-synthesized performance, wrong timing); the winning prompt was two sentences: *"Small magical flames appear on his fingertips when he snaps his fingers, and vanish when he blows on them. Keep everything else the same."*
 2. **Always end with "Keep everything else the same."** — the one documented preservation lever.
 3. **Never name a real-world object as a metaphor.** "Candle-like flame" rendered a literal candle in his hand. Describe the effect itself ("small magical flames on his fingertips").
-3b. **No conditional timing cues — they HARD-FAIL, not drift.** Receipt 2026-07-09: "a dragon appears behind him, flies onto his shoulder WHEN HE CALLS IT, and perches AS HE WALKS…" → deterministic `invalid_request` (2×, "could not generate with the given inputs"); collapsing to one continuous action — "A small photorealistic dragon flies in and perches on his shoulder, puffing a small breath of flame and smoke." — succeeded first try. The model syncs the change to the footage's own motion; it cannot take beat-by-beat stage directions cued to moments in the video.
+3b. **No chained stage directions: they HARD-FAIL, not drift.** Receipt 2026-07-09: "a dragon appears behind him, flies onto his shoulder WHEN HE CALLS IT, and perches AS HE WALKS…" → deterministic `invalid_request` (2×, "could not generate with the given inputs"); collapsing to one continuous action — "A small photorealistic dragon flies in and perches on his shoulder, puffing a small breath of flame and smoke." — succeeded first try. The model syncs the change to the footage's own motion; it cannot take beat-by-beat stage directions cued to moments in the video. The winning flames prompt above ("when he snaps his fingers") shows one effect tied to an action the footage already contains is fine; which part of the dragon prompt triggered the refusal is untested beyond that.
 4. **Safety filter (Google's, strict about harm-to-person):** "fingertips ignite / catch fire" → `content_policy_violation`. Frame effects as magical/harmless VFX: "small magical flames appear on his fingertips" passed. See slates-content-policy §Gemini for the substitution patterns.
 5. **Expect a possible tail artifact** — jitter or a doubled final speech beat in the last ~0.5s. Plan to trim the tail on the timeline; don't burn a re-roll on it.
 6. **Prompt + source clip ONLY.** No element/style reference images — identity swaps that need refs go to `kling-v3.0-omni-edit`.
@@ -67,9 +67,9 @@ Google's fast video generation + editing model ("Nano Banana Pro for video" in c
 8. **Ship via segment-splice** (the workflow, not the model): edit only the seconds where the change happens, splice back over the original on the timeline with the original audio underneath. Most of the deliverable stays untouched original footage — this is how the pro demos are actually assembled (gesture-only edited beats + voiceover in post).
 9. Chain edits one change at a time — each edit saves as a new asset linked to its parent.
 
-## Generation (`slates_generate_video`, model `omni-flash`)
+## Generation (<!-- slates-only -->`slates_generate_video`, <!-- /slates-only -->model `omni-flash`)
 
-- **Inputs:** prompt only (t2v), prompt + ONE start frame (`firstFrameAssetId`, i2v), or prompt + up to **7 reference images** (ingredient/character/environment/style asset params — they merge into one reference list). No last frame, no video/audio references — the op rejects them.
+- **Inputs:** prompt only (t2v), prompt + ONE start frame (<!-- slates-only -->`firstFrameAssetId`, <!-- /slates-only -->i2v), or prompt + up to **7 reference images** (ingredient/character/environment/style asset params — they merge into one reference list). No last frame, no video/audio references — the op rejects them.
 - Descriptive prompts are fine for GENERATION (the short-prompt law above is edit-specific). Structure like a shot brief: subject + action + setting + camera + lighting + tone.
 - **Name references inline** the standard Slates way ("Marcus (image 1) walks…"). The endpoint also accepts explicit `<IMAGE_REF_0>`-style binding tags (zero-indexed) — useful when a specific image must bind to a specific role.
 - **Audio is prompt-driven** — no audio parameters. Dialogue in quotes; direct sound in plain language ("rain patters on the tin roof"). Negative direction as plain instructions ("Do not show text").

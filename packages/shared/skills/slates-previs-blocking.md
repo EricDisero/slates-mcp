@@ -1,6 +1,6 @@
 ---
 name: slates-previs-blocking
-description: Build a 3D blocking pass in Blender, render it grey-box, and use it as a reference video so the generated shot follows a camera path you designed instead of one the model invented. Use when the user wants precise camera control, a multi-cut sequence, a one-take move, spatial consistency across shots, or says the camera keeps drifting / they keep burning credits re-rolling.
+description: "Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip. Use when those controls are required or prompting has failed to hold them."
 ---
 
 # Previs blocking — design the shot, then generate it
@@ -89,17 +89,48 @@ The whole of `slates-camera-language`. Build the rig, then keyframe it. Then **r
 
 Add it after the moves are right, never before — noise on top of a wrong path just hides the wrong path.
 
+<!-- @inject:blender-action-curves -->
+## Read animation curves from the active action layout
+
+Blender 5 uses layered actions: curves belong to the channelbag for `animation_data.action_slot`, inside each layer's strips. A direct `action.fcurves` lookup failed on Blender 5.2.1 in the 2026-08-28 blocking run. Feature-detect the layout before changing interpolation or noise; an unanimated object can legitimately have no curves.
+
+The snippets below use this small Blender-side iterator. It runs inside Blender; no add-on code is imported into the MCP package.
+
+```python
+def action_curves(datablock):
+    anim = getattr(datablock, "animation_data", None)
+    action = getattr(anim, "action", None)
+    if action is None:
+        return
+    if hasattr(action, "fcurves"):
+        yield from action.fcurves
+    elif getattr(anim, "action_slot", None) is not None:
+        for layer in action.layers:
+            for strip in layer.strips:
+                if hasattr(strip, "channelbag"):
+                    bag = strip.channelbag(anim.action_slot)
+                    if bag is not None:
+                        yield from bag.fcurves
+```
+
+Use the datablock that owns the keyed property: the curve data for `eval_time`, the object for location and rotation, the camera data for lens. Confirm a named channel exists before assuming a keyframe operation created it.
+<!-- @end:blender-action-curves -->
+
 ### 5. Verify the cuts
 
 The one check that catches the most damage: on a multi-cut blocking, camera position, target and focal length must all change **exactly on the cut frame, with no transition frame between**. One interpolated frame reads as a whip-pan the model will faithfully reproduce.
 
 ```python
-# Every camera f-curve keyframe on a cut frame must be CONSTANT out of the
-# previous key, or the cut smears.
-for fc in cam.animation_data.action.fcurves:
-    for kp in fc.keyframe_points:
-        if int(kp.co[0]) in CUT_FRAMES:
-            kp.interpolation = 'CONSTANT'
+# On a jump-cut camera, key the final pre-cut pose at cut_frame - 1.
+# CONSTANT belongs to that preceding key: interpolation controls its OUTGOING segment.
+# Check object transforms and camera data (including lens). Repeat for a keyed target.
+for owner in (cam, cam.data):
+    for fc in action_curves(owner):
+        keys = list(fc.keyframe_points)
+        for previous, current in zip(keys, keys[1:]):
+            if current.co[0] in CUT_FRAMES:
+                assert previous.co[0] == current.co[0] - 1, "Key the final pre-cut state first"
+                previous.interpolation = 'CONSTANT'
 ```
 
 Also check nothing interpenetrates — proxies through floors, clones through the hero object, letters through each other. The model renders intersections as faithfully as it renders everything else.
@@ -118,27 +149,27 @@ bpy.ops.wm.save_as_mainfile(filepath=path, copy=True)
 slates_blender_render_blocking { projectId, fps: 24 }
 ```
 
-Renders the **scene camera** through scene settings — never the user's viewport, so the result does not depend on where they left their mouse — imports the mp4 into the project, and returns `assetId` + `durationSeconds`.
+Renders the **scene camera** through scene settings and imports the mp4 into the project. The result does not depend on where the user left their viewport or mouse. It returns `asset.id` + `durationSeconds`.
 
 Then:
 
 ```
 slates_generate_video {
   model: "seedance-2.5",
-  videoReferenceAssetIds: [<the blocking asset>],
+  videoReferenceAssetIds: [<asset.id>],
   videoReferenceSecondsEach: [<durationSeconds>],
   characterAssetIds: [...], environmentAssetIds: [...], styleAssetIds: [...],
   prompt: <written per slates-blocking-to-prompt>
 }
 ```
 
-**Four inputs, and that is the entire stack:** a character sheet each, one location/style reference, the blocking clip, and a prompt written against the blocking. Resist adding a fifth.
+**A focused reference stack:** one identity sheet per character, any location or look reference the brief needs, the blocking clip, and a prompt written against it. Add a reference only for a distinct requirement; more competing references add variables rather than guaranteeing fidelity. An audio reference is valid when voice or sound continuity needs it and the selected endpoint supports it.
 
-Model note: seedance-2.5 is the seat for this — 10 reference videos at up to 30s each. seedance-2 and minimax-h3 take 3 at 15s. Route per `slates-model-selection`.
+Choose a model that accepts video references using `slates-model-selection`, then read its current reference caps. Video duration limits apply to the combined reference clips, not to each clip independently; quote each actual input duration.
 
 ## Leaving holes on purpose
 
-Where the model outperforms any blockout you could build — liquid, smoke, fire, cloth — **block a black gap instead** and say so in the prompt: `CUT 7 (14.5-17.0, black gap in the reference)`. You are reserving a slot, not forgetting one.
+Where the model outperforms any blockout you could build — liquid, smoke, fire, cloth — **block a black gap instead** and say so in the prompt: `CUT 7 (14.5-17.0, black gap in the reference)`. You are reserving a slot, not forgetting one. Keep these exact times in the blocking record, then translate model-facing time cues through `slates-blocking-to-prompt`; not every endpoint accepts fractional timestamps.
 
 ## What not to do
 
@@ -146,7 +177,7 @@ Where the model outperforms any blockout you could build — liquid, smoke, fire
 - **Don't animate what you don't need.** Heads especially — a proxy head turning wrong is worse than one that never turns.
 - **Don't build the camera before the geometry.** It has nothing to aim at, and every value you set gets redone.
 - **Don't skip reading the scene back.** Write timings from `slates_blender_scene`'s `cutSeconds`, never from what you intended to build.
-- **Don't exceed the model's reference-video ceiling.** A 40s blocking against a 30s cap silently truncates.
+- **Don't exceed the model's reference-video ceiling.** A 40s blocking against a 30s cap is rejected; trim it first.
 
 ## Related
 
