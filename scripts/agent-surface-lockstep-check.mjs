@@ -61,6 +61,8 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
 import { desktopSource } from './desktop-source.mjs'
+import { runInNewContext } from 'node:vm'
+import ts from 'typescript'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
@@ -195,9 +197,31 @@ console.log('agent-surface-lockstep-check')
   if (!/const TOOLS = toolDefinitions\(ops, \{ surface: 'mcp' \}\)/.test(server)) {
     fail(CHECK, `${mcpServerPath}: ListTools no longer renders through the shared \`toolDefinitions()\` — a surface-private tool or a divergent schema can now hide here.`)
   }
-  if (!/tools: TOOLS\.filter\([\s\S]*?\.map\(/.test(server)) {
-    fail(CHECK, `${mcpServerPath}: ListTools no longer maps every rendered definition.`)
+  function mapsEveryTool(source) {
+    const ast = ts.createSourceFile(mcpServerPath, source, ts.ScriptTarget.Latest, true)
+    const handlers = []
+    const unwrap = node => ts.isParenthesizedExpression(node) ? unwrap(node.expression) : node
+    const visit = node => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === 'setRequestHandler' && node.arguments[0]?.getText(ast) === 'ListToolsRequestSchema') handlers.push(node)
+      ts.forEachChild(node, visit)
+    }
+    visit(ast)
+    if (handlers.length !== 1 || !ts.isArrowFunction(handlers[0].arguments[1])) return false
+    const body = unwrap(handlers[0].arguments[1].body)
+    if (!ts.isObjectLiteralExpression(body)) return false
+    const tools = body.properties.find(property => ts.isPropertyAssignment(property) && property.name.getText(ast) === 'tools')
+    const value = tools && unwrap(tools.initializer)
+    return !!value && ts.isCallExpression(value) && ts.isPropertyAccessExpression(value.expression)
+      && ts.isIdentifier(value.expression.expression) && value.expression.expression.text === 'TOOLS'
+      && value.expression.name.text === 'map'
   }
+  if (!mapsEveryTool(server)) {
+    fail(CHECK, `${mcpServerPath}: ListTools must map every rendered definition directly; filtering or omitting tools breaks the fixed MCP surface.`)
+  }
+  // Mutation test in memory: the same guard must reject a real list omission.
+  const omittedTool = server.replace('tools: TOOLS.map(', 'tools: TOOLS.filter(tool => tool.name !== "slates_generate_video").map(')
+  if (omittedTool === server || mapsEveryTool(omittedTool)) fail(CHECK, 'the full-list guard did not reject its omitted-tool mutation.')
 
   if (!existsSync(desktopOpsPath)) {
     warn(`sibling repo ../slate is not on disk — the DESKTOP half of checks 1 and 3 was skipped.`)
@@ -236,13 +260,32 @@ console.log('agent-surface-lockstep-check')
 {
   const CHECK = '2 mcp-instructions'
   const server = readFileSync(mcpServerPath, 'utf8').replace(/\r\n/g, '\n')
-  // Either the bare doctrine, or the 2026-09-13 composed form: the running
-  // version line, the optional update notice, then the doctrine — nothing else
-  // may be joined in, so the array's other members are pinned by name.
-  const composed =
-    /const instructions = \[\n\s*`Slates MCP server v\$\{pkg\.version\} \(\$\{PKG_NAME\}\)\.`,\n\s*updateAdvice,\n\s*buildAgentDoctrine\(\{ surface: 'mcp' \}\),\n\]/
-  if (!/const instructions = buildAgentDoctrine\(\{ surface: 'mcp' \}\)/.test(server) && !composed.test(server)) {
-    fail(CHECK, `${mcpServerPath}: \`instructions\` is not built from buildAgentDoctrine({ surface: 'mcp' }) (bare, or the version-line + updateAdvice + doctrine array).`)
+  // Evaluate the actual consumer composition with deterministic inputs. It may
+  // split the canonical doctrine to put its first paragraph before the notice;
+  // it must preserve every doctrine byte and introduce no private guidance.
+  try {
+    const ast = ts.createSourceFile(mcpServerPath, server, ts.ScriptTarget.Latest, true)
+    const declarations = ast.statements.filter(statement => ts.isVariableStatement(statement)
+      && statement.declarationList.declarations.some(declaration => ['doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
+    const code = declarations.map(statement => statement.getText(ast)).join('\n') + '\ninstructions'
+    const javascript = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
+    const canonical = buildAgentDoctrine({ surface: 'mcp' })
+    const boundary = canonical.indexOf('\n\n')
+    for (const notice of [undefined, 'UPDATE AVAILABLE: fixture notice']) {
+      let calls = 0
+      const composed = runInNewContext(javascript, {
+        pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', updateAdvice: notice,
+        buildAgentDoctrine: options => {
+          if (options.surface !== 'mcp') throw new Error('wrong doctrine surface')
+          calls++
+          return canonical
+        },
+      }, { timeout: 1000 })
+      const expected = ['Slates MCP server v0.0.0 (@slatesvideo/mcp-server).', canonical.slice(0, boundary), notice, canonical.slice(boundary + 2)].filter(Boolean).join('\n\n')
+      if (calls !== 1 || composed !== expected) fail(CHECK, 'MCP instructions do not preserve the canonical doctrine with its first paragraph ahead of the optional notice.')
+    }
+  } catch (error) {
+    fail(CHECK, `${mcpServerPath}: cannot verify canonical instruction composition: ${error.message}`)
   }
   // `instructions` must reach the constructor. The capabilities object grew
   // (prompts, resources, logging), so the anchor is the field, not the literal.

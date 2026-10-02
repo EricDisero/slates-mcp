@@ -10,68 +10,46 @@ import { ALL_OPERATIONS, toolDefinitions } from '../packages/shared/dist/index.j
 
 const serverPath = fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))
 
-// THE DEFAULT IS WHAT USERS GET: every tool, one list for the whole connection.
-// Until 0.6.1 this file asserted the default started SHORT, so the checks
-// certified the bug that left Claude Desktop, Claude Code in the Claude app and
-// Codex users with nine tools and no generation (2026-09-30).
-{
-  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath], stderr: 'pipe' })
-  const client = new Client({ name: 'default-surface-check', version: '1.0.0' })
+// Every launch has the full list, including legacy flags retained for compatibility.
+// Tool discovery returns schemas; it never changes capability availability.
+for (const flags of [[], ['--tools=compact'], ['--tools=flat']]) {
+  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath, ...flags], stderr: 'pipe' })
+  const client = new Client({ name: 'fixed-surface-check', version: '1.0.0' })
   let changed = 0
   client.setNotificationHandler(ToolListChangedNotificationSchema, () => { changed++ })
   try {
     await client.connect(transport)
     const initial = (await client.listTools()).tools
-    assert.equal(initial.length, ALL_OPERATIONS.length, 'the default list carries every operation')
+    assert.equal(initial.length, ALL_OPERATIONS.length, 'every launch lists every operation')
     for (const name of ['slates_generate_image', 'slates_generate_video', 'slates_create_shot', 'slates_generate_from_shots']) {
-      assert.ok(initial.some((t) => t.name === name), `${name} is listed by default`)
+      assert.ok(initial.some(tool => tool.name === name), `${name} is listed at startup`)
     }
-    await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_list_shots'] } })
-    assert.deepEqual((await client.listTools()).tools, initial, 'a load does not change the list (MCP 2026-07-28, server/tools)')
-    assert.equal(changed, 0, 'the default server never sends tools/list_changed')
-    console.log(`default-mcp: ${initial.length} tools / ${Buffer.byteLength(JSON.stringify(initial))} bytes, stable across a load`)
+    const search = await client.callTool({ name: 'slates_load_tools', arguments: { query: 'animate these photos' } })
+    assert.ok(search.structuredContent.matches.slice(0, 3).some(match => match.name === 'slates_generate_video'))
+    await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_generate_image'] } })
+    await client.callTool({ name: 'slates_load_tools', arguments: { group: 'admin' } })
+    assert.deepEqual((await client.listTools()).tools, initial, 'queries, exact loads and group loads never change the list')
+    assert.equal(changed, 0, 'no tools/list_changed notification is sent')
+    const image = initial.find(tool => tool.name === 'slates_generate_image')
+    assert.deepEqual(image, toolDefinitions(ALL_OPERATIONS, { surface: 'mcp' }).find(tool => tool.name === image.name))
+    assert.equal(image.annotations.readOnlyHint, false)
+    assert.equal(initial.find(tool => tool.name === 'slates_delete_project').annotations.destructiveHint, true)
+    const invalid = await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_missing'] } })
+    assert.equal(invalid.isError, true)
+    assert.deepEqual((await client.listTools()).tools, initial, 'an invalid load preserves the list')
+    // Missing required settings returns before any transport or generation.
+    const call = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'photorealistic cinematic room', model: 'gpt-image-2-5-sunburst' } })
+    assert.equal(call.structuredContent.requires_clarification, true)
+    assert.equal(call.structuredContent.prompt_warning, undefined)
+    for (const args of [{ topic: 'sunburst' }, { topic: 'cinematic', query: 'near-silhouette' }, { topic: 'cinematic', depth: 'full' }]) {
+      const result = await client.callTool({ name: 'slates_get_prompting_guide', arguments: args })
+      assert.equal(result.isError, undefined)
+      assert.equal(result.structuredContent.guide, result.content[0].text)
+      assert.ok(result.structuredContent.guide.length > 100)
+    }
+    console.log(`fixed-mcp ${flags.join(' ') || 'default'}: ${initial.length} tools / ${Buffer.byteLength(JSON.stringify(initial))} bytes; discovery, permission hints, errors and guides passed`)
   } finally { await client.close(); await transport.close() }
 }
-
-// `--tools=compact`: the opt-in nine-tool start, for a host that honors list_changed.
-const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath, '--tools=compact'], stderr: 'pipe' })
-const client = new Client({ name: 'compact-surface-check', version: '1.0.0' })
-let changed = 0
-client.setNotificationHandler(ToolListChangedNotificationSchema, () => { changed++ })
-try {
-  await client.connect(transport)
-  assert.equal(client.getServerCapabilities().tools.listChanged, true)
-  const initial = (await client.listTools()).tools
-  assert.ok(initial.length < 12)
-  assert.ok(!initial.some((t) => t.name === 'slates_generate_image'))
-  const search = await client.callTool({ name: 'slates_load_tools', arguments: { query: 'generate image' } })
-  assert.ok(search.structuredContent.matches.some((m) => m.name === 'slates_generate_image'))
-  await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_generate_image'] } })
-  const loaded = (await client.listTools()).tools.find((t) => t.name === 'slates_generate_image')
-  const expected = toolDefinitions(ALL_OPERATIONS, { surface: 'mcp' }).find((t) => t.name === loaded.name)
-  assert.deepEqual(loaded, expected)
-  assert.equal(loaded.annotations.readOnlyHint, false)
-  assert.ok(changed > 0)
-  await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_delete_project'] } })
-  const next = (await client.listTools()).tools
-  assert.ok(!next.some((t) => t.name === 'slates_generate_image'))
-  assert.equal(next.find((t) => t.name === 'slates_delete_project').annotations.destructiveHint, true)
-  const invalid = await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_missing'] } })
-  assert.equal(invalid.isError, true)
-  assert.deepEqual((await client.listTools()).tools, next)
-  // Compatibility: previously discovered names remain callable, even if a host
-  // does not refresh its list. No generation: missing aspect ratio returns early.
-  const call = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'photorealistic cinematic room', model: 'gpt-image-2-5-sunburst' } })
-  assert.equal(call.structuredContent.requires_clarification, true)
-  assert.equal(call.structuredContent.prompt_warning, undefined)
-  for (const args of [{ topic: 'sunburst' }, { topic: 'cinematic', query: 'near-silhouette' }, { topic: 'cinematic', depth: 'full' }]) {
-    const r = await client.callTool({ name: 'slates_get_prompting_guide', arguments: args })
-    assert.equal(r.isError, undefined)
-    assert.equal(r.structuredContent.guide, r.content[0].text)
-    assert.ok(r.structuredContent.guide.length > 100)
-  }
-  console.log(`compact-mcp: ${initial.length} startup tools / ${Buffer.byteLength(JSON.stringify(initial))} bytes; discovery, listChanged, permission hints, compatibility calls and guide bodies passed`)
-} finally { await client.close(); await transport.close() }
 
 // Mock only the billable operation to exercise the real MCP approval protocol.
 // Network is disabled in the server process; no provider or account can be touched.

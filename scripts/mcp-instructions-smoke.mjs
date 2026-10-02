@@ -33,7 +33,7 @@ if (!existsSync(serverPath)) {
 // Claude Code keeps the first 2,048 characters of a server's instructions
 // (code.claude.com/docs/en/mcp, § Scale with MCP tool search). 0.6.0's cut fell
 // mid-sentence in the spend-approval step, so the whole Essentials section must
-// end inside it, including when the UPDATE AVAILABLE notice sits in front.
+// end inside it, including when the UPDATE AVAILABLE notice follows the first paragraph.
 const CLAUDE_CODE_INSTRUCTIONS_CUT = 2048
 function essentialsInCut(label, text) {
   const start = text.indexOf('## Essentials')
@@ -50,6 +50,18 @@ function essentialsInCut(label, text) {
     check(`${label}: "${marker}" survives the cut`, kept.includes(marker))
   }
   console.log(`  ..  ${label}: Essentials end at character ${next} of ${CLAUDE_CODE_INSTRUCTIONS_CUT}`)
+}
+
+// Current Codex MCP guidance asks for a self-contained first 512 characters.
+function firstParagraphInCut(label, text) {
+  const kept = text.slice(0, 512)
+  for (const marker of ['slates_get_prompting_guide', 'spend credits', 'estimate every step', 'show the itemized total', 'wait for approval']) {
+    check(`${label}: first 512 characters carry "${marker}"`, kept.includes(marker))
+  }
+  const versionEnd = text.indexOf('\n\n')
+  const paragraphEnd = text.indexOf('\n\n', versionEnd + 2)
+  const noticeStart = text.indexOf('UPDATE AVAILABLE')
+  check(`${label}: update notice follows the complete first doctrine paragraph`, paragraphEnd > versionEnd && (noticeStart < 0 || noticeStart > paragraphEnd))
 }
 
 let failures = 0
@@ -116,6 +128,7 @@ if (typeof instructions === 'string') {
     instructions.includes('Working without skill files')
   )
   console.log(`  ..  ${instructions.length} chars of instructions on the wire`)
+  firstParagraphInCut('the current run', instructions)
   essentialsInCut('the current run', instructions)
 }
 
@@ -124,6 +137,15 @@ const generateImage = tools.find((t) => t.name === 'slates_generate_image')
 check('slates_generate_image is exposed', !!generateImage)
 check('slates_generate_video is listed by default', tools.some((t) => t.name === 'slates_generate_video'))
 if (generateImage) check('no cross-model blacklist in the schema', !generateImage.description.includes('"photorealistic"'))
+
+// Tool discovery is read-only; it must not change the MCP list seen on startup.
+{
+  const search = await client.callTool({ name: 'slates_load_tools', arguments: { query: 'animate these photos' } })
+  const matches = search.structuredContent?.matches ?? []
+  check('a photo animation brief discovers video generation', matches.slice(0, 3).some(match => match.name === 'slates_generate_video'))
+  await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_generate_video'] } })
+  check('exact tool discovery leaves the full MCP list fixed', JSON.stringify((await client.listTools()).tools) === JSON.stringify(tools))
+}
 
 // ── the enforcement, end to end, through the real MCP call path ────────────
 //
@@ -230,6 +252,8 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   // expected count is whatever the built package holds (a hand-typed "33" sat
   // here for a month after the corpus reached 34).
   const { SKILLS } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  const { buildAgentDoctrine } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  check('wire instructions preserve every canonical doctrine byte', (() => { const canonical = buildAgentDoctrine({ surface: 'mcp' }); const first = canonical.indexOf('\n\n'); const wire = (instructions ?? '').slice((instructions ?? '').indexOf('\n\n') + 2); return wire.startsWith(canonical.slice(0, first)) && wire.endsWith(canonical.slice(first + 2)) })())
   const skillCount = Object.keys(SKILLS).length
   check('every bundled skill is exposed as an MCP prompt', prompts.length === skillCount, `${prompts.length} of ${skillCount}`)
   const got = await client.getPrompt({ name: 'slates-cost-discipline' })
@@ -313,7 +337,8 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   const stale = staleClient.getInstructions() ?? ''
   check('a behind server puts UPDATE AVAILABLE in its instructions', stale.includes('UPDATE AVAILABLE'))
   check('the notice tells the agent to have the user restart the client', /quit and reopen the MCP client/.test(stale))
-  essentialsInCut('a behind server (notice in front)', stale)
+  firstParagraphInCut('a behind server', stale)
+  essentialsInCut('a behind server (notice after first paragraph)', stale)
   check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
   await staleClient.close()
 }

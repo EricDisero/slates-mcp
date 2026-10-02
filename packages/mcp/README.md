@@ -75,9 +75,9 @@ No environment variables, no API keys to paste into config files.
 
 ## What the agent can do
 
-<!-- gen:tool-count -->157<!-- /gen:tool-count --> tools covering the full workspace: project, folder, character, location, look, and board management (create / update / delete), image generation and surgical image editing (<!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> — with project-asset reference images), video generation (<!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, veo-3.1-fast, veo-3.1-standard, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, MiniMax H3 Max Turbo, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->), audio generation (<!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->), lip sync, motion transfer, background generation with status polling, timeline assembly (add / reorder / remove clips), MP4 export and FCP7 XML export for DaVinci Resolve, cost estimation, and credit balance. Bundled prompting/workflow guides are readable at runtime via the `slates_get_prompting_guide` tool — no skill installation needed for MCP-only clients.
+<!-- gen:tool-count -->157<!-- /gen:tool-count --> tools covering the full workspace: project, folder, character, location, look, and board management (create / update / delete), image generation and surgical image editing (<!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> — with project-asset reference images), video generation (<!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, MiniMax H3 Max Turbo, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster -->), audio generation (<!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster -->), lip sync, motion transfer, background generation with status polling, timeline assembly (add / reorder / remove clips), MP4 export and FCP7 XML export for DaVinci Resolve, cost estimation, and credit balance. Bundled prompting/workflow guides are readable at runtime via the `slates_get_prompting_guide` tool — no skill installation needed for MCP-only clients.
 
-Generation tools estimate cost first and ask for confirmation on anything over <!-- gen:confirm-credits -->17<!-- /gen:confirm-credits --> credits, so the agent cannot silently burn credits. Every tool also carries MCP annotations, so a host can auto-approve a read and warn on a delete; the <!-- gen:skill-count -->37<!-- /gen:skill-count --> bundled skills are exposed as MCP **prompts**, and the manual, the model capability table and the live price list as **resources**.
+Generation tools estimate cost first and ask for confirmation on anything over <!-- gen:confirm-credits -->17<!-- /gen:confirm-credits --> credits, so the agent cannot silently burn credits. Every tool also carries MCP annotations, so a host can auto-approve a read and warn on a delete; the <!-- gen:skill-count -->36<!-- /gen:skill-count --> bundled skills are exposed as MCP **prompts**, and the manual, the model capability table and the live price list as **resources**.
 
 The timeline, export, background-generation, edit-image, and image-reference tools require a Slates desktop on agent API v2 — if a tool reports a version error, update Slates (Settings → Check for Updates) and retry.
 
@@ -92,10 +92,9 @@ The timeline, export, background-generation, edit-image, and image-reference too
 The server lists every tool, and the list stays the same for the whole connection. Your client
 decides how much of it to load: Claude Code and Codex send the model the tool names only and fetch a
 tool's full definition when it is needed. `slates_load_tools` with `query` finds a tool by task.
-`--tools=compact` starts with a small workspace/discovery set instead and adds tools through
-`tools/list_changed`, for a client that re-reads its list mid-chat (Claude Desktop, Claude Code in the
-Claude app and Codex do not).
+Legacy `--tools=compact` and `--tools=flat` launch flags are accepted; both expose the full fixed list.
 
-`slates_get_prompting_guide` returns a short readable card by default. Use `query` for a section or
+`slates_get_prompting_guide` with no topic discovers guides from a brief in `query`, or lists the
+catalog without a query. With a topic it returns a short card by default. Use `query` for a section or
 cinematic technique ID, `depth: "index"` for headings, or `depth: "full"` for the complete guide.
 Both text and structured content include the actual guide body. No extra loading hook is required.

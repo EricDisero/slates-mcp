@@ -17,13 +17,14 @@ import { z } from 'zod'
 import {
   ALL_OPERATIONS,
   SKILLS,
+  parseSkillMetadata,
   MODEL_CAPABILITIES,
   MODEL_FACTS,
   SlatesCloudClient,
   buildAgentDoctrine,
   APP_MANUAL,
   defaultContext,
-  toolDefinitions, STARTUP_TOOL_IDS,
+  toolDefinitions,
   cachedLatestVersion,
   refreshLatestVersion,
   updateNotice,
@@ -83,17 +84,20 @@ const updateAdvice = updateNotice(
   cachedLatestVersion(PKG_NAME),
   'Newer models and parameters are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client (Claude Desktop, Codex, Cursor) so npx fetches the new version; if it was installed globally, run `npm i -g @slatesvideo/mcp-server@latest` first.'
 )
+const doctrine = buildAgentDoctrine({ surface: 'mcp' })
+const firstParagraphEnd = doctrine.indexOf('\n\n')
 const instructions = [
   `Slates MCP server v${pkg.version} (${PKG_NAME}).`,
+  doctrine.slice(0, firstParagraphEnd),
   updateAdvice,
-  buildAgentDoctrine({ surface: 'mcp' }),
+  doctrine.slice(firstParagraphEnd + 2),
 ].filter((part): part is string => !!part).join('\n\n')
 
 const server = new Server(
   { name: 'slates-studio', version: pkg.version },
   {
     capabilities: {
-      tools: { listChanged: true },
+      tools: {},
       // Every bundled skill, offered in the host's own picker rather than
       // only through a tool call the model has to decide to make.
       prompts: {},
@@ -124,12 +128,9 @@ const server = new Server(
 // "as a side effect of other requests on the connection". Hiding definitions is
 // the HOST's job: Claude Code and Codex send the model names only and fetch a
 // schema on use, so the full list cost about 3,100 tokens up front in Claude
-// Code and nothing measurable in Codex. `--tools=compact` keeps the old
-// nine-tool start for a host that honors list_changed; `--tools=flat` is
-// accepted as the default it now is.
+// Code and nothing measurable in Codex. Legacy --tools=compact and
+// --tools=flat flags remain accepted; every launch exposes the same full list.
 const TOOLS = toolDefinitions(ops, { surface: 'mcp' })
-const compactTools = process.argv.includes('--tools=compact')
-let selectedTools = new Set<string>()
 
 /**
  * Output schemas for the ops whose result shape is STABLE.
@@ -196,7 +197,7 @@ const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
 }
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOLS.filter((t) => !compactTools || STARTUP_TOOL_IDS.has(t.name) || selectedTools.has(t.name)).map((t) => ({
+  tools: TOOLS.map((t) => ({
     name: t.name,
     description: t.description,
     inputSchema: t.inputSchema,
@@ -343,11 +344,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     }
 
     let data = result.data as Record<string, unknown> | undefined
-    if (compactTools && op.id === 'slates_load_tools' && Array.isArray(data?.tools)) {
-      selectedTools = new Set((data.tools as Array<{ name: string }>).map((t) => t.name))
-      await server.sendToolListChanged().catch(() => {})
-    }
-
 
     // The one place the server can ask the USER instead of the model.
     //
@@ -416,10 +412,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
 
 /** First sentence of the frontmatter description — the picker's one-liner. */
 function skillSummary(name: string): string {
-  const body = SKILLS[name] ?? ''
-  const fm = /^---\n([\s\S]*?)\n---/.exec(body)
-  const desc = fm ? /^description:\s*(.+)$/m.exec(fm[1])?.[1] : undefined
-  const first = (desc ?? name).split(/(?<=\.)\s/)[0]
+  const { description } = parseSkillMetadata(SKILLS[name], name)
+  const first = description.split(/(?<=\.)\s/)[0]
   return first.length > 300 ? `${first.slice(0, 297)}…` : first
 }
 
@@ -567,6 +561,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
 })
 
 async function main(): Promise<void> {
+  if (process.argv.includes('--tools=compact')) console.error('[slates-mcp] --tools=compact is deprecated; the server always exposes the full fixed tool list. Clients control selective loading.')
   const transport = new StdioServerTransport()
   await server.connect(transport)
   if (updateAdvice) console.error(`[slates-mcp] ${updateAdvice}`)
