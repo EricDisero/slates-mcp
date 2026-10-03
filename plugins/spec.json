@@ -1,0 +1,67 @@
+{
+  "$comment": "The one source for every Slates plugin package. scripts/build-plugins.mjs reads this file, the free skills in packages/shared/skills/ and the plugin-only skills in plugins/src/skills/, and writes plugins/slates/, plugins/slates-claude-directory/, the two marketplace files and dist-plugins/slates-openai-directory.zip. Edit here, then run `npm run build:plugins`; never edit a generated file. Listing copy is customer-facing: no model names, prices or caps (plugin skills and listings are frozen at submission), no em dashes.",
+  "name": "slates",
+  "displayName": "Slates",
+  "shortDescription": "The AI video studio you own",
+  "description": "Your AI runs the whole video production in Slates, the desktop AI video studio you own. It writes the script, builds the storyboard, shows the price before anything generates, makes the shots and lays out the cut.",
+  "longDescription": "Slates is a desktop AI video studio you buy once and keep. This plugin connects your AI to it, so your AI can run the whole production with you. It writes the script, builds characters and storyboards, shows you the price before anything generates, makes the images and video, and lays the cut out on the timeline, ready to export to DaVinci Resolve or Premiere. Every project and file stays on your own computer.\n\nYou need the Slates desktop app on Windows or macOS and a Slates account with credits. If the app isn't set up yet, the plugin walks you through installing and connecting it, then hands the work to the Slates tools.",
+  "developerName": "Blueprint Online Learning Inc.",
+  "author": {
+    "name": "Blueprint Online Learning Inc.",
+    "email": "hello@slates.video",
+    "url": "https://slates.video"
+  },
+  "homepage": "https://slates.video",
+  "repository": "https://github.com/EricDisero/slates-mcp",
+  "license": "MIT",
+  "category": "Creativity",
+  "capabilities": [
+    "Interactive",
+    "Write"
+  ],
+  "keywords": [
+    "slates",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "storyboard",
+    "desktop",
+    "mcp"
+  ],
+  "urls": {
+    "website": "https://slates.video",
+    "support": "https://slates.video/support",
+    "privacyPolicy": "https://slates.video/privacy",
+    "termsOfService": "https://slates.video/terms"
+  },
+  "defaultPrompts": [
+    "Connect Slates and show me my projects",
+    "Turn this script into a storyboard in Slates and quote the shots before generating anything",
+    "Plan a 15-second product ad in Slates from this brief"
+  ],
+  "icon": {
+    "desktopPath": "build/icon.png",
+    "$comment": "Read from the desktop repo through desktopSource() (SLATES_DESKTOP_DIR, else ../slate) and copied into each package as assets/icon.png. In CI without the desktop, the committed plugins/slates/assets/icon.png is reused."
+  },
+  "mcpServer": {
+    "name": "slates",
+    "package": "@slatesvideo/mcp-server",
+    "versionFrom": "packages/mcp/package.json"
+  },
+  "skills": {
+    "plugin": [
+      "slates-connect"
+    ],
+    "shared": [
+      "slates-project-organization",
+      "slates-script-craft",
+      "slates-storyboard-from-script",
+      "slates-shot-variety",
+      "slates-one-prompt-film",
+      "slates-edit-and-iterate",
+      "slates-direct-response-ad",
+      "slates-ugc-influencer-ad"
+    ]
+  },
+  "liveGuideFooter": "Any other Slates guide this skill names loads live through the `slates_get_prompting_guide` tool, which always carries the current models, prices and limits."
+}

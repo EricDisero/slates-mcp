@@ -115,3 +115,5 @@ npm tarball. Paid skills live in the private `slates-api/pack-skills/` and must 
 this repo**, which is public: an entitlement filter over a public artifact protects nothing, and not
 shipping the file is the only gate. The frontmatter, the four skill categories, the `resolveGuideTopic()` alias table and the
 endpoint-schema-beats-model-card rule: `.claude/rules/skills.md`.
+
+**Plugins are generated.** `plugins/slates/` (our Codex and Claude Code marketplace), `plugins/slates-claude-directory/` (Anthropic's directory, server pinned) and `dist-plugins/slates-openai-directory.zip` (OpenAI's directory, skills only) are built by `npm run build:plugins` from `plugins/spec.json`, the skills it selects here and `plugins/src/skills/`. After a skill edit, rebuild them; `npm run build` fails on drift. Directory skills are frozen at submission, so the build refuses a model name, a price or a cap in any plugin skill. Push a version bump only after its npm publish lands: the directory package pins that version. State and Eric's submission steps: second-brain `plans/2026-09-21-slates-chatgpt-plugin-distribution.md`.

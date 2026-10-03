@@ -1,0 +1,19 @@
+{
+  "metadata": {
+    "description": "Your AI runs the whole video production in Slates, the desktop AI video studio you own. It writes the script, builds the storyboard, shows the price before anything generates, makes the shots and lays out the cut."
+  },
+  "name": "slates",
+  "owner": {
+    "email": "hello@slates.video",
+    "name": "Blueprint Online Learning Inc.",
+    "url": "https://slates.video"
+  },
+  "plugins": [
+    {
+      "category": "Creativity",
+      "description": "Your AI runs the whole video production in Slates, the desktop AI video studio you own. It writes the script, builds the storyboard, shows the price before anything generates, makes the shots and lays out the cut.",
+      "name": "slates",
+      "source": "./plugins/slates"
+    }
+  ]
+}

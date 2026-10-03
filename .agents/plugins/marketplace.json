@@ -1,0 +1,20 @@
+{
+  "interface": {
+    "displayName": "Slates"
+  },
+  "name": "slates",
+  "plugins": [
+    {
+      "category": "Creativity",
+      "name": "slates",
+      "policy": {
+        "authentication": "ON_INSTALL",
+        "installation": "AVAILABLE"
+      },
+      "source": {
+        "path": "./plugins/slates",
+        "source": "local"
+      }
+    }
+  ]
+}

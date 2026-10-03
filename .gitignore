@@ -11,6 +11,7 @@ packages/mcp/dist-mcpb/
 # what slates-web's check-skills-pack-lockstep.mjs reads to prove the live
 # SKILLS_PACK_DOWNLOAD_URL matches a pack that was actually built.
 dist-pack/*.zip
+dist-plugins/
 
 # Generated (by packages/shared/scripts/embed-skills.mjs on every build)
 packages/shared/src/skills/content.ts

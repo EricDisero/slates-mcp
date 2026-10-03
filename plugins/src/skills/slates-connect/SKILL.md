@@ -1,0 +1,109 @@
+---
+name: slates-connect
+description: Install, open, connect, or repair Slates when its slates_* tools are missing or fail to reach the desktop app. Do not use when Slates tools already work; continue with the user's request instead.
+---
+
+# Connect Slates
+
+## 1. Check the existing connection
+
+If `slates_*` tools are available, call `slates_get_workspace_state`.
+If it succeeds, continue with the user's request. Change nothing.
+If it fails, use the error to diagnose the connection below.
+
+## 2. Check the desktop app
+
+Detect the operating system. Check whether Slates is installed and running.
+
+- On Windows, look for Slates in the Start menu and for
+  `%LOCALAPPDATA%\Programs\slates\Slates.exe`. Check the running `Slates.exe`
+  process, for example with PowerShell `Get-Process Slates -ErrorAction SilentlyContinue`.
+- On macOS, look for `/Applications/Slates.app` or `~/Applications/Slates.app`.
+  Check Activity Monitor for Slates, or run `pgrep -x Slates`.
+
+Open the installed app. Keep it open on the same computer as the MCP host.
+In Slates, open **Settings → AI tools → Use Slates from Claude, Cursor or Codex**.
+Check that the connection says **Connected**. If it says **Not connected yet**,
+have the user press **Send link** and complete the email authorization.
+The local connection control in that section is **Connect without the email link**.
+An installed app alone does not prove its agent connection is on.
+
+## 3. Install Slates if missing
+
+Download only from `https://slates.video/download` or the latest release at
+`https://github.com/EricDisero/slates-releases/releases/latest`.
+Choose the Windows `.exe` or macOS `.dmg` for the user's operating system.
+Do not use a third-party mirror or an old release.
+
+Use the visible operating-system installation flow. On Windows, open the installer
+and let it finish. On macOS, open the DMG and drag Slates to Applications.
+Open Slates after installation.
+
+Never bypass an invalid signature, Gatekeeper warning, or SmartScreen warning.
+Never disable a security check, remove quarantine to bypass a warning, or re-sign the app.
+Retry at most one fresh official download if the first is corrupt or incomplete.
+If a warning persists, stop and report it.
+If the host cannot download, install, or open the app, stop and give the user
+`https://slates.video/download` with the blocked step. Let them finish the visible OS flow.
+
+## 4. Have the user sign in inside Slates
+
+Have the user sign in inside the app with the email they used to purchase Slates.
+Let them complete any email link or confirmation themselves.
+Never ask for or handle their credentials, licence key, or tokens.
+Return to **Settings → AI tools** and confirm the agent connection is on.
+
+## 5. Register the MCP server only if missing
+
+Identify the current host. Run `codex mcp list` for Codex or `claude mcp list`
+for Claude Code. Check plugin-provided servers too.
+A Slates plugin from our marketplace already carries the server.
+If a Slates server is present, keep it and diagnose any failure. Do not add another.
+
+Before adding a missing server, run `node --version`.
+Node.js supplies `npx`. If Node.js is missing, give the user `https://nodejs.org`
+and have them install it, then reopen the terminal or host and check again.
+
+For Codex, run:
+
+```sh
+codex mcp add slates -- npx -y @slatesvideo/mcp-server
+```
+
+For Claude Code, use **Settings → AI tools → Connect** beside **Claude Code**,
+or run:
+
+```sh
+claude mcp add slates -s user -- npx -y @slatesvideo/mcp-server
+```
+
+Never edit a host's config file by hand.
+If two Slates servers are registered, keep the plugin-provided server and remove
+the older user-level registration through the host's MCP command or controls.
+If the host cannot register a local stdio server, stop and explain that this
+connection requires a local MCP host, such as Codex or Claude Code.
+A regular ChatGPT web chat cannot reach this local stdio server.
+
+## 6. Load and prove the connection
+
+Tell the user to start a new task or session, because hosts load MCP tools when
+a task starts. Restart the host if needed to load the registration.
+In the new task or session, call `slates_get_workspace_state`.
+Report success only after the call succeeds, then continue with the user's request.
+If the tools are still unavailable, report that verification is pending.
+
+## 7. Troubleshoot briefly
+
+- If the app is closed, reopen Slates and leave it running.
+- If `~/.slates/agent-connection.json` is missing, reconnect in
+  **Settings → AI tools**. The app writes this file. Check its existence only;
+  do not print its contents, handle its tokens, or create it by hand.
+- If tools are missing from an old server, read the version and any update notice
+  in the server's instructions. Restart the host to update an unpinned `npx`
+  install, then start a new session and repeat the workspace-state check.
+
+## 8. Keep setup free of generation
+
+Setup never spends credits. Do not generate anything to test the connection.
+Before any generation, use the Slates tools to quote the price and show the prompt.
+Wait for the user's approval before generating.

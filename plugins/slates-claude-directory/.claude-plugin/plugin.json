@@ -1,0 +1,26 @@
+{
+  "author": {
+    "email": "hello@slates.video",
+    "name": "Blueprint Online Learning Inc.",
+    "url": "https://slates.video"
+  },
+  "description": "Your AI runs the whole video production in Slates, the desktop AI video studio you own. It writes the script, builds the storyboard, shows the price before anything generates, makes the shots and lays out the cut.",
+  "displayName": "Slates",
+  "homepage": "https://slates.video",
+  "keywords": [
+    "slates",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "storyboard",
+    "desktop",
+    "mcp"
+  ],
+  "license": "MIT",
+  "name": "slates",
+  "privacyPolicyUrl": "https://slates.video/privacy",
+  "repository": "https://github.com/EricDisero/slates-mcp",
+  "supportUrl": "https://slates.video/support",
+  "termsOfServiceUrl": "https://slates.video/terms",
+  "version": "0.6.2"
+}

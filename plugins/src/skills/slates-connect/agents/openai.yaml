@@ -1,0 +1,3 @@
+interface:
+  display_name: "Connect Slates"
+  short_description: "Install, open, and connect the Slates desktop app."

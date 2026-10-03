@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "slates": {
+      "args": [
+        "-y",
+        "@slatesvideo/mcp-server@0.6.2"
+      ],
+      "command": "npx"
+    }
+  }
+}

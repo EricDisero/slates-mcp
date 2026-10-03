@@ -1,0 +1,46 @@
+{
+  "author": {
+    "email": "hello@slates.video",
+    "name": "Blueprint Online Learning Inc.",
+    "url": "https://slates.video"
+  },
+  "description": "Your AI runs the whole video production in Slates, the desktop AI video studio you own. It writes the script, builds the storyboard, shows the price before anything generates, makes the shots and lays out the cut.",
+  "homepage": "https://slates.video",
+  "interface": {
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "category": "Creativity",
+    "composerIcon": "./assets/icon.png",
+    "defaultPrompt": [
+      "Connect Slates and show me my projects",
+      "Turn this script into a storyboard in Slates and quote the shots before generating anything",
+      "Plan a 15-second product ad in Slates from this brief"
+    ],
+    "developerName": "Blueprint Online Learning Inc.",
+    "displayName": "Slates",
+    "logo": "./assets/icon.png",
+    "longDescription": "Slates is a desktop AI video studio you buy once and keep. This plugin connects your AI to it, so your AI can run the whole production with you. It writes the script, builds characters and storyboards, shows you the price before anything generates, makes the images and video, and lays the cut out on the timeline, ready to export to DaVinci Resolve or Premiere. Every project and file stays on your own computer.\n\nYou need the Slates desktop app on Windows or macOS and a Slates account with credits. If the app isn't set up yet, the plugin walks you through installing and connecting it, then hands the work to the Slates tools.",
+    "privacyPolicyURL": "https://slates.video/privacy",
+    "shortDescription": "The AI video studio you own",
+    "supportURL": "https://slates.video/support",
+    "termsOfServiceURL": "https://slates.video/terms",
+    "websiteURL": "https://slates.video"
+  },
+  "keywords": [
+    "slates",
+    "ai-video",
+    "video-generation",
+    "image-generation",
+    "storyboard",
+    "desktop",
+    "mcp"
+  ],
+  "license": "MIT",
+  "mcpServers": "./.mcp.json",
+  "name": "slates",
+  "repository": "https://github.com/EricDisero/slates-mcp",
+  "skills": "./skills/",
+  "version": "0.6.2"
+}
