@@ -94,6 +94,10 @@ const QUESTIONS = [
   ['turn off sound on a video generation', ['video settings', 'Audio inside a video clip']],
   ['how do I rename a board', ['Boards', 'board name']],
   ['export several cuts at once', ['Export several cuts']],
+  ['export ad variants in several delivery formats', ['variant grid', 'delivery formats', 'Export several cuts']],
+  ['stop a batch export now and retry unfinished files', ['batch export', 'cancel and retry', 'Export several cuts']],
+  ['reframe a clip for a delivery format without changing my cut', ['reframe', 'delivery framing']],
+  ['where are my export manifest and Meta CSV after restarting', ['manifest and CSV', 'batch history', 'Export several cuts']],
 ]
 
 let hits = 0

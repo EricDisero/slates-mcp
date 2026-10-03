@@ -600,13 +600,42 @@ type DockSection = (typeof VIEW_DOCK_SECTIONS)[number]
 /** What each dock section is called on screen. */
 const DOCK_SECTION_NAMES: Record<DockSection, string> = { storyboards: 'Boards', library: 'Library', folders: 'Folders', pinned: 'Pinned' }
 
+// Delivery ids and dimensions come from the desktop catalog, not model capabilities.
+const deliveryAspectInput = z.string().min(1).describe('Delivery format id from slates_get_variant_grid.formats; the desktop validates it and supplies dimensions.')
+const gridSelectionInput = z.object({ rowKeys: z.array(z.string()), aspects: z.array(deliveryAspectInput) }).strict()
+const deliveryInput = z.object({
+  formats: z.array(deliveryAspectInput).min(1),
+  shortSide: z.number().int().positive().optional().describe('Optional short side supported by the desktop delivery settings.'),
+  mode: z.enum(['fill', 'fit']).optional().describe('Fill crops around focus; fit pads the frame.'),
+}).strict()
+const taxonomyInput = z.object({
+  concept: z.string().min(1), variant: z.string().min(1),
+  hook: z.string().optional(), body: z.string().optional(), cast: z.string().optional(),
+  vf: z.string().optional(), icp: z.string().optional(), lp: z.string().optional(),
+}).strict().describe('Naming fields. Prefill recorded variation choices by position, never infer them from labels. The desktop owns filename formatting and collision resolution.')
+const slotBindingInput = z.object({
+  key: z.string(), label: z.string().optional(), choicePosition: z.number().int().nonnegative().optional(),
+  sectionId: z.string().optional(), alternativeId: z.string().optional(), shotIds: z.array(z.string().uuid()).optional(),
+}).strict()
+const gridBindingInput = z.object({
+  familyId: z.string(), variationId: z.string().nullable().optional(),
+  slots: z.object({ hook: slotBindingInput.optional(), body: slotBindingInput.optional(), endCard: slotBindingInput.optional() }).strict().optional(),
+  intendedShotIds: z.array(z.string().uuid()).optional(),
+}).strict().describe('Explicit existing-cut slot bindings; creates no combinations or nested sequences.')
+const cutOptionsInput = {
+  delivery: deliveryInput.nullable().optional().describe('Delivery formats and framing defaults; null restores legacy Master export.'),
+  taxonomy: taxonomyInput.nullable().optional(),
+  gridBinding: gridBindingInput.nullable().optional(),
+}
+type CutOptions = { delivery?: z.infer<typeof deliveryInput> | null; taxonomy?: z.infer<typeof taxonomyInput> | null; gridBinding?: z.infer<typeof gridBindingInput> | null }
+
 /** The shape both view ops speak. Mirrors `ViewReport` in the desktop's
  *  `@shared/types/view`; the desktop is the only writer, and it answers every
  *  call with what its own stores settled on. */
 interface ViewShape {
   projectId: string | null
   lens: (typeof VIEW_LENSES)[number]
-  cut: { open: boolean; full: boolean; side: (typeof VIEW_CUT_SIDES)[number]; height: number; width: number }
+  cut: { open: boolean; full: boolean; side: (typeof VIEW_CUT_SIDES)[number]; height: number; width: number; timelineId?: string | null; format?: string; gridSelection?: z.infer<typeof gridSelectionInput> }
   /** `folded` is absent from a desktop whose view predates folding. */
   leftDock: { open: boolean; width: number; folded?: DockSection[] }
   studioAgent: { enabled: boolean; open: boolean; width: number }
@@ -688,7 +717,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. New desktops also report cut.format and selected variant grid rows/aspects. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -718,7 +747,7 @@ export const getView: Operation<Record<string, never>> = {
 export const setView: Operation<{
   projectId?: string | null
   lens?: (typeof VIEW_LENSES)[number]
-  cut?: { open?: boolean; full?: boolean; side?: (typeof VIEW_CUT_SIDES)[number]; height?: number; width?: number; timelineId?: string }
+  cut?: { open?: boolean; full?: boolean; side?: (typeof VIEW_CUT_SIDES)[number]; height?: number; width?: number; timelineId?: string; format?: string; gridSelection?: z.infer<typeof gridSelectionInput> }
   leftDock?: { open?: boolean; width?: number; folded?: DockSection[] }
   studioAgent?: { open?: boolean; width?: number }
   script?: { details?: boolean; textScale?: number; panelShotId?: string | null }
@@ -749,6 +778,8 @@ export const setView: Operation<{
           height: z.number().optional().describe("The bottom band's height in px."),
           width: z.number().optional().describe("The side column's width in px."),
           timelineId: z.string().optional().describe('The named cut to show on the timeline (slates_list_timelines).'),
+          format: deliveryAspectInput.optional().describe('Preview this delivery format; requires ad-variant-export.'),
+          gridSelection: gridSelectionInput.optional().describe('Selected existing grid rows and delivery formats; requires ad-variant-export. Does not export.'),
         })
         .strict()
         .optional(),
@@ -832,6 +863,9 @@ export const setView: Operation<{
       input.script?.textScale !== undefined ||
       input.script?.panelShotId !== undefined
     if (widened) await ctx.desktop().requireCapability('view-v2', 'showing and opening things in the window')
+    if (input.cut?.format !== undefined || input.cut?.gridSelection !== undefined) {
+      await ctx.desktop().requireCapability('ad-variant-export', 'delivery preview and variant grid selection')
+    }
     const r = await ctx.desktop().post<{ view: ViewShape | null; reason?: string }>('/agent/view', input)
     if (!r.view) {
       return { text: r.reason ? `Nothing was changed (${r.reason}).` : 'Nothing was changed.', data: { view: null } }
@@ -5840,15 +5874,97 @@ interface TimelineView {
   durationSec?: number
 }
 
-const exportCutsInput = z.object({ projectId: z.string().uuid(), directory: z.string(), manifestId: z.string().min(1),
+const legacyExportCutsInput = z.object({ projectId: z.string().uuid(), directory: z.string(), manifestId: z.string().min(1),
   action: z.enum(['start','status','cancel']).optional().describe('start (default) begins, or re-attaches to a running export; status reads it; cancel stops after the output being rendered.'),
-  items: z.array(z.object({ timelineId: z.string().uuid(), format: z.enum(['mp4','xml']) })).min(1).optional().describe('Required to start.') })
+  items: z.array(z.object({ timelineId: z.string().uuid(), format: z.enum(['mp4','xml']) }).strict()).min(1).optional().describe('Required to start.') }).strict()
+const adCopyInput = z.object({ destinationUrl: z.string().optional(), primaryText: z.string().optional(), headline: z.string().optional(), cta: z.string().optional() }).strict()
+const batchExportCutsInput = z.object({
+  version: z.literal(2).describe('Use version 2 with batchId and items for delivery-format batches. Omit version for legacy directory/manifestId requests.'),
+  projectId: z.string().uuid(), batchId: z.string().min(1).describe('Required for version 2. Reuse this id and the same items to reattach or retry.'),
+  exportRoot: z.string().optional().describe('Optional export root; the desktop remembers it and creates a fresh batch folder.'),
+  items: z.array(z.object({ timelineId: z.string().uuid(), aspects: z.array(deliveryAspectInput).min(1).optional(),
+    formats: z.array(z.enum(['mp4', 'xml'])).min(1).optional(), taxonomy: taxonomyInput.optional() }).strict()).min(1),
+  copy: adCopyInput.optional().describe('User-entered batch ad copy and destination defaults. Omission leaves them empty; never copy script or video text here.'),
+  outputCopy: z.record(adCopyInput).optional().describe('Per-output ad copy overrides keyed by the desktop receipt output key.'),
+}).strict()
+// MCP requires an object at the schema root; the CLI also reads its shape for
+// project defaults and flag coercion. Validate the two wire contracts intact.
+const exportCutsInput = z.object({
+  ...legacyExportCutsInput.partial().shape,
+  ...batchExportCutsInput.partial().shape,
+  projectId: z.string().uuid(),
+  items: z.array(z.union([batchExportCutsInput.shape.items.element, legacyExportCutsInput.shape.items.unwrap().element])).min(1).optional().describe('Required for version 2 start/retry and legacy start. Version 2 selects existing timelineIds with aspects/formats/taxonomy; legacy selects timelineId/format.'),
+}).strict().superRefine((input, ctx) => {
+  const parsed = (input.version === 2 ? batchExportCutsInput : legacyExportCutsInput).safeParse(input)
+  if (!parsed.success) for (const issue of parsed.error.issues) ctx.addIssue(issue)
+})
 export const exportCuts: Operation<z.infer<typeof exportCutsInput>> = {
-  id: 'slates_export_cuts', description: 'Export explicit named cuts to distinct local files with a frozen manifest of timeline settings, media, script revisions and generation provenance. Returns at once while rendering continues; poll with action status. Starting again with the same manifestId and selection retries unfinished outputs under the same filenames and skips finished ones. Existing outputs are never overwritten, and export never generates media. Uses current video/XML fidelity limits.',
+  id: 'slates_export_cuts', description: 'Start or retry a background export of existing named cuts to local files without generating media or spending credits. Version 2 selects cuts × delivery aspects from slates_get_variant_grid and returns batchId, manifestPath and frozen named outputs immediately; poll slates_get_export_batch. Repeating the same batchId and selection reattaches or retries unfinished outputs; completed files are checked and never overwritten. Naming, delivery and provenance are frozen by the desktop. CSV contains completed MP4s only and is unverified against a live Meta import. Missing takes are reported per cut, never filled. Version 2 requires ad-variant-export; update Slates on capability refusal. Legacy directory/manifestId/items/action requests remain supported.',
+  billable: false,
   input: exportCutsInput,
   async run(input, ctx) {
-    await ctx.desktop().requireCapability('named-cuts', 'named cuts')
- return ok(await ctx.desktop().post('/agent/timeline/export-cuts', input)) },
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('named-cuts', 'named cuts')
+    if (input.version === 2) await desktop.requireCapability('ad-variant-export', 'ad variant batch export and retry')
+    return ok(await desktop.post('/agent/timeline/export-cuts', input))
+  },
+}
+
+export const getExportBatch: Operation<{ projectId: string; batchId?: string }> = {
+  id: 'slates_get_export_batch', description: 'Inspect the status of an ad variant export batch, or list saved batches in a project when batchId is omitted. Returns receipts and per-output states immediately through GET, including after a desktop restart. Never starts or retries a render and never spends credits. Requires ad-variant-export; update Slates on capability refusal.',
+  billable: false,
+  input: z.object({ projectId: z.string().uuid(), batchId: z.string().min(1).optional() }).strict(),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('ad-variant-export', 'ad variant export batch status and listing')
+    if (input.batchId !== undefined) return ok(await desktop.get('/agent/timeline/export-cuts/status', input))
+    return ok(await desktop.get('/agent/timeline/export-batches', { projectId: input.projectId }))
+  },
+}
+
+export const cancelExportBatch: Operation<{ projectId: string; batchId: string; mode: 'now' | 'after-current' }> = {
+  id: 'slates_cancel_export_batch', description: 'Stop an ad variant export now, or after the current output finishes. mode now aborts active encoding; after-current preserves the current output before stopping. Completed files and frozen names remain available for retry with slates_export_cuts. Never generates media or spends credits. Requires ad-variant-export; update Slates on capability refusal.',
+  billable: false,
+  input: z.object({ projectId: z.string().uuid(), batchId: z.string().min(1), mode: z.enum(['now', 'after-current']) }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variant-export', 'ad variant export cancellation')
+    return ok(await ctx.desktop().post('/agent/timeline/export-cuts/cancel', input))
+  },
+}
+
+export const getVariantGrid: Operation<{ projectId: string }> = {
+  id: 'slates_get_variant_grid', description: 'Read the variant grid of existing named cuts, recorded slot choices, missing takes and delivery format ids with actual dimensions. Shows absent combinations without creating them; missing-take prices are local quotes, never generation requests. Select existing timelineIds and returned aspects for slates_export_cuts. Requires ad-variant-export; update Slates on capability refusal.',
+  billable: false,
+  input: z.object({ projectId: z.string().uuid() }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variant-export', 'the ad variant grid and delivery catalog')
+    return ok(await ctx.desktop().get('/agent/timeline/variant-grid', input))
+  },
+}
+
+const reframeReportInput = z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid(), aspect: deliveryAspectInput, clipId: z.string().uuid().optional() }).strict()
+export const getReframeReport: Operation<z.infer<typeof reframeReportInput>> = {
+  id: 'slates_get_reframe_report', description: 'Inspect effective delivery framing, computed dimensions, kept frame percentage, upscale and stale-take or missing-media warnings for a cut or one clip. Read before reframing; warnings never trigger generation or disable export. Requires ad-variant-export; update Slates on capability refusal.',
+  billable: false,
+  input: reframeReportInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variant-export', 'delivery framing reports')
+    return ok(await ctx.desktop().get('/agent/timeline/reframe-report', input))
+  },
+}
+
+const reframeClipInput = reframeReportInput.extend({ clipId: z.string().uuid(), framing: z.object({
+  mode: z.enum(['fill', 'fit']).optional(), focusX: z.number().min(0).max(1).optional(),
+  focusY: z.number().min(0).max(1).optional(), zoom: z.number().min(1).optional(),
+}).strict().nullable().describe('Normalized focus and zoom for this clip/aspect. Null resets the override; the desktop binds it to the current take.') })
+export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
+  id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. Requires ad-variant-export; update Slates on capability refusal.',
+  billable: false,
+  input: reframeClipInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variant-export', 'clip delivery reframing')
+    return ok(await ctx.desktop().post('/agent/timeline/reframe', input))
+  },
 }
 
 export const listTimelines: Operation<{ projectId: string }> = {
@@ -5858,12 +5974,16 @@ export const listTimelines: Operation<{ projectId: string }> = {
     await ctx.desktop().requireCapability('named-cuts', 'named cuts')
  return ok(await ctx.desktop().get('/agent/timelines', input)) },
 }
-export const saveTimeline: Operation<{ projectId: string; timelineId?: string; name: string }> = {
-  id: 'slates_save_timeline', description: 'Create a named cut, or rename the explicit timelineId. Existing cuts and the legacy default stay intact.',
-  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional(), name: z.string().min(1) }),
+export const saveTimeline: Operation<{ projectId: string; timelineId?: string; name: string } & CutOptions> = {
+  id: 'slates_save_timeline', description: 'Create a named cut, or rename the explicit timelineId, with optional delivery, naming taxonomy and explicit variant grid bindings. Existing cuts and the legacy default stay intact. New fields require ad-variant-export; null clears them. Read delivery ids and dimensions from slates_get_variant_grid; never infer slot roles from labels.',
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional(), name: z.string().min(1), ...cutOptionsInput }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('named-cuts', 'named cuts')
- return ok(await ctx.desktop().post('/agent/timelines', input)) },
+    if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
+      await ctx.desktop().requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')
+    }
+    return ok(await ctx.desktop().post('/agent/timelines', input))
+  },
 }
 
 /**
@@ -6088,21 +6208,28 @@ export const updateTimelineSettings: Operation<{
   height?: number
   frameRate?: 24 | 30 | 60
   masterVolume?: number
-}> = {
+} & CutOptions> = {
   id: 'slates_update_timeline_settings',
   description:
-    "Update the project timeline's output settings: resolution, frame rate (24/30/60 — all clips are conformed to it on export), and masterVolume, the output fader (linear gain, -∞ to +12 dB) applied to the final mix in both preview and MP4 export (use it to prevent clipping when stacking loud tracks). Note these are normally auto-managed: the first video clip sets fps + resolution, and higher-res clips raise the canvas. Changing frameRate after clips are placed retimes them — avoid unless the timeline is empty.",
+    "Update a cut's output settings: resolution, frame rate (24/30/60), masterVolume, or delivery formats, naming taxonomy and explicit variant grid bindings. New fields require ad-variant-export; null clears them. Read aspects and dimensions from slates_get_variant_grid. Delivery-only updates on an explicit cut return the computed formats. masterVolume is linear gain (0 is silent, 1 is unity, 4 is maximum boost), applied to preview and final mix. An unconfigured canvas follows source resolution; delivery preserves its master aspect. Changing frameRate retimes placed clips — avoid unless the timeline is empty.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     width: z.number().int().min(16).optional(),
     height: z.number().int().min(16).optional(),
     frameRate: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
     masterVolume: z.number().min(0).max(4).optional().describe('Output fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
+    ...cutOptionsInput,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     await requireNamedCut(desktop, input.timelineId)
+    if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
+      await desktop.requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')
+    }
+    if (input.timelineId && input.delivery !== undefined && Object.keys(input).every(key => ['projectId', 'timelineId', 'delivery'].includes(key))) {
+      return ok(await desktop.post('/agent/timeline/delivery', input))
+    }
     return ok(await desktop.post('/agent/timeline/update-settings', input))
   },
 }
@@ -6116,8 +6243,10 @@ export const exportVideo: Operation<{
   timelineId?: string
   outputPath: string
   overwrite?: boolean
+  aspect?: string
 }> = {
   id: 'slates_export_video',
+  billable: false,
   description:
     "Render the project's timeline to an MP4 file on disk via the desktop app's ffmpeg pipeline (H.264 + AAC, gaps rendered as black). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline.",
   input: z
@@ -6130,6 +6259,7 @@ export const exportVideo: Operation<{
         .refine((p) => ABSOLUTE_PATH_RE.test(p), { message: 'outputPath must be absolute' })
         .describe('Absolute path for the rendered file, ending in .mp4 (e.g. C:\\Users\\you\\Videos\\ad.mp4 or /Users/you/ad.mp4). slates_get_project_directory gives a sensible default folder.'),
       overwrite: z.boolean().optional(),
+      aspect: deliveryAspectInput.optional().describe('Optional delivery aspect from slates_get_variant_grid; requires ad-variant-export. Omission keeps existing export behavior.'),
     })
     .refine((d) => !!d.projectId !== !!d.timelineId, {
       message: 'Pass exactly one of projectId or timelineId',
@@ -6137,6 +6267,7 @@ export const exportVideo: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('export', 'video export')
+    if (input.aspect !== undefined) await desktop.requireCapability('ad-variant-export', 'single video delivery export')
     const r = await desktop.post<{
       success: boolean
       outputPath?: string
@@ -6151,6 +6282,7 @@ export const exportVideo: Operation<{
       timelineId: input.timelineId,
       outputPath: input.outputPath,
       overwrite: input.overwrite,
+      aspect: input.aspect,
     })
     const mb = r.fileSizeBytes != null ? (r.fileSizeBytes / (1024 * 1024)).toFixed(1) : '?'
     return ok(
@@ -8864,6 +8996,11 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   listTimelines as unknown as Operation<unknown>,
   saveTimeline as unknown as Operation<unknown>,
   exportCuts as unknown as Operation<unknown>,
+  getExportBatch as unknown as Operation<unknown>,
+  cancelExportBatch as unknown as Operation<unknown>,
+  getVariantGrid as unknown as Operation<unknown>,
+  reframeClip as unknown as Operation<unknown>,
+  getReframeReport as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,

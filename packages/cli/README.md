@@ -1,6 +1,6 @@
 # @slatesvideo/cli
 
-The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->157<!-- /gen:tool-count --> tool schemas into context.
+The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->162<!-- /gen:tool-count --> tool schemas into context.
 
 ## Install
 
@@ -19,7 +19,7 @@ Requires Node.js 18+ and the Slates desktop app ([slates.video](https://slates.v
 | `slates status` | Show connection state, account, and credit balance |
 | `slates mcp` | Detect Codex, Claude and Cursor; print the Codex/Claude Code setup commands or the JSON config; `--write` merges it into Claude Desktop / Cursor configs (with a `.bak` backup) |
 | `slates install-skills` | Install the same bundled skills for Claude Code and Codex; `--client claude` or `--client codex` selects one, and `--global` covers every project |
-| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->157<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
+| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->162<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
 | `slates run <op> --input '<json>'` | Pass a NESTED object (Shot `params`/`refs`, batch updates) — flags cannot express those |
 | `slates use <project>` | Set the default project, by id or name, so ops stop needing `--projectId` |
 | `slates doctor` | Check every setup precondition and print the fix for each failure |
@@ -61,6 +61,8 @@ slates run slates_get_credit_balance --json
 > The timeline, export, background-generation, edit-image, and image-reference ops need a Slates desktop on agent API v2 — if an op reports a version error, update Slates (Settings → Check for Updates) and retry.
 
 Notes for agent use:
+
+For local variant exports, read `slates_get_variant_grid`, pass a version 2 payload to `slates_export_cuts` with `--input-file`, then poll `slates_get_export_batch` with the project and batch ids. The desktop's `ad-variant-export` capability is required. See the [batch and framing operations](../../README.md#what-it-does).
 
 - Repeated flags or comma lists become arrays: `--ids a,b,c`.
 - `--json` emits `{text, data, images}`. Image entries carry `mimeType` and byte count only, not the binary. Use the MCP server (`@slatesvideo/mcp-server`) when the agent needs to see generated images inline.

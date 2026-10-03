@@ -12,9 +12,11 @@ Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is 
 
 ## What it does
 
-The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and boards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->157<!-- /gen:tool-count --> tools total.
+The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and boards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->162<!-- /gen:tool-count --> tools total.
 
 Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
+
+Ad variant exports use `slates_get_variant_grid` for existing cuts and the desktop's delivery catalog, then `slates_export_cuts` with `version: 2` for an immediate batch receipt. `slates_get_export_batch` reads status or lists saved batches; `slates_cancel_export_batch` stops now or after the current output. `slates_get_reframe_report` and `slates_reframe_clip` inspect and adjust delivery framing. These operations require the desktop's `ad-variant-export` capability. Export and retry use existing media and spend no credits; missing takes remain reported, and the Meta CSV remains unverified against a live import.
 
 > **Desktop version note:** the timeline, export, background-generation, edit-image, and image-reference tools need a Slates desktop on agent API v2. If a tool reports a version error, update Slates (Settings → Check for Updates) and retry. Everything else works on older desktops.
 
@@ -78,7 +80,7 @@ slates run --list             # list every operation
 slates run slates_create_project --name "neon samurai"
 ```
 
-In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->157<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
+In Codex or Claude Code, the agent shells out to `slates run <op> --key value` instead of loading <!-- gen:tool-count -->162<!-- /gen:tool-count --> tool schemas into context — `slates run <op> --help` prints one op's flags, and `--input '<json>'` carries the nested objects flags cannot.
 
 The <!-- gen:skill-count -->36<!-- /gen:skill-count --> bundled skills provide higher-level recipes: <!-- gen:workflow-skill-count -->21<!-- /gen:workflow-skill-count --> workflow guides (<!-- gen:workflow-skills -->blocking-to-prompt, camera-language, character-identity, chatgpt-images, cinematic-look, content-policy, cost-discipline, dialogue-blocking, direct-response-ad, edit-and-iterate, model-selection, one-prompt-film, previs-blocking, project-organization, restyle-from-blocking, script-craft, shot-variety, storyboard-from-script, style-prompting, ugc-influencer-ad, vision-feedback-loop<!-- /gen:workflow-skills -->) and <!-- gen:per-model-skill-count -->15<!-- /gen:per-model-skill-count --> per-model prompting guides covering <!-- gen:video-roster -->kling-v3.0-std, kling-v3.0-pro, kling-v3.0-omni, Seedance 2.0, Seedance 2.5, Gemini Omni Flash, MiniMax H3, MiniMax H3 Max, MiniMax H3 Max Turbo, LTX-2.5, LTX-2.5 Pro<!-- /gen:video-roster --> for video, <!-- gen:image-roster -->Nano Banana 2 (Gemini 3.1 Flash Image), Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2.5 Flare, GPT Image 2.5 Sunburst, FLUX.2 Max, Seedream 5 Lite<!-- /gen:image-roster --> for images, and <!-- gen:audio-roster -->Seed Audio 1.0, ElevenLabs Sound Effects v2, Inworld Realtime TTS-2<!-- /gen:audio-roster --> for audio.
 
@@ -108,6 +110,16 @@ The <!-- gen:skill-count -->36<!-- /gen:skill-count --> bundled skills provide h
 ```
 
 Operations choose their transport internally. `slates_get_credit_balance` hits the cloud. `slates_create_project` hits the desktop. `slates_generate_image` hits the cloud, then the desktop client writes the resulting asset to the local project folder. The user watches it appear in the Slates UI as it lands.
+
+## Long-batch verification
+
+The optional long-batch check uses a running [isolated verification desktop](../slate/docs/verification-harness.md) with existing media. Its separate HOME must contain that instance's `.slates/agent-connection.json`; it rejects a token matching the production desktop's token and allows the default port, which every desktop uses. Prepare cuts whose render remains active for ten minutes, then run:
+
+```bash
+node scripts/ad-variant-export-check.mjs --long-batch --home <isolated-home> --project-id <uuid> --export-root <isolated-output-folder>
+```
+
+`--timeline-ids <uuid,uuid>` optionally narrows the existing cuts. The test starts a fresh batch, polls through the built MCP server with a five-second call timeout for at least ten minutes, then stops its batch. A job that finishes early fails this acceptance check. External requests and non-export desktop routes are refused; no generation tool is called. Without a running isolated instance, the check reports `NOT RUN` with exit code 2. The fast fixture check runs in `npm run build` and proves transport behavior separately.
 
 ## Publishing
 

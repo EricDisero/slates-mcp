@@ -557,12 +557,22 @@ console.log('agent-surface-lockstep-check')
     // parameter — `ctx.desktop().post(` and `desktop.post<T>(` are both real
     // call shapes here), or the blender execute path.
     const writes = /\.post\s*[<(]/.test(body) || /BlenderBridgeClient|client\.call\(/.test(body)
+    const reads = /\.get\s*[<(]/.test(body)
+    if (reads && !writes && !a.readOnlyHint) {
+      fail(CHECK, `${op.id} only GETs but is not annotated readOnlyHint; keep status and mutation tools separate.`)
+    }
     if (a.readOnlyHint && writes && !READ_VIA_POST.has(op.id)) {
       fail(
         CHECK,
         `${op.id} is annotated readOnlyHint but its run body POSTs. A host auto-approves a read — ` +
           `this hint would let it auto-approve a mutation. Fix the derivation in operations/surface.ts.`
       )
+    }
+  }
+  for (const id of ['slates_export_cuts', 'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid', 'slates_reframe_clip', 'slates_get_reframe_report']) {
+    const op = ALL_OPERATIONS.find(o => o.id === id)
+    if (!op || op.billable !== false || op.annotations.openWorldHint) {
+      fail(CHECK, `${id} must exist and explicitly remain non-billable and local; export/retry never generates media.`)
     }
   }
   if (missing === 0 && !failures.some((f) => f.startsWith(`[${CHECK}]`))) {

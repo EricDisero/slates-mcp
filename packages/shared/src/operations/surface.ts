@@ -95,6 +95,8 @@ const IDEMPOTENT_PREFIXES = [
   'slates_reorder_',
   'slates_rename_',
   'slates_batch_update_',
+  'slates_reframe_',
+  'slates_cancel_export_batch',
 ]
 
 const startsWithAny = (id: string, prefixes: readonly string[]): boolean =>
@@ -177,6 +179,8 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
   script: ['slates_get_script_document', 'slates_update_script_document', 'slates_get_script_sections', 'slates_update_script_section', 'slates_get_script_suggestions', 'slates_update_script_suggestions', 'slates_get_script_uses', 'slates_preview_script_variation', 'slates_create_script_variation', 'slates_get_shot_inputs', 'slates_reuse_shot_take'],
   timeline: [
     'slates_list_timelines', 'slates_save_timeline', 'slates_export_cuts',
+    'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid',
+    'slates_reframe_clip', 'slates_get_reframe_report',
     'slates_get_timeline',
     'slates_add_clip_to_timeline',
     'slates_reorder_clips',

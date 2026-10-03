@@ -21,6 +21,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { mcpFixture } from './ad-variant-export-check.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const serverPath = join(here, '..', 'packages', 'mcp', 'dist', 'server.js')
@@ -76,9 +77,11 @@ const check = (name, cond, detail = '') => {
 
 // No flag: the smoke reads what a user's client gets. It ran with `--tools=flat`
 // until 0.6.1, so it never saw the nine-tool default that shipped in 0.6.0.
+const fixture = await mcpFixture()
 const transport = new StdioClientTransport({
   command: process.execPath,
-  args: [serverPath],
+  args: fixture.args,
+  env: fixture.env,
   stderr: 'pipe',
 })
 const client = new Client({ name: 'slates-instructions-smoke', version: '1.0.0' })
@@ -136,6 +139,13 @@ check('tool list is non-empty', tools.length > 0, `${tools.length}`)
 const generateImage = tools.find((t) => t.name === 'slates_generate_image')
 check('slates_generate_image is exposed', !!generateImage)
 check('slates_generate_video is listed by default', tools.some((t) => t.name === 'slates_generate_video'))
+for (const [name, readOnly] of [
+  ['slates_export_cuts', false], ['slates_get_export_batch', true], ['slates_cancel_export_batch', false],
+  ['slates_get_variant_grid', true], ['slates_reframe_clip', false], ['slates_get_reframe_report', true],
+]) {
+  const tool = tools.find(t => t.name === name)
+  check(`${name} is exposed by default with correct read/write annotations`, !!tool && tool.annotations?.readOnlyHint === readOnly && tool.annotations?.openWorldHint === false)
+}
 if (generateImage) check('no cross-model blacklist in the schema', !generateImage.description.includes('"photorealistic"'))
 
 // Tool discovery is read-only; it must not change the MCP list seen on startup.
@@ -318,17 +328,16 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
 // Spawned with HOME/USERPROFILE pointed at a temp dir so the real ~/.slates is
 // never touched. The cache file is what refreshLatestVersion writes.
 {
-  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs')
-  const { tmpdir } = await import('node:os')
-  const home = mkdtempSync(join(tmpdir(), 'slates-smoke-home-'))
-  mkdirSync(join(home, '.slates'), { recursive: true })
+  const { writeFileSync } = await import('node:fs')
+  const staleFixture = await mcpFixture()
+  const home = staleFixture.home
   writeFileSync(
     join(home, '.slates', 'update-check.json'),
     JSON.stringify({ '@slatesvideo/mcp-server': { latest: '99.0.0', checkedAt: Date.now() } })
   )
   const staleTransport = new StdioClientTransport({
     command: process.execPath,
-    args: [serverPath],
+    args: staleFixture.args,
     stderr: 'pipe',
     env: { ...process.env, HOME: home, USERPROFILE: home },
   })
@@ -341,9 +350,11 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   essentialsInCut('a behind server (notice after first paragraph)', stale)
   check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
   await staleClient.close()
+  await staleFixture.close()
 }
 
 await client.close()
+await fixture.close()
 
 if (failures > 0) {
   console.error(`\nmcp-instructions-smoke FAILED (${failures} assertion(s))`)
