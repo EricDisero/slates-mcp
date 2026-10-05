@@ -41,6 +41,7 @@
 //                         lacks checks a token that desktop lacks.
 //  12. VIEW LISTS       — the view ops' lenses, timeline sides and navigator
 //                         sections equal slate's `@shared/types/view`.
+//  13. ASSET NAME LIMITS — the label and note limits equal slate's `assetLabel.ts`.
 //
 // 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of them has been
 // mutation-tested (break it, confirm red, restore, confirm green). If you add
@@ -931,6 +932,29 @@ function zodDescriptions(op) {
     })
     if (drift.length) fail(CHECK, drift.join('; '))
     else pass(CHECK, `${pairs.length} view lists equal slate's`)
+  }
+}
+
+// ── 13. the asset name and note limits, mirrored exactly ───────────────────
+// `slates_upload_reference_image` and `slates_update_asset` carry the desktop's limits on a given label and
+// note (slate/src/shared/assetLabel.ts) so a model is refused before the call. The desktop enforces; a copy
+// that drifts is a schema refusing a name the app takes, or passing one it rejects.
+{
+  const CHECK = '13 asset-name-limits-mirror'
+  const file = join(desktopRoot, 'src', 'shared', 'assetLabel.ts')
+  if (!existsSync(file)) {
+    warn(`${CHECK}: slate not on disk beside slates-mcp; skipped`)
+  } else {
+    const desk = readFileSync(file, 'utf8')
+    const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
+    const num = (src, name) => Number(new RegExp(`const ${name}\\s*=\\s*(\\d+)`).exec(src)?.[1] ?? NaN)
+    const pairs = [['MAX_ASSET_LABEL', 'ASSET_LABEL_MAX'], ['MAX_ASSET_NOTE', 'ASSET_NOTE_MAX']]
+    const drift = pairs.flatMap(([d, m]) => {
+      const [a, b] = [num(desk, d), num(opsSrc, m)]
+      return Number.isNaN(a) || Number.isNaN(b) ? [`${Number.isNaN(a) ? d : m} not found`] : a === b ? [] : [`${m} ${b} ≠ slate ${d} ${a}`]
+    })
+    if (drift.length) fail(CHECK, drift.join('; '))
+    else pass(CHECK, `label and note limits equal slate's`)
   }
 }
 

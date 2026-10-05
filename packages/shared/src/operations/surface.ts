@@ -193,6 +193,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
   // Rename, delete, reorder. The 63-op CRUD tail the review measured at 39.5 KB.
   admin: [
     'slates_update_project',
+    'slates_update_asset',
     'slates_delete_project',
     'slates_delete_asset',
     'slates_update_character',

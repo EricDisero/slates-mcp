@@ -369,6 +369,24 @@ const BACKGROUND_DESCRIBE =
 const FOLDER_DESCRIBE =
   "Folder the result lands in (slates_list_folders). Omit it to follow the folder chosen in the user's Slates window, else the project root; null is the root, on purpose."
 const folderIdField = z.string().uuid().nullable().optional().describe(FOLDER_DESCRIBE)
+
+// A name and a note for an asset (`slates_upload_reference_image`, `slates_update_asset`). The desktop
+// enforces both limits (slate/src/shared/assetLabel.ts, MAX_ASSET_LABEL and MAX_ASSET_NOTE); these copies
+// give the model the refusal before the call, and lockstep check 13 holds the two equal.
+const ASSET_LABEL_MAX = 120
+const ASSET_NOTE_MAX = 2000
+const assetLabelField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ASSET_LABEL_MAX)
+  .describe('The name shown on the asset card and in lists, with its code, e.g. "Ref: copper No".')
+const assetNoteField = z
+  .string()
+  .trim()
+  .min(1)
+  .max(ASSET_NOTE_MAX)
+  .describe("What the asset is, stored as the asset's prompt text and read back by slates_get_asset.")
 /** The `folderId` part of a generate or upload body: present only when the caller named one (null is the root). */
 const folderBody = (folderId: string | null | undefined): { folderId?: string | null } => (folderId === undefined ? {} : { folderId })
 
@@ -2083,10 +2101,12 @@ export const uploadReferenceImage: Operation<{
   dataUrl?: string
   type?: 'image' | 'video' | 'audio'
   folderId?: string | null
+  label?: string
+  note?: string
 }> = {
   id: 'slates_upload_reference_image',
   description:
-    'Add a reference image, video clip, or audio file to a Slates project from disk. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" to bring in a clip (the user\'s own footage to edit/relocate/trim) or type:"audio" for music/VO/SFX they already have; both are probed on ingest, so duration (and for video, dimensions) are available immediately, and audio gets its waveform. Default type is "image". dataUrl is image-only.',
+    'Add a reference image, video clip, or audio file to a Slates project from disk. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" to bring in a clip (the user\'s own footage to edit/relocate/trim) or type:"audio" for music/VO/SFX they already have; both are probed on ingest, so duration (and for video, dimensions) are available immediately, and audio gets its waveform. Default type is "image". dataUrl is image-only. Pass label to name it and note to record what it is; without them it is "Imported file". A picture derived from a project asset (edited, masked, upscaled or converted outside Slates) belongs in slates_save_external_image with referenceAssetIds, so its source and prompt are recorded.',
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -2097,6 +2117,8 @@ export const uploadReferenceImage: Operation<{
         .optional()
         .describe('Asset kind for a filePath import — "image" (default), "video", or "audio". A dataUrl is always an image.'),
       folderId: folderIdField,
+      label: assetLabelField.optional(),
+      note: assetNoteField.optional(),
     })
     .refine((d) => !!d.filePath !== !!d.dataUrl, {
       message: 'Pass exactly one of filePath or dataUrl',
@@ -2105,12 +2127,16 @@ export const uploadReferenceImage: Operation<{
     const desktop = ctx.desktop()
     // A desktop before the folder rule ignores folderId and files at the root.
     if (input.folderId !== undefined) await desktop.requireCapability('media-folder', 'choosing the folder a result lands in')
+    // A desktop before the name ignores label and note and imports it as "Imported file".
+    if (input.label !== undefined || input.note !== undefined) await desktop.requireCapability('asset-naming', 'naming an upload')
+    const naming = { ...(input.label !== undefined ? { label: input.label } : {}), ...(input.note !== undefined ? { note: input.note } : {}) }
     if (input.filePath) {
       const r = await desktop.post<{ asset: unknown }>('/agent/assets/upload', {
         projectId: input.projectId,
         filePath: input.filePath,
         type: input.type ?? 'image',
         ...folderBody(input.folderId),
+        ...naming,
       })
       return ok(r)
     }
@@ -2123,8 +2149,29 @@ export const uploadReferenceImage: Operation<{
       projectId: input.projectId,
       dataUrl: input.dataUrl,
       ...folderBody(input.folderId),
+      ...naming,
     })
     return ok(r)
+  },
+}
+
+export const updateAsset: Operation<{ projectId: string; assetId: string; label?: string; note?: string }> = {
+  id: 'slates_update_asset',
+  description:
+    "Rename an asset (its label, shown with its code on its card and in lists) and/or replace the note stored as its prompt text. UUID or badge code. A note changes only an upload or a picture saved from an external host; a generated asset keeps the prompt that made it but can still be renamed.",
+  input: z
+    .object({ projectId: z.string().uuid(), assetId: z.string().min(1), label: assetLabelField.optional(), note: assetNoteField.optional() })
+    .strict()
+    .refine((d) => d.label !== undefined || d.note !== undefined, { message: 'Pass a label, a note or both' }),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('asset-naming', 'naming an asset')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const { asset } = await ctx.desktop().post<{ asset: Record<string, unknown> }>('/agent/assets/update', {
+      assetId: id,
+      ...(input.label !== undefined ? { label: input.label } : {}),
+      ...(input.note !== undefined ? { note: input.note } : {}),
+    })
+    return ok({ asset: { ...compactAsset(asset), note: asset.prompt } })
   },
 }
 
@@ -8822,6 +8869,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getAssetsBatch as unknown as Operation<unknown>,
   getAssetVideoFrames as unknown as Operation<unknown>,
   uploadReferenceImage as unknown as Operation<unknown>,
+  updateAsset as unknown as Operation<unknown>,
   saveExternalImage as unknown as Operation<unknown>,
   getChatGptStatus as unknown as Operation<unknown>,
   connectChatGpt as unknown as Operation<unknown>,

@@ -54,6 +54,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['view', 'the window layout'],
   ['pins', 'pinned references'],
   ['asset-favorite', 'favorites'],
+  ['asset-naming', 'naming an upload and renaming an asset'],
   ['asset-export', 'exporting media'],
   ['library', 'the Library'],
   ['templates', 'templates'],

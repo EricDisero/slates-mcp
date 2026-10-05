@@ -33,6 +33,34 @@ const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)
   assert.equal(op('save_external_image').input.safeParse({ projectId, prompt: 'p', generator: 'g' }).success, false)
   await call('upload_reference_image', { projectId, filePath: 'ordinary.png' }, ctx)
   assert.deepEqual(posts[1], { route: '/agent/assets/upload', body: { projectId, filePath: 'ordinary.png', type: 'image' } })
+  assert.ok(!capabilities.includes('asset-naming'), 'an upload with no name asks for no naming capability')
+  // A name and a note travel with the upload (trimmed), on a path or a pasted picture, and gate on the desktop that reads them.
+  await call('upload_reference_image', { projectId, filePath: 'shirt.png', label: '  Ref: copper No ', note: 'Pasted shirt' }, ctx)
+  assert.deepEqual(posts.at(-1), { route: '/agent/assets/upload', body: { projectId, filePath: 'shirt.png', type: 'image', label: 'Ref: copper No', note: 'Pasted shirt' } })
+  assert.equal(capabilities.at(-1), 'asset-naming')
+  await call('upload_reference_image', { projectId, dataUrl: 'data:image/png;base64,AAAA', label: 'Pasted ref' }, ctx)
+  assert.deepEqual(posts.at(-1), { route: '/agent/assets/upload-base64', body: { projectId, dataUrl: 'data:image/png;base64,AAAA', label: 'Pasted ref' } })
+  for (const bad of [{ label: '  ' }, { label: 'x'.repeat(121) }, { note: '' }, { note: 'n'.repeat(2001) }]) {
+    assert.equal(op('upload_reference_image').input.safeParse({ projectId, filePath: 'a.png', ...bad }).success, false, `refuses ${JSON.stringify(bad).slice(0, 30)}`)
+  }
+  assert.match(op('upload_reference_image').description, /slates_save_external_image with referenceAssetIds/)
+  assert.ok(op('upload_reference_image').description.length < 2048)
+  posts.length = 2
+  // slates_update_asset resolves a badge code, posts only what was passed, and answers a compact row.
+  const renamePosts = []
+  const renameCtx = { desktop: () => ({
+    requireCapability: async cap => { capabilities.push(cap) },
+    get: async () => ({ assets: [{ id: assetId, code: 'IMG-A2', label: 'Result', type: 'image' }] }),
+    post: async (route, body) => { renamePosts.push({ route, body }); return { asset: { id: assetId, code: 'IMG-A2', label: 'Ref: shirt', type: 'image', prompt: 'The shirt front', filePath: 'secret.png' } } },
+  }) }
+  const renamed = await call('update_asset', { projectId, assetId: 'IMG-A2', label: ' Ref: shirt ' }, renameCtx)
+  assert.deepEqual(renamePosts[0], { route: '/agent/assets/update', body: { assetId, label: 'Ref: shirt' } })
+  assert.equal(capabilities.at(-1), 'asset-naming')
+  assert.deepEqual(renamed.data.asset, { id: assetId, code: 'IMG-A2', label: 'Ref: shirt', type: 'image', created_at: undefined, note: 'The shirt front' })
+  await call('update_asset', { projectId, assetId, note: 'The shirt front' }, renameCtx)
+  assert.deepEqual(renamePosts[1].body, { assetId, note: 'The shirt front' })
+  assert.equal(op('update_asset').input.safeParse({ projectId, assetId }).success, false, 'a rename must name something')
+  assert.equal(op('update_asset').input.safeParse({ projectId, assetId, label: 'x', extra: 1 }).success, false)
   const requestId = '44444444-4444-4444-8444-444444444444'
   await call('generate_chatgpt_image', { projectId, requestId, prompt: 'Exact\nprompt', referenceAssetIds: ['IMG-A2', 'IMG-A1'], background: true }, ctx)
   assert.deepEqual(posts[2], { route: '/agent/generation/chatgpt-image', body: { projectId, requestId, prompt: 'Exact\nprompt', referenceAssetIds: [assetId, referenceId], background: true } })

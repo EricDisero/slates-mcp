@@ -1,6 +1,6 @@
 # @slatesvideo/cli
 
-The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->157<!-- /gen:tool-count --> tool schemas into context.
+The `slates` command for the [Slates](https://slates.video) AI video studio. Drive Slates from your terminal, or let Codex (with your ChatGPT account) or Claude Code shell out to it instead of loading <!-- gen:tool-count -->158<!-- /gen:tool-count --> tool schemas into context.
 
 ## Install
 
@@ -19,7 +19,7 @@ Requires Node.js 18+ and the Slates desktop app ([slates.video](https://slates.v
 | `slates status` | Show connection state, account, and credit balance |
 | `slates mcp` | Detect Codex, Claude and Cursor; print the Codex/Claude Code setup commands or the JSON config; `--write` merges it into Claude Desktop / Cursor configs (with a `.bak` backup) |
 | `slates install-skills` | Install the same bundled skills for Claude Code and Codex; `--client claude` or `--client codex` selects one, and `--global` covers every project |
-| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->157<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
+| `slates run <op>` | Invoke any Slates operation by id; `--list` shows all <!-- gen:tool-count -->158<!-- /gen:tool-count -->, `<op> --help` shows one op's flags |
 | `slates run <op> --input '<json>'` | Pass a NESTED object (Shot `params`/`refs`, batch updates) — flags cannot express those |
 | `slates use <project>` | Set the default project, by id or name, so ops stop needing `--projectId` |
 | `slates doctor` | Check every setup precondition and print the fix for each failure |
