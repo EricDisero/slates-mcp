@@ -7537,11 +7537,25 @@ export const createShot: Operation<
       ? ` Saved from ${input.fromAssetId}: its recorded recipe is the Shot's, and that result is its first take (unless another Shot already holds it).` +
         (r.unsavedPaths?.length ? ` ${r.unsavedPaths.length} recorded attachment(s) are not project assets and are not on the Shot.` : '')
       : ''
+    // 🔑 THE COUNTS RIDE THIS RESULT TOO (2026-10-07). Writing a shot list is
+    // when sameness is cheapest to fix, and the eval showed the agent wrote
+    // three Shots and never called slates_list_shots in 3 of 4 trials. Same
+    // reasoning as describeVarietyReport: what it must choose to fetch does not
+    // reach it, so the board's running counts arrive with each new Shot. A
+    // failed read never fails the write; the Shot already exists.
+    let varietyNote = ''
+    try {
+      const storyboardId = (r.shot?.storyboardId ?? r.shot?.storyboard_id) as string | undefined
+      const board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { projectId: input.projectId, storyboardId })
+      const described = describeVarietyReport(board.variety)
+      if (described) varietyNote = `
+Board so far: ${described}`
+    } catch { /* counts are a courtesy here; slates_list_shots is the full read */ }
     // The CODE is the address the user sees on the row — say it back so the
     // next call, and the next sentence to the user, can point at it.
     return ok(
       r.shot,
-      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}`.trim()
+      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}`.trim() + varietyNote
     )
   },
 }

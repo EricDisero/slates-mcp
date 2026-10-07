@@ -226,6 +226,14 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // compliance 0/8 → 30/32, while the same guidance behind a guide fetch sat at
   // 13% before and after. This sentence exists only to say the numbers are
   // there and must be looked at; the craft is the skill.
+  // 2026-10-07, measured: asked for "just the shot list for now", GLM-5.3-Flash
+  // AND Opus 5.5 both wrote a good list into the chat, 0/8 each, and never
+  // created a Shot. Neither knew that in Slates a shot list IS Shots — and on
+  // the desktop slates_create_shot is not core, so nothing on screen said so.
+  fork(
+    `- A SHOT LIST IS SHOTS: asked for a shot list, storyboard or breakdown, write each beat as a Shot with slates_create_shot (load it by name first): Shots land on the board and can be priced and fired later; a chat list cannot. Read the set back with slates_list_shots. Writing Shots is free, even under "don't generate yet".`,
+    `- A SHOT LIST IS SHOTS: asked for a shot list, storyboard or breakdown, write each beat as a Shot with slates_create_shot: Shots land on the board and can be priced and fired later; a chat list cannot. Read the set back with slates_list_shots. Writing Shots is free, even under "don't generate yet".`
+  ),
   both(
     `- READ THE VARIETY COUNTS BEFORE FIRING A SET: slates_list_shots and slates_get_storyboard_with_frames return authored framing and movement distributions. Review unintended sameness while preserving deliberate repetition and the user's format; counts do not require a rewrite. slates-shot-variety is the craft.`
   ),
