@@ -7547,14 +7547,15 @@ export const createShot: Operation<
     // SCOPED TO THE SHOT'S OWN BOARD. The create response carries the Shot's
     // scene, not its board, and the listing falls back to EVERY board in the
     // project when no board is named — so an unscoped read would report other
-    // boards' cuts as this one's. An explicit storyboardId is used as given;
-    // otherwise the board whose listing holds the new Shot is found. No board
-    // found means no counts, never project-wide ones.
+    // boards' cuts as this one's. A storyboardId placed the Shot only when no
+    // frameId or sceneId came with it (the schema ignores it then), so it is
+    // used only in that case; otherwise the board whose listing holds the new
+    // Shot is found. No board found means no counts, never project-wide ones.
     let varietyNote = ''
     try {
       const shotId = r.shot?.id as string | undefined
       let board: { variety: VarietyReport | null } | null = null
-      if (input.storyboardId) {
+      if (input.storyboardId && !input.frameId && !input.sceneId) {
         board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { storyboardId: input.storyboardId })
       } else if (shotId) {
         const { storyboards } = await desktop.get<{ storyboards: Array<{ id: string }> }>('/agent/storyboards', { projectId: input.projectId })
