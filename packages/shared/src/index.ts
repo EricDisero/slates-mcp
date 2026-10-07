@@ -68,9 +68,13 @@ export {
   // `bannedTokensFor` is internal to the module and stays there.
   BANNED_PROMPT_TOKENS, describeBannedTokens,
   findBannedTokens, bannedTokenWarning,
+  // refusableBannedTokens: the desktop Studio Agent loop's pre-spend refusal
+  // (slate studio-agent/guards.ts) — the checkable subset, honouring each
+  // block's call-shape limit.
+  refusableBannedTokens,
   // Per-model lists — the 13 skills the two cross-model lists never covered.
   bannedTokensForSkill, describeBannedTokensForSkill,
-  type BannedToken, type BannedTokenScope,
+  type BannedToken, type BannedTokenScope, type BannedTokenCondition,
 } from './prompts/banned-tokens.js'
 // 🚨 CRAFT CARDS — the POSITIVE half of the guide, extracted from the skills'
 // own `@card` blocks and delivered on the estimate result. The eval scorer reads

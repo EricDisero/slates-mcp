@@ -91,8 +91,17 @@ Each one moved a fact to a single home and left a rebuild-and-publish obligation
     `build-prompt-builder`'s portability check correctly refuses to ship an op name in the public
     lead magnet.)
   - `bannedTokenWarning()` reports what the submitted prompt actually contained, in the op RESULT,
-    on the pre-spend gates as well as the success path. **Non-blocking** — the generation proceeds
-    (PRODUCT_PHILOSOPHY → make state visible, never block).
+    on the pre-spend gates as well as the success path. **Non-blocking in the op layer** — the
+    generation proceeds (PRODUCT_PHILOSOPHY → make state visible, never block). **The desktop Studio
+    Agent's loop refuses the call before the spend** (slate `studio-agent/guards.ts`, 2026-10-07): on
+    the success path the warning arrived after the credits were gone ("cinematic" in a Nano Banana 2
+    Lite prompt), while the one warning that came back on a call that spent nothing was acted on. It
+    refuses only `refusableBannedTokens`: the skill's positive forms written beside a token (`(say
+    …)`, `than …`, `as in: …`, `(…) passed`) are never tokens, a block whose heading limits it to a
+    call shape ("with a reference video", "in an EDIT prompt") refuses only on that shape, and a line
+    that needs context the call cannot show ("after the first introduction") only warns. Write a new
+    @banned block to those conventions. A word the user typed passes, and the identical call runs
+    once the agent has read the refusal.
   - Generation results name the review op. Three different pointers, because what the agent already
     HAS differs: a blocking image generation returns the pixels inline ("look at what you have"), a
     video generation returns none ("call `slates_get_asset_video_frames`"), a background submission

@@ -156,7 +156,12 @@ await assert.rejects(() => call('load_tools', { names: ['missing'] }), /Unknown 
 assert.match((await call('load_tools', { query: 'generate image' })).text, /slates_generate_image/)
 console.log(`prompt-control: inline bindings, ${catalogue.length} selective techniques, defaults, scoped warnings, actual mock payload and discovery passed`)
 
-assert.ok(findBannedTokens('Keep everything else the same.', 'video', 'slates-prompting-omni-flash').length > 0)
+// The skill's own advice is never a never-use token: Omni Flash says to always end an edit with this
+// line, and FLUX's list writes the positive form beside each negative (2026-10-07 review, #5).
+assert.equal(findBannedTokens('Keep everything else the same.', 'video', 'slates-prompting-omni-flash').length, 0)
+assert.equal(findBannedTokens('a candle-like glow', 'video', 'slates-prompting-omni-flash').length, 1)
+assert.equal(findBannedTokens('sharp focus throughout, empty scene, soft, diffused lighting', 'image', 'slates-prompting-flux-2-max').length, 0)
+assert.equal(findBannedTokens('no blur, no people', 'image', 'slates-prompting-flux-2-max').length, 2)
 for (const [id, capability] of Object.entries(MODEL_CAPABILITIES)) {
   if (!capability.imageResolutions) continue
   const result = await call('get_prompting_guide', {topic: id})

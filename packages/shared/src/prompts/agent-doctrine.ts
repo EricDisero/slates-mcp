@@ -27,13 +27,18 @@
 // 3. PROSE IS EXPLANATION, NOT ENFORCEMENT. The two rules the agent actually
 //    breaks — "load the guide" and "quality-check with vision" — are enforced
 //    STRUCTURALLY in the op layer (generated banned-token lists inlined into
-//    the generate ops' descriptions, non-blocking warnings on the submitted
-//    prompt, and a review pointer on every generation result). A rule with no
+//    the generate ops' descriptions, warnings on the submitted prompt that the
+//    desktop loop turns into a refusal before the spend, and a review pointer
+//    on every generation result). A rule with no
 //    check is a suggestion, and an LLM is the least reliable enforcer you
 //    could pick. Do not "fix" a skipped rule by adding a sentence here.
-// 4. NEVER BLOCK. PRODUCT_PHILOSOPHY.md → the Sandbox Doctrine: make state
-//    visible, never block. Enforcement means the guidance is already present
-//    and violations are reported back — never a refused call or a wizard step.
+// 4. NEVER BLOCK THE USER. PRODUCT_PHILOSOPHY.md → the Sandbox Doctrine: make
+//    state visible, never block. In the op layer enforcement means the guidance
+//    is already present and violations are reported back. The desktop loop may
+//    refuse an AGENT's call that breaks a rule code can check (never-use words
+//    before a spend, a project nobody asked for, a model the plan did not
+//    approve: slate `studio-agent/guards.ts`, 2026-10-07), and each refusal has
+//    a way through for the user: their own words, an approved plan, a resend.
 // 5. CACHE DISCIPLINE. This output is the desktop's cached prompt prefix and
 //    its byte-stability IS the cache mechanism (measured 97.4% steady-state
 //    cache hit). No timestamps, no balances, no project names, no per-session
