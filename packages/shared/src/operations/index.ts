@@ -7543,11 +7543,27 @@ export const createShot: Operation<
     // reasoning as describeVarietyReport: what it must choose to fetch does not
     // reach it, so the board's running counts arrive with each new Shot. A
     // failed read never fails the write; the Shot already exists.
+    //
+    // SCOPED TO THE SHOT'S OWN BOARD. The create response carries the Shot's
+    // scene, not its board, and the listing falls back to EVERY board in the
+    // project when no board is named — so an unscoped read would report other
+    // boards' cuts as this one's. An explicit storyboardId is used as given;
+    // otherwise the board whose listing holds the new Shot is found. No board
+    // found means no counts, never project-wide ones.
     let varietyNote = ''
     try {
-      const storyboardId = (r.shot?.storyboardId ?? r.shot?.storyboard_id) as string | undefined
-      const board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { projectId: input.projectId, storyboardId })
-      const described = describeVarietyReport(board.variety)
+      const shotId = r.shot?.id as string | undefined
+      let board: { variety: VarietyReport | null } | null = null
+      if (input.storyboardId) {
+        board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { storyboardId: input.storyboardId })
+      } else if (shotId) {
+        const { storyboards } = await desktop.get<{ storyboards: Array<{ id: string }> }>('/agent/storyboards', { projectId: input.projectId })
+        for (const sb of (storyboards ?? []).slice(0, 10)) {
+          const listed = await desktop.get<{ shots: Array<{ id: string }>; variety: VarietyReport | null }>('/agent/shots', { storyboardId: sb.id })
+          if ((listed.shots ?? []).some((s) => s.id === shotId)) { board = listed; break }
+        }
+      }
+      const described = describeVarietyReport(board?.variety)
       if (described) varietyNote = `
 Board so far: ${described}`
     } catch { /* counts are a courtesy here; slates_list_shots is the full read */ }
