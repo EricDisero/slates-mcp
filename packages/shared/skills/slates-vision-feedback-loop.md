@@ -39,7 +39,7 @@ This is a cost rule as well as craft: a premium video call can cost many times a
 
 1. **Generate.** Call `slates_generate_image` with a prompt. The result is in your context as an image content block.
 2. **Evaluate on TWO axes — they are different questions:**
-   - **Brief-conformance** — what did the user actually want? Are the elements right? Composition? Lighting? Subject identity?
+   - **Brief-conformance** — what did the user actually want? Check the four edges first: a subject cut off by the frame (a lighthouse missing its lantern, a head cropped at the brow) is a defect unless the brief asked for that crop. Then: are the elements right? Composition? Lighting? Subject identity?
    - **Defects** — run the slop rubric below. *A frame can match the brief perfectly and still be slop that mushes the moment it moves.* Checking only the first axis is how a bad frame reaches an expensive video call.
 3. **One of three outcomes:**
    - **Right** → save it (bind to a frame, character slot, etc.) and move on.

@@ -402,8 +402,12 @@ const folderBody = (folderId: string | null | undefined): { folderId?: string | 
 // it to re-fetch something already in front of it burns a turn for nothing:
 // a blocking image generation returns the pixels inline, a video generation
 // returns none, and a background submission has no asset yet.
+// The check is spelled out because looking was not enough: on 2026-10-07 the
+// agent received the pixels of a lighthouse with its lantern cut off by the top
+// edge, described the image, and called it on brief (fix-after-review, 2 of 8).
 const IMAGE_INLINE_REVIEW =
-  'The image is attached to this result — look at it against the brief before you describe it. ' +
+  'The image is attached to this result — look at it against the brief before you describe it: ' +
+  'first the frame edges (is every subject whole, or is one cut off where the brief did not ask for a crop?), then each thing the brief named. ' +
   'Any claim about how it LOOKS must come from pixels you actually received (slates-vision-feedback-loop).'
 const VIDEO_REVIEW_POINTER =
   'You have NOT seen this clip: call slates_get_asset_video_frames on the asset id above before ' +
@@ -1685,6 +1689,25 @@ export const estimateGenerationCost: Operation<{
     const skill = promptingSkillFor(input.model)
     const card = describeCraftCard(skill)
     const banned = describeBannedTokensForSkill(skill)
+    // Before the card on purpose: the desktop strips a repeated card by cutting
+    // the text at "--- HOW TO PROMPT", and this line must survive that.
+    const ownImage = (IMAGE_MODELS as readonly string[]).includes(input.model) ? (input.model as ImageModelId) : null
+    const cheaper = ownImage ? cheaperImageOptions(byKey, perCredits, ownImage, input.aspectRatio) : null
+    const framing = input.aspectRatio ?? '16:9'
+    const unpricedNote = cheaper?.unpriced.length
+      ? ` Not on the price list at ${framing}: ${cheaper.unpriced.join(', ')}; estimate one directly to price it.`
+      : ''
+    const cheaperLine = cheaper?.shown.length
+      ? `\nCheaper per image on the price list at ${framing}` +
+        `${cheaper.cheaper > cheaper.shown.length ? ` (${cheaper.shown.length} of ${cheaper.cheaper})` : ''}: ` +
+        cheaper.shown.map((o) => {
+          const settings = [
+            ...(o.resolution !== defaultImageResolutionFor(o.model) ? [o.resolution] : []),
+            ...(o.quality && o.quality !== DEFAULT_GPT_QUALITY ? [`quality ${o.quality}`] : []),
+          ]
+          return `${o.model} ${fmtCredits(o.credits)}${settings.length ? ` (${settings.join(', ')})` : ''}`
+        }).join('; ') + `.${unpricedNote}`
+      : unpricedNote ? `\n${unpricedNote.trim()}` : ''
     return ok({
       model: input.model,
       cost_key: key,
@@ -1692,9 +1715,11 @@ export const estimateGenerationCost: Operation<{
       cost_per_credits: perCredits,
       total_credits: totalCredits,
       requires_confirm: totalCredits > CONFIRM_CREDITS,
+      ...(cheaper?.shown.length ? { cheaper_options: cheaper.shown } : {}),
       ...(card ? { craft_card: card, craft_card_skill: skill } : {}),
       ...(banned ? { banned_tokens: banned } : {}),
     }, `${input.model}${qty > 1 ? ` ×${qty}` : ''}: ${fmtCredits(totalCredits)} (${key}).` +
+      cheaperLine +
       (card ? `\n\n--- HOW TO PROMPT ${input.model} ---\n${card}` : '') +
       (banned ? `\n\n${banned}` : ''))
   },
@@ -2899,6 +2924,54 @@ export function imageCostKey(
   return `nano-banana-2-${resolution}`
 }
 
+type CheaperImageOption = { model: ImageModelId; credits: number; resolution: '1k' | '2k' | '3k' | '4k'; quality?: GptQualityId }
+
+/**
+ * Image settings on the price list that cost less per image than `than`: each
+ * seat's cheapest legal resolution (and GPT Image tier), ties going to the
+ * seat's default resolution and then the higher tier. The quoted seat's own
+ * cheaper setting is kept first, then the cheapest others, four in all.
+ * Priced at `aspectRatio` (GPT Image prices square and 4:3 frames higher) and
+ * read only from the registry the estimate already fetched: a seat whose key
+ * at that framing is not on the list is reported unpriced, never fetched.
+ *
+ * WHY IT RIDES THE ESTIMATE: asked for "the cheapest and best version" on
+ * 2026-10-07, the agent priced Nano Banana 2 alone (6 credits), called it the
+ * cheapest option and generated; 1- and 2-credit seats were never compared.
+ * Which seat is right stays the agent's call ("cheap" and "best" trade), so
+ * nothing is routed here: the comparison is a fact in front of it instead.
+ */
+function cheaperImageOptions(
+  byKey: ReadonlyMap<string, number>,
+  than: number,
+  own: ImageModelId,
+  aspectRatio?: string
+): { shown: CheaperImageOption[]; cheaper: number; unpriced: ImageModelId[] } {
+  const all: CheaperImageOption[] = []
+  const unpriced: ImageModelId[] = []
+  for (const model of IMAGE_MODELS) {
+    const qualities: Array<GptQualityId | undefined> = isGptImageModel(model) ? [...GPT_QUALITY_TIERS] : [undefined]
+    const fallback = defaultImageResolutionFor(model)
+    let best: CheaperImageOption | null = null
+    for (const resolution of MODEL_CAPABILITIES[model]?.imageResolutions ?? []) {
+      for (const quality of qualities) {
+        const credits = byKey.get(imageCostKey(model, resolution, quality, aspectRatio))
+        if (credits == null) continue
+        const better = !best || credits < best.credits || (credits === best.credits && (
+          (resolution === fallback && best.resolution !== fallback) ||
+          (resolution === best.resolution && quality != null && best.quality != null &&
+            GPT_QUALITY_TIERS.indexOf(quality) > GPT_QUALITY_TIERS.indexOf(best.quality))))
+        if (better) best = { model, credits, resolution, ...(quality ? { quality } : {}) }
+      }
+    }
+    if (!best) unpriced.push(model)
+    else if (best.credits < than) all.push(best)
+  }
+  const sorted = all.sort((x, y) => x.credits - y.credits || x.model.localeCompare(y.model))
+  const mine = sorted.filter((o) => o.model === own)
+  return { shown: [...mine, ...sorted.filter((o) => o.model !== own)].slice(0, 4), cheaper: sorted.length, unpriced }
+}
+
 // The default image seat with a project to route through, READ from MODEL_FACTS
 // `tier`. Asserted at load so a default moved to a seat this op cannot send
 // fails the build instead of every omitted-model call.
@@ -2973,8 +3046,8 @@ export const generateImage: Operation<{
     // which is where a rewrite is still free.
     // Omitted model: the default seat when there is a project to route through,
     // nano-banana-2 without one, because it is the only headless seat. The
-    // desktop's pre-flight guard (`estimateOpCostCents`, src/main/studio-agent/
-    // ops.ts) picks the same seat: change both together.
+    // desktop resolves the same seat for its cost and plan-model guards
+    // (`imageModelFor`, slate src/main/studio-agent/guards.ts): change both together.
     const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : 'nano-banana-2')
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
@@ -7795,16 +7868,47 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
         credits: q?.credits ?? null,
       }
     })
+    // 🚨 THE ROWS ARE IN THE TEXT. The desktop Studio Agent reads only `text`
+    // (`opResultToContent` in slate's studio-agent/ops.ts); `data` reaches MCP
+    // clients as structured content and nobody else. This text used to be the
+    // totals alone, so the in-app agent could see "3 shot(s), 444 credits" and
+    // no Shot it could name: on 2026-10-07 it listed the same board six times,
+    // tried `slates_get_shot("SHOT-1")`, and the eval trial timed out.
+    // The variety report comes first and the rows stop at SHOT_ROWS_CHARS, so a
+    // long board can never push the report past the desktop's 12,000-character
+    // result cap (TOOL_RESULT_CHAR_CAP in slate's studio-agent/ops.ts).
+    const rowText: string[] = []
+    let rowChars = 0
+    for (const s of shots) {
+      const line = [
+        [s.place, s.code].filter(Boolean).join(' ') || '—',
+        JSON.stringify(s.name),
+        s.model ?? 'no model',
+        s.credits == null ? 'unpriced' : fmtCredits(s.credits),
+        `id ${s.id}`,
+      ].join(' · ')
+      if (rowChars + line.length + 1 > SHOT_ROWS_CHARS) break
+      rowText.push(line)
+      rowChars += line.length + 1
+    }
+    const omitted = shots.length - rowText.length
+    const report = describeVarietyReport(r.variety)
     return ok(
       { shots, total_credits: total, unpriced, variety: r.variety },
       `${shots.length} shot(s), at least ${fmtCredits(total)} to fire them all` +
         (unpriced > 0 ? ` (${unpriced} could not be priced — no model or no duration set).` : '.') +
-        (describeVarietyReport(r.variety) ? `
-
-${describeVarietyReport(r.variety)}` : '')
+        (report ? `\n\n${report}` : '') +
+        (rowText.length ? `\n\n${rowText.join('\n')}` : '') +
+        (omitted > 0
+          ? `\n…and ${omitted} more Shot(s) not listed here: pass storyboardId or frameId to list part of the board, or read one with slates_get_shot.`
+          : '')
     )
   },
 }
+
+/** Room for Shot rows in the slates_list_shots text: about 65 rows, well inside the
+ *  desktop's 12,000-character result cap with the totals and the variety report. */
+const SHOT_ROWS_CHARS = 8000
 
 export const getShot: Operation<{ shotId: string }> = {
   id: 'slates_get_shot',
@@ -8681,7 +8785,14 @@ export const loadTools: Operation<{ group?: OperationGroup; query?: string; name
     }
     const names = input.names ?? OPERATION_GROUPS[input.group!]
     const unknown = names.filter((id) => !ALL_OPERATIONS.some((op) => op.id === id))
-    if (unknown.length) throw new Error(`Unknown operation(s): ${unknown.join(', ')}`)
+    if (unknown.length) {
+      // Name the real tools a guessed name was reaching for. On 2026-10-07 the
+      // agent tried slates_generate_shot, slates_run_shot and slates_get_shots
+      // one call at a time before finding slates_generate_from_shots.
+      const near = [...new Set(unknown.flatMap((id) =>
+        searchTools(ALL_OPERATIONS, id.replace(/^slates_/, '').replace(/_/g, ' ')).slice(0, 3).map(({ op }) => op.id)))]
+      throw new Error(`Unknown operation(s): ${unknown.join(', ')}.${near.length ? ` Closest real tools: ${near.join(', ')}.` : ''}`)
+    }
     const defs = toolDefinitions(ALL_OPERATIONS.filter((op) => names.includes(op.id)), { surface: 'mcp' })
     return ok({ group: input.group, tools: defs }, `Loaded tools (call by name):\n${JSON.stringify(defs)}`)
   },
