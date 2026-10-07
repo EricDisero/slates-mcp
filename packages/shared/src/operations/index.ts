@@ -7564,8 +7564,7 @@ export const createShot: Operation<
         }
       }
       const described = describeVarietyReport(board?.variety)
-      if (described) varietyNote = `
-Board so far: ${described}`
+      if (described) varietyNote = `\nBoard so far: ${described}`
     } catch { /* counts are a courtesy here; slates_list_shots is the full read */ }
     // The CODE is the address the user sees on the row — say it back so the
     // next call, and the next sentence to the user, can point at it.
