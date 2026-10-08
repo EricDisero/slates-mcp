@@ -249,7 +249,7 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // created a Shot. Neither knew that in Slates a shot list IS Shots — and on
   // the desktop slates_create_shot is not core, so nothing on screen said so.
   fork(
-    `- A SHOT LIST IS SHOTS: asked for a shot list, storyboard or breakdown, write each beat as a Shot with slates_create_shot (load it by name first): Shots land on the board and can be priced and fired later; a chat list cannot. Read the set back with slates_list_shots. Writing Shots is free, even under "don't generate yet".`,
+    `- A SHOT LIST IS SHOTS: asked for a shot list, storyboard or breakdown, write each beat as a Shot with slates_create_shot (load it by name first): Shots land on the board and can be priced and fired later; a chat list cannot. Read the set back with slates_list_shots. Writing Shots is free, even under "don't generate yet". Firing Shots is slates_generate_from_shots, so each take lands on its Shot; to fire them at other settings, change each Shot first with slates_update_shot and say so in the plan. A loose slates_generate_video leaves the board without its takes.`,
     `- A SHOT LIST IS SHOTS: asked for a shot list, storyboard or breakdown, write each beat as a Shot with slates_create_shot: Shots land on the board and can be priced and fired later; a chat list cannot. Read the set back with slates_list_shots. Writing Shots is free, even under "don't generate yet".`
   ),
   both(
