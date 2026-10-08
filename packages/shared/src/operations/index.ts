@@ -7615,31 +7615,13 @@ export const createShot: Operation<
     // three Shots and never called slates_list_shots in 3 of 4 trials. Same
     // reasoning as describeVarietyReport: what it must choose to fetch does not
     // reach it, so the board's running counts arrive with each new Shot. A
-    // failed read never fails the write; the Shot already exists.
-    //
-    // SCOPED TO THE SHOT'S OWN BOARD. The create response carries the Shot's
-    // scene, not its board, and the listing falls back to EVERY board in the
-    // project when no board is named — so an unscoped read would report other
-    // boards' cuts as this one's. A storyboardId placed the Shot only when no
-    // frameId or sceneId came with it (the schema ignores it then), so it is
-    // used only in that case; otherwise the board whose listing holds the new
-    // Shot is found. No board found means no counts, never project-wide ones.
-    let varietyNote = ''
-    try {
-      const shotId = r.shot?.id as string | undefined
-      let board: { variety: VarietyReport | null } | null = null
-      if (input.storyboardId && !input.frameId && !input.sceneId) {
-        board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { storyboardId: input.storyboardId })
-      } else if (shotId) {
-        const { storyboards } = await desktop.get<{ storyboards: Array<{ id: string }> }>('/agent/storyboards', { projectId: input.projectId })
-        for (const sb of (storyboards ?? []).slice(0, 10)) {
-          const listed = await desktop.get<{ shots: Array<{ id: string }>; variety: VarietyReport | null }>('/agent/shots', { storyboardId: sb.id })
-          if ((listed.shots ?? []).some((s) => s.id === shotId)) { board = listed; break }
-        }
-      }
-      const described = describeVarietyReport(board?.variety)
-      if (described) varietyNote = `\nBoard so far: ${described}`
-    } catch { /* counts are a courtesy here; slates_list_shots is the full read */ }
+    // storyboardId placed the Shot only when no frameId or sceneId came with it
+    // (the schema ignores it then), so only then does it name the board.
+    const varietyNote = await boardSoFar(desktop, {
+      projectId: input.projectId,
+      shotId: r.shot?.id as string | undefined,
+      storyboardId: input.storyboardId && !input.frameId && !input.sceneId ? input.storyboardId : undefined,
+    })
     // The CODE is the address the user sees on the row — say it back so the
     // next call, and the next sentence to the user, can point at it.
     return ok(
@@ -7647,6 +7629,36 @@ export const createShot: Operation<
       `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}`.trim() + varietyNote
     )
   },
+}
+
+/**
+ * The board's running counts after a Shot write, as the "Board so far" line, or ''.
+ * Scoped to the Shot's OWN board: the listing falls back to every board in the
+ * project when none is named, so an unscoped read would report other boards' cuts
+ * as this one's. `storyboardId` is used only when it alone placed the Shot;
+ * otherwise the board whose listing holds the Shot is found. No board found means
+ * no counts, never project-wide ones. A failed read never fails the write.
+ */
+async function boardSoFar(
+  desktop: ReturnType<OperationContext['desktop']>,
+  where: { projectId: string; shotId?: string; storyboardId?: string }
+): Promise<string> {
+  try {
+    let board: { variety: VarietyReport | null } | null = null
+    if (where.storyboardId) {
+      board = await desktop.get<{ variety: VarietyReport | null }>('/agent/shots', { storyboardId: where.storyboardId })
+    } else if (where.shotId) {
+      const { storyboards } = await desktop.get<{ storyboards: Array<{ id: string }> }>('/agent/storyboards', { projectId: where.projectId })
+      for (const sb of (storyboards ?? []).slice(0, 10)) {
+        const listed = await desktop.get<{ shots: Array<{ id: string }>; variety: VarietyReport | null }>('/agent/shots', { storyboardId: sb.id })
+        if ((listed.shots ?? []).some((s) => s.id === where.shotId)) { board = listed; break }
+      }
+    }
+    const described = describeVarietyReport(board?.variety)
+    return described ? `\nBoard so far: ${described}` : ''
+  } catch {
+    return '' // counts are a courtesy here; slates_list_shots is the full read
+  }
 }
 
 export const updateShot: Operation<
@@ -7707,7 +7719,10 @@ export const updateShot: Operation<
         posterAssetId: input.posterAssetId,
       },
     })
-    return ok(r.shot)
+    // An edit to framing changes the counts, and the agent read them BEFORE it
+    // (agent eval round 11: two runs fixed a repeat and never saw the new counts).
+    const varietyNote = await boardSoFar(desktop, { projectId: input.projectId, shotId: r.shot?.id as string | undefined })
+    return ok(r.shot, JSON.stringify(r.shot) + varietyNote)
   },
 }
 
