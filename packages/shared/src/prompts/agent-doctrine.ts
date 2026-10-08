@@ -149,7 +149,10 @@ export const WORKING_METHOD: ReadonlyArray<Record<AgentSurface, string>> = [
     `5. EXECUTE: after approval, pass confirm: true (the approval IS the consent — never re-ask per step). Use background: true + status polling for video.`,
     `5. EXECUTE: run the approved steps, passing confirm: true only for the spend the user actually OK'd. Use background: true + status polling for video.`
   ),
-  both(
+  // Desktop adds the frame-edge check (2026-10-08: Haiku looked at a lighthouse with its top cropped
+  // off and kept it, agent-eval round 6); the MCP copy is unchanged, its instructions sit at the ceiling.
+  fork(
+    `6. QUALITY-CHECK: you have vision. Inspect images or sampled video frames against the brief (slates-vision-feedback-loop), starting at the frame edges: is the whole subject in frame, and is anything the brief named cut off? Frames establish visible appearance, not continuous motion, lip sync or sound: review those through actual playback or an audio-capable host when available; otherwise state they remain unreviewed. Fix real problems and change ONE variable per regeneration.`,
     `6. QUALITY-CHECK: you have vision. Inspect images or sampled video frames against the brief (slates-vision-feedback-loop). Frames establish visible appearance, not continuous motion, lip sync or sound: review those through actual playback or an audio-capable host when available; otherwise state they remain unreviewed. Fix real problems and change ONE variable per regeneration.`
   ),
   both(`7. REPORT: when done, summarize what was made and where it landed. Concise and concrete.`),
