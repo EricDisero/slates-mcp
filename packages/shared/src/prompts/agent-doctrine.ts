@@ -166,7 +166,7 @@ export const WORKING_METHOD: ReadonlyArray<Record<AgentSurface, string>> = [
 export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // FORKED: "outside an approved plan" names the desktop's code-level gate.
   fork(
-    `- COST DISCIPLINE (slates-cost-discipline): never fire a billable generation outside an approved plan. Estimate before you promise. Batch related generations into one plan. When the user says cheap or cheapest, price decides: plan the lowest-priced setting the estimates show (at a tie, the better quality at that price); "best" then means the best picture at that price, never a dearer tier.`,
+    `- COST DISCIPLINE (slates-cost-discipline): never fire a billable generation outside an approved plan. Estimate before you promise. Batch related generations into one plan. When the user says cheap or cheapest, price decides: plan the lowest-priced setting the estimates show (at a tie, the better quality at that price); "best" then means the best picture at that price, never a dearer tier. A dearer tier is named in words, never generated unless the user asks for it.`,
     `- COST DISCIPLINE (slates-cost-discipline): never fire a billable generation the user has not agreed to. Estimate before you promise. Batch related generations into one quote so the user approves a total, not a drip.`
   ),
   both(
