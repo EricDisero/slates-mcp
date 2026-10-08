@@ -8418,7 +8418,10 @@ export const generateFromShots: Operation<{
           quote.items
             .map((i) => `${i.code ?? i.name}: ${i.credits == null ? 'unpriced' : fmtCredits(i.credits)}${i.blocked ? ` — ${i.blocked}` : ''}`)
             .join('\n') +
-          '\nGet approval for these prices, then pass their fingerprint with confirm: true.'
+          // Printed, not only in `data`: a client without elicitation reads this text
+          // alone, and the confirm step refuses without the fingerprint (agent eval, round 9).
+          `\nfingerprint: ${quote.fingerprint}` +
+          '\nGet approval for these prices, then pass this fingerprint with confirm: true.'
       )
     }
     return ok(
