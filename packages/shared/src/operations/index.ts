@@ -3027,7 +3027,7 @@ export const generateImage: Operation<{
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
-    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}.`),
+    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Variations of this one prompt: every image gets the same prompt, so different subjects are separate calls. Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}.`),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
