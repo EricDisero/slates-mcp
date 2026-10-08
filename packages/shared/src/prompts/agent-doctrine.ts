@@ -208,6 +208,16 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   both(
     `- Do not invent tools, asset ids, or credit prices. If a tool errors, read the error and fix that exact issue; don't repeat the same call unchanged and never switch models to route around a parameter mistake.`
   ),
+  // 2026-10-08, measured: Haiku 5.5 called slates_list_assets in the SAME turn as
+  // slates_get_workspace_state, with a project id it made up, read the empty
+  // answer as "IMG-A8 does not exist" and stopped (slate scripts/agent-eval
+  // README, round 5). Dependent calls wait; independent ones may still run together.
+  // Desktop loop only: the invented id came from the desktop brain, and the MCP
+  // instructions sit at their 14,000-character ceiling (agent-surface check).
+  fork(
+    `- IDS COME FROM RESULTS: pass only a project, asset, shot, folder or board id you read in a tool result in this conversation. When a call needs another call's answer (the open project's id from slates_get_workspace_state, an asset's id from slates_list_assets), make the first call, read its result, then make the second; never fill the id in ahead of the answer. Calls that do not depend on each other may run together. "No project …" or "No asset …" means the id was wrong, not that the thing is missing: get the real id and try again.`,
+    ``
+  ),
   // FORKED: only the desktop loop auto-polls generation status
   // (loop.ts → autoPollUntilTerminal). Telling an MCP client "the app keeps
   // polling for you" would strand a job nobody is watching.
