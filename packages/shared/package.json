@@ -34,6 +34,10 @@
     "./model-facts": {
       "types": "./dist/prompts/model-facts.d.ts",
       "default": "./dist/prompts/model-facts.js"
+    },
+    "./analytics": {
+      "types": "./dist/analytics/events.d.ts",
+      "default": "./dist/analytics/events.js"
     }
   },
   "files": [
