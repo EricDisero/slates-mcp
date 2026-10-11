@@ -193,7 +193,7 @@ SELECT id, speech_rate, duration_seconds, transcript
 `.trim()
 
 /** When the numbers below were last derived from the query above. */
-export const SPEECH_RATE_MEASURED_ON = '2026-09-30'
+export const SPEECH_RATE_MEASURED_ON = '2026-10-11'
 
 /**
  * 🔑 THE REGISTER SPLIT IS REAL AND MEASURED, which is why there is no single
@@ -212,7 +212,7 @@ export const SPEECH_RATE = {
    * 250, not p90: those are rates real ads actually hit, and flagging an
    * achievable read is exactly how a check gets ignored.
    */
-  ceiling: { wpm: 283, n: 67, segment: 'max over every marked row' },
+  ceiling: { wpm: 283, n: 69, segment: 'max over every marked row' },
 } as const satisfies Record<string, SpeechRate>
 
 export type SpeechRegister = Exclude<keyof typeof SPEECH_RATE, 'ceiling'>
