@@ -144,9 +144,9 @@ export interface DurationCapability {
   mode: 'continuous' | 'discrete'
   /** For discrete mode: the exact allowed durations. */
   values?: number[]
-  /** Resolution-dependent narrowing (retired Veo forced 8s at 1080p AND 4k). */
+  /** Resolution-dependent narrowing: a resolution that allows fewer durations (LTX sets this). */
   resolutionOverrides?: Record<string, Pick<DurationCapability, 'min' | 'max' | 'mode' | 'values'>>
-  /** Prompt-mode narrowing (retired Veo's reference-to-video endpoint was 8s only). */
+  /** Prompt-mode narrowing: a mode, such as reference-to-video, that allows fewer durations. No row sets one today. */
   modeOverrides?: Record<string, Pick<DurationCapability, 'min' | 'max' | 'mode' | 'values'>>
 }
 
@@ -371,7 +371,7 @@ export interface ModelCapability {
  * credits route carries Kling on fal: `slate/src/main/agent/routes.ts`
  * never sends `klingProvider`, so `handlers/video.ts` defaults it to `'fal'`.
  * So an agent gets Kling's THREE fal ratios, not the eight it takes on its
- * direct API (retired Veo had the same split, two against ten). Validating
+ * direct API. Validating
  * against the direct sets would accept a ratio fal rejects, which is the exact
  * failure this module exists to delete.
  */

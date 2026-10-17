@@ -1306,8 +1306,6 @@ export const VIDEO_MODELS = [
   'kling-v3.0-std',
   'kling-v3.0-pro',
   'kling-v3.0-omni',
-  // Veo 3.1 Fast and Standard were retired on 2026-10-02 (Eric). The server
-  // keeps their keys for older desktops only; nothing here offers them.
   'seedance-2',
   // Seedance 2.5 is the DEFAULT video model (Eric, 2026-09-13): 30s takes, 30
   // image references, audio-only references, up to 1080p (2026-08-24). 2.0 stays
@@ -3763,7 +3761,8 @@ export const extractGridCells: Operation<{
  * rather than a raw Zod error the agent has to guess its way out of.
  *
  * `promptMode` matters for any row that declares `duration.modeOverrides.ingredients`
- * (retired Veo's reference-to-video endpoint was 8s only). Free reference images
+ * (for an endpoint whose reference-to-video mode takes fewer durations than its
+ * frame modes; no row sets one today). Free reference images
  * with no first/last frame IS ingredients mode.
  */
 function assertVideoCapabilities(input: {
@@ -4570,12 +4569,6 @@ export const generateVideo: Operation<{
         })
       }
     }
-
-    // ⛔ The hand-written Veo duration block that stood here is GONE. It read
-    // `![4,6,8].includes(duration)` plus "4K only at 8s" — and the registry
-    // forces 8s at 1080p TOO, so it happily quoted a 4s 1080p Veo the provider
-    // rejects. `assertVideoCapabilities` above covers both, plus the
-    // reference-to-video 8s rule it never knew about, from the SSOT.
 
     // Resolve every asset reference (UUID or badge code) against the
     // project AT CALL TIME. Codes the user just spoke ("a8 is the one")
