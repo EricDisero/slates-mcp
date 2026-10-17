@@ -639,7 +639,8 @@ interface ViewShape {
   board?: { id: string | null; level: string; cardWidth: number; filter: string; linkedClips: boolean; scriptFollowsDrag: boolean; collapsedSceneIds: string[] }
   media?: { tab: string | null; folderId: string | null; unfiledOnly: boolean; search: string; favoritesOnly: boolean; linkedOnly: boolean; rounds: boolean; cardSize: number; sourcesShown: string[]; hiddenCategoryIds: string[] }
   library?: { categoryId: string | null }
-  viewer?: { assetId: string | null }
+  /** `mode` and `sourceAssetId`: the timeline's Viewer, absent from a desktop of 1.6.2 or older. */
+  viewer?: { assetId: string | null; mode?: 'source' | 'timeline'; sourceAssetId?: string | null }
   compare?: { open: boolean; assetIds: string[] }
   animatic?: { open: boolean }
   settings?: { open: boolean }
@@ -671,6 +672,7 @@ const describeLooking = (v: ViewShape): string => {
   }
   if (v.media?.folderId) parts.push(`Folder ${v.media.folderId} is chosen: new pictures land in it.`)
   if (v.viewer?.assetId) parts.push(`The picture viewer is open on ${v.viewer.assetId}.`)
+  if (v.viewer?.mode === 'source' && v.viewer.sourceAssetId) parts.push(`The timeline's Viewer shows the clip ${v.viewer.sourceAssetId} (Source).`)
   if (v.compare?.open) parts.push(`Compare is open on ${v.compare.assetIds.length} items.`)
   if (v.animatic?.open) parts.push('The animatic is up.')
   if (v.settings?.open) parts.push('Settings is open.')
@@ -711,7 +713,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -756,7 +758,7 @@ export const setView: Operation<{
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, the picture viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -832,7 +834,7 @@ export const setView: Operation<{
         .strict()
         .optional(),
       library: z.object({ categoryId: z.string().nullable() }).strict().optional().describe("Open a Library category's page in Media's place; null goes back to the grid."),
-      viewer: z.object({ assetId: z.string().nullable() }).strict().optional().describe('Open the picture viewer on a picture; null closes it.'),
+      viewer: z.object({ assetId: z.string().nullable() }).strict().optional().describe("A picture opens in the picture viewer; a clip plays in the timeline's Viewer (Source), on desktops after 1.6.2. null closes the picture viewer."),
       compare: z
         .object({ open: z.boolean().optional(), assetIds: z.array(z.string()).max(4).optional().describe('The compare set, two to four items.') })
         .strict()
