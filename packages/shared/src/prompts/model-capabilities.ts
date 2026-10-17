@@ -13,8 +13,8 @@
 // enums plus English prose, with no link of any kind back to the registry. It
 // had drifted on every axis: an aspect-ratio enum offering `9:21` (a value that
 // exists in NO model, invented here), "Kling/Seedance support all" when Seedance
-// takes 6 of 11 and Kling-on-fal takes 3, "Veo locks to 16:9" when Veo on fal
-// takes two, "Kling: 5-15" against a registry minimum of 3, and a
+// takes 6 of 11 and Kling-on-fal takes 3, "locks to 16:9" for a model that took
+// two on fal, "Kling: 5-15" against a registry minimum of 3, and a
 // `videoResolution` description that never mentioned Kling at all. A customer
 // burned a round trip on 2026-08-16 passing `4:5` to Seedance: the op accepted
 // it, the job queued, credits reserved, and the provider rejected it
