@@ -6,7 +6,7 @@
 
 ## Contents
 
-- [Subject definition rule (verbatim, fal blog)](#subject-definition-rule-verbatim-fal-blog)
+- [Subject definition rule (verbatim, published guide)](#subject-definition-rule-verbatim-published-guide)
 - [Dialogue syntax](#dialogue-syntax)
 - [Voice direction formula (Omni)](#voice-direction-formula-omni)
 - [The Immediately keyword (Omni only)](#the-immediately-keyword-omni-only)
@@ -49,7 +49,7 @@ Kuaishou's video model. Three tiers: `kling-v3.0-std` (general use, sound suppor
 
 Up to 15s. Multi-shot supported (up to 6 cuts in 15s total). Strong on image-to-video — preserves identity, layout, and text from the input image well.
 
-## Subject definition rule (verbatim, fal blog)
+## Subject definition rule (verbatim, published guide)
 
 > "Define your core subjects clearly at the beginning of the prompt and keep descriptions consistent across shots."
 
@@ -113,7 +113,7 @@ SFX accepts physical-cause specificity:
 
 ## Image-to-video guidance
 
-**Verbatim (fal blog):**
+**Verbatim (published guide):**
 > "Treat the input image as an anchor. Kling 3.0 excels at preserving the identity, layout, and text details. Focus prompts on how the scene evolves *from* the image: subtle movements, camera motion, or environmental changes."
 
 **Don't re-describe what's already in the image.** Focus on motion, changes, evolution.
@@ -184,7 +184,7 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 ## Negative prompting — has a real field
 
-Kling exposes `negative_prompt` on the fal endpoint (different from Seedance which has none). Default block to start from:
+Kling exposes `negative_prompt` on the endpoint Slates calls (different from Seedance which has none). Default block to start from:
 
 ```
 blurry, low quality, watermark, text overlay, distorted hands, extra fingers,
@@ -216,7 +216,7 @@ Ambient noise: <soundscape>.
 Camera <single move>.
 ```
 
-Cinematic example (paraphrasing fal blog patterns):
+Cinematic example (paraphrasing published guide patterns):
 > "Shot 1: Wide establishing shot of a neon-lit alleyway in heavy rain, steam rising from grates. Camera slowly tracks forward.
 > Shot 2: Medium shot of a detective in a trench coat ducking under an awning, water dripping from his hat brim. [Detective: weary, raspy]: 'I knew she'd come back.' Ambient noise: distant traffic, rain on metal.
 > Shot 3: Close-up on his eyes, narrowing as headlights flash across his face."
@@ -249,7 +249,6 @@ Rules:
 
 ## Sources
 
-- [fal.ai — Kling 3.0 Prompting Guide](https://blog.fal.ai/kling-3-0-prompting-guide/)
 - [Vidguru — Kling 3.0 Omni Guide](https://www.vidguru.ai/blog/kling-3.0-omni-guide.html)
 - [AcceptPrompt — Kling 3 Prompt Guide](https://www.acceptprompt.com/blog/kling-3-prompt-guide)
 - [DataCamp — Kling 3.0 Tutorial](https://www.datacamp.com/tutorial/kling-3-0)

@@ -64,8 +64,8 @@ movement from video 1. Preserve the character's identity, appearance, and outfit
 That is the same endpoint the old `motionModel=seedance-2` branch called — it just wrote that sentence for you, invisibly. Add style/setting/camera direction freely; Seedance re-generates the whole shot.
 
 - **Reference videos must total 2–15s on 2.0, or 2–30s on 2.5.** Longer clips: trim first. Kling MC (`characterOrientation: 'video'`) takes up to 30s.
-- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key; quote via the confirm gate before spending. On both Seedance 2.0 and 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
-- **Faces route through the face cascade**: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → confirm consent → `seedanceRealFace=true, realFaceConsent=true` (premium realface vref pricing).
+- **Billing = combined input+output seconds** (the vref keys). The server probes the clip and corrects an understated key; quote via the confirm gate before spending. On a Seedance 2.0 or 2.5 Face row the input side counts as at least the output's length: max(input, output) + output.
+- **Faces go through the face cascade**: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → confirm consent → `seedanceRealFace=true, realFaceConsent=true` (premium realface vref pricing).
 - `characterOrientation` has no Seedance equivalent; framing follows the prompt + `aspectRatio`.
 
 Everything below is about the Kling tool.
@@ -200,5 +200,3 @@ Don't second-guess the assets the user picked — the model executes the transfe
 
 ## Sources
 
-- [fal.ai — Kling Motion Control V3 Standard](https://fal.ai/models/fal-ai/kling-video/v3/standard/motion-control)
-- [fal.ai — Kling Motion Control V3 Pro](https://fal.ai/models/fal-ai/kling-video/v3/pro/motion-control)

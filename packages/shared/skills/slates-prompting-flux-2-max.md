@@ -55,7 +55,7 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 - `A chef plating in a steel kitchen pass. Shot on Hasselblad X2D, 80mm, f/2.8. Overhead fluorescents plus warm spill from the line. Natural skin texture, subtle imperfections. Muted steel and #7A3B2E copper.`
 - `An empty municipal pool at dusk, 35mm, deep focus, early digital camera with slight noise and flash falloff. Cracked #4A7C8C tiles. Candid, unstaged.`
 
-Black Forest Labs' top image model, routed via fal.ai. In Slates: `slates_generate_image` with `model: flux-2-max` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). Strengths vs Nano Banana 2: photoreal texture, less censored, precise hex-color control, strong typography. Reference images route through FLUX's edit endpoint and carry a lower per-model cap than NB2's 14.
+Black Forest Labs' top image model. In Slates: `slates_generate_image` with `model: flux-2-max` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). Strengths vs Nano Banana 2: photoreal texture, less censored, precise hex-color control, strong typography. Reference images route through FLUX's edit endpoint and carry a lower per-model cap than NB2's 14.
 
 ## Core structure — front-load what matters
 
@@ -189,4 +189,3 @@ When you pass `referenceAssetIds`, the first call returns the references **inlin
 ## Sources
 
 - [Black Forest Labs — FLUX.2 Prompting Guide](https://docs.bfl.ml/guides/prompting_guide_flux2)
-- [fal.ai — FLUX.2 [max] Prompt Guide](https://fal.ai/learn/devs/flux-2-max-prompt-guide)

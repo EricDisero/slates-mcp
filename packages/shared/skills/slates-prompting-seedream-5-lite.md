@@ -54,7 +54,7 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 - `Professional headshot of a female CEO, short blonde hair, confident expression, navy suit, neutral office background. Studio lighting, shallow depth of field, high-end corporate photography, shot on 85mm.`
 - `A rain-soaked night market stall, cinematic, rule of thirds with the vendor camera-right, foreground steam blurred, moody low-key lighting with practical neon, shot on 35mm.`
 
-ByteDance's Seedream image model, Lite tier, routed via fal.ai. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId; no headless path). **Flat-priced regardless of resolution**, the cheapest flat-priced seat in Slates, which makes it a useful choice for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
+ByteDance's Seedream image model, Lite tier. In Slates: `slates_generate_image` with `model: seedream-5-lite` (REQUIRES projectId; no headless path). **Flat-priced regardless of resolution**, the cheapest flat-priced seat in Slates, which makes it a useful choice for high-volume drafting, storyboard exploration, and variant grids. Call `slates_estimate_generation_cost` for the current number; never quote prices from memory. Less censored than Nano Banana 2.
 
 **When to pick it:** lots of frames cheap (storyboard passes, 3-4 variant exploration), posters/layouts with text, quick look-dev. Step up to NB2 or FLUX.2 Max for the locked hero shot.
 
@@ -119,5 +119,4 @@ Flat pricing supports iteration: draft, evaluate inline, diagnose one specific d
 
 ## Sources
 
-- [fal.ai — Seedream Prompt Guide](https://fal.ai/learn/devs/seedream-v4-5-prompt-guide)
-- [BytePlus ModelArk — Seedream Prompt Guide](https://docs.byteplus.com/en/docs/ModelArk/1829186)
+- [ByteDance — Seedream Prompt Guide](https://docs.byteplus.com/en/docs/ModelArk/1829186)

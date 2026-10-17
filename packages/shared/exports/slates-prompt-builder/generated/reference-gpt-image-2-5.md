@@ -85,7 +85,7 @@ All five rungs are exposed, and they span ~36× end to end (2k class: $0.0044 �
 
 🚨 **The tier NAMES moved between versions and the strings did not.** GPT Image 2's `medium` is this model's `high`; its `high` is this model's `max` — same money, one rung of renaming. For a recipe explicitly written for GPT Image 2, map the old tier before reusing it on 2.5. A current user request for `medium` still means `medium`. Getting this backwards costs picture quality silently: nothing errors, the bill is correct for what was asked, and the image is just worse.
 
-Never rely on the provider default. fal's default is `high`, which is correct today — but it is the third rung of five rather than the top of two, so leaning on it means a fal-side change silently reprices you. Slates sends its configured quality explicitly; current defaults live in `SKILL.md`. Your explicit choice overrides them.
+Never rely on the API's default. It is `high`, which is correct today — but it is the third rung of five rather than the top of two, so leaning on it means a change upstream silently reprices you. Slates sends its configured quality explicitly; current defaults live in `SKILL.md`. Your explicit choice overrides them.
 
 **Start at the default and change tiers for an unmet requirement.** OpenAI's own procedure: *"If the output falls short, test a higher quality setting. Once it meets your requirements, test lower settings to see whether they preserve acceptable quality while reducing latency. Use `xhigh` or `max` only when they improve an unmet quality requirement within your latency budget."* A higher rung does **not** guarantee a better result on a given prompt. Compare `medium` against `high` when the job is small or dense text; that is where the rungs separate most visibly.
 
@@ -97,7 +97,7 @@ Never rely on the provider default. fal's default is `high`, which is correct to
 
 ⚠️ **Above 2560×1440 you are on a path OpenAI marks EXPERIMENTAL.** Verbatim: *"Outputs with more than 3,686,400 total pixels ('2560x1440') are experimental."* That is the whole **4k** class (≈8.0 MP) plus 3k at 4:3/3:4 (≈3.70 MP). It bills normally and it works — but prove the shot at 2k or 3k 16:9 first, and do not be surprised by an odd frame at 4k.
 
-**Hard size bounds**, from fal's schema verbatim: each edge ≤ 3840 px, both edges multiples of 16, longer:shorter ratio ≤ 3:1, total pixels between 655,360 and 8,294,400. **The pixel ceiling is the one that actually bites** — the multiple-of-16 rule is documented but NOT enforced, and we have the receipt: 1920×1080 fails it (1080 = 67.5 × 16), is one of fal's own six priced canonical sizes, and metered clean. Slates picks sizes that respect the ceiling; these matter only if you hand-build a request.
+**Hard size bounds**, from the endpoint's schema verbatim: each edge ≤ 3840 px, both edges multiples of 16, longer:shorter ratio ≤ 3:1, total pixels between 655,360 and 8,294,400. **The pixel ceiling is the one that actually bites** — the multiple-of-16 rule is documented but NOT enforced, and we have the receipt: 1920×1080 fails it (1080 = 67.5 × 16), is one of the six priced canonical sizes, and metered clean. Slates picks sizes that respect the ceiling; these matter only if you hand-build a request.
 
 🚨 **THE ASPECT RATIO CHANGES THE PRICE ON THIS MODEL, and on no other image model.** OpenAI bills image OUTPUT TOKENS and the count tracks the frame's SHAPE, so at the same resolution class **`1:1` costs about 1.8× and `4:3`/`3:4` about 1.37× what `16:9` costs**; `9:16` costs the same as `16:9`. Metered 2026-09-09 and priced into the cost key, so the quote you get before generating is the real number — but if you are choosing between shapes and the budget is tight, **16:9 or 9:16 is the cheap one.** Every other image model charges the same whatever the shape.
 
@@ -109,7 +109,7 @@ Never rely on the provider default. fal's default is `high`, which is correct to
 
 **Receipt, 2026-09-15, Sunburst, IMG-A192–A198.** The up-front version returned the studio look; the inline versions were never refused and never came back as a sheet. Two costs, both fixed in words: anything the prompt does not describe is taken from the reference (name every garment), and props nobody asked for appear (say what is in the foreground and that nothing else is). One sheet-only plate kept its described location, which narrows the two-reference rule in `slates-ugc-influencer-ad`. A look reference did far less than a described light. The full ladder is the vault's `cinematic-look-research.md`; the techniques are `slates-cinematic-look`.
 
-Reference images route through the edit endpoint, **up to 16** — fal's documented `maxItems`, and the highest reference ceiling of any image seat in Slates (the Banana line takes 14). It was capped at 10 until 2026-09-09, which was never anybody's limit, just a number nobody had checked. The composed "image N" naming applies as everywhere else. Mask-based inpainting exists at the API level but is not surfaced: a mask is something the user has to paint, and there is no painting surface — describe the change instead.
+Reference images route through the edit endpoint, **up to 16** — the endpoint's documented `maxItems`, and the highest reference ceiling of any image seat in Slates (the Banana line takes 14). It was capped at 10 until 2026-09-09, which was never anybody's limit, just a number nobody had checked. The composed "image N" naming applies as everywhere else. Mask-based inpainting exists at the API level but is not surfaced: a mask is something the user has to paint, and there is no painting surface — describe the change instead.
 
 ## Editing — separate the change from the constraints
 
@@ -160,7 +160,7 @@ Name materials, lighting, colour and medium. Mood words are cues only — "cinem
 
 ## 🚨 WHAT GETS YOU BLOCKED — read before writing a prompt with a person in it
 
-**Receipt: 24 consecutive attempts on one character, 2026-08-24, same project and same rail.** Eleven were refused with `content_policy_violation` on the fal edit endpoint. The refusals were never about the scene — one of the blocked prompts was a woman standing at a kitchen counter with her hand on it. **Two phrasings were hard blocks, 5 for 5 each, and neither ever passed:**
+**Receipt: 24 consecutive attempts on one character, 2026-08-24, same project and same rail.** Eleven were refused with `content_policy_violation` on the edit endpoint. The refusals were never about the scene — one of the blocked prompts was a woman standing at a kitchen counter with her hand on it. **Two phrasings were hard blocks, 5 for 5 each, and neither ever passed:**
 
 **1. Never describe the reference as a photograph of a real person.**
 

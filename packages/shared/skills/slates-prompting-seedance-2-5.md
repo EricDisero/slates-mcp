@@ -129,15 +129,15 @@ Worked, at the shipped rates:
 | 2.5 · 720p · 5s · faceless | 58 |
 | 2.5 · 1080p · 5s · faceless | 142 |
 | 2.5 · 720p · 30s · faceless | 347 |
-| 2.5 · 720p · 30s · AI-face route | **489** |
-| 2.5 · 720p · 30s · consented real-face route | **710** |
+| 2.5 · 720p · 30s · Face | **489** |
+| 2.5 · 720p · 30s · consented real person | **710** |
 | 2.5 · 1080p · 30s · faceless | **853** |
-| 2.5 · 1080p · 30s · consented real-face route | **1,749** |
-| *(for scale)* 2.0 · 1080p · 15s · AI-face route | 411 |
+| 2.5 · 1080p · 30s · consented real person | **1,749** |
+| *(for scale)* 2.0 · 1080p · 15s · Face | 411 |
 
 **A 30-second 720p clip can cost more than a 15-second 1080p one** — and a base licence starts
-with 1,000 credits. Someone who reads "720p" as "cheap" and asks for a 30-second take on the
-real-face route has spent 71% of their welcome grant on one clip; **on the real-face route a single
+with 1,000 credits. Someone who reads "720p" as "cheap" and asks for a 30-second take of a
+consented real person has spent 71% of their welcome grant on one clip; **for a real person a single
 30-second 1080p take is more than the whole grant.**
 
 **Discipline:**
@@ -232,13 +232,13 @@ That makes one recipe possible that was not before: drive a scene's timing, voic
 a recording with no visual anchor at all — a voice line, a music bed, a room tone — and let the
 model build the picture to it. Cite it the same way as any other reference
 (`Reference the timbre in <Audio_N> to generate…`), and remember that audio references carry **no
-billing dimension** on any Seedance route: audio is included.
+billing dimension** on any Seedance row: audio is included.
 
 ### Video references
 
 Up to 10 clips, ≤30s combined (2.0: 3 clips, ≤15s). A reference VIDEO switches the cost key to
-`seedance-2.5*-vref-{res}-{T}s`, where **T = Σ input seconds + output seconds** on faceless and real-face routes;
-on the AI-face route, **T = max(Σ input seconds, output seconds) + output seconds** on both 2.0 and 2.5. The sum is across
+`seedance-2.5*-vref-{res}-{T}s`, where **T = Σ input seconds + output seconds** without Face and for a consented real person;
+on a Face row, **T = max(Σ input seconds, output seconds) + output seconds** on both 2.0 and 2.5. The sum is across
 **every** clip attached, not just the longest. Three 6-second references on a 12-second output bills
 30 seconds, not 12 and not 18. Quote before confirming.
 
@@ -295,7 +295,7 @@ the citation, not a fallback — *"use her face and wardrobe from image 1, not i
 background"* is a stronger instruction than naming the positive alone, because an unscoped reference
 brings its whole frame with it.
 
-**BytePlus documents disagree on reference sigils.** Its API tutorial says *"Use `@Image 1`,
+**ByteDance's documents disagree on reference sigils.** Its API tutorial says *"Use `@Image 1`,
 `@Video 1`, and `@Audio 1`"*, while its 2.5 prompt guide uses the bare form
 (`Image 1 / Video 1 / Audio 1`) in its normative sentence. Both are first-party sources; the
 bare form is confirmed working on both Seedance models. Use the syntax accepted by the endpoint
@@ -336,12 +336,12 @@ Kling O3 Edit is the one that takes element and style reference images.
   (ByteDance recommends 1–5 — *"replace the man in dark clothing in @Video 1 with @Image 2"*);
   **Slates has not wired that path**, so today an edit that must lock an identity from a photo
   goes to Kling O3 Edit. Constraint of our build, not of the model — worth revisiting.
-- **An edit costs about 1.2x a plain 2.5 generation of the same length**: every Seedance provider
-  charges an edit on input + output seconds, at the reduced video-reference rate. Read the confirm
+- **An edit costs about 1.2x a plain 2.5 generation of the same length**: every Seedance edit
+  is charged on input + output seconds, at the reduced video-reference rate. Read the confirm
   gate's number; do not reason from the generation rate.
-- **Set `seedanceFace: true` when a character's face is visible in the clip.** The faceless provider
-  blocks faces outright — this is not a price optimisation, it is whether the job runs at all.
-- **There is no consented-real-face route for editing.** Real-person footage that the AI-face route
+- **Set `seedanceFace: true` when a character's face is visible in the clip.** Without it, a
+  face is blocked outright — this is not a price optimisation, it is whether the job runs at all.
+- **There is no consented real-person option for editing.** Real-person footage that the Face edit
   rejects has to go to Kling O3 Edit.
 
 **Prompting an edit** — the same discipline as every other edit engine: **describe only what
@@ -371,11 +371,11 @@ not a lip-sync job. Bill it like any other edit — on the source clip's length.
 ## Faces, and what does NOT change
 
 <!-- slates-only -->
-The three-tier face routing is identical to 2.0 — faceless → default route, an AI character's face →
-`seedanceFace: true` (the relaxed provider, a real cost premium), a real person's photo → the
-consent-gated real-person route after a `[REAL_FACE_DETECTED]` rejection, with `realFaceConsent: true`
+The three face tiers are identical to 2.0 — faceless → leave Face off, an AI character's face →
+`seedanceFace: true` (a real cost premium), a real person's photo → the
+consent-gated real-person option after a `[REAL_FACE_DETECTED]` rejection, with `realFaceConsent: true`
 set **only** after the user explicitly confirms they hold the rights to the likeness. The full rules,
-including why the real-vs-AI call is the provider's and not yours, are in
+including why the real-vs-AI call is the model's and not yours, are in
 `slates-prompting-seedance`.
 <!-- /slates-only -->
 

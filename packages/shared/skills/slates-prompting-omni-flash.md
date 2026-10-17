@@ -46,7 +46,7 @@ description: "Prompt Gemini Omni Flash video generation or Omni Flash edits (omn
 - harm-to-person framing: `ignite`, `catch fire`, `on fire` applied to a person trips the safety filter
 <!-- @banned:end -->
 
-Google's fast video generation + editing model ("Nano Banana Pro for video" in creator slang — a nickname; it is NOT the NB Pro image model). Carried on fal (`google/gemini-omni-flash*`). 720p only, 24fps, 3–10 second clips, 16:9 or 9:16. **Audio is native and included** — dialogue, SFX, and ambient generate WITH the video at no extra cost.
+Google's fast video generation + editing model ("Nano Banana Pro for video" in creator slang — a nickname; it is NOT the NB Pro image model). 720p only, 24fps, 3–10 second clips, 16:9 or 9:16. **Audio is native and included** — dialogue, SFX, and ambient generate WITH the video at no extra cost.
 
 ## Where it routes
 

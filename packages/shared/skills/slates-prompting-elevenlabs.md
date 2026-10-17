@@ -42,7 +42,7 @@ description: "Prompt ElevenLabs Sound Effects v2 (eleven-sfx) for a single effec
 - `door sound`, `whoosh`, `footsteps`, `impact`, `ambience` standing alone
 <!-- @banned:end -->
 
-One short sound with an exact length, carried on fal (`fal-ai/elevenlabs/sound-effects/v2`). This Slates audio surface has a real duration control and a real loop mode.
+One short sound with an exact length. This Slates audio surface has a real duration control and a real loop mode.
 
 ## Where it routes
 

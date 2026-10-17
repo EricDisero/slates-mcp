@@ -70,14 +70,14 @@ endpoint: attach a reference and Slates refuses the call rather than dropping it
 drafts, volume and start-frame coverage, then re-run the keeper on Max or base H3 when it needs
 references.
 
-**1080p on Max and Turbo is a refinement, not a native render.** fal's schema, verbatim: *"1080P
+**1080p on Max and Turbo is a refinement, not a native render.** The endpoint's schema, verbatim: *"1080P
 latent refinement from a native 768P source."* It is a different stage from base H3's 2K/4K
 upscaler, and it costs double the 768p second. Judge a 1080p take against the same shot at 768p
 before paying for it across a batch.
 
 **The speed is measured, not claimed** (2026-08-27, same prompt and params on both rows): a 5-second
 768p text-to-video finished in **4.8 seconds** on Max against **57 seconds** on base H3 — roughly
-**12x**, queue to finished file. fal advertises "under 3 seconds"; the literal claim did not hold at
+**12x**, queue to finished file. The model page advertises "under 3 seconds"; the literal claim did not hold at
 4.8s wall-clock, but the order of magnitude did. For iteration loops and client-present work that gap
 is the entire reason the seat exists.
 
@@ -236,13 +236,13 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 ### Cite references by number — Slates already does it for you
 
-H3 on fal takes references as **typed slots** and expects the prompt to name them by modality and
+H3 in Slates takes references as **typed slots** and expects the prompt to name them by modality and
 order: **`image 1`, `image 2`, `video 1`, `audio 1`**. That is exactly what the Slates composer
 emits from your `@mentions` and `#tags` (`Marcus (image 1) in the workshop (image 2)`), in the
 exact order it sends them.
 
 🚨 **Do NOT hand-write angle-bracket reference tags.** MiniMax's own model-card grammar uses
-`<Subject N>` / `<Picture N>` / `<Video N>` / `<Audio N>` labels; the fal endpoints Slates calls do
+`<Subject N>` / `<Picture N>` / `<Video N>` / `<Audio N>` labels; the endpoints Slates calls do
 not — they build the binding from the typed slots and ask for plain numbered prose. Typing the tags
 yourself puts literal angle brackets in the prompt the model reads.
 
@@ -318,7 +318,7 @@ dropping one side.
 
 **768p is the default for a reason.** It is the tier the model natively generates.
 
-🚨 **2K and 4K are UPSCALES of a 768p render, not larger generations.** fal's own schema says so:
+🚨 **2K and 4K are UPSCALES of a 768p render, not larger generations.** The endpoint's own schema says so:
 *"480P and 768P are native generation modes; 2K and 4K upscale a 768P base result."* The upscaler
 (H3-Regenerate-2K) is a separate stage bolted onto a finished take — it can enlarge detail but it
 cannot add information.

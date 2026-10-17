@@ -154,7 +154,7 @@ A shape that works:
 
 ## 5. Camera: write it, don't enumerate it
 
-fal exposes a `camera_motion` enum (dolly in/out/left/right, jib up/down, static, focus shift).
+The endpoint exposes a `camera_motion` enum (dolly in/out/left/right, jib up/down, static, focus shift).
 **Slates does not surface it, deliberately** — and prose is the better instrument anyway:
 
 - **A written move can be tied to a specific moment.** "A slow push-in that settles as she reaches
@@ -175,7 +175,7 @@ Asking for 7s is not a rounding matter — that generation does not exist.
 
 **And the long end is 1080p-and-below only.** At 1440p and 4K the ceiling drops to **6, 8 or 10**.
 
-fal's own default is `auto`, which lets the model pick the length from the described action.
+The endpoint's own default is `auto`, which lets the model pick the length from the described action.
 **Slates always sends an explicit length instead**, so what you choose is what you are billed for.
 Choose the length the beat needs.
 

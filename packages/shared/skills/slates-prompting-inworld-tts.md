@@ -140,7 +140,7 @@ Exactly one source per call, and none of them requires a character to exist firs
 
 ## Consent
 
-Cloning a real person's voice needs that person's explicit, documented permission, scoped to what you are making. Clone from original human recordings only — never from another model's output. This is the same gate the real-face route applies to likeness, and it applies here for the same reason.
+Cloning a real person's voice needs that person's explicit, documented permission, scoped to what you are making. Clone from original human recordings only — never from another model's output. This is the same gate the real-person video option applies to likeness, and it applies here for the same reason.
 
 ## Worked examples
 

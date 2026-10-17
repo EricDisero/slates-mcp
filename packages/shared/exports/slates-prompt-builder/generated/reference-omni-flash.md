@@ -26,7 +26,7 @@
 - several staged beats cued to moments (`when he calls it, and perches as he walks`): these hard-fail, they do not merely drift. One effect tied to an action already in the clip (`when he snaps his fingers`) passed
 - harm-to-person framing: `ignite`, `catch fire`, `on fire` applied to a person trips the safety filter
 
-Google's fast video generation + editing model ("Nano Banana Pro for video" in creator slang — a nickname; it is NOT the NB Pro image model). Carried on fal (`google/gemini-omni-flash*`). 720p only, 24fps, 3–10 second clips, 16:9 or 9:16. **Audio is native and included** — dialogue, SFX, and ambient generate WITH the video at no extra cost.
+Google's fast video generation + editing model ("Nano Banana Pro for video" in creator slang — a nickname; it is NOT the NB Pro image model). 720p only, 24fps, 3–10 second clips, 16:9 or 9:16. **Audio is native and included** — dialogue, SFX, and ambient generate WITH the video at no extra cost.
 
 ## Where it routes
 

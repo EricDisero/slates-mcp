@@ -31,10 +31,10 @@ description: "Prompt Seedance 2.0 (seedance-2), and retrieve the shared Seedance
 **Hard constraint:** NO timestamps — 2.0 ignores them and answers only to shot numbers (2.5 acts on them). No lens, aperture, film stock or camera body: that is image-model vocabulary and a Seedance anti-pattern. There is no negativePrompt field.
 <!-- @card:end -->
 
-ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
+ByteDance's video model, on Slates credits. Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
 > **How to read this file.**
-> **[official :NNNN]** — ByteDance's own BytePlus ModelArk prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
+> **[official :NNNN]** — ByteDance's own Seedance prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
 > **[community]** — third-party guides and our own field notes. Useful, but an `[official]` block always wins.
 > **[slates]** — how the Slates app composes or bills this; not ByteDance doctrine.
 >
@@ -256,22 +256,22 @@ These aren't separate Seedance features; they're prompting strategies over refer
 - **Lip-sync / dialogue:** write the line in the prompt — `The person in video 1 says: "…"` — with audio generation on (always on in Slates). A **video** source's own voice is cloned natively; an **audio** reference (≤15s) drives speech from an existing recording: `…speaks the dialogue from audio 1 with accurate lip sync.`
 - **Voice + face from one clip (the talking-head recipe):** ONE unedited 2–15s clip of the person speaking (clear voice, no music, no cuts) as the video reference + prompt with the new script → their likeness AND voice deliver the new line.
 <!-- slates-only -->
-- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = combined clip seconds + output seconds on faceless and real-face routes. The AI-face route bills max(combined input, output) + output on both 2.0 and 2.5; quote before confirming. Audio references are free (audio is included on every route).
+- **Billing:** a reference VIDEO switches the cost key to `seedance-2*-vref-{res}-{T}s` where T = combined clip seconds + output seconds without Face and for a consented real person. A Face row bills max(combined input, output) + output on both 2.0 and 2.5; quote before confirming. Audio references are free (audio is included on every row).
 <!-- /slates-only -->
 
 <!-- slates-only -->
 ## Faces — set `seedanceFace` for AI-character faces
 
-Seedance routes through **three tiers** depending on the face in the reference, exposed as the "Face in Reference" toggle plus the real-face params on `slates_generate_video`:
+Seedance has **three face tiers** depending on the face in the reference, exposed as the "Face in Reference" toggle plus the real-face params on `slates_generate_video`:
 
-- **Faceless / object / environment refs → default route (cheapest).** Leave `seedanceFace` off.
-- **An AI-character's FACE in a reference → `seedanceFace: true`.** The default route's baseline moderation rejects or degrades faces, so this reroutes to the face-capable provider. It costs **~45% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the face-route price, not the faceless one.
-- **A REAL person's photo (the user themselves, an actor) → the consent-gated real-person route.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the provider classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, about 1.4× the AI-face rate, about 2× faceless; quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
+- **Faceless / object / environment refs → Face off (cheapest).** Leave `seedanceFace` off.
+- **An AI-character's FACE in a reference → `seedanceFace: true`.** Without it, moderation rejects or degrades faces. It costs **~45% more** — the cost key becomes `seedance-2-face-{res}-{N}s`, so the pre-flight quote already reflects it. Announce the Face price, not the faceless one.
+- **A REAL person's photo (the user themselves, an actor) → the consent-gated real-person option.** If a `seedanceFace` gen fails with `[REAL_FACE_DETECTED]`, the model classified the reference as a real person: confirm with the user that (a) they hold the rights/consent to the likeness and (b) they accept the higher price (cost key `seedance-2-realface-{res}-{N}s`, about 1.4× the AI-face rate, about 2× faceless; quote via `slates_estimate_generation_cost`), then retry with `seedanceRealFace: true` + `realFaceConsent: true`. Never set `realFaceConsent` without the user's explicit confirmation.
 
 Rules:
-- **The real-vs-AI call is the PROVIDER'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass the standard face route (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively route to the real-face tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every route.
+- **The real-vs-AI call is the MODEL'S, not yours.** ByteDance's classifier is probabilistic — some real photos pass on Face (billed at the cheap rate; fine), others get rejected with `[REAL_FACE_DETECTED]` (auto-refunded). Don't preemptively escalate to the real-person tier just because a photo looks real; try `seedanceFace: true` first and escalate only on the marked rejection. Public figures / celebrities fail on every tier.
 - It's about the **reference, not the output.** If your character identity or generated portrait shows a face, turn it on. A product shot with no person stays off.
-- Don't toggle it on "just in case" — a faceless gen on the face route burns ~45% extra for nothing.
+- Don't toggle it on "just in case" — a faceless gen on Face burns ~45% extra for nothing.
 <!-- /slates-only -->
 
 ## Reference rules (the verified ones)
@@ -428,9 +428,8 @@ Stability phrases that help:
 ## Sources
 
 **Official (authoritative):**
-- BytePlus ModelArk — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
+- ByteDance — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
 
 **Community (secondary):**
-- [fal.ai — How to Use Seedance 2.0](https://fal.ai/learn/tools/how-to-use-seedance-2-0)
 - [apiyi.com — Seedance 2.0 Prompt Guide](https://help.apiyi.com/en/seedance-2-0-prompt-guide-video-generation-camera-style-tips-en.html)
 - [atlabs.ai — Ultimate Seedance 2.0 Prompting Guide](https://www.atlabs.ai/blog/the-ultimate-seedance-2.0-prompting-guide-47-prompts-2026)

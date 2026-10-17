@@ -1051,7 +1051,7 @@ export const setComposer: Operation<{
         .string()
         .min(1)
         .optional()
-        .describe('A model id (slates_list_available_models), `<id>::face` for a face route, `chatgpt`, `lip-sync` or `motion-transfer`.'),
+        .describe('A model id (slates_list_available_models), `<id>::face` for its Face row, `chatgpt`, `lip-sync` or `motion-transfer`.'),
       prompt: z.string().optional().describe('Replaces the words. @name and #name attach what they name, as typing does.'),
       addMentions: z
         .array(z.string().regex(/^[@#]\S+$/))
@@ -1521,8 +1521,8 @@ export const estimateGenerationCost: Operation<{
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     aspectRatio: z.string().optional().describe('GPT Image only: 1:1, 4:3 and 3:4 cost more than 16:9.'),
     sound: z.boolean().optional().describe('Kling 3.0: the audio flag changes the cost key. Omitted means sound on, as generation bills it; pass false to price a silent take. Kling 4K keys include audio.'),
-    seedanceFace: z.boolean().optional().describe('Seedance AI-face route (pricier key).'),
-    seedanceRealFace: z.boolean().optional().describe('Seedance consented real-face route (premium key).'),
+    seedanceFace: z.boolean().optional().describe('Seedance Face row, for an AI character\'s face (pricier key).'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance with a consented real person (premium key).'),
     videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
     audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, including attached character voices.'),
     referenceImages: z.number().int().min(0).optional().describe(
@@ -3115,7 +3115,7 @@ export const generateImage: Operation<{
         requires_clarification: true,
         missing: ['projectId'],
         message:
-          `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path asks fal for one batch and nano-banana-2 caps a batch at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
+          `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path asks for one batch and nano-banana-2 caps a batch at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
       })
     }
     let refEcho = ''
@@ -4334,9 +4334,9 @@ export const generateVideo: Operation<{
     sound: z.boolean().optional().describe('Kling (every tier) and LTX: sound on (default) or silent (false); Kling bills audio as its own key. Seedance, Omni Flash and H3 always generate audio.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling model with sound on — auto-generate background music.'),
-    seedanceFace: z.boolean().optional().describe('Seedance ONLY: a reference shows an AI CHARACTER\'s face. Faces are blocked on the default route, so this reroutes to a face-capable provider at ~45% more. A REAL person fails here with [REAL_FACE_DETECTED] — see seedanceRealFace.'),
-    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. Real-person route, about 1.4x the AI-face price (about 2x faceless) — quote it first. REQUIRES realFaceConsent=true.'),
-    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every route.'),
+    seedanceFace: z.boolean().optional().describe('Seedance ONLY: a reference shows an AI CHARACTER\'s face. Without it, faces are blocked; with it the generation costs ~45% more. A REAL person fails here with [REAL_FACE_DETECTED] — see seedanceRealFace.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, about 1.4x the Face price (about 2x faceless) — quote it first. REQUIRES realFaceConsent=true.'),
+    realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every tier.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the confirm gate (which fires for almost every video gen since they\'re expensive).'),
@@ -4658,7 +4658,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSeconds'],
         message:
-          'A Seedance video reference bills on combined input+output seconds (on 2.5 AI-face, max(input, output) + output). Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+          'A Seedance video reference bills on combined input+output seconds (on a 2.5 Face row, max(input, output) + output). Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
       })
     }
     const pluralRefCount = input.videoReferenceAssetIds?.length ?? 0
@@ -4670,7 +4670,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSecondsEach'],
         message:
-          `A Seedance video reference bills on combined input+output seconds (on 2.5 AI-face, max(input, output) + output). Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
+          `A Seedance video reference bills on combined input+output seconds (on a 2.5 Face row, max(input, output) + output). Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
     const cloud = ctx.cloud()
@@ -5296,7 +5296,6 @@ export const generateLipSync: Operation<{
   ttsSpeed?: number
   audioFilePath?: string
   avatarModel?: 'avatar-standard' | 'avatar-pro'
-  klingProvider?: 'fal' | 'kling'
   background?: boolean
   confirm?: boolean
 }> = {
@@ -5316,7 +5315,6 @@ export const generateLipSync: Operation<{
     ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
     avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard (~14 credits/5s) for general use. avatar-pro (~29 credits/5s) for sharper face fidelity.'),
-    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing. Leave unset: all agent generations bill Slates credits (BYOK is retired).'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required for avatar-pro.'),
   }),
@@ -5398,7 +5396,6 @@ export const generateLipSync: Operation<{
       ttsSpeed: input.ttsSpeed,
       audioFilePath: input.audioFilePath,
       avatarModel: input.avatarModel,
-      klingProvider: input.klingProvider,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
       background: input.background,
@@ -5445,7 +5442,6 @@ export const generateMotionTransfer: Operation<{
   motionModel?: 'kling-mc-std' | 'kling-mc-pro'
   characterOrientation?: 'video' | 'image'
   prompt?: string
-  klingProvider?: 'fal' | 'kling'
   background?: boolean
   confirm?: boolean
 }> = {
@@ -5461,7 +5457,6 @@ export const generateMotionTransfer: Operation<{
     motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('kling-mc-std general motion; kling-mc-pro cleaner anatomy — default. Quote both with slates_estimate_generation_cost.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Optional refinement. Read slates-prompting-motion-transfer.'),
-    klingProvider: z.enum(['fal', 'kling']).optional().describe('Provider routing. "fal" (default) uses Slates credits.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required — both tiers exceed.'),
   }),
@@ -5527,7 +5522,6 @@ export const generateMotionTransfer: Operation<{
       motionModel,
       characterOrientation: input.characterOrientation ?? 'video',
       prompt: input.prompt,
-      klingProvider: input.klingProvider,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
       background: input.background,
@@ -5616,7 +5610,7 @@ export const editVideo: Operation<{
     videoResolution: zEnum(EDIT_VIDEO_RESOLUTIONS).optional().describe(
       `seedance-2.5-edit ONLY (default ${defaultVideoResolutionFor('seedance-2.5-edit')}). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.`
     ),
-    seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Faceless edits run on BytePlus; faces are blocked there and must route to the relaxed provider, which costs about 40-50% more. A face edit submitted without this flag is rejected by the provider, not silently downgraded.'),
+    seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Without it a face is blocked outright; with it the edit costs about 40-50% more. A face edit submitted without this flag is rejected, not silently downgraded.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
     folderId: folderIdField,
@@ -7137,7 +7131,7 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
     sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
     seedanceFace: d(
       z.boolean().optional(),
-      "Seedance only — a reference shows an AI character's FACE; reroutes to a face-capable provider, ~45% more."
+      "Seedance only — a reference shows an AI character's FACE; without it faces are blocked, and it costs ~45% more."
     ),
     audioDurationSeconds: d(
       z.number().int().min(1).max(120).optional(),

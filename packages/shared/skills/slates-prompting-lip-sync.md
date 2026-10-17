@@ -40,7 +40,7 @@ description: "Prepare Kling lip-sync or avatar generation with slates_generate_l
 <!-- /slates-only -->
 **Never use** — the avatar prompt is scene context and motion verbs are ignored:
 - `turns her head`, `raises an eyebrow`, `hand gestures`, `nods`, `walks`
-- `reader_en_m-v1` — listed in fal's docs, returns "Voice id not found" in production
+- `reader_en_m-v1` — listed in the API docs, returns "Voice id not found" in production
 <!-- @banned:end -->
 
 **This tool is Kling-only.** It wraps Kling's dedicated lip-sync and avatar endpoints; output follows the source clip for video or the voice track for a still, billed per 5s block.
@@ -60,7 +60,7 @@ Seedance can generate the performance rather than bolting a mouth onto finished 
 That is the same endpoint the old `engine=seedance-2` branch called — it just built the sentence for you, invisibly, and it presupposed a "video 1" that might not exist. Writing the prompt is the whole difference, and it is the part you want control of.
 
 - Driving clips must be 2–15s; output duration is whatever you set (4–15s).
-- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys); pass the clip duration and quote before confirming. On both Seedance 2.0 and 2.5's AI-face route (EvoLink) the input side counts as at least the output's length: max(input, output) + output.
+- Video references bill COMBINED input+output seconds (`seedance-2*-vref-*` keys); pass the clip duration and quote before confirming. On a Seedance 2.0 or 2.5 Face row the input side counts as at least the output's length: max(input, output) + output.
 - Faces go through the normal cascade: `seedanceFace` for a character, `[REAL_FACE_DETECTED]` → `seedanceRealFace` + `realFaceConsent` for a real person.
 
 Everything below is about the Kling tool.
@@ -114,7 +114,7 @@ Prefer upload for production-quality voice. TTS for fast iteration / placeholder
 
 ## Voice catalog (TTS)
 
-Reliable English voices (verified working on the fal endpoint as of 2026):
+Reliable English voices (verified working in Slates as of 2026):
 
 | Voice ID | Description |
 |----------|-------------|
@@ -125,9 +125,9 @@ Reliable English voices (verified working on the fal endpoint as of 2026):
 | `uk_oldman3` | Older man, UK accent |
 | `calm_story1` | Storyteller / narrator |
 
-Avoid `reader_en_m-v1` — listed in fal.ai docs but returns "Voice id not found" in production.
+Avoid `reader_en_m-v1` — listed in the API docs but returns "Voice id not found" in production.
 
-Full 48-voice list (ZH, JA, KO included): https://fal.ai/models/fal-ai/kling-video/lipsync/text-to-video/api
+The full list has 48 voices, ZH, JA and KO included.
 
 ## Speech-rate notes
 
@@ -214,6 +214,3 @@ Don't second-guess the source. If the output is wrong, iterate on source choice 
 
 ## Sources
 
-- [fal.ai — Kling LipSync API](https://fal.ai/models/fal-ai/kling-video/lipsync/text-to-video/api)
-- [fal.ai — AI Avatar v2 Standard](https://fal.ai/models/fal-ai/kling-video/ai-avatar/v2/standard/api)
-- [fal.ai — AI Avatar v2 Pro](https://fal.ai/models/fal-ai/kling-video/ai-avatar/v2/pro/api)

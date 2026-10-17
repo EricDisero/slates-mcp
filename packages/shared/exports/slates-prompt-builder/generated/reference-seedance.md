@@ -51,10 +51,10 @@
 
 **Hard constraint:** NO timestamps — 2.0 ignores them and answers only to shot numbers (2.5 acts on them). No lens, aperture, film stock or camera body: that is image-model vocabulary and a Seedance anti-pattern. There is no negativePrompt field.
 
-ByteDance's video model — first-party via **BytePlus ModelArk** (credits only, no BYOK). Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
+ByteDance's video model, on Slates credits. Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
 > **How to read this file.**
-> **[official :NNNN]** — ByteDance's own BytePlus ModelArk prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
+> **[official :NNNN]** — ByteDance's own Seedance prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
 > **[community]** — third-party guides and our own field notes. Useful, but an `[official]` block always wins.
 > **[slates]** — how the Slates app composes or bills this; not ByteDance doctrine.
 >
@@ -406,9 +406,8 @@ Stability phrases that help:
 ## Sources
 
 **Official (authoritative):**
-- BytePlus ModelArk — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
+- ByteDance — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
 
 **Community (secondary):**
-- [fal.ai — How to Use Seedance 2.0](https://fal.ai/learn/tools/how-to-use-seedance-2-0)
 - [apiyi.com — Seedance 2.0 Prompt Guide](https://help.apiyi.com/en/seedance-2-0-prompt-guide-video-generation-camera-style-tips-en.html)
 - [atlabs.ai — Ultimate Seedance 2.0 Prompting Guide](https://www.atlabs.ai/blog/the-ultimate-seedance-2.0-prompting-guide-47-prompts-2026)

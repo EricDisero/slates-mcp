@@ -43,7 +43,7 @@ description: "Prompt Seed Audio 1.0 (seed-audio) with slates_generate_audio. Cov
 - shot language: `wide shot`, `slow push in`, `warm tungsten` — camera and lighting words are video-prompt words the model has to ignore
 <!-- @banned:end -->
 
-ByteDance's one-pass audio scene model, carried on fal (`bytedance/seed-audio-1.0`). It generates dialogue, sound effects and ambience **together**, from a single plain sentence. Use the generated duration bounds below and the current catalogue for routing; it is useful for continuity beds.
+ByteDance's one-pass audio scene model. It generates dialogue, sound effects and ambience **together**, from a single plain sentence. Use the generated duration bounds below and the current catalogue for routing; it is useful for continuity beds.
 
 <!-- @inject:thresholds -->
 <!-- GENERATED from @slatesvideo/shared — do not edit between the markers.
