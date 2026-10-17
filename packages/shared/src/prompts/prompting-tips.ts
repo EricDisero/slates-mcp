@@ -178,21 +178,21 @@ const SEEDANCE_25: PromptingTipsEntry = {
     [
       {
         heading: '720p is not the cheap one here',
-        example: '30s \u00b7 720p \u00b7 Face route = 489 credits\n15s \u00b7 1080p \u00b7 Seedance 2.0 Face = 411 credits',
+        example: '30s \u00b7 720p \u00b7 Seedance 2.5 Face = 489 credits\n15s \u00b7 1080p \u00b7 Seedance 2.0 Face = 411 credits',
         note: 'Length is what moves the price, and 2.5 doubles the length ceiling — so a 30-second 720p clip can cost more than a 15-second 1080p one, against a 1,000-credit starting balance. Explore at short LENGTH rather than low resolution: cut the seconds to 4-8 while you are finding the shot, and stay at the resolution you actually want. A 480p pass does not de-risk a 720p render — generation is stochastic, so the 720p run is a different take, not the same shot rendered better. The Generate button always shows the exact number first.',
         critical: true,
       },
       {
         heading: 'Audio-only references',
         example: 'Reference the timbre in audio 1 to generate...',
-        note: '2.5 accepts an audio reference on its own — a voice line, a music bed, a room tone — with no image or video alongside it. 2.0 could not. Audio references never cost extra on any Seedance route.',
+        note: '2.5 accepts an audio reference on its own — a voice line, a music bed, a room tone — with no image or video alongside it. 2.0 could not. Audio references never cost extra on any Seedance row.',
       },
       ...SEEDANCE.columns[1],
     ],
   ],
   footer: [
 '30 image references is a budget, not a target — 2-4 strong references still beat both extremes, one per role. ByteDance\'s own ceilings for 2.5: 1-8 subjects bound by image reference stay stable (9-12 works but needs re-rolls), 1-5 subjects bound by video or audio reference, and 5-10 seconds is the sweet spot for a reference clip. Unlike 2.0, a multi-view turnaround sheet can be a single subject reference here — past 5 subjects, go back to one view per image. The larger budget is for long multi-shot takes and for video plus audio references alongside images.',
-    'A reference VIDEO bills input seconds PLUS output seconds, and 2.5 accepts references up to 30s combined — so a 20-second reference driving a 20-second output bills 40 seconds. On the AI-face route the reference counts as at least as long as the output: a 5-second reference on a 20-second output bills 40 seconds, not 25. The Generate button shows the total.',
+    'A reference VIDEO bills input seconds PLUS output seconds, and 2.5 accepts references up to 30s combined — so a 20-second reference driving a 20-second output bills 40 seconds. On a Face row the reference counts as at least as long as the output: a 5-second reference on a 20-second output bills 40 seconds, not 25. The Generate button shows the total.',
     ...(SEEDANCE.footer ?? []).slice(0, 2),
     'Frames and reference images stay mutually exclusive, and on a first/last-frame generation Seedance 2.5 chooses the aspect ratio itself — the ratio control shows "Adaptive" because the start frame decides the shape.',
   ],
@@ -221,7 +221,7 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
       },
       {
         heading: 'Turn Face on when a face is visible',
-        note: 'The default provider blocks character faces outright — this is not a price optimisation, it is whether the job runs at all. There is no consented-real-face route for editing; real-person footage the Face route rejects has to go to Kling O3 Edit.',
+        note: 'Without Face, a character face in the clip is refused outright — this is not a price optimisation, it is whether the job runs at all. Editing has no consented real-person option; real-person footage the Face row rejects has to go to Kling O3 Edit.',
         critical: true,
       },
       {

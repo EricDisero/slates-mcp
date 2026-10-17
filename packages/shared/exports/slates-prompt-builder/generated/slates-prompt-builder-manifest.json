@@ -48,11 +48,11 @@
     },
     {
       "path": "src/prompts/model-capabilities.ts",
-      "sha256": "abf78613f8210e80a67e1ccbb8d4a93fc094baa23b075b0043fa98b3974d9324"
+      "sha256": "1f3ea8f851718af39061cf699b33cc167f563252a6b161521c6629e60c661c6e"
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "e7298b62ff4562b60808d7c5addff2737d648b4ae89b95c84796bb0238986bba"
+      "sha256": "1eb305bce7e045f5133f5052f0ebd38087c9854cfc8af98093a95c31eab6d081"
     },
     {
       "path": "src/prompts/partials.generated.ts",
