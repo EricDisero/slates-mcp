@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { APP_MANUAL, appManualIndex, appManualSections, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
 import { desktopSource } from './desktop-source.mjs'
 
-const canonical = desktopSource('docs/slates-llm-manual.md')
+// slates-web may pin the docs to a slate commit that buyers have (scripts/llm-docs/desktop-docs-ref.json,
+// SLATES_DOCS_REF overrides). Pinned, this package ships that commit's manual, so the copy to match is the
+// generator's own output of it, slates-web's public/slates-reference.md, not slate's main.
+const web = resolve(dirname(fileURLToPath(import.meta.url)), '../../slates-web')
+const pinFile = resolve(web, 'scripts/llm-docs/desktop-docs-ref.json')
+const docsRef = process.env.SLATES_DOCS_REF !== undefined
+  ? process.env.SLATES_DOCS_REF || null
+  : existsSync(pinFile) ? JSON.parse(readFileSync(pinFile, 'utf8')).ref : null
+const canonical = docsRef ? resolve(web, 'public/slates-reference.md') : desktopSource('docs/slates-llm-manual.md')
+if (docsRef) console.error(`[sources] manual: slates-web reference, pinned to slate ${docsRef.slice(0, 7)}`)
 if (existsSync(canonical)) {
   assert.equal(APP_MANUAL, readFileSync(canonical, 'utf8'), 'Manual drift: run npm run build:llm-docs in slates-web')
 } else console.warn('Canonical sibling absent; checking the published snapshot only.')
