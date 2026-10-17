@@ -1,7 +1,7 @@
 // Per-model PROMPTING TIPS — the short, curated, FREE prompting guidance.
 // SINGLE SOURCE OF TRUTH: this file. Nothing downstream authors tips copy (no
-// hand-written tips JSX or prose anywhere — that's how the Omni Flash / Veo /
-// Kling chimera modal shipped).
+// hand-written tips JSX or prose anywhere — that's how the Omni Flash modal shipped
+// showing another model's tips under a Kling title).
 //
 // WHERE IT RENDERS (changed 2026-08-10): exactly one place, the generated page
 // https://slates.video/docs/prompting, emitted by slates-web

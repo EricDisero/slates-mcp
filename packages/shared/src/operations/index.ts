@@ -40,10 +40,11 @@ import {
 // never re-state one of those constraints as a literal enum or a sentence
 // again. It did until 2026-08-16, and every axis had drifted: an invented
 // `9:21`, "Kling/Seedance support all" (Seedance takes 6 of 11 and has no
-// `4:5`), "Veo locks to 16:9" (two on fal), "Kling: 5-15" (min is 3), a
-// `videoResolution` line that never mentioned Kling, and 4s quoted for Veo at
-// 1080p. A customer burned a round trip on `4:5` + Seedance: accepted here,
-// queued, credits reserved, rejected by the provider asynchronously.
+// `4:5`), a model said to lock to 16:9 (it took two on fal), "Kling: 5-15"
+// (min is 3), a `videoResolution` line that never mentioned Kling, and 4s
+// quoted for a model at 1080p that only took 8s there. A customer burned a
+// round trip on `4:5` + Seedance: accepted here, queued, credits reserved,
+// rejected by the provider asynchronously.
 import {
   AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
@@ -4143,7 +4144,7 @@ export const generateVideo: Operation<{
     prompt: z.string().min(1).max(4000),
     // ROUTING doctrine only. Every capability number was stripped on 2026-08-16
     // and now lives in the aspectRatio / duration / videoResolution descriptions
-    // below, generated from MODEL_CAPABILITIES. "Veo = 16:9 only" and
+    // below, generated from MODEL_CAPABILITIES. "16:9 only" for a model and
     // "seedance-2.5 480p/720p" were both stated here AND there, and the two
     // copies disagreed — and the second of those went stale on 2026-08-24 when
     // 2.5 gained 1080p, which is exactly the failure mode generating it fixes.
@@ -4273,7 +4274,7 @@ export const generateVideo: Operation<{
           `Missing required field(s): ${missing.join(', ')}. ` +
           `Read the slates-cost-discipline + ${promptingSkillFor(input.model)} skills, ` +
           // Generated from MODEL_CAPABILITIES. The prose that stood here claimed
-          // "Veo locks to 16:9", "Kling/Seedance support 1:1 16:9 9:16 4:3 3:4
+          // a model locked to 16:9, "Kling/Seedance support 1:1 16:9 9:16 4:3 3:4
           // 21:9" and "Kling 5-15s" — three wrong claims in one sentence.
           `or ask the user. ` +
           `Aspect ratio for ${input.model}: ${aspectRatiosFor(input.model, AGENT_ROUTE_PROVIDER).join(', ')}. ` +

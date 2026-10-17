@@ -2,7 +2,7 @@
 // and @slatesvideo/cli).
 //
 // WHY THIS EXISTS (2026-09-13): a Discord user's agent reported "H3 isn't in
-// the API tool, only Kling, Veo and Seedance are exposed" — a server older
+// the API tool, only Kling, [a model] and Seedance are exposed" — a server older
 // than 0.5.10 (2026-08-28). Nothing told him, and nothing told his agent. The
 // install path is `npx -y @slatesvideo/mcp-server` with no version pinned, so
 // a client RESTART is the whole update; the failure is a client that never

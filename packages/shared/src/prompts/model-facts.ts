@@ -73,7 +73,7 @@ export interface ModelFact {
    * meaning the default SEEDANCE seat (a bare "seedance" resolves to 2.0), and for
    * a month two rows read as the default while the routing doctrine then in force
    * (Eric, 2026-07-03: Kling 3.0 the general-purpose default, Seedance the premium
-   * escalation) never changed. The marketing site meanwhile headlined Veo, a
+   * escalation) never changed. The marketing site meanwhile headlined a
    * `niche` row, because no check could read a tier out of prose. The tier is
    * DATA now; the notes describe, they do not rank.
    *
