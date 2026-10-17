@@ -47,13 +47,13 @@
     "src/content/blog/ai-video-generator-pricing-2026.mdx": 2,
     "src/content/blog/index.ts": 16,
     "src/content/blog/kling-vs-veo-vs-sora.mdx": 32,
-    "src/content/blog/seedance-2-guide-2026.mdx": 15,
+    "src/content/blog/seedance-2-guide-2026.mdx": 14,
     "src/content/pseo/explain/ai-transition.ts": 4,
     "src/content/pseo/explain/image-to-video-ai.ts": 4,
     "src/content/pseo/index.ts": 3,
     "src/content/pseo/models/nano-banana-2.ts": 2,
     "src/content/pseo/models/sora-2.ts": 2,
-    "src/content/pseo/models/veo-3-1.ts": 59,
+    "src/content/pseo/models/veo-3-1.ts": 61,
     "src/content/pseo/tools/ai-video-editor.ts": 2,
     "src/content/pseo/tools/free-ai-video-generator.ts": 2
   }
