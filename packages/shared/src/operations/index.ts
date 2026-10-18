@@ -628,8 +628,9 @@ export const setSelection: Operation<{
 const VIEW_LENSES = ['board', 'media', 'script'] as const
 const VIEW_CUT_SIDES = ['bottom', 'left', 'right'] as const
 const VIEW_DOCK_SECTIONS = ['storyboards', 'library', 'folders', 'pinned'] as const
-// W3: the one window's two layouts (`WINDOW_LAYOUTS`).
+// W3: the one window's two layouts (`WINDOW_LAYOUTS`), and its shape (`SHAPE_SETTINGS`).
 const VIEW_WINDOW_LAYOUTS = ['plan', 'edit'] as const
+const VIEW_SHAPE_SETTINGS = ['auto', 'landscape', 'vertical'] as const
 // 1.6.1: what the user is looking at. Mirrors slate's `@shared/types/view` (lockstep check 12).
 const VIEW_BOARD_LEVELS = ['film', 'scenes', 'shot'] as const
 const VIEW_BOARD_FILTERS = ['all', 'with-clip', 'without-clip'] as const
@@ -691,7 +692,21 @@ interface ViewShape {
   settings?: { open: boolean }
   composer?: { open: boolean }
   /** W3 (slate a4f829b): the layout and which areas show; absent from older desktops. */
-  window?: { layout: 'plan' | 'edit'; lens: boolean; viewer: boolean; inspector: 'column' | 'drawer' | null; timeline: boolean; lensWidth: number }
+  window?: {
+    layout: 'plan' | 'edit'
+    lens: boolean
+    viewer: boolean
+    inspector: 'column' | 'drawer' | null
+    timeline: boolean
+    lensWidth: number
+    // Layouts as presets (desktops with `layout-presets`); older desktops leave these out.
+    preset?: string
+    presetName?: string
+    changed?: boolean
+    presets?: Array<{ id: string; name: string; builtIn: boolean }>
+    shape?: 'landscape' | 'vertical'
+    shapeSetting?: (typeof VIEW_SHAPE_SETTINGS)[number]
+  }
   layers?: string[]
   notes?: string[]
   /** When the desktop last reported it. */
@@ -754,7 +769,9 @@ const describeView = (v: ViewShape): string => {
     `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
     (v.leftDock.folded?.length ? ` Folded in the navigator: ${v.leftDock.folded.map((f) => DOCK_SECTION_NAMES[f] ?? f).join(', ')}.` : '') +
     (v.window
-      ? ` The window is in the ${v.window.layout === 'edit' ? 'Edit' : 'Plan'} layout, showing ${
+      ? ` The window is in the ${v.window.presetName ?? (v.window.layout === 'edit' ? 'Edit' : 'Plan')} layout${
+          v.window.changed ? ' (changed since it was saved)' : ''
+        }${v.window.shape ? `, ${v.window.shape}` : ''}, showing ${
           areas.length > 1 ? `${areas.slice(0, -1).join(', ')} and ${areas.at(-1)}` : areas[0] ?? 'none of its areas'
         }.`
       : '') +
@@ -771,7 +788,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Inspector as a column or a drawer), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Edit, Plan or one the user saved, whether it changed since saved, the landscape or vertical shape, which areas show, the Inspector as a column or a drawer), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -813,11 +830,19 @@ export const setView: Operation<{
   animatic?: { open: boolean; fromShotId?: string }
   settings?: { open: boolean; pane?: (typeof VIEW_SETTINGS_PANES)[number] }
   composer?: { open: boolean }
-  window?: { layout?: (typeof VIEW_WINDOW_LAYOUTS)[number]; viewer?: boolean; inspector?: boolean; lensWidth?: number }
+  window?: {
+    layout?: (typeof VIEW_WINDOW_LAYOUTS)[number]
+    preset?: string
+    reset?: boolean
+    shape?: (typeof VIEW_SHAPE_SETTINGS)[number]
+    viewer?: boolean
+    inspector?: boolean
+    lensWidth?: number
+  }
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout (Edit, Plan or one the user saved), its shape and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -906,13 +931,23 @@ export const setView: Operation<{
       window: z
         .object({
           layout: z.enum(VIEW_WINDOW_LAYOUTS).optional().describe('edit gives the Viewer the room, with Media, Board and Script a column at its left; plan gives it to them, with the Viewer a column at their right.'),
+          preset: z
+            .string()
+            .min(1)
+            .optional()
+            .describe("Switch to this layout, by id or by name in any case: Edit, Plan or one the user saved (slates_get_view lists them in window.presets). An unknown name comes back as a note naming the layouts."),
+          reset: z.boolean().optional().describe("true puts the current layout back as it was saved (the Layout map's Reset layout)."),
+          shape: z
+            .enum(VIEW_SHAPE_SETTINGS)
+            .optional()
+            .describe('landscape: the timeline full width along the bottom. vertical: the Viewer and the Inspector full height at the right, Media, Board and Script over the timeline at the left. auto follows the open timeline (vertical while it is taller than wide).'),
           viewer: z.boolean().optional().describe('Show or hide the Viewer.'),
           inspector: z.boolean().optional().describe('Show or hide the Inspector; the window decides column or drawer.'),
           lensWidth: z.number().optional().describe("The Media, Board and Script column's width in px in the Edit layout."),
         })
         .strict()
         .optional()
-        .describe('The one window (desktops with it): its layout and which areas show.'),
+        .describe('The one window (desktops with it): its layout, its shape and which areas show.'),
     })
     .strict(),
   async run(input, ctx) {
@@ -928,6 +963,9 @@ export const setView: Operation<{
       input.script?.textScale !== undefined ||
       input.script?.panelShotId !== undefined
     if (widened) await ctx.desktop().requireCapability('view-v2', 'showing and opening things in the window')
+    if (input.window?.preset !== undefined || input.window?.reset !== undefined || input.window?.shape !== undefined) {
+      await ctx.desktop().requireCapability('layout-presets', 'choosing a layout or the window shape')
+    }
     if (input.cut?.format !== undefined || input.cut?.gridSelection !== undefined) {
       await ctx.desktop().requireCapability('ad-variant-export', 'delivery preview and variant grid selection')
     }
