@@ -39,8 +39,10 @@
 //  10. API HOST MIRROR  — slate's PROD_API_URL equals shared SLATES_API_URL.
 //  11. CAPABILITY GATES — an op reaching a route the last released desktop
 //                         lacks checks a token that desktop lacks.
-//  12. VIEW LISTS       — the view ops' lenses, timeline sides and navigator
-//                         sections equal slate's `@shared/types/view`.
+//  12. VIEW LISTS       — the view ops' lenses, timeline sides, navigator
+//                         sections and window layouts equal slate's `@shared/types/view`,
+//                         and the overlay ops' styles, limits, ranges, defaults and batch
+//                         cap equal slate's.
 //  13. ASSET NAME LIMITS — the label and note limits equal slate's `assetLabel.ts`.
 //
 // 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of them has been
@@ -956,6 +958,7 @@ function zodDescriptions(op) {
       ['LENSES', 'VIEW_LENSES', view],
       ['CUT_SIDES', 'VIEW_CUT_SIDES', view],
       ['DOCK_SECTIONS', 'VIEW_DOCK_SECTIONS', view],
+      ['WINDOW_LAYOUTS', 'VIEW_WINDOW_LAYOUTS', view],
       ['SELECTION_TARGETS', 'SELECTION_TARGETS', view],
       ['SELECTION_MODES', 'SELECTION_MODES', view],
       ['GRID_EXTRACT_MODELS', 'GRID_EXTRACT_SEATS', grids],
@@ -965,8 +968,49 @@ function zodDescriptions(op) {
       const b = list(opsSrc, mine)
       return a === null || b === null ? [`${a === null ? desk : mine} not found`] : a === b ? [] : [`${mine} [${b}] ≠ slate ${desk} [${a}]`]
     })
+    // The overlay ops' look (L1): the text styles are a type union in slate, the rest single values.
+    const read = (...parts) => {
+      const file = join(desktopRoot, ...parts)
+      return existsSync(file) ? readFileSync(file, 'utf8') : ''
+    }
+    const styles = read('src', 'shared', 'textStyles.ts')
+    const sharedOverlays = read('src', 'shared', 'overlays.ts')
+    // Every quoted member, across lines: `type X = 'a' | 'b'` or one member per `|` line. Line comments
+    // are dropped first, so one between members neither ends the union nor adds a quoted word.
+    const union = (src, name) => {
+      const m = new RegExp(`type ${name}\\s*=((?:\\s*\\|?\\s*'[^']+')+)`).exec(src.replace(/\/\/.*$/gm, ''))
+      return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).join(',') : null
+    }
+    // The whole right-hand side, so 3.5 or 3 * 2 never reads as 3; quotes, `as const` and a line comment dropped.
+    const value = (src, name) => {
+      const m = new RegExp(`const ${name}\\b[^=]*=\\s*([^;\\n]+)`).exec(src)
+      return m ? m[1].replace(/\/\/.*$/, '').replace(/\s+as\s+const\s*$/, '').trim().replace(/^'(.*)'$/, '$1') : null
+    }
+    // A { min, max } range: slate writes it inline at the field's check, this package as a named constant.
+    const range = (src, re) => {
+      const m = re.exec(src)
+      return m ? `${Number(m[1])}..${Number(m[2])}` : null
+    }
+    const deskRange = (field) => range(sharedOverlays, new RegExp(`fraction\\(\\s*[\\w.]+\\s*,\\s*'${field}'\\s*,\\s*\\{\\s*min:\\s*([\\d.]+)\\s*,\\s*max:\\s*([\\d.]+)\\s*\\}`))
+    const myRange = (name) => range(opsSrc, new RegExp(`const ${name}\\b[^=]*=\\s*\\{\\s*min:\\s*([\\d.]+)\\s*,\\s*max:\\s*([\\d.]+)\\s*\\}`))
+    const values = [
+      ['TextStyleId', union(styles, 'TextStyleId'), 'TEXT_STYLE_IDS', list(opsSrc, 'TEXT_STYLE_IDS')],
+      ['DEFAULT_TEXT_STYLE', value(styles, 'DEFAULT_TEXT_STYLE'), 'TEXT_STYLE_DEFAULT', value(opsSrc, 'TEXT_STYLE_DEFAULT')],
+      ['MAX_TEXT_LENGTH', value(sharedOverlays, 'MAX_TEXT_LENGTH'), 'OVERLAY_TEXT_MAX', value(opsSrc, 'OVERLAY_TEXT_MAX')],
+      ['MAX_WORDS', value(sharedOverlays, 'MAX_WORDS'), 'OVERLAY_WORDS_MAX', value(opsSrc, 'OVERLAY_WORDS_MAX')],
+      ['MAX_WORD_LENGTH', value(sharedOverlays, 'MAX_WORD_LENGTH'), 'OVERLAY_WORD_TEXT_MAX', value(opsSrc, 'OVERLAY_WORD_TEXT_MAX')],
+      ["fraction(…, 'size')", deskRange('size'), 'OVERLAY_SIZE_RANGE', myRange('OVERLAY_SIZE_RANGE')],
+      ["fraction(…, 'width')", deskRange('width'), 'OVERLAY_WIDTH_RANGE', myRange('OVERLAY_WIDTH_RANGE')],
+      ['DEFAULT_OVERLAY_SECONDS', value(read('src', 'main', 'editor', 'overlays.ts'), 'DEFAULT_OVERLAY_SECONDS'), 'OVERLAY_DEFAULT_SECONDS', value(opsSrc, 'OVERLAY_DEFAULT_SECONDS')],
+      // slate writes the batch cap inline in `overlayItems`.
+      ['overlayItems batch cap', /body\.items\.length\s*>\s*(\d+)/.exec(read('src', 'main', 'agent', 'routes-editor.ts'))?.[1] ?? null, 'OVERLAY_BATCH_MAX', value(opsSrc, 'OVERLAY_BATCH_MAX')],
+    ]
+    for (const [desk, a, mine, b] of values) {
+      if (a === null || b === null) drift.push(`${a === null ? desk : mine} not found`)
+      else if (a !== b) drift.push(`${mine} [${b}] ≠ slate ${desk} [${a}]`)
+    }
     if (drift.length) fail(CHECK, drift.join('; '))
-    else pass(CHECK, `${pairs.length} view lists equal slate's`)
+    else pass(CHECK, `${pairs.length} view lists and ${values.length} overlay values equal slate's`)
   }
 }
 

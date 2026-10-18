@@ -628,6 +628,8 @@ export const setSelection: Operation<{
 const VIEW_LENSES = ['board', 'media', 'script'] as const
 const VIEW_CUT_SIDES = ['bottom', 'left', 'right'] as const
 const VIEW_DOCK_SECTIONS = ['storyboards', 'library', 'folders', 'pinned'] as const
+// W3: the one window's two layouts (`WINDOW_LAYOUTS`).
+const VIEW_WINDOW_LAYOUTS = ['plan', 'edit'] as const
 // 1.6.1: what the user is looking at. Mirrors slate's `@shared/types/view` (lockstep check 12).
 const VIEW_BOARD_LEVELS = ['film', 'scenes', 'shot'] as const
 const VIEW_BOARD_FILTERS = ['all', 'with-clip', 'without-clip'] as const
@@ -811,10 +813,11 @@ export const setView: Operation<{
   animatic?: { open: boolean; fromShotId?: string }
   settings?: { open: boolean; pane?: (typeof VIEW_SETTINGS_PANES)[number] }
   composer?: { open: boolean }
+  window?: { layout?: (typeof VIEW_WINDOW_LAYOUTS)[number]; viewer?: boolean; inspector?: boolean; lensWidth?: number }
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, and the Board's card size and linked clips. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -900,6 +903,16 @@ export const setView: Operation<{
       animatic: z.object({ open: z.boolean(), fromShotId: z.string().optional() }).strict().optional().describe('Play the board as a rough cut from a Shot (the Board or Script tab must be showing).'),
       settings: z.object({ open: z.boolean(), pane: z.enum(VIEW_SETTINGS_PANES).optional() }).strict().optional().describe('Open Settings, on a pane (ai is AI tools, keys is API keys).'),
       composer: z.object({ open: z.boolean() }).strict().optional().describe('Show or hide the prompt box.'),
+      window: z
+        .object({
+          layout: z.enum(VIEW_WINDOW_LAYOUTS).optional().describe('edit gives the Viewer the room, with Media, Board and Script a column at its left; plan gives it to them, with the Viewer a column at their right.'),
+          viewer: z.boolean().optional().describe('Show or hide the Viewer.'),
+          inspector: z.boolean().optional().describe('Show or hide the Inspector; the window decides column or drawer.'),
+          lensWidth: z.number().optional().describe("The Media, Board and Script column's width in px in the Edit layout."),
+        })
+        .strict()
+        .optional()
+        .describe('The one window (desktops with it): its layout and which areas show.'),
     })
     .strict(),
   async run(input, ctx) {
@@ -918,6 +931,14 @@ export const setView: Operation<{
     if (input.cut?.format !== undefined || input.cut?.gridSelection !== undefined) {
       await ctx.desktop().requireCapability('ad-variant-export', 'delivery preview and variant grid selection')
     }
+    // A desktop from before the one window has no capability token for it, and refuses a patch holding only
+    // `window` as empty; its view report has no `window`, so read that first.
+    if (input.window !== undefined && Object.entries(input).every(([k, v]) => k === 'window' || v === undefined)) {
+      const current = await ctx.desktop().get<{ view: ViewShape | null }>('/agent/view')
+      if (current.view && current.view.window === undefined) {
+        return { text: 'Nothing was changed: this Slates has no one-window layout; update Slates.', data: { view: current.view } }
+      }
+    }
     const r = await ctx.desktop().post<{ view: ViewShape | null; reason?: string }>('/agent/view', input)
     if (!r.view) {
       return { text: r.reason ? `Nothing was changed (${r.reason}).` : 'Nothing was changed.', data: { view: null } }
@@ -926,7 +947,11 @@ export const setView: Operation<{
     const noFolds = input.leftDock?.folded !== undefined && r.view.leftDock.folded === undefined
       ? " This Slates cannot fold the navigator's sections; update Slates."
       : ''
-    return { text: describeView(r.view) + noFolds, data: { view: r.view } }
+    // A desktop from before the one window takes the patch and ignores `window`.
+    const noWindow = input.window !== undefined && r.view.window === undefined
+      ? ' This Slates has no one-window layout, so window was not applied; update Slates.'
+      : ''
+    return { text: describeView(r.view) + noFolds + noWindow, data: { view: r.view } }
   },
 }
 
@@ -6248,7 +6273,7 @@ export const reorderClips: Operation<{ trackId: string; clipIds: string[] }> = {
 export const removeClip: Operation<{ clipId: string }> = {
   id: 'slates_remove_clip',
   description:
-    "Remove a clip from the timeline (the source asset is untouched). Leaves a gap at the clip's old position — MP4 export renders gaps as black; call slates_reorder_clips afterwards to close gaps.",
+    "Remove a clip from the timeline (the source asset is untouched). Leaves a gap at the clip's old position — MP4 export renders gaps as black; on a video or audio track call slates_reorder_clips afterwards to close gaps. An overlay track's text and image clips keep their times, and the gap is just no overlay.",
   input: z.object({ clipId: z.string().uuid() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -6289,22 +6314,198 @@ export const manageTimelineMarker: Operation<{
 
 export const addTimelineTrack: Operation<{
   projectId: string; timelineId?: string
-  type?: 'video' | 'audio'
+  type?: 'video' | 'audio' | 'overlay'
   name?: string
 }> = {
   id: 'slates_add_timeline_track',
   description:
-    "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). The new track is appended below existing tracks. Returns the new track and the full timeline.",
+    "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). A video or audio track is appended below the existing tracks; an overlay track, for text and image overlays, goes on top so it draws over every other track. Returns the new track and the full timeline.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
-    type: z.enum(['video', 'audio']).optional().describe('Default: audio.'),
-    name: z.string().optional().describe("Default: 'Audio N' / 'Video N'."),
+    type: z.enum(['video', 'audio', 'overlay']).optional().describe('Default: audio. overlay needs a desktop with text and image overlays.'),
+    name: z.string().optional().describe("Default: 'Audio N', 'Video N' or 'Overlay N'."),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
+    if (input.type === 'overlay') await desktop.requireCapability('timeline-overlays', 'text and image overlays')
     await requireNamedCut(desktop, input.timelineId)
     return ok(await desktop.post('/agent/timeline/add-track', input))
+  },
+}
+
+// Text and image overlays (slate's finished-ads plan, L1). The look's lists, limits, ranges and defaults
+// mirror slate's `src/shared/textStyles.ts`, `src/shared/overlays.ts` and `src/main/editor/overlays.ts`,
+// and the batch cap slate's `src/main/agent/routes-editor.ts`, which this package cannot import;
+// lockstep check 12 fails when they differ. The 0..1 position and
+// opacity are fractions by definition, not a desktop choice.
+const TEXT_STYLE_IDS = ['word-pop', 'keyword', 'subtitle', 'headline', 'clean'] as const
+const TEXT_STYLE_DEFAULT = 'subtitle'
+const OVERLAY_TEXT_MAX = 2000
+const OVERLAY_WORDS_MAX = 2000
+const OVERLAY_WORD_TEXT_MAX = 200
+const OVERLAY_SIZE_RANGE = { min: 0.25, max: 4 } as const
+const OVERLAY_WIDTH_RANGE = { min: 0.01, max: 1 } as const
+const OVERLAY_DEFAULT_SECONDS = 3
+const OVERLAY_BATCH_MAX = 500
+
+/** Text the desktop accepts: not blank (it trims before checking), at most `max` characters. A pattern, not a refine, so the JSON schema a host checks says it too. */
+const overlayText = (max: number) => z.string().max(max).regex(/\S/, 'must not be blank')
+
+const overlayPlacementInput = {
+  startSec: z.number().min(0).optional().describe('Where the clip starts, in timeline seconds. startSec or startFrame is required, not both.'),
+  startFrame: z.number().int().min(0).optional().describe('Where the clip starts, in timeline frames.'),
+  durationSec: z.number().positive().optional().describe(`How long it shows, in seconds. Default: ${OVERLAY_DEFAULT_SECONDS}.`),
+  endFrame: z.number().int().min(1).optional().describe('The frame it ends before, instead of durationSec.'),
+  trackId: z.string().uuid().optional().describe('An overlay track (slates_add_timeline_track, type overlay). Default: the topmost unlocked, shown overlay track with room, or a new one on top.'),
+}
+const overlayPositionInput = {
+  x: z.number().min(0).max(1).optional().describe("The centre's distance from the left edge, as a fraction of the frame's width."),
+  y: z.number().min(0).max(1).optional().describe("The centre's distance from the top edge, as a fraction of the frame's height."),
+}
+const textSizeInput = z
+  .number().min(OVERLAY_SIZE_RANGE.min).max(OVERLAY_SIZE_RANGE.max)
+  .describe(`A multiple of the style's text size, ${OVERLAY_SIZE_RANGE.min} to ${OVERLAY_SIZE_RANGE.max}; 1 is the style's own.`)
+const imageWidthInput = z
+  .number().min(OVERLAY_WIDTH_RANGE.min).max(OVERLAY_WIDTH_RANGE.max)
+  .describe(`Its width as a fraction of the frame's width, ${OVERLAY_WIDTH_RANGE.min} to ${OVERLAY_WIDTH_RANGE.max}; the height follows the picture.`)
+const textLookInput = {
+  style: z.enum(TEXT_STYLE_IDS).optional().describe(`Default: ${TEXT_STYLE_DEFAULT}. word-pop lights up the spoken word when the clip has words.`),
+  ...overlayPositionInput,
+  size: textSizeInput.optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('The text colour as #rrggbb. Default: the style\'s.'),
+}
+const overlayWordsInput = z
+  .array(
+    z
+      .object({ text: overlayText(OVERLAY_WORD_TEXT_MAX), start: z.number().min(0), end: z.number().min(0) })
+      .strict()
+      .refine((w) => w.end > w.start, { message: 'end must be after start' })
+  )
+  .max(OVERLAY_WORDS_MAX)
+  .describe("Word timings in timeline seconds, for captions that follow the voice; each word's end comes after its start.")
+
+/** An item must start once: startSec or startFrame, and end at most once: durationSec or endFrame. Refused here, naming it. */
+function requireOverlayStart(items: { startSec?: number; startFrame?: number; durationSec?: number; endFrame?: number }[]): void {
+  items.forEach((item, i) => {
+    if (item.startSec === undefined && item.startFrame === undefined) throw new Error(`items[${i}] needs startSec or startFrame.`)
+    if (item.startSec !== undefined && item.startFrame !== undefined) throw new Error(`items[${i}]: give startSec or startFrame, not both.`)
+    if (item.durationSec !== undefined && item.endFrame !== undefined) throw new Error(`items[${i}]: give durationSec or endFrame, not both.`)
+  })
+}
+
+const overlayCount = (r: { clips?: unknown[] }, what: string): string => {
+  const n = r.clips?.length ?? 0
+  return `Added ${n} ${what}${n === 1 ? '' : 's'}.`
+}
+
+export const addTextClip: Operation<{
+  projectId: string; timelineId?: string
+  items: ({ text: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number]; x?: number; y?: number; size?: number; color?: string; startSec?: number; startFrame?: number; durationSec?: number; endFrame?: number; trackId?: string })[]
+}> = {
+  id: 'slates_add_text_clip',
+  description:
+    "Put text on the timeline: captions, a headline, a keyword, a call to action. Each item is one text clip on an overlay track, drawn over the video in preview and export; a batch lands in one transaction, all or none. Captions that follow the voice: one clip per line, with each word's timing in words. Read slates_get_timeline first for the frame rate and where clips sit. Returns the clips and the timeline. Change one later with slates_update_overlay_clip, remove it with slates_remove_clip.",
+  input: z.object({
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
+    items: z
+      .array(
+        z
+          .object({
+            text: overlayText(OVERLAY_TEXT_MAX).describe('What it says.'),
+            words: overlayWordsInput.optional(),
+            ...textLookInput,
+            ...overlayPlacementInput,
+          })
+          .strict()
+      )
+      .min(1)
+      .max(OVERLAY_BATCH_MAX),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-overlays', 'text and image overlays')
+    await requireNamedCut(desktop, input.timelineId)
+    requireOverlayStart(input.items)
+    const r = await desktop.post<{ clips?: unknown[] }>('/agent/timeline/add-text', input)
+    return ok(r, `${overlayCount(r, 'text clip')} ${JSON.stringify(r)}`)
+  },
+}
+
+export const addImageOverlay: Operation<{
+  projectId: string; timelineId?: string
+  items: ({ assetId: string; x?: number; y?: number; width?: number; opacity?: number; startSec?: number; startFrame?: number; durationSec?: number; endFrame?: number; trackId?: string })[]
+}> = {
+  id: 'slates_add_image_overlay',
+  description:
+    "Put a picture over the video on the timeline: a logo, a product shot, an end card, a badge. Each item is one image clip on an overlay track, drawn in preview and export; a batch lands in one transaction, all or none. The picture is an image asset already in the project. Returns the clips and the timeline. Change one later with slates_update_overlay_clip, remove it with slates_remove_clip.",
+  input: z.object({
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
+    items: z
+      .array(
+        z
+          .object({
+            assetId: z.string().min(1).describe('An image asset in the project: its code (IMG-A12) or id.'),
+            ...overlayPositionInput,
+            width: imageWidthInput.optional().describe(`${imageWidthInput.description} Default: half.`),
+            opacity: z.number().min(0).max(1).optional().describe('Default: 1, fully opaque.'),
+            ...overlayPlacementInput,
+          })
+          .strict()
+      )
+      .min(1)
+      .max(OVERLAY_BATCH_MAX),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-overlays', 'text and image overlays')
+    await requireNamedCut(desktop, input.timelineId)
+    requireOverlayStart(input.items)
+    const refs = await resolveAssetRefs(ctx, input.projectId, input.items.map((item) => item.assetId))
+    const items = input.items.map((item, i) => {
+      const asset = refs.get(item.assetId)
+      if (!asset) throw new Error(`items[${i}].assetId "${item.assetId}" is not an asset in this project (slates_list_assets).`)
+      return { ...item, assetId: asset.id }
+    })
+    const r = await desktop.post<{ clips?: unknown[] }>('/agent/timeline/add-image-overlay', { ...input, items })
+    return ok(r, `${overlayCount(r, 'image overlay')} ${JSON.stringify(r)}`)
+  },
+}
+
+export const updateOverlayClip: Operation<{
+  projectId: string
+  items: ({ clipId: string; text?: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number] | null; x?: number | null; y?: number | null; size?: number | null; color?: string | null; width?: number | null; opacity?: number | null })[]
+}> = {
+  id: 'slates_update_overlay_clip',
+  description:
+    "Change a text clip's words or look, or an image overlay's place, size and opacity. Only the fields you name change; null puts one back to the style's or the default. words replaces a text clip's timings, and [] drops them; new text keeps the old timings, so send words with it. When the clip shows does not change here: to move one, remove it (slates_remove_clip) and add it again. A batch lands in one transaction, all or none. Returns the changed clips.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    items: z
+      .array(
+        z
+          .object({
+            clipId: z.string().uuid().describe('A text or image clip (slates_get_timeline).'),
+            text: overlayText(OVERLAY_TEXT_MAX).optional().describe('Text clips: what it says.'),
+            words: overlayWordsInput.optional(),
+            style: z.enum(TEXT_STYLE_IDS).nullable().optional().describe(`Text clips. null: ${TEXT_STYLE_DEFAULT}.`),
+            x: z.number().min(0).max(1).nullable().optional().describe("The centre's distance from the left edge, as a fraction of the frame's width."),
+            y: z.number().min(0).max(1).nullable().optional().describe("The centre's distance from the top edge, as a fraction of the frame's height."),
+            size: textSizeInput.nullable().optional().describe(`Text clips: ${textSizeInput.description}`),
+            color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional().describe('Text clips: #rrggbb.'),
+            width: imageWidthInput.nullable().optional().describe(`Image clips: ${imageWidthInput.description}`),
+            opacity: z.number().min(0).max(1).nullable().optional().describe('Image clips.'),
+          })
+          .strict()
+          .refine((item) => Object.keys(item).some((k) => k !== 'clipId'), { message: 'name at least one field to change besides clipId' })
+      )
+      .min(1)
+      .max(OVERLAY_BATCH_MAX),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-overlays', 'text and image overlays')
+    return ok(await desktop.post('/agent/timeline/update-overlay', input))
   },
 }
 
@@ -9262,6 +9463,9 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   removeClip as unknown as Operation<unknown>,
   manageTimelineMarker as unknown as Operation<unknown>,
   addTimelineTrack as unknown as Operation<unknown>,
+  addTextClip as unknown as Operation<unknown>,
+  addImageOverlay as unknown as Operation<unknown>,
+  updateOverlayClip as unknown as Operation<unknown>,
   updateTimelineTrack as unknown as Operation<unknown>,
   removeTimelineTrack as unknown as Operation<unknown>,
   updateTimelineSettings as unknown as Operation<unknown>,

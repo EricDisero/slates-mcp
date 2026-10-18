@@ -93,7 +93,7 @@ so nothing downstream has to restate them in prose (which is how they went stale
 | 9 | Desktop routes ↔ callers, BOTH directions: every `r.add` route in slate has a caller (an op, slate itself, or a trailing `// legacy:` marker naming the published client it still serves), and every route an op calls EXISTS in slate — the direction that deleted a live route on 2026-09-05 |
 | 10 | slate's `PROD_API_URL` literal equals `SLATES_API_URL` — the one host the renderer cannot import from the package and must mirror |
 | 11 | An op on a route the last released desktop lacks checks a capability token that desktop lacks; `doctor` lists every token |
-| 12 | The view ops' lenses, timeline sides and navigator sections equal slate's `@shared/types/view` |
+| 12 | The view ops' lists equal slate's `@shared/types/view`, and the overlay ops' styles, limits, ranges and defaults equal slate's |
 | 13 | The asset label and note limits equal slate's `assetLabel.ts` |
 | 14 | Every tool renders an object schema; `toolDefinition()` refuses one that does not (a zod 4 schema renders as `{}`) |
 

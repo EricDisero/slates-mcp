@@ -47,6 +47,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['voices', 'the preset voice shelf'],
   ['timeline', 'the timeline'],
   ['timeline-tracks', 'timeline tracks and settings'],
+  ['timeline-overlays', 'text and image overlays'],
   ['export', 'video and XML export'],
   ['ad-variant-export', 'variant batch export, grid, delivery framing and selection'],
   ['chatgpt-image-generation', 'connected ChatGPT images'],
