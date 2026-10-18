@@ -1,4 +1,5 @@
 import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
+import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
@@ -276,6 +277,11 @@ const ASSET_UUID_ONLY = 'Asset UUID, not a badge code: pass the code to slates_l
 const confirmGateSentence = (alsoWhen?: string) =>
   `Show the user the estimate and wait for their OK before any generation, however small. Cost above ${CONFIRM_CREDITS} credits${alsoWhen ? `, or ${alsoWhen},` : ''} also returns requires_confirm — pass confirm=true only to relay that OK.`
 const CONFIRM_GATE_SENTENCE = confirmGateSentence()
+/** Longest source clip motion transfer reads, by characterOrientation: the run bills at most this. */
+const MOTION_TRANSFER_MAX_SECONDS = { video: 30, image: 10 } as const
+const STYLE_DESCRIBE = (omitted: string) => `Art style. ${omitted} Canonical styles: ${STYLE_LIBRARY.filter((s) => s.id !== DEFAULT_STYLE_ID).map((s) => s.id).join(', ')}. Or pass any free-text instruction, e.g. 'turn this into a real person'.`
+/** The character, location and look ops read and write Library items (slate routes-library.ts); new work uses the Library op named. */
+const LIBRARY_TWIN = (op: string, does: string) => ` These are Library items: ${op} ${does}.`
 /** The confirm param, one wording: it relays the user's OK of a quoted spend. */
 const CONFIRM_PARAM = `Set true only to relay the user's explicit OK of this exact spend.`
 
@@ -682,6 +688,8 @@ interface ViewShape {
   animatic?: { open: boolean }
   settings?: { open: boolean }
   composer?: { open: boolean }
+  /** W3 (slate a4f829b): the layout and which areas show; absent from older desktops. */
+  window?: { layout: 'plan' | 'edit'; lens: boolean; viewer: boolean; inspector: 'column' | 'drawer' | null; timeline: boolean; lensWidth: number }
   layers?: string[]
   notes?: string[]
   /** When the desktop last reported it. */
@@ -721,22 +729,33 @@ const describeLooking = (v: ViewShape): string => {
 }
 
 const describeView = (v: ViewShape): string => {
-  const where = v.cut.full
-    ? 'filling the workspace'
-    : v.cut.open
-      ? v.cut.side === 'bottom'
-        ? `a ${v.cut.height}px band under the ${v.lens} tab`
-        : `a ${v.cut.width}px column on the ${v.cut.side} of the ${v.lens} tab`
-      : 'closed, resting as one line at the bottom'
+  const under = v.window ? 'along the bottom of the window' : `under the ${v.lens} tab`
+  const where = v.window && !v.window.timeline
+    ? 'hidden'
+    : v.cut.full
+      ? 'filling the workspace'
+      : v.cut.open
+        ? v.cut.side === 'bottom'
+          ? `a ${v.cut.height}px band ${under}`
+          : `a ${v.cut.width}px column on the ${v.cut.side} of the ${v.lens} tab`
+        : 'closed, resting as one line at the bottom'
+  const areas = v.window
+    ? [v.window.lens && `the ${v.lens} tab`, v.window.viewer && 'the Viewer', v.window.inspector && `the Inspector as a ${v.window.inspector}`, v.window.timeline && 'the timeline'].filter(Boolean) as string[]
+    : []
   const agent = v.studioAgent.enabled
     ? v.studioAgent.open
       ? `the Studio Agent panel is open (${v.studioAgent.width}px)`
       : 'the Studio Agent panel is closed'
     : 'the Studio Agent is switched off in Settings'
   return (
-    `The ${v.lens} tab is showing. The timeline is ${where}. ` +
+    `The ${v.lens} tab is ${v.window && !v.window.lens ? 'hidden' : 'showing'}. The timeline is ${where}. ` +
     `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
     (v.leftDock.folded?.length ? ` Folded in the navigator: ${v.leftDock.folded.map((f) => DOCK_SECTION_NAMES[f] ?? f).join(', ')}.` : '') +
+    (v.window
+      ? ` The window is in the ${v.window.layout === 'edit' ? 'Edit' : 'Plan'} layout, showing ${
+          areas.length > 1 ? `${areas.slice(0, -1).join(', ')} and ${areas.at(-1)}` : areas[0] ?? 'none of its areas'
+        }.`
+      : '') +
     (v.script ? ` The Script page shows ${v.script.details ? 'Words + shots (each shot\'s picture beside its words)' : 'Words (the words alone)'}.` : '') +
     describeLooking(v)
   )
@@ -750,7 +769,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Inspector as a column or a drawer), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -795,7 +814,7 @@ export const setView: Operation<{
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, and the Board's card size and linked clips. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -807,9 +826,9 @@ export const setView: Operation<{
           side: z
             .enum(VIEW_CUT_SIDES)
             .optional()
-            .describe('Where the timeline is parked. A column suits a wide monitor; picking a side opens the timeline.'),
+            .describe('Where the timeline is parked; picking a side opens the timeline. On a desktop with the one-window layout it always runs along the bottom: another side comes back as a note and is not applied.'),
           height: z.number().optional().describe("The bottom band's height in px."),
-          width: z.number().optional().describe("The side column's width in px."),
+          width: z.number().optional().describe("The side column's width in px; with the one-window layout, the Viewer's width in the Plan layout."),
           timelineId: z.string().optional().describe('The named cut to show on the timeline (slates_list_timelines).'),
           format: deliveryAspectInput.optional().describe('Preview this delivery format; requires ad-variant-export.'),
           gridSelection: gridSelectionInput.optional().describe('Selected existing grid rows and delivery formats; requires ad-variant-export. Does not export.'),
@@ -2468,7 +2487,7 @@ export const moveEntityToProject: Operation<{
 
 export const listCharacters: Operation<{ projectId: string }> = {
   id: 'slates_list_characters',
-  description: 'List characters in a Slates project.',
+  description: 'List characters in a Slates project.' + LIBRARY_TWIN('slates_list_library', 'lists them with every other Library item, each with its category and mention (@name; looks #name)'),
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().get('/agent/characters', { projectId: input.projectId }))
@@ -2482,12 +2501,12 @@ export const createCharacter: Operation<{
   style?: string
 }> = {
   id: 'slates_create_character',
-  description: 'Create a new character in a Slates project.',
+  description: 'Create a new character in a Slates project.' + LIBRARY_TWIN('slates_create_library_item', 'creates one in a category you choose and returns its @mention'),
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omitted: realistic.')),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/characters', input))
@@ -2497,7 +2516,7 @@ export const createCharacter: Operation<{
 export const setCharacterIdentity: Operation<{ characterId: string; assetId: string | null }> = {
   id: 'slates_set_character_identity_asset',
   description:
-    'Bind one image asset as the character identity (or clear with assetId=null). The user sees the character card update live.',
+    'Bind one image asset as the character identity (or clear with assetId=null). The user sees the character card update live.' + LIBRARY_TWIN('slates_update_library_item', 'edits the same row'),
   input: z.object({
     characterId: z.string().uuid(),
     assetId: z.string().uuid().nullable().describe(ASSET_UUID_ONLY),
@@ -2516,7 +2535,7 @@ export const setCharacterIdentity: Operation<{ characterId: string; assetId: str
 
 export const listEnvironments: Operation<{ projectId: string }> = {
   id: 'slates_list_environments',
-  description: 'List the locations (environments) in a Slates project.',
+  description: 'List the locations (environments) in a Slates project.' + LIBRARY_TWIN('slates_list_library', 'lists them with every other Library item, each with its category and mention (@name; looks #name)'),
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().get('/agent/environments', { projectId: input.projectId }))
@@ -2530,12 +2549,12 @@ export const createEnvironment: Operation<{
   style?: string
 }> = {
   id: 'slates_create_environment',
-  description: 'Create a new location (environment) in a Slates project.',
+  description: 'Create a new location (environment) in a Slates project.' + LIBRARY_TWIN('slates_create_library_item', 'creates one in a category you choose and returns its @mention'),
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omitted: realistic.')),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/environments', input))
@@ -2647,7 +2666,7 @@ export const createStoryboard: Operation<{
     'Create a new board (storyboard) with a default first scene. Returns the board record.',
   input: z.object({
     projectId: z.string().uuid(),
-    name: z.string().min(1).max(120),
+    name: z.string().min(1).max(80),
     description: z.string().optional(),
   }),
   async run(input, ctx) {
@@ -3078,7 +3097,7 @@ export const generateImage: Operation<{
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
-    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Variations of this one prompt: every image gets the same prompt, so different subjects are separate calls. Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}.`),
+    count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Variations of this one prompt: every image gets the same prompt, so different subjects are separate calls. Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}. A 2x2 or 3x3 grid in one picture is a Shot's or the prompt box's Grid (params.gridMode), not count.`),
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -3521,7 +3540,7 @@ export const editImage: Operation<{
   input: z.object({
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project. ' + ASSET_UUID_ONLY),
-    prompt: z.string().min(1).max(4000).describe('The change, not the whole image.'),
+    prompt: z.string().min(1).max(4000).describe('The change, not the whole image. @name and #look words attach nothing here: pass those pictures in referenceAssetIds.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
     referenceAssetIds: z.array(z.string().uuid().describe(ASSET_UUID_ONLY)).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
@@ -5503,7 +5522,7 @@ export const generateMotionTransfer: Operation<{
     confirmGateSentence('a source length it cannot read'),
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
-    sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Up to 30s with characterOrientation video, 10s with image; billed per 5s block.'),
+    sourceVideoAssetId: z.string().uuid().describe(`Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Up to ${MOTION_TRANSFER_MAX_SECONDS.video}s with characterOrientation video, ${MOTION_TRANSFER_MAX_SECONDS.image}s with image; billed per 5s block.` + ' ' + ASSET_UUID_ONLY),
     targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project. ' + ASSET_UUID_ONLY),
     motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('kling-mc-std general motion; kling-mc-pro cleaner anatomy — default. Quote both with slates_estimate_generation_cost.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
@@ -5516,7 +5535,7 @@ export const generateMotionTransfer: Operation<{
     // Billed per 5s block of the driving clip, which the output follows, up to
     // the orientation's maximum (the desktop's `motionTransferEstimate`).
     const clipSeconds = await recordedSeconds(ctx.desktop(), input.projectId, input.sourceVideoAssetId)
-    const seconds = clipSeconds == null ? null : Math.min(clipSeconds, (input.characterOrientation ?? 'video') === 'video' ? 30 : 10)
+    const seconds = clipSeconds == null ? null : Math.min(clipSeconds, MOTION_TRANSFER_MAX_SECONDS[input.characterOrientation ?? 'video'])
     const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, motionModel, seconds, false)
 
     // Cost confirm gate. Motion transfer is mechanical — the model
@@ -6608,12 +6627,12 @@ export const updateCharacter: Operation<{
 }> = {
   id: 'slates_update_character',
   description:
-    'Update a character\'s name, description, style, or voice. Use slates_set_character_identity_asset for its canonical image.',
+    'Update a character\'s name, description, style, or voice. Use slates_set_character_identity_asset for its canonical image.' + LIBRARY_TWIN('slates_update_library_item', 'edits the same row'),
   input: z.object({
     characterId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omit to keep the stored style.')),
     // Agent parity for the character card's voice slot: the desktop route has
     // taken this since 2026-08-28; the op never exposed it, so an agent could
     // render a voice and had no way to keep it on the character.
@@ -6643,7 +6662,7 @@ export const updateCharacter: Operation<{
 
 export const deleteCharacter: Operation<{ characterId: string }> = {
   id: 'slates_delete_character',
-  description: 'Delete a character from its project.',
+  description: 'Delete a character from its project.' + LIBRARY_TWIN('slates_delete_library_item', 'deletes the same row'),
   input: z.object({ characterId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/characters/delete', { id: input.characterId }))
@@ -6659,12 +6678,12 @@ export const updateEnvironment: Operation<{
 }> = {
   id: 'slates_update_environment',
   description:
-    'Update a location\'s name, description, style, or bound reference image (referenceAssetId=null clears it).',
+    'Update a location\'s name, description, style, or bound reference image (referenceAssetId=null clears it).' + LIBRARY_TWIN('slates_update_library_item', 'edits the same row'),
   input: z.object({
     environmentId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe("Art style. Omit to inherit the reference's style (the default). Canonical styles: photoreal, anime, painterly, 3d-render, comic. Or pass any free-text instruction, e.g. 'turn this into a real person'."),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omit to keep the stored style.')),
     referenceAssetId: z.string().uuid().nullable().optional(),
   }),
   async run(input, ctx) {
@@ -6684,7 +6703,7 @@ export const updateEnvironment: Operation<{
 
 export const deleteEnvironment: Operation<{ environmentId: string }> = {
   id: 'slates_delete_environment',
-  description: 'Delete a location from its project.',
+  description: 'Delete a location from its project.' + LIBRARY_TWIN('slates_delete_library_item', 'deletes the same row'),
   input: z.object({ environmentId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/environments/delete', { id: input.environmentId }))
@@ -6693,7 +6712,7 @@ export const deleteEnvironment: Operation<{ environmentId: string }> = {
 
 export const listStyles: Operation<{ projectId: string }> = {
   id: 'slates_list_styles',
-  description: 'List the looks (styles) in a Slates project.',
+  description: 'List the looks (styles) in a Slates project.' + LIBRARY_TWIN('slates_list_library', 'lists them with every other Library item, each with its category and mention (#name for a look)'),
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().get('/agent/styles', { projectId: input.projectId }))
@@ -6702,7 +6721,7 @@ export const listStyles: Operation<{ projectId: string }> = {
 
 export const createStyle: Operation<{ projectId: string; name: string; description?: string }> = {
   id: 'slates_create_style',
-  description: 'Create a new look (style) in a Slates project.',
+  description: 'Create a new look (style) in a Slates project.' + LIBRARY_TWIN('slates_create_library_item', 'creates one in a category you choose and returns its #mention'),
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
@@ -6721,7 +6740,7 @@ export const updateStyle: Operation<{
 }> = {
   id: 'slates_update_style',
   description:
-    'Update a look\'s name, description, or bound reference image (imageAssetId=null clears it).',
+    'Update a look\'s name, description, or bound reference image (imageAssetId=null clears it).' + LIBRARY_TWIN('slates_update_library_item', 'edits the same row'),
   input: z.object({
     styleId: z.string().uuid(),
     name: z.string().min(1).max(120).optional(),
@@ -6740,7 +6759,7 @@ export const updateStyle: Operation<{
 
 export const deleteStyle: Operation<{ styleId: string }> = {
   id: 'slates_delete_style',
-  description: 'Delete a look from its project.',
+  description: 'Delete a look from its project.' + LIBRARY_TWIN('slates_delete_library_item', 'deletes the same row'),
   input: z.object({ styleId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/styles/delete', { id: input.styleId }))
@@ -6876,7 +6895,7 @@ export const manageLibraryCategory: Operation<{
     action: z.enum(['create', 'rename', 'set-behaviour', 'reorder', 'delete']),
     projectId: z.string().uuid().optional(),
     categoryId: z.string().uuid().optional(),
-    name: z.string().min(1).max(80).optional(),
+    name: z.string().min(1).max(40).optional().describe("Up to 40 characters, as the app's name field."),
     kind: z.enum(['thing', 'look']).optional(),
     template: z.enum(['person', 'location']).nullable().optional(),
     retagShots: z.boolean().optional(),
@@ -6919,7 +6938,7 @@ export const copyLibraryItemToProject: Operation<{ itemId: string; targetProject
 export const getTemplate: Operation<{ path?: string }> = {
   id: 'slates_get_template',
   description:
-    "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the saved templates on this machine (the app's starter set and the user's own folder).",
+    "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the templates in the user's templates folder, plus any starter templates the app ships.",
   input: z.object({ path: z.string().min(1).optional().describe('Absolute path of a .slatestemplate file. Omit to list saved templates.') }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('templates', 'templates')
@@ -6939,7 +6958,7 @@ export const exportTemplate: Operation<{
 }> = {
   id: 'slates_export_template',
   description:
-    "Save a board, a scene or one Shot as a template file someone else can start from. Give exactly one of storyboardId, sceneId or shotId. The file carries each Shot's full recipe (prompt, model, settings, reference roles, script words) plus the reference files and the Library items the Shots mention; it carries no takes. The project is untouched. Returns the path, the counts, and a warning for any reference whose file is missing.",
+    "Save a board, a scene or one Shot as a template file someone else can start from. Give exactly one of storyboardId, sceneId or shotId. The file carries each Shot's full recipe (prompt, model, settings, reference roles, script words) plus the reference files and the Library items the Shots mention; it carries no takes. The project is untouched. A file saved outside the user's templates folder is not in the template list (slates_get_template without path); the user opens it with Open a file. Returns the path, the counts and a warning for any reference whose file is missing.",
   input: z.object({
     projectId: z.string().uuid(),
     path: z.string().min(1).describe('Absolute path to write, ending in .slatestemplate. Its folder is created if needed.'),
@@ -6968,7 +6987,7 @@ export const importTemplate: Operation<{
 }> = {
   id: 'slates_import_template',
   description:
-    "Add a template to a project. A board template becomes a new board; a scene template becomes a new scene of `storyboardId` (default: the most recently edited board); a single-Shot template is filed like any new Shot (into `sceneId` when given). Its reference files become new assets of this project and its Library items are created here (a taken name is suffixed and the imported prompts are rewritten to match; see `renamed`). `swaps` maps a slot key from slates_get_template to an asset of THIS project (id or code) of the slot's type: the item takes that picture, or every Shot that attached the template's reference attaches it instead, and the template's own file for that slot is not imported. Generates nothing and spends nothing: price and fire the returned shotIds with slates_generate_from_shots, after the user approves the prices.",
+    "Add a template to a project. A board template becomes a new board; a scene template becomes a new scene of `storyboardId` (default: the most recently edited board); a single-Shot template is filed like any new Shot (into `sceneId` when given, else the last scene of `storyboardId` or of the most recently edited board). Its reference files become new assets of this project and its Library items are created here (a taken name is suffixed and the imported prompts are rewritten to match; see `renamed`). `swaps` maps a slot key from slates_get_template to an asset of THIS project (id or code) of the slot's type: the item takes that picture, or every Shot that attached the template's reference attaches it instead, and the template's own file for that slot is not imported. Generates nothing and spends nothing: price and fire the returned shotIds with slates_generate_from_shots, after the user approves the prices.",
   input: z.object({
     projectId: z.string().uuid(),
     path: z.string().min(1).describe('Absolute path of the .slatestemplate file.'),
@@ -7001,7 +7020,7 @@ export const updateStoryboard: Operation<{
   description: 'Update a board\'s name and/or description.',
   input: z.object({
     storyboardId: z.string().uuid(),
-    name: z.string().min(1).max(120).optional(),
+    name: z.string().min(1).max(80).optional(),
     description: z.string().optional(),
   }),
   async run(input, ctx) {
@@ -7078,7 +7097,7 @@ export const updateFrame: Operation<{
     // of what the Shot in this slot already encodes — the image's role and the
     // beat's words — and they were backfilled into Shots on 2026-08-31. Use
     // slates_update_shot for either.
-    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. A scene or position change carries the words in this slot with it on the Script page. preferredClipId picks the clip the timeline takes for this slot (a video asset id or VID code; null goes back to the slot\'s most recent linked clip), as the take menu\'s "Use in the timeline" does. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
+    'Update a slot: its shot label, notes, bound asset (assetId=null unbinds), scene or position. A scene or position change carries the words in this slot with it on the Script page. preferredClipId picks the clip the timeline takes for this slot (a video asset id or VID code; null goes back to the newest linked video), as the take menu\'s "Use in the timeline" does. The BEAT — its line, references, model, prompt and framing — lives on the Shot in this slot; use slates_update_shot for that.',
   input: z.object({
     frameId: z.string().uuid(),
     shotLabel: z.string().optional(),
@@ -7273,7 +7292,7 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
       'Validated against the model when the Shot is saved.'
     ),
     imageResolution: d(z.enum(['1k', '2k', '3k', '4k']).optional(), 'Image models only.'),
-    gptQuality: d(z.enum(GPT_QUALITY_TIERS).optional(), 'GPT Image 2.5 only.'),
+    gptQuality: d(z.enum(GPT_QUALITY_TIERS).optional(), `${IMAGE_MODELS.filter(isGptImageModel).join(', ')} only.`),
     gptBackground: d(z.enum(GPT_BACKGROUNDS).optional(), 'GPT Image only.'),
     detachedVoiceCharacterIds: z.array(z.string()).optional().describe('Character voices removed from this recipe.'),
     imageQuantity: d(z.number().int().min(1).max(10).optional(), 'Image models only.'),
@@ -8275,12 +8294,16 @@ export const getScript: Operation<{ sceneId: string }> = {
 }
 
 const variationSchema = z.object({
-  storyboardId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), name: z.string().min(1),
-  choices: z.array(z.object({ sectionId: z.string().uuid(), alternativeId: z.string().uuid() })),
+  storyboardId: z.string().uuid(),
+  expectedRevision: z.number().int().nonnegative().describe('The revision from slates_get_script_document; a stale one is refused.'),
+  name: z.string().min(1),
+  choices: z.array(z.object({ sectionId: z.string().uuid(), alternativeId: z.string().uuid() })).describe('One saved version per section, ids from slates_get_script_sections.'),
   arrangement: z.array(z.object({ sectionId: z.string().uuid(), alternativeId: z.string().uuid() })).optional(),
-  itemOverrides: z.array(z.object({ from: z.string().uuid(), to: z.string().uuid(), voice: z.enum(['keep','replace']) })).optional(),
-  assetOverrides: z.array(z.object({ from: z.string().min(1), to: z.string().min(1) })).optional(),
-  idempotencyKey: z.string().min(1).optional(),
+  itemOverrides: z.array(z.object({ from: z.string().uuid(), to: z.string().uuid(), voice: z.enum(['keep','replace']) })).optional()
+    .describe("Swap one Library item for another of the same kind and role, a person for a person, a location for a location (item ids). voice keep: the replaced item's voice stays on the Shots it speaks in; replace: it does not carry over."),
+  assetOverrides: z.array(z.object({ from: z.string().min(1), to: z.string().min(1) })).optional()
+    .describe('Swap one asset for another of the same type (ids or badge codes).'),
+  idempotencyKey: z.string().min(1).optional().describe('Required to create: a retry with the same key and choices returns the same Board.'),
 })
 export const previewScriptVariation: Operation<z.infer<typeof variationSchema>> = {
   id: 'slates_preview_script_variation', description: 'Preview explicit version choices (one saved version per section) and independent ID-based reference replacements without writes or generation. An optional ordered arrangement supports repetition and omission. Returns composed requests, custom-prompt/reference warnings, a quote, and a plan marking each shot reuse (a finished take with matching inputs exists) or new. Inspect only the combinations you need.',
@@ -8291,7 +8314,7 @@ export const previewScriptVariation: Operation<z.infer<typeof variationSchema>> 
   },
 }
 export const createScriptVariation: Operation<z.infer<typeof variationSchema>> = {
-  id: 'slates_create_script_variation', description: 'Materialize one reviewed variation as an independent Board with local shot IDs and lineage. Requires idempotencyKey; retry returns the same Board. Returns a quote through the normal request service. No media generation or implicit take reuse.',
+  id: 'slates_create_script_variation', description: 'Materialize one reviewed variation as an independent Board with local shot IDs and lineage. Pass idempotencyKey: a retry with the same key returns the same Board. Returns a quote through the normal request service. No media generation or implicit take reuse.',
   input: variationSchema,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents and variations')
@@ -8342,15 +8365,23 @@ export const getScriptSections: Operation<{ storyboardId: string }> = {
  const data = await ctx.desktop().get('/agent/script/sections', input); return ok(data, 'Script sections read.') },
 }
 const sectionInput = z.object({
-  storyboardId: z.string().uuid(), expectedRevision: z.number().int().min(0), action: z.enum(['create', 'alternative', 'choose', 'save', 'reuse', 'updateUses', 'rename', 'archive', 'tags']),
-  sectionId: z.string().uuid().optional(), alternativeId: z.string().uuid().optional(), parentId: z.string().uuid().optional(), label: z.string().optional(),
+  storyboardId: z.string().uuid(),
+  expectedRevision: z.number().int().min(0).describe('The revision from slates_get_script_document; a stale one is refused.'),
+  action: z.enum(['create', 'alternative', 'choose', 'save', 'reuse', 'updateUses', 'rename', 'archive', 'tags']),
+  sectionId: z.string().uuid().optional().describe('Every action except create.'),
+  alternativeId: z.string().uuid().optional(),
+  parentId: z.string().uuid().optional().describe('create: a section that contains this passage.'),
+  label: z.string().optional().describe('The name: required for create and alternative, and for rename.'),
   tags: z.array(z.string()).max(20).optional().describe('Free tags for action tags; replaces the list.'),
-  target: z.object({ sceneId: z.string().uuid(), at: z.number().int().min(0), expectedRevision: z.number().int().min(0) }).optional(),
-  uses: z.array(z.object({ sectionId: z.string().uuid(), expectedRevision: z.number().int().min(0) })).optional(),
-  fragments: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0) })).optional(),
+  target: z.object({ sceneId: z.string().uuid(), at: z.number().int().min(0), expectedRevision: z.number().int().min(0) }).optional()
+    .describe("reuse: the scene the copy goes into, the place in its text, and that board's document revision."),
+  uses: z.array(z.object({ sectionId: z.string().uuid(), expectedRevision: z.number().int().min(0) })).optional()
+    .describe('updateUses: the copies to update, with the revisions slates_get_script_uses returns.'),
+  fragments: z.array(z.object({ sceneId: z.string().uuid(), start: z.number().int().min(0), end: z.number().int().min(0) })).optional()
+    .describe('create: the passage, as ranges of scene text.'),
 })
 export const changeScriptSection: Operation<z.infer<typeof sectionInput>> = {
-  id: 'slates_update_script_section', description: 'Create a free-named section from a selected passage, save the words now on the page as a new version (action alternative), save changes to the shown version (save) or choose another (choose), insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one version (alternativeId), or set its free tags. Choosing, archiving a section, reuse and updateUses first save the page\'s words and shot bindings into the version that was showing (the page is never unsaved; save remains for an explicit save), and only alternative starts a new version; archiving a section keeps its words, shots and media on the page. Uses the current document revision and never generates media. Partial crossing sections are refused.',
+  id: 'slates_update_script_section', description: 'Create a free-named section from a selected passage, save the words now on the page as a new version (action alternative), save changes to the shown version (save) or choose another (choose), insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one version (alternativeId), or set its free tags (action tags). Choosing, archiving a section, reuse and updateUses first save the page\'s words and shot bindings into the version that was showing (the page is never unsaved; save remains for an explicit save), and only alternative starts a new version; archiving a section keeps its words, shots and media on the page. Uses the current document revision and never generates media. Partial crossing sections are refused.',
   input: sectionInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8999,7 +9030,7 @@ export const blenderStatus: Operation<Record<string, never>> = {
 export const blenderExecute: Operation<{ code: string; timeoutSeconds?: number }> = {
   id: 'slates_blender_execute',
   description:
-    'Run Python (`bpy`) inside the connected Blender and return whatever the code assigns to a dict named `result`. This is how blocking gets built: primitives, empties, constraints, camera rigs, keyframes, markers. Anything Blender can do, this can do. Assign a dict to `result` to get data back (e.g. `result = {"camera": cam.name}`); print() output comes back separately as stdout. On an exception you get the full traceback — read it, fix the code, retry. Before writing an unfamiliar call, look up its real signature with slates_blender_docs rather than guessing: the add-on ships the Blender 5.1 API reference precisely so you do not have to recall it.',
+    'Run Python (`bpy`) inside the connected Blender and return whatever the code assigns to a dict named `result`. This is how blocking gets built: primitives, empties, constraints, camera rigs, keyframes, markers. Anything Blender can do, this can do. Assign a dict to `result` to get data back (e.g. `result = {"camera": cam.name}`); print() output comes back separately as stdout. On an exception you get the full traceback — read it, fix the code, retry. Before writing an unfamiliar call, look up its real signature with slates_blender_docs rather than guessing: the add-on ships the Blender API reference precisely so you do not have to recall it.',
   input: z.object({
     code: z
       .string()
@@ -9025,7 +9056,7 @@ export const blenderExecute: Operation<{ code: string; timeoutSeconds?: number }
 export const blenderScene: Operation<Record<string, never>> = {
   id: 'slates_blender_scene',
   description:
-    'Scene summary from the connected Blender: frame range, fps, duration, render resolution, the active camera with its keyframe times in both frames and seconds, and the full collection/object tree with transforms and constraints. Cheap — call it freely between edits. The camera keyframe times ARE the cut structure, so read them before writing any shot-by-shot prompt.',
+    'Scene summary from the connected Blender: frame range, fps, duration, render resolution, the active camera with its keyframe times in both frames and seconds, and the full collection/object tree with transforms and constraints. Cheap — call it freely between edits. It errors when the bridge is down; slates_blender_status checks without failing. The camera keyframe times ARE the cut structure, so read them before writing any shot-by-shot prompt.',
   input: z.object({}),
   async run() {
     return ok(await new BlenderBridgeClient().call('result = _mod("scene").summary()'))
@@ -9035,7 +9066,7 @@ export const blenderScene: Operation<Record<string, never>> = {
 export const blenderDocs: Operation<{ identifier: string }> = {
   id: 'slates_blender_docs',
   description:
-    'Look up a dotted Blender Python API identifier in the bundled 5.1 reference — e.g. "bpy.ops.object", "bpy.types.Camera", "bpy.types.FollowPathConstraint". Pass "*" for top-level modules or "bpy.ops.*" to list a namespace. Use this instead of recalling a signature from memory: invented operator names and wrong enum values are the most common way previs code fails, and they fail silently often enough to be worth the lookup.',
+    'Look up a dotted Blender Python API identifier in the bundled Blender API reference — e.g. "bpy.ops.object", "bpy.types.Camera", "bpy.types.FollowPathConstraint". Pass "*" for top-level modules or "bpy.ops.*" to list a namespace. Use this instead of recalling a signature from memory: invented operator names and wrong enum values are the most common way previs code fails, and they fail silently often enough to be worth the lookup.',
   input: z.object({
     identifier: z.string().min(1).describe('Dotted identifier, or a namespace wildcard like "bpy.ops.*".'),
   }),
