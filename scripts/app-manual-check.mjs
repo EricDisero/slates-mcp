@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { APP_MANUAL, appManualIndex, appManualSections, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
+import { APP_MANUAL, appManualIndex, appManualSections, ALL_OPERATIONS, SKILLS } from '../packages/shared/dist/index.js'
 import { desktopSource } from './desktop-source.mjs'
 
 // slates-web may pin the docs to a slate commit that buyers have (scripts/llm-docs/desktop-docs-ref.json,
@@ -52,3 +52,31 @@ for (const q of ['export an mp4', 'where is the timeline', 'use my own voice rec
 }
 assert.ok(appManualIndex().length <= 12000, `the manual map is ${appManualIndex().length} characters`)
 console.log(`App manual: canonical snapshot matches, one small section per question, ${cited.length} cited ops all exist, shared operation serves the same text.`)
+
+// The agent-facing text that rides beside the manual. A tool with an empty description gives the model
+// a bare name, and a skill that names a tool or a guide the package lacks sends the agent after
+// something that is not there (2026-10-17: a GPT Image guide line cited a rule in a skill that no
+// longer had it). Skill text is checked where it is written: the shared skills and the plugin-only ones.
+const undescribed = ALL_OPERATIONS.filter((o) => !(o.description ?? '').trim()).map((o) => o.id)
+assert.deepEqual(undescribed, [], `Op(s) with no description: ${undescribed.join(', ')}`)
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const skillFiles = [
+  ...readdirSync(resolve(repo, 'packages/shared/skills')).filter((f) => f.endsWith('.md')).map((f) => resolve(repo, 'packages/shared/skills', f)),
+  ...readdirSync(resolve(repo, 'plugins/src/skills')).map((d) => resolve(repo, 'plugins/src/skills', d, 'SKILL.md')).filter((f) => existsSync(f)),
+]
+const guideNames = new Set([...Object.keys(SKILLS), ...readdirSync(resolve(repo, 'plugins/src/skills'))])
+// Backticked `slates-…` names that are repos, packages or files, not guides.
+const notGuides = new Set(['slates-mcp', 'slates-web', 'slates-api', 'slates-blender', 'slates-releases', 'slates-video', 'slates-studio'])
+const broken = []
+for (const file of skillFiles) {
+  const text = readFileSync(file, 'utf8')
+  const name = file.replace(/\\/g, '/').split('/').slice(-2).join('/')
+  for (const id of new Set(text.match(/\bslates_[a-z0-9_]+/g) ?? [])) {
+    if (!/_$/.test(id) && !id.startsWith('slates_sk_') && !opIds.has(id)) broken.push(`${name}: tool ${id}`)
+  }
+  for (const [, guide] of text.matchAll(/`(slates-[a-z0-9-]+)`/g)) {
+    if (!notGuides.has(guide) && !guide.endsWith('-') && !guideNames.has(guide)) broken.push(`${name}: guide ${guide}`)
+  }
+}
+assert.deepEqual(broken, [], `Skill text names what the package lacks:\n  ${broken.join('\n  ')}`)
+console.log(`Agent text: ${ALL_OPERATIONS.length} ops described; ${skillFiles.length} skill files name only real tools and guides.`)
