@@ -71,7 +71,7 @@ GPT Image's edge is **character-level text accuracy** (~99% on English), ordered
 
 ## Quality tiers — always set explicitly
 
-All five rungs are exposed, and they span ~36× end to end (2k class: $0.0044 → $0.158), which makes this the single biggest cost lever on the model. **The steps are UNEVEN — do not reason about them as a constant multiplier:** ~2.3× `low`→`medium`, ~3.9× `medium`→`high`, ~1.8× `high`→`xhigh`, ~2.25× `xhigh`→`max`. The same ratios hold at every OFFERED resolution class (2k/3k/4k); unoffered 1k differs slightly.
+All five rungs are exposed, and they span ~36× end to end at every resolution class, which makes this the single biggest cost lever on the model. **The steps are UNEVEN — do not reason about them as a constant multiplier:** ~2.3× `low`→`medium`, ~3.9× `medium`→`high`, ~1.8× `high`→`xhigh`, ~2.25× `xhigh`→`max`. The same ratios hold at every OFFERED resolution class (2k/3k/4k); unoffered 1k differs slightly.
 
 | Tier | Use it for |
 |---|---|

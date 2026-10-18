@@ -55,7 +55,7 @@ Two seats, and the naming is a trap:
 | Build | Distilled, 8-step | Full diffusion ("Diffusion Fidelity Rendering") |
 | Resolutions | 720p / 1080p / **1440p** / 4K | 720p / 1080p |
 | Durations | 6–20s, even steps | 6 / 8 / 10s |
-| Price | $0.09–$0.30 per second | $0.12–$0.17 per second |
+| Price | ~4.5–15 cr/s | ~6–8.5 cr/s |
 | Reach for it when | iterating, long takes, 4K delivery, batch volume | one dense final render inside 1080p and 10s |
 
 **Pro is not "base plus more."** It buys picture quality on a *narrower* envelope — it cannot make
@@ -209,7 +209,7 @@ Native synchronised audio is **included at every resolution on both seats**, wit
 no toggle that costs money — unlike Kling, where sound is a paid dimension. A 6-second 1080p LTX
 clip **with sound** is 39 credits.
 
-Combined with 1080p at $0.13/s, the cheapest native 1080p second with sound included in Slates, this makes LTX **the
+Combined with 1080p at ~6.5 cr/s, the cheapest native 1080p second with sound included in Slates, this makes LTX **the
 coverage seat**: the one to reach for when the job is many takes rather than one hero shot, when a
 sequence needs its own sound, or when the credit budget is the binding constraint.
 

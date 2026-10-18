@@ -56,13 +56,13 @@ where 2.0 ignores them.**
 **Seedance 2.5 is the EXPENSIVE seat, not the cheap one — and it has no 4K.**
 
 It runs at 480p, 720p or 1080p (1080p landed on all three routes on 2026-08-24), and at every
-resolution the two seats share it costs MORE than 2.0 — 720p $0.231/s against $0.15/s, **54% more**.
+resolution the two seats share it costs MORE than 2.0 — 720p ~11.6 cr/s against ~7.5 cr/s, **54% more**.
 So 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:
 
 | | Seedance 2.0 | Seedance 2.5 |
 |---|---|---|
 | Resolution | 480p / 720p / 1080p / **native 4K** | 480p / 720p / 1080p — **no 4K** |
-| Price at 720p (faceless) | **$0.15/s** | $0.231/s |
+| Price at 720p (faceless) | **~7.5 cr/s** | ~11.6 cr/s |
 | Length | 4–15s | **4–30s in one take** |
 | Reference budget | 12 files total (9 image / 3 video / 3 audio caps) | **50 (30 image + 10 video + 10 audio)** |
 | Combined reference video/audio | ≤15s | **≤30s** |
@@ -73,7 +73,7 @@ So 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:
 | Default video model | no | **yes** (since 2026-09-13) |
 
 **2.5 is the default. Route to 2.0 for 4K delivery, or when the same resolution has to be
-cheaper** — its 720p is $0.15/s against 2.5's $0.231/s.
+cheaper** — its 720p is ~7.5 cr/s against 2.5's ~11.6 cr/s.
 
 ---
 

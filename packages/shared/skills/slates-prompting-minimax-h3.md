@@ -58,7 +58,7 @@ what the endpoint accepts:
 | Resolution | 480p / 768p / **2K / 4K** | 480p / 768p / 1080p | 480p / 768p / 1080p |
 | References | 9 images + 3 video + 3 audio (12 files) | 9 images + 3 video + 3 audio (12 files) | **none** (no reference endpoint) |
 | Frames | start and/or end | start and/or end | start and/or end |
-| Price at 768p | **$0.060/s** | $0.080/s | $0.040/s |
+| Price at 768p | **~3 cr/s** | ~4 cr/s | ~2 cr/s |
 | Why pick it | resolution, references, and the cheaper second | **speed** — a 5s 768p clip in **4.8s** vs **57s** (measured) | **price** — half Max's rate at every tier |
 
 **Max is the premium seat, not the budget one.** It is 33% dearer at 768p, equal at 480p, and it
