@@ -60,6 +60,7 @@ const QUESTIONS = [
   ['the studio agent tab disappeared', ['turn it on or off', 'Studio Agent tab is gone', 'app, files and sign-in']],
   ['does the studio agent cost credits', ['credits and cost']],
   ['can the studio agent think on my claude plan', ['where it thinks']],
+  ['how do I use Blender with Slates for a camera move', ['Blender previs']],
   ['use codex with my chatgpt plan for the studio agent', ['where it thinks']],
   ['stop the agent while it is running', ['stop or cancel a run']],
   ['import my own video files', ['import your own files']],
@@ -93,11 +94,11 @@ const QUESTIONS = [
   ['make the cards bigger on the board', ['View panel', 'View sizes']],
   ['turn off sound on a video generation', ['video settings', 'Audio inside a video clip']],
   ['how do I rename a board', ['Boards', 'board name']],
-  ['export several cuts at once', ['Export several cuts']],
-  ['export ad variants in several delivery formats', ['variant grid', 'delivery formats', 'Export several cuts']],
-  ['stop a batch export now and retry unfinished files', ['batch export', 'cancel and retry', 'Export several cuts']],
+  ['export several cuts at once', ['Export several cuts', 'Export several timelines']],
+  ['export ad variants in several delivery formats', ['variant grid', 'delivery formats', 'Export several cuts', 'Export several timelines']],
+  ['stop a batch export now and retry unfinished files', ['batch export', 'cancel and retry', 'Export several cuts', 'Export several timelines']],
   ['reframe a clip for a delivery format without changing my cut', ['reframe', 'delivery framing']],
-  ['where are my export manifest and Meta CSV after restarting', ['manifest and CSV', 'batch history', 'Export several cuts']],
+  ['where are my export manifest and Meta CSV after restarting', ['manifest and CSV', 'batch history', 'Export several cuts', 'Export several timelines']],
 ]
 
 let hits = 0
