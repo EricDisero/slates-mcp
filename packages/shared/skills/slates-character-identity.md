@@ -41,6 +41,8 @@ On a deep neutral-grey plate (hex `3a3a3c`, written bare; since the composer fix
 
 **Why one sheet.** Every `@character` mention attaches that character's canonical identity image, so each character costs one reference slot. It also reduces competing facial renderings to **one** — with the front panel headless and the back panel turned away, the portrait is the only face on the sheet, so there is nothing left to average.
 
+**Except as a GPT Image reference.** OpenAI's filter refuses any reference with a headless body panel, so a GPT Image picture of the character attaches the portrait the sheet was made from, or another head-visible picture of them, and names the character inline rather than with `@Name`, which attaches the sheet. The refusal was measured on GPT Image 2 and is not yet re-measured on 2.5; details in the GPT Image guide, § What gets you blocked. Every other model keeps taking the sheet.
+
 ## Workflow
 
 ### Get the reference
