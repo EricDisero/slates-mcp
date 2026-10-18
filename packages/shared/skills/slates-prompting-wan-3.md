@@ -44,7 +44,7 @@ description: "Prompt Wan 3.0 (wan-3.0) with slates_generate_video. Covers per-ty
 - a padded negative list that repeats the positive prompt
 <!-- @banned:end -->
 
-Wan 3.0 (`wan3.0-video` at Alibaba, `alibaba/wan-3.0/*` on fal) generates picture and sound together, 2–30 seconds, at 480p, 720p or 1080p, in 16:9, 4:3, 1:1, 3:4 or 9:16. Sound is on by default and can be switched off. Added to Slates 2026-10-17. Sources: Alibaba Model Studio's API guide and prompt guide, and fal's OpenAPI schemas for the three endpoints.
+Wan 3.0, Alibaba's video model, generates picture and sound together, 2–30 seconds, at 480p, 720p or 1080p, in 16:9, 4:3, 1:1, 3:4 or 9:16. Sound is on by default and can be switched off. Added to Slates 2026-10-17. Sources: Alibaba's API guide and prompt guide, and the schemas of the three endpoints Slates calls.
 
 ## Where it routes
 
@@ -61,7 +61,7 @@ Wan 3.0 (`wan3.0-video` at Alibaba, `alibaba/wan-3.0/*` on fal) generates pictur
 
 Alibaba: *"`reference_xx`/`file`/`link` types and `first_frame`/`last_frame` types are mutually exclusive and cannot be used in the same request."* So frames with references are refused rather than one side silently dropped. To hold a look from a frame while using references, pass the frame as a reference image and say what it lends.
 
-**Reference video bills on top of the output.** fal: input video duration is *"billed in addition to output duration"*. A 10s take with a 6s reference clip bills 16 seconds. Each reference clip must be at least 16 fps (fal).
+**Reference video bills on top of the output.** Input video duration is billed in addition to output duration. A 10s take with a 6s reference clip bills 16 seconds. Each reference clip must be at least 16 fps.
 
 ## Reference citation (Alibaba's grammar)
 
@@ -108,9 +108,9 @@ There is no negative-prompt field; write them as sentences at the end. Only what
 ## Duration and the sound switch
 
 - Duration is 2–30 seconds. Slates always sends a number; the provider's "smart duration" is never used, so the quote equals the bill.
-- `sound: false` makes a silent take. fal's listing names one price per resolution with no sound dimension; a metered bill has not yet confirmed it.
+- `sound: false` makes a silent take. Sound on or off costs the same at each resolution; a metered bill has not yet confirmed it.
 
 ## Content notes
 
-- fal lists the endpoints under a commercial licence. Alibaba's pages state no face policy; real-face behaviour has not been tested in Slates.
-- The provider's safety checker stays on; fal says turning it off needs account authorization.
+- The model is licensed for commercial use. Alibaba's pages state no face policy; real-face behaviour has not been tested in Slates.
+- The safety checker stays on.

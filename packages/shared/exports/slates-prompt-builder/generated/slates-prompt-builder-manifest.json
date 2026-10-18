@@ -28,7 +28,7 @@
     },
     {
       "path": "skills/slates-prompting-omni-flash.md",
-      "sha256": "8d834d89f11434424c895973534261461356e40763407fdd1c3bca8944c86561"
+      "sha256": "c8f58567a62d75460473ea119dafabfc600d4c2a15e06181347a0bff2ba8068f"
     },
     {
       "path": "skills/slates-prompting-seedance-2-5.md",
@@ -105,8 +105,8 @@
     },
     {
       "path": "reference-omni-flash.md",
-      "bytes": 10364,
-      "sha256": "c4fc0d3c2efc0144db3f3f230ba260b7e7cab2dbb9876f3c89549df8ba1dde66"
+      "bytes": 10357,
+      "sha256": "83fbee2aa38333eb44cc3d3f453af631f7c0eefaaace62e3cefcc88359e48e92"
     },
     {
       "path": "reference-content-policy.md",
@@ -116,8 +116,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 70392,
-    "sha256": "3079faff973a30dcbfbe1b0e7c01b19a14f4924410a2d8dc12184a60480a0065",
+    "bytes": 70389,
+    "sha256": "bbf515bb12274deeb68915be8357baeede69d8321c1f676bf4240fd0462067a7",
     "entries": [
       "SKILL.md",
       "reference-character.md",
