@@ -83,7 +83,7 @@ const updateAdvice = updateNotice(
   PKG_NAME,
   pkg.version,
   cachedLatestVersion(PKG_NAME),
-  'Newer models and parameters are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client (Claude Desktop, Codex, Cursor) so npx fetches the new version; if it was installed globally, run `npm i -g @slatesvideo/mcp-server@latest` first.'
+  'Newer models are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client so npx fetches it; a global install needs `npm i -g @slatesvideo/mcp-server@latest` first.'
 )
 const doctrine = buildMcpInstructions()
 const firstParagraphEnd = doctrine.indexOf('\n\n')

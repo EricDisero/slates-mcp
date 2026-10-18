@@ -47,7 +47,7 @@ function essentialsInCut(label, text) {
     `they end at character ${next}`
   )
   const kept = text.slice(0, CLAUDE_CODE_INSTRUCTIONS_CUT)
-  for (const marker of ['FINDING TOOLS', 'slates_estimate_generation_cost', 'confirm: true', 'REAL NUMBERS ONLY', 'slates_get_workspace_state', 'slates_get_prompting_guide']) {
+  for (const marker of ['FINDING TOOLS', 'slates_estimate_generation_cost', 'confirm: true', 'REAL NUMBERS ONLY', 'slates_get_workspace_state', 'slates_get_prompting_guide', 'topic: "working-method"']) {
     check(`${label}: "${marker}" survives the cut`, kept.includes(marker))
   }
   console.log(`  ..  ${label}: Essentials end at character ${next} of ${CLAUDE_CODE_INSTRUCTIONS_CUT}`)

@@ -99,14 +99,15 @@ export function buildSkillIndex(): SkillIndexEntry[] {
 // 2026-09-30), and 0.6.0's cut fell mid-sentence in step 4, so every hard rule
 // after it never reached the model. What an agent needs to act safely — how to
 // find a tool when the host shows names only, the spend gate, real numbers, the
-// current project — sits here; the sections below expand it for clients that
-// read everything. mcp-instructions-smoke asserts these lines land inside the
-// cut when UPDATE AVAILABLE follows the first doctrine paragraph.
+// current project — sits here, and buildMcpInstructions() ends it on the
+// pointer to the full method. mcp-instructions-smoke asserts these lines and
+// that pointer land inside the cut when UPDATE AVAILABLE follows the first
+// doctrine paragraph.
 const PREAMBLE: Record<AgentSurface, string> = fork(
   `You are the Slates Studio Agent — a production assistant living inside Slates, the AI video creation studio. Turn the user's vision into finished work using the optional Slates tools and relevant production craft. Choose the workflow for the brief; start from the user's existing material and bring results into their project or timeline when asked.`,
   `Turn the user's vision into finished work in Slates. Find craft with slates_get_prompting_guide(query: the brief); reuse current guidance. Tools generate real media and spend credits. Before generation, estimate every step, show the itemized total and wait for approval. Work in the current project. Choose tools to fit the brief.
 
-## Essentials (the sections below expand on these)
+## Essentials
 
 - FINDING TOOLS: every Slates capability is its own slates_* tool. If your client shows tool names only, search your tools for the task (for example "slates generate video") and load that tool before calling it. slates_load_tools searches Slates tools by task and returns exact schemas.
 - SPENDING: before ANY generation, price every step with slates_estimate_generation_cost, show the user the itemized total in ONE message, and wait for their OK. Pass confirm: true only to relay an explicit user OK for that exact spend.
@@ -296,8 +297,8 @@ const MCP_EVERY_REQUEST = [
 ]
 
 /**
- * The MCP server's `instructions`: the Essentials, the every-request rules and
- * a pointer to the full working method. The server adds only its version line
+ * The MCP server's `instructions`: the Essentials, ending on the pointer to the
+ * full working method, then the every-request rules. The server adds only its version line
  * and the update notice (lockstep check 2).
  */
 export function buildMcpInstructions(): string {
@@ -307,15 +308,15 @@ export function buildMcpInstructions(): string {
     if (hits.length !== 1) throw new Error(`MCP instructions: "${opener}" matches ${hits.length} doctrine entries`)
     return `- ${hits[0].replace(/^(\d\. |- )/, '')}`
   })
+  // The pointer is the last Essentials bullet, not a closing section: a host
+  // that cuts at 2,048 characters dropped the closing section, and the model
+  // then said nothing pointed at the full method (2026-10-18 probe, Claude Code 2.1.293).
   return `${PREAMBLE.mcp}
+- WORKING METHOD: the full method, hard rules (exact model ids, variety counts, Seed Audio length) and guide index: slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}"). Read it once a production workflow starts.
 
 ## Every request
 
 ${lines.join('\n')}
-
-## The full working method
-
-The rest of the working method and the hard rules (cost and token discipline, exact model ids, the variety counts, Seed Audio length) and the guide index: slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}"). Read it once when a production workflow starts.
 
 ${MCP_FOOTER}`
 }
