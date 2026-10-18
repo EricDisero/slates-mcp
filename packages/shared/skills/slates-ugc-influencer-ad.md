@@ -1,11 +1,11 @@
 ---
 name: slates-ugc-influencer-ad
-description: "Direct a creator-style spoken ad when the brief calls for a camera-facing person or exchange. Covers activity, performance, phone-camera handling, speech, interaction and sound."
+description: "Make a UGC or influencer-style ad with a camera-facing creator. One person and voice across clips: performance, phone-camera handling, speech, lip sync and sound; not a product-led ad (slates-direct-response-ad)."
 ---
 
 # Creator-style performance
 
-Read `slates-script-craft` for the script and opening/bridge versions. Match the requested creator, audience and reference register. Phone footage, quiet polish and cinematic treatment are choices; no evidence here establishes one as universally highest-converting.
+Read `slates-script-craft` for the script and opening/bridge versions. Match the requested creator, audience and reference register. Phone footage, quiet polish and cinematic treatment are choices; follow the requested register.
 
 ## Direct a person in a place
 
@@ -21,12 +21,12 @@ One person or several may carry the piece. Give reactions and answers their ante
 
 Speech may point at what the viewer sees when demonstrating a claim. It need not compete with the picture for novelty on every line. Keep pauses, listening and the intended register; a fixed words-per-second formula cannot establish the performance's duration.
 
-Make audio intent explicit: dialogue, room sound, effects, score or silence. A silent demo is valid. Use current model guidance for audio support and reference syntax. Plan captions or text only where the actual editing surface supports them; do not promise an unverified rendering feature.
+Make audio intent explicit: dialogue, room sound, effects, score or silence. A silent demo is valid. Decide how the words are voiced before generating: spoken natively in the video, rendered as a separate voice take (a preset, a described voice, or a recording the user has permission to use), or a finished clip re-synced to a voice with lip sync. Fetch the matching guide with `slates_get_prompting_guide` (queries: voice, lip sync, dialogue). Plan captions or text only where the actual editing surface supports them; do not promise an unverified rendering feature.
 
 ## References and production choices
 
-Select the identity, voice, location and direct images deliberately. A replacement presenter need not replace a separately retained voice. A changed location does not automatically replace a first-frame image. Inspect the composed request to see which references remain.
+Select the identity, voice, location and direct images deliberately. Keep the creator as one Library character: `slates-character-identity` binds the identity sheet, and a voice attached to the character comes along on an `@mention` where the video model reads a voice. A recording attached as a voice sets the voice, accent and timing; give the exact words alongside it, because the model re-transcribes the take. A replacement presenter need not replace a separately retained voice. A changed location does not automatically replace a first-frame image. Inspect the composed request to see which references remain.
 
-A plate-first approach is useful when the composition must be approved before motion, but it is not a prerequisite for all video. Choose single-take or multiple-cut production according to the intended performance and current capabilities. Do not copy vendor duration, resolution or reference limits into this guide.
+A plate-first approach is useful when the composition must be approved before motion, but it is not a prerequisite for all video. Choose single-take or multiple-cut production according to the intended performance and current capabilities.
 
-Before spending, follow `slates-cost-discipline` for the selected set. Inspect errors and existing job state; a refusal or timeout does not authorize another charge. Check the actual clip's picture and sound against the brief, preserve earlier takes, and trim or rearrange when that solves the issue without regenerating. Exported playback, not a successful process exit, establishes the result.
+Before spending, follow `slates-cost-discipline` for the selected set. Inspect errors and existing job state; a refusal or timeout does not authorize another charge. Check the actual clip's picture and sound against the brief, preserve earlier takes, and trim or rearrange when that solves the issue without regenerating. Check the picture from sampled frames; lip sync, voice and sound need real playback through a host that can play audio, otherwise report them unreviewed.

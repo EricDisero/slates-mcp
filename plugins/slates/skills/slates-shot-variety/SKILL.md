@@ -6,7 +6,7 @@ description: "Shape visual rhythm across a shot sequence or diagnose unintended 
 
 # Visual rhythm across a sequence
 
-`slates_list_shots` supplies distributions and repeated runs from authored shot fields. Read across the sequence, then decide whether repetition serves the intended effect. A dominant bucket is a question, not a defect or generation barrier.
+`slates_list_shots` and `slates_get_storyboard_with_frames` supply shot-size and camera-move distributions and repeated runs from authored shot fields. Read across the sequence, then decide whether repetition serves the intended effect. A dominant bucket is a question, not a defect or generation barrier.
 
 ## Compare neighboring cuts
 
@@ -16,11 +16,11 @@ Repeated frames can establish a joke, a comparison or a calm observational regis
 
 ## Re-cut only for a reason
 
-Merge when performance and picture should continue together. Split when the image needs to change while speech continues, or when the intended read needs another placement. Preserve sentence continuity and references across the split. Price the resulting requests; do not assume splitting is free or merging is cheaper.
+Merge when performance and picture should continue together. Split when the image needs to change while speech continues, or when the intended read needs another placement. `slates_split_shot` splits at a caret (a mid-sentence split marks the second row as continuing) and `slates_merge_shots` joins two neighbours; a merge keeps the first Shot's model and params, discards the second's, and has no undo tool (the user can press Ctrl+Z in the app straight after), so check both recipes first. Preserve sentence continuity and references across the split. Price the resulting requests; do not assume splitting is free or merging is cheaper.
 
-The script fit signal derives from an opt-in ad corpus measured over whole runtime. Above-sample pace deserves inspection; it does not prove a line impossible. Measure the actual spoken take when available, including pauses and reactions. No fixed cut length or shot count is a universal rule.
+The WORDS line and over-long-line notes in the same result derive from an opt-in ad corpus measured over whole runtime. Above-sample pace deserves inspection; it does not prove a line impossible. Measure the actual spoken take when available, including pauses and reactions. No fixed cut length or shot count is a universal rule.
 
-Multi-shot generations can contain several visual cuts. Compare their internal rhythm as well as the boundaries between generated clips. The app counts only authored information: an unknown framing bucket is missing description, not evidence about the pixels.
+Multi-shot generations can contain several visual cuts. Compare their internal rhythm as well as the boundaries between generated clips; when a planned change must land, give it its own Shot, since cuts inside one clip are less reliable than separate clips. The app counts only authored information: an unknown framing bucket is missing description, not evidence about the pixels.
 
 This guide improves deliberate visual decisions. It does not measure taste, conversion or the quality of a finished performance. Use `slates-script-craft` for the argument, exchanges and setup/payoff that the picture supports.
 

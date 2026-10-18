@@ -8,7 +8,7 @@ description: Install, open, connect, or repair Slates when its slates_* tools ar
 
 ## 1. Check the existing connection
 
-If `slates_*` tools are available, call `slates_get_workspace_state`.
+If `slates_*` tools are available, or a search of your tools for "slates workspace state" finds them, call `slates_get_workspace_state`.
 If it succeeds, continue with the user's request. Change nothing.
 If it fails, use the error to diagnose the connection below.
 
@@ -23,10 +23,13 @@ Detect the operating system. Check whether Slates is installed and running.
   Check Activity Monitor for Slates, or run `pgrep -x Slates`.
 
 Open the installed app. Keep it open on the same computer as the MCP host.
+If it shows the sign-in screen, do section 4 first.
 In Slates, open **Settings → AI tools → Use Slates from Claude, Cursor or Codex**.
 Check that the connection says **Connected**. If it says **Not connected yet**,
 have the user press **Send link** and complete the email authorization.
-The local connection control in that section is **Connect without the email link**.
+If it says **Check your email**, the link is waiting; do not resend it.
+**Connect without the email link** only starts the local server, for a Slates key
+made on the website; it does not sign the account in.
 An installed app alone does not prove its agent connection is on.
 
 ## 3. Install Slates if missing
@@ -61,8 +64,8 @@ for Claude Code. Check plugin-provided servers too.
 A Slates plugin from our marketplace already carries the server.
 If a Slates server is present, keep it and diagnose any failure. Do not add another.
 
-Before adding a missing server, run `node --version`.
-Node.js supplies `npx`. If Node.js is missing, give the user `https://nodejs.org`
+Before adding a missing server, run `node --version`; the server needs Node.js 18
+or newer, which supplies `npx`. If Node.js is missing or older, give the user `https://nodejs.org`
 and have them install it, then reopen the terminal or host and check again.
 
 For Codex, run:
@@ -78,12 +81,16 @@ or run:
 claude mcp add slates -s user -- npx -y @slatesvideo/mcp-server
 ```
 
+For Claude Desktop or Cursor, use **Connect** beside it in **Settings → AI tools**,
+then restart that app.
+
 Never edit a host's config file by hand.
 If two Slates servers are registered, keep the plugin-provided server and remove
 the older user-level registration through the host's MCP command or controls.
 If the host cannot register a local stdio server, stop and explain that this
 connection requires a local MCP host, such as Codex or Claude Code.
-A regular ChatGPT web chat cannot reach this local stdio server.
+A regular ChatGPT web chat cannot reach this local stdio server; for a paste-in
+answer there, have the user copy **Help → Copy the manual for your AI** into the chat.
 
 ## 6. Load and prove the connection
 
@@ -99,6 +106,13 @@ If the tools are still unavailable, report that verification is pending.
 - If `~/.slates/agent-connection.json` is missing, reconnect in
   **Settings → AI tools**. The app writes this file. Check its existence only;
   do not print its contents, handle its tokens, or create it by hand.
+- If the app is open and signed in but calls still cannot reach it, the stored
+  connection may be stale: have the user press **Disconnect** in **Settings → AI tools**,
+  then connect again.
+- If tools load but some are refused as unsupported, the desktop app is older than
+  the server: have the user install the waiting update (**Restart** on the update toast).
+- If the Slates CLI is installed, `slates doctor` checks the connection file, account,
+  desktop server and capabilities, and prints a fix for each failure.
 - If tools are missing from an old server, read the version and any update notice
   in the server's instructions. Restart the host to update an unpinned `npx`
   install, then start a new session and repeat the workspace-state check.

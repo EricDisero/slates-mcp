@@ -28,7 +28,7 @@ Change the idea: an event, question, objection, proof, audience situation or rev
 
 Read each candidate as a complete piece with the same body. Check unanswered promises, introduced speakers, incompatible offers and repeated reveals. Suggestions remain editable; no required Hook/Body/CTA fields.
 
-Use `slates_get_script_document`, `slates_get_script_sections` and revision-checked `slates_update_script_document` / `slates_update_script_section`. Save versions before switching. Preview one requested combination before materializing it; never expand every possible combination automatically. Reference substitutions are explicit IDs, not name replacements in prose. Keep voice retention deliberate.
+Use `slates_get_script_document`, `slates_get_script_sections` and revision-checked `slates_update_script_document` / `slates_update_script_section`. Switching versions saves the page's words into the version showing, so nothing is lost; action `alternative` is what starts a new version. Before updating the copies of a reused passage, review them with `slates_get_script_uses` and pass only the selected, non-conflicting ones. Preview one requested combination with `slates_preview_script_variation` (it writes nothing), then make it with `slates_create_script_variation`; never expand every possible combination automatically. Reference substitutions are explicit IDs, not name replacements in prose. A finished script the user hands over goes in as text with `slates_paste_script`.
 
 ## Spoken flow and pacing
 
@@ -36,10 +36,10 @@ Prefer a concrete actor doing something over abstract benefit language. “Seaml
 
 Preserve the user's or reference's cadence when it carries character, comedy or comprehension. A repeated sentence or triplet is not inherently an error. Personal voice preferences apply only to the person who supplied them. Never invent testimonials or measurable results.
 
-Read the canonical fit analysis supplied with the shots. Its corpus estimate uses total ad runtime, including silence, and an opt-in register sample. It is not measured articulation speed; the observed maximum is not a universal human limit. Plan for pauses, reactions and sound. Once a voice/video take exists, its measured performance governs the cut. Model clip duration, estimated script duration and actual speech duration are separate facts.
+Read the fit analysis in the `slates_list_shots` result (its WORDS line and over-long-line notes). Its corpus estimate uses total ad runtime, including silence, and an opt-in register sample. It is not measured articulation speed; the observed maximum is not a universal human limit. Plan for pauses, reactions and sound. Once a voice/video take exists, its measured performance governs the cut. Model clip duration, estimated script duration and actual speech duration are separate facts.
 
 ## Apply the requested scope
 
 For suggestions, propose each replacement with `slates_update_script_suggestions` (action `create`), quoting the exact words it replaces at the revision you read; the creator accepts or dismisses it in the document, and `slates_get_script_suggestions` reports what became of it. For an explicit edit request, apply the scoped edit and read it back; do not add an approval ceremony. On a stale revision, reread and preserve both authors' changes. Do not replace the whole script to change one opening.
 
-Headings and directions are non-spoken metadata. Shots are optional production bindings. Script-driven recipes compile the active words; custom prompts retain their bytes and need a visible alignment review. Existing takes remain historical media. Writing, switching versions and importing templates do not generate anything. Load production and cost guidance only when production is requested.
+Headings and directions are non-spoken metadata. Shots are optional production bindings. Script-driven recipes compile the active words; custom prompts retain their bytes and need a visible alignment review. Existing takes remain historical media. Writing, switching versions, importing templates and creating a variation generate nothing; a variation returns a quote. Load production and cost guidance only when production is requested.
