@@ -1,0 +1,898 @@
+{
+  "settings": {
+    "model": "claude-opus-5-5",
+    "runs": 3,
+    "judge": true
+  },
+  "rows": [
+    {
+      "case": "storyboard-from-script",
+      "skill": "storyboard from script",
+      "runs": {
+        "baseline": "3/3",
+        "candidate": "3/3"
+      },
+      "musts": {
+        "baseline": 0.3333333333333333,
+        "candidate": 0.3333333333333333,
+        "perMust": [
+          {
+            "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+            "baseline": 0,
+            "candidate": 0
+          },
+          {
+            "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+            "baseline": 1,
+            "candidate": 1
+          },
+          {
+            "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+            "baseline": 0,
+            "candidate": 0
+          }
+        ]
+      },
+      "forbidden": {
+        "baseline": [],
+        "candidate": []
+      },
+      "harness": [],
+      "judge": {
+        "baseline": 6.666666666666667,
+        "candidate": 6,
+        "better": [
+          "baseline",
+          "baseline",
+          "baseline"
+        ]
+      },
+      "tokens": {
+        "baseline": 55213.666666666664,
+        "candidate": 55753.333333333336
+      },
+      "pass": false,
+      "failedOn": [
+        "judge"
+      ]
+    },
+    {
+      "case": "model-cost",
+      "skill": "models and cost",
+      "runs": {
+        "baseline": "3/3",
+        "candidate": "3/3"
+      },
+      "musts": {
+        "baseline": 1,
+        "candidate": 1,
+        "perMust": [
+          {
+            "must": "call slates_estimate_generation_cost|slates_list_available_models",
+            "baseline": 1,
+            "candidate": 1
+          }
+        ]
+      },
+      "forbidden": {
+        "baseline": [],
+        "candidate": []
+      },
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "judge": {
+        "baseline": 4.666666666666667,
+        "candidate": 8.333333333333334,
+        "better": [
+          "candidate",
+          "candidate",
+          "candidate"
+        ]
+      },
+      "tokens": {
+        "baseline": 75690,
+        "candidate": 84102
+      },
+      "pass": true,
+      "failedOn": []
+    },
+    {
+      "case": "board-to-videos",
+      "skill": "board quote",
+      "runs": {
+        "baseline": "3/3",
+        "candidate": "3/3"
+      },
+      "musts": {
+        "baseline": 1,
+        "candidate": 1,
+        "perMust": [
+          {
+            "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+            "baseline": 1,
+            "candidate": 1
+          }
+        ]
+      },
+      "forbidden": {
+        "baseline": [],
+        "candidate": []
+      },
+      "harness": [],
+      "judge": {
+        "baseline": 5.666666666666667,
+        "candidate": 6,
+        "better": [
+          "baseline",
+          "candidate",
+          "baseline"
+        ]
+      },
+      "tokens": {
+        "baseline": 88100.33333333333,
+        "candidate": 87058.66666666667
+      },
+      "pass": true,
+      "failedOn": []
+    }
+  ],
+  "traces": [
+    {
+      "case": "board-to-videos",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_board_quote",
+        "ToolSearch",
+        "slates_get_credit_balance"
+      ],
+      "tokens": 87756,
+      "outputTokens": 1478,
+      "turns": 8
+    },
+    {
+      "case": "board-to-videos",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_load_tools",
+        "slates_list_shots",
+        "slates_get_board_quote",
+        "slates_get_shot",
+        "ToolSearch",
+        "slates_get_credit_balance"
+      ],
+      "tokens": 104896,
+      "outputTokens": 1875,
+      "turns": 11
+    },
+    {
+      "case": "board-to-videos",
+      "arm": "baseline",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_board_quote",
+        "ToolSearch",
+        "slates_get_credit_balance"
+      ],
+      "tokens": 71649,
+      "outputTokens": 1528,
+      "turns": 8
+    },
+    {
+      "case": "board-to-videos",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_load_tools",
+        "slates_list_shots",
+        "slates_get_board_quote",
+        "slates_get_credit_balance",
+        "slates_get_shot"
+      ],
+      "tokens": 118608,
+      "outputTokens": 1911,
+      "turns": 11
+    },
+    {
+      "case": "board-to-videos",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_board_quote"
+      ],
+      "tokens": 81594,
+      "outputTokens": 1336,
+      "turns": 7
+    },
+    {
+      "case": "board-to-videos",
+      "arm": "candidate",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_get_board_quote|slates_estimate_generation_cost",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_board_quote"
+      ],
+      "tokens": 60974,
+      "outputTokens": 1403,
+      "turns": 6
+    },
+    {
+      "case": "model-cost",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_get_prompting_guide",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 79895,
+      "outputTokens": 1531,
+      "turns": 10
+    },
+    {
+      "case": "model-cost",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_get_prompting_guide",
+        "slates_get_workspace_state",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 82756,
+      "outputTokens": 1481,
+      "turns": 9
+    },
+    {
+      "case": "model-cost",
+      "arm": "baseline",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_prompting_guide",
+        "slates_get_prompting_guide",
+        "slates_get_workspace_state",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 64419,
+      "outputTokens": 1466,
+      "turns": 9
+    },
+    {
+      "case": "model-cost",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_get_workspace_state",
+        "slates_list_shots",
+        "slates_get_shot",
+        "slates_get_prompting_guide",
+        "slates_get_prompting_guide",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 97543,
+      "outputTokens": 2026,
+      "turns": 12
+    },
+    {
+      "case": "model-cost",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_shots",
+        "slates_estimate_generation_cost",
+        "slates_get_shot",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 54995,
+      "outputTokens": 1551,
+      "turns": 8
+    },
+    {
+      "case": "model-cost",
+      "arm": "candidate",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "call slates_estimate_generation_cost|slates_list_available_models",
+          "pass": true
+        }
+      ],
+      "forbidden": [],
+      "harness": [
+        "GET /members/manifest.json 402"
+      ],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_shots",
+        "slates_get_prompting_guide",
+        "slates_get_shot",
+        "slates_get_prompting_guide",
+        "slates_get_prompting_guide",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost",
+        "slates_estimate_generation_cost"
+      ],
+      "tokens": 99768,
+      "outputTokens": 1996,
+      "turns": 12
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script_document",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 52017,
+      "outputTokens": 1546,
+      "turns": 8
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script_document",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 52000,
+      "outputTokens": 1529,
+      "turns": 8
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "baseline",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script_document",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 61624,
+      "outputTokens": 1861,
+      "turns": 8
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 55130,
+      "outputTokens": 1673,
+      "turns": 7
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 54859,
+      "outputTokens": 1447,
+      "turns": 7
+    },
+    {
+      "case": "storyboard-from-script",
+      "arm": "candidate",
+      "run": 3,
+      "ok": true,
+      "server": "connected",
+      "musts": [
+        {
+          "must": "guide /^slates-(storyboard-from-script|script-craft|shot-variety)$/",
+          "pass": false
+        },
+        {
+          "must": "call slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+          "pass": true
+        },
+        {
+          "must": "call slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot",
+          "pass": false
+        }
+      ],
+      "forbidden": [],
+      "harness": [],
+      "calls": [
+        "ToolSearch",
+        "slates_get_workspace_state",
+        "slates_list_storyboards",
+        "slates_get_storyboard_with_frames",
+        "slates_get_script_document",
+        "slates_get_script",
+        "slates_get_script"
+      ],
+      "tokens": 57271,
+      "outputTokens": 2180,
+      "turns": 8
+    }
+  ],
+  "judgements": [
+    {
+      "case": "storyboard-from-script",
+      "run": 1,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 6,
+        "madeUpUi": [
+          "\"Break the script into shots\" button/command name"
+        ],
+        "inventedNumbers": [
+          "14 words vs 51-word budget",
+          "SHOT-A1..A4 labels",
+          "cut A2 or A4 to 3s"
+        ],
+        "note": "Shows the board and says nothing was generated or changed, but also claims no character is linked to Mara. It asks the user to decide before spending, and it says it will price before generating. It never mentions the blocked saves, the existing VID-V1 generation, or the missing prompt on A2."
+      },
+      "candidate": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "14 words vs 51-word budget",
+          "SHOT-A1..A4 labels",
+          "suggested 3-4s per shot"
+        ],
+        "note": "Shows the board and says nothing was generated, but claims no characters or locations are attached despite Library items Mara, Ritual can and Kitchen. It never mentions the blocked saves or that A1 is already generated as VID-V1. Offers to price A2 and A3 although A2 has no prompt."
+      },
+      "better": "baseline",
+      "promptHash": "282698c69d454336"
+    },
+    {
+      "case": "storyboard-from-script",
+      "run": 2,
+      "order": "X=baseline",
+      "baseline": {
+        "score": 8,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Accurate board, flags 20s vs 15s, says nothing generated, offers to price before spending; doesn't mention the blocked saves but doesn't claim edits either."
+      },
+      "candidate": {
+        "score": 7,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "suggested A2 and A4 at about 2–3s each"
+        ],
+        "note": "Same accurate board and no generation, but offers to change durations/labels despite saves being refused, and proposes shortening durations that Kling may not support."
+      },
+      "better": "baseline",
+      "promptHash": "0f170629d99e473e"
+    },
+    {
+      "case": "storyboard-from-script",
+      "run": 3,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "51-word script budget (not in the facts)"
+        ],
+        "note": "Says clearly that nothing was changed or generated, shows the board with size and camera counts, and flags the 20s vs 15s mismatch. It wrongly suggests creating a Mara character and location when the Library already has Mara and Kitchen."
+      },
+      "candidate": {
+        "score": 5,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "51-word script budget (not in the facts)"
+        ],
+        "note": "Correctly finds the script already split and leaves the board alone, but says all four shots still need video when 1A is already generated as VID-V1. It never says outright that nothing was generated and ignores the Library items."
+      },
+      "better": "baseline",
+      "promptHash": "e2c8dee8db90040b"
+    },
+    {
+      "case": "model-cost",
+      "run": 1,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 5,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Recommends Seedance 2.5 at 1080p for 142 credits from the generic guide, ignoring that the hero shot on the board is already on Kling 3.0 at a 32-credit price. Not tied to the project's actual Shot, and pushes the most expensive option. It does ask before spending, but the advice fits this user less well."
+      },
+      "candidate": {
+        "score": 8,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Project-specific: identifies the 2B hero end card, recommends Kling 3.0 with a reason tied to logo legibility, quotes 32 credits for 5 s plus alternatives, and asks before generating. One oddity: the Shot ID 'SHOT-A4' and the 21/58/142 alternatives can't be checked against the facts, but they read as tool-derived."
+      },
+      "better": "candidate",
+      "promptHash": "2cea18730313ff57"
+    },
+    {
+      "case": "model-cost",
+      "run": 2,
+      "order": "X=baseline",
+      "baseline": {
+        "score": 5,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Gives a routing-based recommendation with tool-sourced prices and asks before spending, but ignores that the board's shots are on Kling and recommends a 142-credit option without tying it to the project; ignoring the 32-credit existing setup is a weaker fit."
+      },
+      "candidate": {
+        "score": 8,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Project-specific recommendation (keep Kling on 2B), matches the board quote of 32 credits, gives a comparison table with a resolution caveat, offers a prompt tip, and asks before firing; minor risk in the claim of 'SHOT-A4' naming and Kling-specific guidance."
+      },
+      "better": "candidate",
+      "promptHash": "fbb6bdbe2fee6b7f"
+    },
+    {
+      "case": "model-cost",
+      "run": 3,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 4,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Recommended Seedance 2.5 without checking the hero shot, which is a static close-up on Kling, and pushed 142-credit 1080p; it admits not opening the storyboard and never quotes the current Kling price."
+      },
+      "candidate": {
+        "score": 9,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Looked at the actual hero shot (2B static close-up, logo legibility), recommended Kling 3.0 with a guide-based reason, quoted 32/21 credits plus Seedance comparisons, and asked before spending."
+      },
+      "better": "candidate",
+      "promptHash": "118dd58cf216d425"
+    },
+    {
+      "case": "board-to-videos",
+      "run": 1,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Clean quote with 96 total, flags empty A2, waits for OK; offers a draft prompt. Also treats A1 as generatable although it was already generated, and its image claims are unsupported; less cluttered than X."
+      },
+      "candidate": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "720p",
+          "sound on"
+        ],
+        "note": "Good quote and flags 1B, but states 1A is being generated for 96 though 1A was already generated as VID-V1, and claims 2A lacks images and offers to attach them for free, which is unsupported given edits were refused; also adds extra questions."
+      },
+      "better": "baseline",
+      "promptHash": "cb9b3a75485e5122"
+    },
+    {
+      "case": "board-to-videos",
+      "run": 2,
+      "order": "X=baseline",
+      "baseline": {
+        "score": 5,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "720p resolution not in the facts",
+          "SHOT-A3 has no references attached (claim not supported by the facts)"
+        ],
+        "note": "Quotes correctly and flags the empty shot, but its table lists 32 credits for SHOT-A1 even though 1A is already generated as VID-V1, it adds an unverified claim about missing references, and it offers option B to generate."
+      },
+      "candidate": {
+        "score": 6,
+        "madeUpUi": [
+          "Generate panel (plausible but not confirmed)"
+        ],
+        "inventedNumbers": [],
+        "note": "Quotes the three priced shots and the 96 total in one message, flags the empty SHOT-A2, and waits for the OK. It also lists SHOT-A1 as 32 credits despite VID-V1 already existing, and its suggested prompt includes a slow push-in while claiming only one shot moves."
+      },
+      "better": "candidate",
+      "promptHash": "c9c7fa0f163cab16"
+    },
+    {
+      "case": "board-to-videos",
+      "run": 3,
+      "order": "X=candidate",
+      "baseline": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [],
+        "note": "Clear quote, flags the empty shot, states the 1,240 balance, and explicitly says it will spend only after the exact amount is OK'd. Also misses that A1 is already generated and offers to regenerate it in the 96 credit option. Hedges the A2 price better than X."
+      },
+      "candidate": {
+        "score": 6,
+        "madeUpUi": [],
+        "inventedNumbers": [
+          "\"probably cost another 32 credits\" for SHOT-A2 is an estimate, though hedged and flagged for re-quote"
+        ],
+        "note": "Good quote and flags the empty shot, but misses that A1 is already generated as VID-V1 and then offers to generate A1 for 32 credits. Also adds a questionable 15s vs 20s length remark and doesn't state the balance."
+      },
+      "better": "baseline",
+      "promptHash": "e9b4024858140fa1"
+    }
+  ]
+}

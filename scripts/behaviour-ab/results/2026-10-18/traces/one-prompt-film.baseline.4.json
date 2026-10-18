@@ -1,0 +1,283 @@
+{
+  "case": "one-prompt-film",
+  "arm": "baseline",
+  "run": 4,
+  "model": "claude-opus-5-5",
+  "wallMs": 43458,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_017icyRzbFWNuUFZjSTbKTr7",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_get_prompting_guide,mcp__slates__slates_load_tools,mcp__slates__slates_estimate_generation_cost,mcp__slates__slates_get_credit_balance",
+        "max_results": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_017icyRzbFWNuUFZjSTbKTr7",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Jei6ND1DFcVTvBsYtfYzYa",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Jei6ND1DFcVTvBsYtfYzYa",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Nsmm36izq5C3oUdA9NPBj5",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "query": "30 second short film, lone lighthouse keeper finds a message in a bottle on stormy shore, emotional, cinematic"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Nsmm36izq5C3oUdA9NPBj5",
+      "error": false,
+      "text": "{\"query\":\"30 second short film, lone lighthouse keeper finds a message in a bottle on stormy shore, emotional, cinematic\",\"fallback\":false,\"total\":6,\"offset\":0,\"nextOffset\":null,\"guides\":[{\"name\":\"slates-one-prompt-film\",\"description\":\"Turn a video brief into a finished, editable Slates production and verified export. Use for requests to make a film, short, trailer, music video, ad or other complete video, entering through writing, imported footage or an existing edit.\",\"tier\":\"free\",\"matched\":[\"short\",\"film\"],\"sections\":[]},{\"name\":\"slates-model-selection\",\"description\":\"Choose image, video, edit and audio models for the brief, including animating photos, making films or directing voices. Load before choosing or defaulting a model or quoting a plan; retrieve model-specific craft after selection.\",\"tier\":\"free\",\"matched\":[\"film\"],\"sections\":[]},{\"name\":\"slates-prompting-omni-flash\",\"description\":\"Prompt Gemini Omni Flash video generation or Omni Flash edits (omni-flash, omni-flash-edit). Covers native sound, reference inputs and short change-only prompts that preserve edit fidelity.\",\"tier\":\"free\",\"matched\":[\"short\"],\"sections\":[]},{\"name\":\"slates-cinematic-look\",\"description\":\"Choose lighting, exposure, grade, lens, atmosphere and imperfection techniques for a filmed look. Use for photographic direction or an image that looks too clean, evenly exposed or studio-lit.\",\"tier\":\"free\",\"matched\":[\"cinematic\"],\"sections\":[\"Cinematic look — make a generated frame read as filmed\"]},{\"name\":\"slates-prompting-kling-v3\",\"description\":\"Prompt Kling V3.0 video generation and Kling O3 video edits. Use with Kling models on slates_generate_video or slates_edit_video; covers subjects, dialogue, sound syntax, multi-shot direction and edit fidelity.\",\"tier\":\"free\",\"matched\":[\"cinematic\"],\"sections\":[\"Cinematic tactics\"]},{\"name\":\"slates-prompting-nano-banana-2\",\"description\":\"Prompt Nano Banana 2, Lite or Pro image generation and edits. Use on these models; covers photographic craft, subject and reference binding, typography, prompt structure and family differences.\",\"tier\":\"free\",\"matched\":[\"cinematic\"],\"sections\":[\"Nano Banana 2 — cinematic & photorealistic prompting\"]}],\"rest\":[{\"name\":\"slates-blocking-to-prompt\",\"description\":\"Translate a rendered blocking clip into a video prompt that preserves its camera, cuts, timing and spatial relationships. Use for previs-guided generation or when output ignores the blocking.\",\"tier\":\"free\"},{\"name\":\"slates-camera-language\",\"description\":\"Build or refine Blender camera rigs for a previs pass: orbits, floor rises, whip-and-lock moves, handheld, speed ramps and shot transitions. Use when the intended camera path needs deterministic control.\",\"tier\":\"free\"},{\"name\":\"slates-character-identity\",\"description\":\"Prepare and bind a reusable character identity sheet from an image or description. Use when creating cast or preserving the same character across shots.\",\"tier\":\"free\"},{\"name\":\"slates-chatgpt-images\",\"description\":\"Generate and save images through a connected ChatGPT account or the host image tool, preserving Slates prompts, references and project context. Use when ChatGPT generation is requested.\",\"tier\":\"free\"},{\"name\":\"slates-content-policy\",\"description\":\"Check provider-sensitive content before prompting a brief with conflict, creatures, crowds, violence, destruction, weapons, real likenesses or young characters. Use its scoped refusal receipts and scene alternatives alongside the selected model guide.\",\"tier\":\"free\"},{\"name\":\"slates-cost-discipline\",\"description\":\"Estimate and announce generation spend, aggregate batches, follow existing consent and inspect uncertain jobs before retrying. Use when planning or submitting paid media generation.\",\"tier\":\"free\"},{\"name\":\"slates-dialogue-blocking\",\"description\":\"Block a multi-character conversation (at a table, in a car, walking) in Blender when seating, eyelines or screen direction must hold across cuts, or generation has lost that continuity. Includes performance and off-screen dialogue direction.\",\"tier\":\"free\"},{\"name\":\"slates-direct-response-ad\",\"description\":\"Develop a product-led direct-response ad from an offer and references. Use for demonstrations, proof, argument and the next action; combine with script craft and presenter direction as needed.\",\"tier\":\"free\"},{\"name\":\"slates-edit-and-iterate\",\"description\":\"Refine an existing Slates image with a targeted edit or revised generation. Use for changes such as warmer light, removing a figure, reframing or a different look; preserve the original and its lineage.\",\"tier\":\"free\"},{\"name\":\"slates-previs-blocking\",\"description\":\"Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip. Use when those controls are required or prompting has failed to hold them.\",\"tier\":\"free\"},{\"name\":\"slates-project-organization\",\"description\":\"Navigate and organize Slates projects, asset codes such as IMG-A12 or VID-V3, folders, Library references and templates. Use when locating media, preparing a reusable production or keeping a project legible.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-elevenlabs\",\"description\":\"Prompt ElevenLabs Sound Effects v2 (eleven-sfx) for a single effect or loop. Use with slates_generate_audio on this model; covers physical causes, duration, material, space and prompt influence.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-flux-2-max\",\"description\":\"Prompt or edit images with FLUX.2 Max (flux-2-max). Use with slates_generate_image or slates_edit_image on this model; covers word order, camera vocabulary, materials, colours and positive phrasing.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-gpt-image-2-5\",\"description\":\"Prompt or edit images with GPT Image 2.5 Flare or Sunburst. Use with slates_generate_image or slates_edit_image on these models; covers reference roles, lighting, text, panels, quality choices and edits.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-inworld-tts\n[trimmed 4269 chars]",
+      "priced": [
+        6
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01TP7L4oewjwo6U8Dd2oVtu2",
+      "name": "mcp__slates__slates_get_credit_balance",
+      "input": {}
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01TP7L4oewjwo6U8Dd2oVtu2",
+      "error": false,
+      "text": "{\"success\":true,\"credit_balance\":1240}",
+      "priced": [
+        1240
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01XjT4fE9TGuEAybFhNkGCPM",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-one-prompt-film",
+        "depth": "full"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01XjT4fE9TGuEAybFhNkGCPM",
+      "error": false,
+      "text": "{\"topic\":\"slates-one-prompt-film\",\"tier\":\"free\",\"depth\":\"full\",\"bytes\":3496,\"guide\":\"# Idea to finished video\\n\\nCarry the requested piece through to an exported file. Use existing work whenever it serves the brief. The creator can enter at any point: writing, importing footage, comparing takes or changing an edit. No mandatory stage sequence, shot count or number of approval checkpoints follows from this guide.\\n\\n## Make the intended piece visible\\n\\nUse the current project and document unless another destination is requested. Save words through the revision-checked document tools; `slates-script-craft` covers writing and versions. Add production bindings only where needed. A shot needs no image, and a cut can use imported footage with no script.\\n\\nPreserve fixed passages, explicit creative choices and custom prompt bytes. Record production choices in editable shots. Explain only consequential judgments not already visible there. Recurring cast, repeated framing, silence and dependent scenes are valid when they serve the piece.\\n\\n## Inspect the actual requests and estimate\\n\\nUse `slates_get_shot` to inspect the composed prompt, settings and references. Model choices and supported settings come from `slates-model-selection`, the current capability surface and the selected model's guide. Do not carry limits or prices from an old example.\\n\\nFollow `slates-cost-discipline` and the user's generation policy. Quote the exact requested set with `slates_generate_from_shots` before confirming it. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing, choosing versions, importing and building a cut do not spend generation credits.\\n\\nKeep reusable historical media separate from new requests. Matching words alone do not prove matching voice, references or settings. An explicitly requested extra take is never deduplicated away.\\n\\n## Generate only the authorized material\\n\\nSubmit the chosen requests and inspect each returned state. On an uncertain timeout, read the shot's generation IDs and job status before any retry. Diagnose a failure and follow the existing consent policy for added requests. Never discard other takes merely because a new one was selected.\\n\\nInspect image composition and reference fidelity. Inspect video performance, motion and sound across playback; frame samples alone cannot establish speech or motion quality. If an edit can resolve dead air or order, use the existing take rather than assuming another generation is needed.\\n\\n## Arrange and deliver\\n\\nRead the available timelines. Name the destination cut explicitly for a variation; independent comparisons use independent cuts. Add selected media in the intended order, preserve trim/level/transform choices and inspect the actual timeline.\\n\\nUse supported video/XML exports and their stated fidelity limits. For selected named cuts, `slates_export_cuts` records distinct outputs and a manifest; retry unfinished outputs with the same manifest identity. Verify the returned files and playback before reporting success. Describe the completed piece, actual spend where available and output paths. Do not label a render complete merely because its submission succeeded.\\n\\n\\nRecord production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.\"}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_0128Ur5WNvC6S7FixXMPpqAu",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-model-selection",
+        "query": "short narrative film with native sound, 30 seconds",
+        "depth": "section"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_0128Ur5WNvC6S7FixXMPpqAu",
+      "error": false,
+      "text": "{\"topic\":\"slates-model-selection\",\"tier\":\"free\",\"depth\":\"section\",\"bytes\":1647,\"guide\":\"## Sound as a production choice\\n\\nDetermine whether sound must generate with the picture, or become a separate editable asset. Native video sound can lock to visible action; a separate voice, effect or ambience bed can be moved, trimmed and reused on the timeline. The generated catalogue owns which models support each job.\\n\\n- “It needs to sound like a place” calls for a scene, not automatically several separately billed effects. Seed Audio can render dialogue, effects and room tone together from a plain sentence.\\n- “Read this line” needs a voice decision: Inworld TTS-2 for a specified voice or clean narration; Seed Audio when the line belongs inside a scene. Measure and listen to the take before lip sync.\\n- “That needs a thump right there” calls for a physical cause, the event's length and an exact placement in the cut. A dedicated effect can serve that job.\\n- “Give it a track” requires an imported song: there is no standalone music-generation model in Slates. Video models' scene scores are a different capability.\\n\\nSeed Audio has no model duration parameter: Slates writes the requested length into the prompt and bills the requested duration. Never add a conflicting second duration to the sentence. Kling video labels such as `SFX:` and `Ambient noise:` do not transfer to Seed Audio; describe the sound directly. For fade handles, request extra bed length only when useful and include it in the quote.\\n\\nUse `slates-prompting-seed-audio`, `slates-prompting-inworld-tts` and `slates-prompting-elevenlabs` for their distinct sound and voice grammar. Return to the selected video guide for sound generated with video.\"}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01AQjTKb2CJTVdpYqjnWnUmT",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-prompting-seedance-2-5",
+        "depth": "full"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01AQjTKb2CJTVdpYqjnWnUmT",
+      "error": false,
+      "text": "{\"topic\":\"slates-prompting-seedance-2-5\",\"tier\":\"free\",\"depth\":\"full\",\"bytes\":22727,\"guide\":\"# Seedance 2.5 — prompting\\n\\n\\n\\n\\n\\n**Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.\\n\\n**The five levers**\\n1. **Timestamps work here**: integer seconds, and the model acts on them: `[0s-4s] she reads the letter. [4s-9s] she folds it and looks up.` 2.0 ignores exactly this syntax.\\n2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.\\n3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.\\n4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.\\n5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.\\n\\n**Examples**\\n- `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`\\n- `[0s-10s] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10s-20s] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`\\n\\n**Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.\\n\\n\\n\\n\\n\\n\\n**Never use** (with a reference video, 2.5 can reclassify the task and fail a fresh generation on these):\\n- `edit`, `extend`, `continue the video`, `same video but` — they make the provider read a fresh generation as an edit\\n- `f/1.4`, `Portra 400` and any other aperture or film-stock token, or a stacked list of gear — image-model vocabulary. The 2.5 guide's own example names one camera body and one 35 mm lens in a single style line, so a lone lens there is not on this list\\n\\n\\n**Read `slates-prompting-seedance` first.** The prompt GRAMMAR is the same model family: the\\n8-slot advanced formula, subject binding by `<Subject_N>@<Image_N>`, camera vocabulary,\\nexternalised emotion, inline constraint words, the anti-twin fix. None of it is restated here.\\nThis file is only what 2.5 changes — and the biggest change is that **2.5 acts on timestamps\\nwhere 2.0 ignores them.**\\n\\n---\\n\\n## The one fact that decides whether you use it at all\\n\\n**Seedance 2.5 is the EXPENSIVE seat, not the cheap one — and it has no 4K.**\\n\\nIt runs at 480p, 720p or 1080p (1080p landed on all three routes on 2026-08-24), and at every\\nresolution the two seats share it costs MORE than 2.0 — 720p ~11.6 cr/s against ~7.5 cr/s, **54% more**.\\nSo 2.5 does not replace 2.0; it sits beside it, and you pay for what it buys:\\n\\n| | Seedance 2.0 | Seedance 2.5 |\\n|---|---|---|\\n| Resolution | 480p / 720p / 1080p / **native 4K** | 480p / 720p / 1080p — **no 4K** |\\n| Price at 720p (faceless) | **~7.5 cr/s** | ~11.6 cr/s |\\n| Length | 4–15s | **4–30s in one take** |\\n| Reference budget | 12 files total (9 image / 3 video / 3 audio caps) | **50 (30 image + 10 video + 10 audio)** |\\n| Combined reference video/audio | ≤15s | **≤30s** |\\n| Audio-only reference | ✗ (needs an image or video alongside) | **✓** |\\n| **Timestamps in the prompt** | **✗ — ignored; shot numbers only** | **✓ — integer seconds, acted on** |\\n| Multi-view image as ONE subject reference | ✗ (not recommended) | **✓ (up to 5 subjects)** |\\n| Video edit as its own task type | ✗ | **✓ (`seedance-2.5-edit`)** |\\n| Default video model | no | **yes** (since 2026-09-13) |\\n\\n**2.5 is the default. Route to 2.0 for 4K delivery, or when the same resolution has to be\\ncheaper** — its 720p is ~7.5 cr/s against 2.5's ~11.6 cr/s.\\n\\n---\\n\\n## 🚨 Hazard 1 — the prompt-intent task classifier\\n\\nThis is the one that costs money and time, and it has no equivalent on 2.0.\\n\\n**Seedance 2.5 sorts every request into one of five task types** — text-to-video,\\nreference-to-video, first/last-frame, **video edit**, **video extend** — from the reference roles\\nattached **plus the intent of your sentence**. Each type then has its own parameter constraints,\\nand a violation comes back **asynchronously**: the task queues, credits are reserved, and only then\\ndoes it fail.\\n\\nThe trigger words are ordinary English:\\n\\n| Reclassified as | Words that do it (ByteDance's own list) |\\n|---|---|\\n| **video edit** | `edit video` · `add` · `insert` · `remove` · `delete` · `modify` · `replace` · `change to` |\\n| **video extend** | `extend forward` · `extend backward` · `continue` · `continue from` · `extend the story` |\\n\\nSo a perfectly legitimate prompt with a reference video, *\\\"a wide shot of the workshop, **remove** the\\ntripod from frame\\\"* — gets classified as an edit and fails on constraints it never set.\\n\\n**What to do:**\\n\\n1. **If you mean to edit an existing clip, choose its dedicated video-edit endpoint.** The\\n   task-typed endpoint removes the classifier's ambiguity. In Slates, call\\n   `slates_edit_video` with `model: 'seedance-2.5-edit'`.\\n2. **If you mean a fresh shot, describe the finished frame rather than an instruction to change\\n   one.** Not *\\\"remove the tripod\\\"* → *\\\"the workshop bench, clear and uncluttered\\\"*. Not\\n   *\\\"add rain\\\"* → *\\\"heavy rain falling through the streetlight\\\"*. This is better prompting anyway:\\n   the model renders what you describe, it does not take edits to an imagined draft.\\\n[trimmed 16999 chars]",
+      "priced": [
+        1000
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01AFmCiozhKW83xXGFc3Gh9A",
+      "name": "mcp__slates__slates_load_tools",
+      "input": {
+        "query": "create project create shot generate from shots"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01AFmCiozhKW83xXGFc3Gh9A",
+      "error": false,
+      "text": "{\"matches\":[{\"name\":\"slates_generate_from_shots\",\"description\":\"Preview the itemized prices the Generate panel shows for saved Shots.\",\"billable\":true,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":true}},{\"name\":\"slates_create_shot\",\"description\":\"Write one beat of the piece — a Shot: its script line, its references with their roles, its model and params, and the prompt that fires.\",\"billable\":false,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":false}},{\"name\":\"slates_generate_image\",\"description\":\"Generate an image via Slates credits.\",\"billable\":true,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":true}},{\"name\":\"slates_create_project\",\"description\":\"Create a new Slates project.\",\"billable\":false,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":false}},{\"name\":\"slates_generate_character_identity\",\"description\":\"Generate one character identity sheet from a base portrait asset and bind it as the character's canonical reference.\",\"billable\":true,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":true}},{\"name\":\"slates_generate_environment_plate\",\"description\":\"Generate one clean establishing image from an optional base image and bind it as the location's canonical reference.\",\"billable\":true,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":true}},{\"name\":\"slates_generate_video\",\"description\":\"Generate video via Slates credits.\",\"billable\":true,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":true}},{\"name\":\"slates_create_script_variation\",\"description\":\"Materialize one reviewed variation as an independent Board with local shot IDs and lineage.\",\"billable\":false,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":false}},{\"name\":\"slates_update_script_section\",\"description\":\"Create a free-named section from a selected passage, save the words now on the page as a new version (action alternative), save changes to the shown version (save) or choose another (choose), insert an editable copy (reuse), update unedited copies (updateUses), rename or archive a section or one version (alternativeId), or set its free tags.\",\"billable\":false,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":true,\"openWorldHint\":false}},{\"name\":\"slates_create_character\",\"description\":\"Create a new character in a Slates project.\",\"billable\":false,\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":false}}]}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Jf84bLprAsD5zR1cJmUjYc",
+      "name": "mcp__slates__slates_load_tools",
+      "input": {
+        "names": [
+          "slates_create_project",
+          "slates_create_shot",
+          "slates_generate_from_shots",
+          "slates_get_shot",
+          "slates_generate_video"
+        ]
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Jf84bLprAsD5zR1cJmUjYc",
+      "error": false,
+      "text": "{\"tools\":[{\"name\":\"slates_create_project\",\"description\":\"Create a new Slates project. Returns the new project record.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":120}},\"required\":[\"name\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":false,\"openWorldHint\":false}},{\"name\":\"slates_generate_video\",\"description\":\"Generate video via Slates credits. Choose the model with slates-model-selection. Video models prompt very differently: the estimate returns the chosen model's prompting card, and its full guide (slates-prompting-kling-v3 / slates-prompting-seedance / slates-prompting-seedance-2-5 / slates-prompting-omni-flash / slates-prompting-minimax-h3 / slates-prompting-ltx-2-5) covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). Show the user the estimate and wait for their OK before any generation, however small. Cost above 17 credits (and, on image and video, any attached reference) also returns requires_confirm — pass confirm=true only to relay that OK. Image-to-video via firstFrameAssetId; first+last frames on every model except Omni Flash; ingredients via ingredientAssetIds (Kling Omni, Seedance, Omni Flash, H3 and H3 Max; Kling Std/Pro only with a first frame). Asset params take UUIDs or badge codes (\\\"IMG-A8\\\"). \",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"prompt\":{\"type\":\"string\",\"minLength\":1,\"maxLength\":4000},\"model\":{\"type\":\"string\",\"description\":\"One of: kling-v3.0-std | kling-v3.0-pro | kling-v3.0-omni | seedance-2 | seedance-2.5 | omni-flash | minimax-h3 | minimax-h3-max | minimax-h3-max-turbo | ltx-2-5 | ltx-2-5-pro. Pass the BASE id — duration and videoResolution are separate params (registry cost keys like \\\"kling-v3-standard-8s\\\" auto-resolve). All are VIDEO-only.\\nSeedance 2.0: THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare \\\"seedance\\\" still resolves here for older CLIs that expect 4K.\\nSeedance 2.5: DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. No 4K, and dearer than 2.0 at every shared resolution: go to 2.0 for 4K or the same resolution cheaper. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.\\nKling 3.0: THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue and lip-sync; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.\\nGemini Omni Flash: 720p seat with native synced audio included. Route here for drafts with sound in one pass and reference-to-video character-consistency trials; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.\\nMiniMax H3: THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.\\nMiniMax H3 Max: THE SPEED SEAT, dearer than base H3 at 768p and equal at 480p — never the cheap H3 and never the default. A post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call, the same as base H3: frames and references go to different endpoints. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.\\nMiniMax H3 Max Turbo: THE BUDGET SEAT of the MiniMax family: a second post-train of the H3 weights, billed at half H3 Max's rate at every tier. Its 1080p is a refinement of the native 768p render, not a native 1080p generation. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video and start/end frames only, with no reference endpoint, so reference-driven consistency goes to H3 Max or base H3. Route here for drafts, volume and cheap coverage, then re-run the keeper on H3 Max or a hero seat.\\nLTX-2.5: THE VOLUME SEAT — the cheapest 1080p second with sound included, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It supports native high-resolution output and longer takes than most seats; use the capability surface for its resolution-dependent duration limits. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the \n[trimmed 19511 chars]",
+      "priced": [
+        17
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01RrrPA746PP2cte8NMEx4gt",
+      "name": "mcp__slates__slates_create_project",
+      "input": {
+        "name": "The Lighthouse Keeper"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01RrrPA746PP2cte8NMEx4gt",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_create_project has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01CDPhNqYpa61TpvGLh47QvL",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "seedance-2.5",
+        "duration": 30,
+        "videoResolution": "720p"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01CDPhNqYpa61TpvGLh47QvL",
+      "error": false,
+      "text": "{\"model\":\"seedance-2.5\",\"cost_key\":\"seedance-2.5-720p-30s\",\"quantity\":1,\"cost_per_credits\":347,\"total_credits\":347,\"requires_confirm\":true,\"craft_card\":\"**Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.\\n\\n**The five levers**\\n1. **Timestamps work here**: integer seconds, and the model acts on them: `[0s-4s] she reads the letter. [4s-9s] she folds it and looks up.` 2.0 ignores exactly this syntax.\\n2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.\\n3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.\\n4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.\\n5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.\\n\\n**Examples**\\n- `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`\\n- `[0s-10s] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10s-20s] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`\\n\\n**Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-seedance-2-5\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-seedance-2-5\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-seedance-2-5: \\\"edit\\\", \\\"extend\\\", \\\"continue the video\\\", \\\"same video but\\\", \\\"f/1.4\\\", \\\"Portra 400\\\". Describe the intended result specifically.\"}",
+      "priced": [
+        347
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "I've written the film and priced it, but I stopped before saving or generating anything for two reasons.\n\n**1. I couldn't create a project for it.** Creating a project isn't allowed in the current permission mode. Your two projects are \"Morning Ritual Coffee\" and \"Bakery launch,\" and neither has anything to do with a lighthouse. Should I put it in **Bakery launch** (it's empty), or will you create a \"Lighthouse Keeper\" project and tell me when it's there?\n\n**2. Generating costs credits, so I need your OK first.**\n\n**The plan:** one continuous 30-second take on Seedance 2.5 at 720p, 16:9, with sound generated alongside the picture. The prompt below sets the timing of each beat:\n\n> [0s-6s] Wide shot at dusk: a white lighthouse on a rocky point, grey sea, its beam starting to turn. An old keeper in a wool sweater and oilskin coat walks down the wet rocks, slow push in. <waves breaking, gulls, wind>\n> [6s-12s] Medium shot: he stops, crouches and pulls a green glass bottle out of the seaweed at the waterline, handheld. <glass knocking on stone>\n> [12s-18s] Close-up on his weathered hands: he works the cork free and slides out a rolled, yellowed letter. <cork pop, paper rustle>\n> [18s-24s] Close-up on his face lit by the lantern: he reads, his jaw tightens, and his eyes fill but he doesn't cry, slow push in.\n> [24s-30s] Wide shot from behind: he stands on the rocks holding the letter to his chest while the lighthouse beam sweeps over the dark water toward the horizon. (sparse solo piano, a few notes) No dialogue. Rich details, natural colors, cinematic texture, soft lighting. No subtitles.\n\nWe never see what the letter says, so the ending stays open.\n\n**Cost:** 347 credits for one take (from the Slates estimate). You have 1,240 credits, so you'd have 893 left. The keeper is described in text only, with no reference images, so there's no extra charge for showing his face.\n\nReply **\"go\"** with your project choice and I'll save the shot, generate the take, check it, put it on the timeline and export the video."
+    }
+  ],
+  "reply": "I've written the film and priced it, but I stopped before saving or generating anything for two reasons.\n\n**1. I couldn't create a project for it.** Creating a project isn't allowed in the current permission mode. Your two projects are \"Morning Ritual Coffee\" and \"Bakery launch,\" and neither has anything to do with a lighthouse. Should I put it in **Bakery launch** (it's empty), or will you create a \"Lighthouse Keeper\" project and tell me when it's there?\n\n**2. Generating costs credits, so I need your OK first.**\n\n**The plan:** one continuous 30-second take on Seedance 2.5 at 720p, 16:9, with sound generated alongside the picture. The prompt below sets the timing of each beat:\n\n> [0s-6s] Wide shot at dusk: a white lighthouse on a rocky point, grey sea, its beam starting to turn. An old keeper in a wool sweater and oilskin coat walks down the wet rocks, slow push in. <waves breaking, gulls, wind>\n> [6s-12s] Medium shot: he stops, crouches and pulls a green glass bottle out of the seaweed at the waterline, handheld. <glass knocking on stone>\n> [12s-18s] Close-up on his weathered hands: he works the cork free and slides out a rolled, yellowed letter. <cork pop, paper rustle>\n> [18s-24s] Close-up on his face lit by the lantern: he reads, his jaw tightens, and his eyes fill but he doesn't cry, slow push in.\n> [24s-30s] Wide shot from behind: he stands on the rocks holding the letter to his chest while the lighthouse beam sweeps over the dark water toward the horizon. (sparse solo piano, a few notes) No dialogue. Rich details, natural colors, cinematic texture, soft lighting. No subtitles.\n\nWe never see what the letter says, so the ending stays open.\n\n**Cost:** 347 credits for one take (from the Slates estimate). You have 1,240 credits, so you'd have 893 left. The keeper is described in text only, with no reference images, so there's no extra charge for showing his face.\n\nReply **\"go\"** with your project choice and I'll save the shot, generate the take, check it, put it on the timeline and export the video.",
+  "usage": {
+    "input_tokens": 16,
+    "cache_creation_input_tokens": 36344,
+    "cache_read_input_tokens": 148500,
+    "output_tokens": 2964,
+    "output_tokens_details": {
+      "thinking_tokens": 1182
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 36344,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 782,
+        "cache_read_input_tokens": 37544,
+        "cache_creation_input_tokens": 1377,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1377
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 12,
+  "durationMs": 41615,
+  "denials": [
+    {
+      "name": "mcp__slates__slates_create_project",
+      "input": {
+        "name": "The Lighthouse Keeper"
+      }
+    }
+  ],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/members/manifest.json",
+      "query": {},
+      "status": 402
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/credits/balance",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,336 @@
+{
+  "case": "storyboard-from-script",
+  "arm": "baseline",
+  "run": 2,
+  "model": "claude-opus-5-5",
+  "wallMs": 23714,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01LKkugPNmK1pSvKpccfnc47",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_storyboards,mcp__slates__slates_get_script,mcp__slates__slates_break_script_into_shots,mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_get_prompting_guide",
+        "max_results": 6
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01LKkugPNmK1pSvKpccfnc47",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Y6scVeoJXE5AJc7EJEazPd",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {}
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Y6scVeoJXE5AJc7EJEazPd",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_015MbC62XseJvqooVeLyEBTo",
+      "name": "mcp__slates__slates_list_storyboards",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_015MbC62XseJvqooVeLyEBTo",
+      "error": false,
+      "text": "{\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Sv76Ff8rdwJfW4jt3ecNw6",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Sv76Ff8rdwJfW4jt3ecNw6",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21,
+        30000,
+        55,
+        70000,
+        3,
+        20,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Bos2Tw2pyMEV4MYzdnBxPK",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Bos2Tw2pyMEV4MYzdnBxPK",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"script\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"start\":0,\"end\":57,\"line\":\"Your morning coffee shouldn’t taste like a punishment.\"},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"start\":58,\"end\":95,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        70000,
+        57,
+        2,
+        58,
+        95,
+        3
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01GTPQ62KVPC7N4ossRnzZLS",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01GTPQ62KVPC7N4ossRnzZLS",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000002\",\"script\":\"MARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"start\":0,\"end\":47,\"line\":\"Eighteen hours, cold. Nothing bitter left.\"},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"start\":48,\"end\":80,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        2,
+        1,
+        70000,
+        3,
+        47,
+        4,
+        48,
+        80
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "Your script is already split into shots. I'm checking the Script page document once more to make sure no text was left out."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01VPT3qaibFiht4uamnjxgUX",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_script_document",
+        "max_results": 1
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01VPT3qaibFiht4uamnjxgUX",
+      "error": false,
+      "text": "[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01AELQAXadaEmhQztKRjJcGR",
+      "name": "mcp__slates__slates_get_script_document",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01AELQAXadaEmhQztKRjJcGR",
+      "error": false,
+      "text": "{\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"revision\":3,\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\"},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"name\":\"Proof and close\"}],\"text\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\\nMARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\"}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        3,
+        2
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "Your script was already broken into shots, so I didn't change anything. Every line on the Script page of **Cold brew 15s v1** (in Morning Ritual Coffee) already belongs to a shot. Running \"Break the script into shots\" again would only add shots for text that isn't in a shot yet, and there isn't any. Here's the board:\n\n**Scene 1 — Hook**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | MARA: \"Your morning coffee shouldn't taste like a punishment.\" | ✅ has one |\n| SHOT-A2 | Crack and pour | *She cracks the can. Ice. A slow pour.* (action, no dialogue) | ⬜ empty |\n\n**Scene 2 — Proof and close**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A3 | Proof line | MARA: \"Eighteen hours, cold. Nothing bitter left.\" | ⬜ empty |\n| SHOT-A4 | Hero end card | *Ritual. Cold brew, done right.* (no dialogue) | ✅ has one |\n\n**Board summary:**\n- **Runtime:** 4 cuts adding up to 20s. The board description says 15s, so it runs about 5s long.\n- **Shot sizes:** 2 close, 1 extreme close, 1 medium.\n- **Camera:** 3 static and 1 push. The first two shots in a row are both static.\n- **Dialogue:** 15 words, well under the 50-word budget.\n\nNothing has been generated and no credits have been spent. Only A2 and A3 are missing pictures. When you're ready, I can price those two and show you the total before anything runs. If you'd rather change something first, I can do that instead, like trimming to 15s or adding a camera move to A2."
+    }
+  ],
+  "reply": "Your script was already broken into shots, so I didn't change anything. Every line on the Script page of **Cold brew 15s v1** (in Morning Ritual Coffee) already belongs to a shot. Running \"Break the script into shots\" again would only add shots for text that isn't in a shot yet, and there isn't any. Here's the board:\n\n**Scene 1 — Hook**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | MARA: \"Your morning coffee shouldn't taste like a punishment.\" | ✅ has one |\n| SHOT-A2 | Crack and pour | *She cracks the can. Ice. A slow pour.* (action, no dialogue) | ⬜ empty |\n\n**Scene 2 — Proof and close**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A3 | Proof line | MARA: \"Eighteen hours, cold. Nothing bitter left.\" | ⬜ empty |\n| SHOT-A4 | Hero end card | *Ritual. Cold brew, done right.* (no dialogue) | ✅ has one |\n\n**Board summary:**\n- **Runtime:** 4 cuts adding up to 20s. The board description says 15s, so it runs about 5s long.\n- **Shot sizes:** 2 close, 1 extreme close, 1 medium.\n- **Camera:** 3 static and 1 push. The first two shots in a row are both static.\n- **Dialogue:** 15 words, well under the 50-word budget.\n\nNothing has been generated and no credits have been spent. Only A2 and A3 are missing pictures. When you're ready, I can price those two and show you the total before anything runs. If you'd rather change something first, I can do that instead, like trimming to 15s or adding a camera move to A2.",
+  "usage": {
+    "input_tokens": 16,
+    "cache_creation_input_tokens": 8619,
+    "cache_read_input_tokens": 65405,
+    "output_tokens": 1539,
+    "output_tokens_details": {
+      "thinking_tokens": 163
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 8619,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 643,
+        "cache_read_input_tokens": 10882,
+        "cache_creation_input_tokens": 314,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 314
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 9,
+  "durationMs": 21783,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script/document",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    }
+  ]
+}

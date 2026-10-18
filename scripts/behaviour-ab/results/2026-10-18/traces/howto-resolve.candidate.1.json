@@ -1,0 +1,105 @@
+{
+  "case": "howto-resolve",
+  "arm": "candidate",
+  "run": 1,
+  "model": "claude-opus-5-5",
+  "wallMs": 27391,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 150,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_016qVrBVTRJL3EBsWq6jjxj5",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_prompting_guide",
+        "max_results": 1
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_016qVrBVTRJL3EBsWq6jjxj5",
+      "error": false,
+      "text": "[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Wx47jPZM2d1J128er8hoGB",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "app-manual",
+        "query": "export timeline XML DaVinci Resolve"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Wx47jPZM2d1J128er8hoGB",
+      "error": false,
+      "text": "{\"topic\":\"app-manual\",\"bytes\":2116,\"guide\":\"## THE TIMELINE (CUT) AND EXPORT — opening and arranging the timeline, cuts, tracks, clips, split, trim, markers, zoom, mixing, export to MP4 and to DaVinci, Premiere or Final Cut\\n\\n### Timeline: export for DaVinci, Premiere or Final Cut (XML, hand off to an editor, FCP7)\\n\\n1. Toolbar → **Export** → **Export for DaVinci, Premiere or Final Cut** (or `Ctrl+K`; on a Mac, the File menu row of the same name).\\n2. In the save dialog titled \\\"Export Timeline XML\\\" choose a place. The name starts as \\\"{cut name}.xml\\\"; the file type is FCP7 XML.\\n3. A toast for 8 seconds: \\\"Saved {file}. Import it in DaVinci, Premiere or Final Cut as an XML timeline.\\\" with **Show in File Explorer**.\\n\\nThe file is a Final Cut Pro 7 XML. It links to original media by path, so keep the files in place. It carries clip positions, gaps, markers, lane mute and combined lane/output gain. Overlapping audio uses additional lanes; overlapping video includes visible portions and their embedded sound. Source points round to sequence frames; a range too short to represent is refused. Explicitly stretched source ranges need their speed set again in the receiving editor. Slates has no clip transforms, so none are written: reframe, zoom and fade in your editor.\\n\\nIn DaVinci Resolve: File → Import → Timeline, then pick the XML; grade and export from there. In Premiere, import it as an XML timeline. Current Final Cut Pro reads only FCPXML, which this export is not, so finish in DaVinci or Premiere, or convert the file before opening it in Final Cut.\\n\\nSame refusals as the MP4 row (see \\\"Timeline: Export menu\\\"). Agent: `slates_export_timeline_xml`.\\n\\nRelated sections (ask by heading): THE TIMELINE (CUT) AND EXPORT — opening and arranging the timeline, cuts, tracks, clips, split, trim, markers, zoom, mixing, export to MP4 and to DaVinci, Premiere or Final Cut · Timeline: Export menu — where to export (Export button, refused rows, Exporting percent) · Timeline: messages — export and frames (toasts, Export failed, frame errors) · Timeline: Export several cuts dialog (batch export, many cuts, folder, manifest, retry, stop)\"}",
+      "numbers": [
+        2116,
+        4,
+        7,
+        1,
+        2,
+        3,
+        8
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "You can export your cut from Slates as an XML timeline and open it in Resolve.\n\n**In Slates:**\n1. On the timeline toolbar, click **Export** → **Export for DaVinci, Premiere or Final Cut**. The shortcut is `Ctrl+K`.\n2. A save dialog called \"Export Timeline XML\" opens. Pick where to save the file. The name starts as `{cut name}.xml`.\n3. A message pops up saying the file was saved. It has a **Show in File Explorer** button.\n\n**In DaVinci Resolve:**\n4. Go to **File → Import → Timeline** and pick the XML file. Then you can grade and export from Resolve.\n\n**Things to know:**\n- **Don't move your media files.** The XML finds your original files by their location on disk. If you move or rename them, Resolve will show them as offline.\n- **What comes across:** clip positions, gaps, markers, muted tracks and audio levels. Overlapping audio clips go on extra tracks.\n- **What doesn't come across:**\n  - **Zoom, reframing and fades:** Slates doesn't store these, so you'll need to redo them in Resolve.\n  - **Speed changes:** if you stretched any clips, set their speed again in Resolve.\n- **Very short clips:** if a clip is too short to fit in the file, the export is refused.\n\nIf you'd like, I can run the export for you. Just tell me which cut and where to save it."
+    }
+  ],
+  "reply": "You can export your cut from Slates as an XML timeline and open it in Resolve.\n\n**In Slates:**\n1. On the timeline toolbar, click **Export** → **Export for DaVinci, Premiere or Final Cut**. The shortcut is `Ctrl+K`.\n2. A save dialog called \"Export Timeline XML\" opens. Pick where to save the file. The name starts as `{cut name}.xml`.\n3. A message pops up saying the file was saved. It has a **Show in File Explorer** button.\n\n**In DaVinci Resolve:**\n4. Go to **File → Import → Timeline** and pick the XML file. Then you can grade and export from Resolve.\n\n**Things to know:**\n- **Don't move your media files.** The XML finds your original files by their location on disk. If you move or rename them, Resolve will show them as offline.\n- **What comes across:** clip positions, gaps, markers, muted tracks and audio levels. Overlapping audio clips go on extra tracks.\n- **What doesn't come across:**\n  - **Zoom, reframing and fades:** Slates doesn't store these, so you'll need to redo them in Resolve.\n  - **Speed changes:** if you stretched any clips, set their speed again in Resolve.\n- **Very short clips:** if a clip is too short to fit in the file, the export is refused.\n\nIf you'd like, I can run the export for you. Just tell me which cut and where to save it.",
+  "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 5769,
+    "cache_read_input_tokens": 16342,
+    "output_tokens": 706,
+    "output_tokens_details": {
+      "thinking_tokens": 41
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 5769,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 487,
+        "cache_read_input_tokens": 7316,
+        "cache_creation_input_tokens": 1014,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1014
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 3,
+  "durationMs": 25603,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": []
+}

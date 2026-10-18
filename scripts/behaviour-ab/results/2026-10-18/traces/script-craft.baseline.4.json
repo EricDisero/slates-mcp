@@ -1,0 +1,207 @@
+{
+  "case": "script-craft",
+  "arm": "baseline",
+  "run": 4,
+  "model": "claude-opus-5-5",
+  "wallMs": 35478,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01LZqxuTfVoAqd9PwdXpqFTL",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_get_script_document,mcp__slates__slates_get_script,mcp__slates__slates_get_prompting_guide,mcp__slates__slates_update_script_section,mcp__slates__slates_get_script_sections",
+        "max_results": 6
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01LZqxuTfVoAqd9PwdXpqFTL",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01DWkNC7xkSaeqkYsu5tD9tj",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 10
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01DWkNC7xkSaeqkYsu5tD9tj",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01W1BWb1736inXg1uRAdcu8k",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01W1BWb1736inXg1uRAdcu8k",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"activeProject\":{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"description\":\"Ritual cold brew: 15 s vertical ads for Meta and TikTok\",\"assetCount\":5,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-10T18:00:00.000Z\",\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}],\"libraryItemCount\":3},\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01HbvQTZ8MubvsZvAnmw9MUf",
+      "name": "mcp__slates__slates_get_script_document",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01HbvQTZ8MubvsZvAnmw9MUf",
+      "error": false,
+      "text": "{\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"revision\":3,\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\"},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"name\":\"Proof and close\"}],\"text\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\\nMARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\"}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01EhczTUGJiRVbApVx2miQWi",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01EhczTUGJiRVbApVx2miQWi",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"script\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"start\":0,\"end\":57,\"line\":\"Your morning coffee shouldn’t taste like a punishment.\"},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"start\":58,\"end\":95,\"line\":null}],\"revision\":3}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_012EC8JwjpubnbeAUFQNxH5v",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_012EC8JwjpubnbeAUFQNxH5v",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000002\",\"script\":\"MARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"start\":0,\"end\":47,\"line\":\"Eighteen hours, cold. Nothing bitter left.\"},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"start\":48,\"end\":80,\"line\":null}],\"revision\":3}",
+      "priced": []
+    },
+    {
+      "kind": "text",
+      "text": "I've read the script for \"Cold brew 15s v1.\" Here are my rewrites. I haven't changed anything in the project yet.\n\n**SHOT-A1 (hook)**\n- Original: *\"Your morning coffee shouldn't taste like a punishment.\"*\n- **Recommended:** *\"Bitter coffee is not a personality trait.\"*\n- Alternatives: *\"Your coffee shouldn't need forgiving.\"* / *\"Stop letting your coffee bully you.\"*\n\nThe original is a fine idea, but \"shouldn't taste like\" is a soft way to open. The recommended line makes a confident, slightly cheeky claim, which hooks better in the first second on TikTok and Meta.\n\n**SHOT-A3 (proof)**\n- Original: *\"Eighteen hours, cold. Nothing bitter left.\"*\n- **Recommended:** *\"Eighteen hours, cold. The bitterness gives up first.\"*\n- Alternatives: *\"Eighteen hours in the cold. Bitter never makes it out.\"* / *\"Eighteen hours, cold-steeped. All smooth, no bite.\"*\n\nThe recommended version makes bitterness the villain, which pays off the hook, so the two lines work as a setup and punchline instead of a list of features.\n\n**SHOT-A4 (end card)**\n- Original: *\"Ritual. Cold brew, done right.\"*\n- **Recommended:** *\"Make it a Ritual.\"*\n- Alternatives: *\"Ritual. Slow-made. Gone fast.\"* / *\"Ritual. Worth the eighteen hours.\"*\n\n\"Done right\" is a stock phrase that any brand could use. \"Make it a Ritual\" plays on the brand name and works as a call to action. This end-card line isn't set as a spoken line, so it reads as on-screen text. Tell me if you want Mara to say it too.\n\nAll the new lines together come to about 18 words, so they still fit in 15 seconds with room for the can crack and pour in SHOT-A2.\n\nIf you want, I can put the recommended lines (or any mix of the alternatives) into the script. The edit keeps the lines attached to SHOT-A1 and SHOT-A3, and I can save your current wording as a version first so you can switch back."
+    }
+  ],
+  "reply": "I've read the script for \"Cold brew 15s v1.\" Here are my rewrites. I haven't changed anything in the project yet.\n\n**SHOT-A1 (hook)**\n- Original: *\"Your morning coffee shouldn't taste like a punishment.\"*\n- **Recommended:** *\"Bitter coffee is not a personality trait.\"*\n- Alternatives: *\"Your coffee shouldn't need forgiving.\"* / *\"Stop letting your coffee bully you.\"*\n\nThe original is a fine idea, but \"shouldn't taste like\" is a soft way to open. The recommended line makes a confident, slightly cheeky claim, which hooks better in the first second on TikTok and Meta.\n\n**SHOT-A3 (proof)**\n- Original: *\"Eighteen hours, cold. Nothing bitter left.\"*\n- **Recommended:** *\"Eighteen hours, cold. The bitterness gives up first.\"*\n- Alternatives: *\"Eighteen hours in the cold. Bitter never makes it out.\"* / *\"Eighteen hours, cold-steeped. All smooth, no bite.\"*\n\nThe recommended version makes bitterness the villain, which pays off the hook, so the two lines work as a setup and punchline instead of a list of features.\n\n**SHOT-A4 (end card)**\n- Original: *\"Ritual. Cold brew, done right.\"*\n- **Recommended:** *\"Make it a Ritual.\"*\n- Alternatives: *\"Ritual. Slow-made. Gone fast.\"* / *\"Ritual. Worth the eighteen hours.\"*\n\n\"Done right\" is a stock phrase that any brand could use. \"Make it a Ritual\" plays on the brand name and works as a call to action. This end-card line isn't set as a spoken line, so it reads as on-screen text. Tell me if you want Mara to say it too.\n\nAll the new lines together come to about 18 words, so they still fit in 15 seconds with room for the can crack and pour in SHOT-A2.\n\nIf you want, I can put the recommended lines (or any mix of the alternatives) into the script. The edit keeps the lines attached to SHOT-A1 and SHOT-A3, and I can save your current wording as a version first so you can switch back.",
+  "usage": {
+    "input_tokens": 12,
+    "cache_creation_input_tokens": 8653,
+    "cache_read_input_tokens": 46910,
+    "output_tokens": 2358,
+    "output_tokens_details": {
+      "thinking_tokens": 1075
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 8653,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 1396,
+        "cache_read_input_tokens": 10138,
+        "cache_creation_input_tokens": 1083,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1083
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 7,
+  "durationMs": 33714,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects/get",
+      "query": {
+        "id": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script/document",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      },
+      "status": 200
+    }
+  ]
+}

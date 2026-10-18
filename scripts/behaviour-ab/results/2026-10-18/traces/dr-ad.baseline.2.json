@@ -1,0 +1,952 @@
+{
+  "case": "dr-ad",
+  "arm": "baseline",
+  "run": 2,
+  "model": "claude-opus-5-5",
+  "wallMs": 84247,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01VT4jrkvryo83TVpptbaLL5",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_get_prompting_guide,mcp__slates__slates_estimate_generation_cost,mcp__slates__slates_load_tools,mcp__slates__slates_get_credit_balance",
+        "max_results": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01VT4jrkvryo83TVpptbaLL5",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01LgugxBM4Md7jTvK1hogZ6Q",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 10
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01LgugxBM4Md7jTvK1hogZ6Q",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01LAZPnFzkL6Uxrr6ED33B7w",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "query": "15 second direct response vertical Meta ad for a cold brew coffee product"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01LAZPnFzkL6Uxrr6ED33B7w",
+      "error": false,
+      "text": "{\"query\":\"15 second direct response vertical Meta ad for a cold brew coffee product\",\"fallback\":false,\"total\":4,\"offset\":0,\"nextOffset\":null,\"guides\":[{\"name\":\"slates-direct-response-ad\",\"description\":\"Develop a product-led direct-response ad from an offer and references. Use for demonstrations, proof, argument and the next action; combine with script craft and presenter direction as needed.\",\"tier\":\"free\",\"matched\":[\"direct\",\"response\",\"ad\",\"product\"],\"sections\":[\"Product-led direct response\",\"Choose the product's job in the picture\"]},{\"name\":\"slates-ugc-influencer-ad\",\"description\":\"Direct a creator-style spoken ad when the brief calls for a camera-facing person or exchange. Covers activity, performance, phone-camera handling, speech, interaction and sound.\",\"tier\":\"free\",\"matched\":[\"direct\",\"ad\"],\"sections\":[\"Direct a person in a place\"]},{\"name\":\"slates-one-prompt-film\",\"description\":\"Turn a video brief into a finished, editable Slates production and verified export. Use for requests to make a film, short, trailer, music video, ad or other complete video, entering through writing, imported footage or an existing edit.\",\"tier\":\"free\",\"matched\":[\"ad\"],\"sections\":[]},{\"name\":\"slates-prompting-inworld-tts\",\"description\":\"Direct speech with Inworld Realtime TTS-2 (inworld-tts-2). Use with slates_generate_audio on this model; covers voice identity, reference acoustics, delivery tags, punctuation and voice consent.\",\"tier\":\"free\",\"matched\":[\"direct\"],\"sections\":[]}],\"rest\":[{\"name\":\"slates-blocking-to-prompt\",\"description\":\"Translate a rendered blocking clip into a video prompt that preserves its camera, cuts, timing and spatial relationships. Use for previs-guided generation or when output ignores the blocking.\",\"tier\":\"free\"},{\"name\":\"slates-camera-language\",\"description\":\"Build or refine Blender camera rigs for a previs pass: orbits, floor rises, whip-and-lock moves, handheld, speed ramps and shot transitions. Use when the intended camera path needs deterministic control.\",\"tier\":\"free\"},{\"name\":\"slates-character-identity\",\"description\":\"Prepare and bind a reusable character identity sheet from an image or description. Use when creating cast or preserving the same character across shots.\",\"tier\":\"free\"},{\"name\":\"slates-chatgpt-images\",\"description\":\"Generate and save images through a connected ChatGPT account or the host image tool, preserving Slates prompts, references and project context. Use when ChatGPT generation is requested.\",\"tier\":\"free\"},{\"name\":\"slates-cinematic-look\",\"description\":\"Choose lighting, exposure, grade, lens, atmosphere and imperfection techniques for a filmed look. Use for photographic direction or an image that looks too clean, evenly exposed or studio-lit.\",\"tier\":\"free\"},{\"name\":\"slates-content-policy\",\"description\":\"Check provider-sensitive content before prompting a brief with conflict, creatures, crowds, violence, destruction, weapons, real likenesses or young characters. Use its scoped refusal receipts and scene alternatives alongside the selected model guide.\",\"tier\":\"free\"},{\"name\":\"slates-cost-discipline\",\"description\":\"Estimate and announce generation spend, aggregate batches, follow existing consent and inspect uncertain jobs before retrying. Use when planning or submitting paid media generation.\",\"tier\":\"free\"},{\"name\":\"slates-dialogue-blocking\",\"description\":\"Block a multi-character conversation (at a table, in a car, walking) in Blender when seating, eyelines or screen direction must hold across cuts, or generation has lost that continuity. Includes performance and off-screen dialogue direction.\",\"tier\":\"free\"},{\"name\":\"slates-edit-and-iterate\",\"description\":\"Refine an existing Slates image with a targeted edit or revised generation. Use for changes such as warmer light, removing a figure, reframing or a different look; preserve the original and its lineage.\",\"tier\":\"free\"},{\"name\":\"slates-model-selection\",\"description\":\"Choose image, video, edit and audio models for the brief, including animating photos, making films or directing voices. Load before choosing or defaulting a model or quoting a plan; retrieve model-specific craft after selection.\",\"tier\":\"free\"},{\"name\":\"slates-previs-blocking\",\"description\":\"Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip. Use when those controls are required or prompting has failed to hold them.\",\"tier\":\"free\"},{\"name\":\"slates-project-organization\",\"description\":\"Navigate and organize Slates projects, asset codes such as IMG-A12 or VID-V3, folders, Library references and templates. Use when locating media, preparing a reusable production or keeping a project legible.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-elevenlabs\",\"description\":\"Prompt ElevenLabs Sound Effects v2 (eleven-sfx) for a single effect or loop. Use with slates_generate_audio on this model; covers physical causes, duration, material, space and prompt influence.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-flux-2-max\",\"description\":\"Prompt or edit images with FLUX.2 Max (flux-2-max). Use with slates_generate_image or slates_edit_image on this model; covers word order, camera vocabulary, materials, colours and positive phrasing.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-gpt-image-2-5\",\"description\":\"Prompt or edit images with GPT Image 2.5 Flare or Sunburst. Use with slates_generate_image or slates_edit_image on these models; covers reference roles, lighting, text, panels, quality choices and edits.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-kling-v3\",\"description\":\"Prompt Kling V3.0 video generation and Kling O3 video edits. Use with Kling models on slates_generate_video or slates_edit_video; covers subjects, dialogue, sound syntax, multi-shot direction and edit fidelity.\",\"tier\":\"free\"},{\"name\":\"slates-prompting-lip-sync\",\"description\":\"Prepare Kling lip-sync or avatar generation with slates_generate_lip_sync. Covers source selection, voice, framing, audio co\n[trimmed 4147 chars]",
+      "numbers": [
+        15,
+        4,
+        0,
+        2,
+        12,
+        3,
+        5,
+        2.5,
+        1,
+        8948
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01TAbPVvVSrWsDd9bLPHQcwS",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "limit": 2
+      }
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01EydQf7yCDM1mTxhJvJsT9R",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-direct-response-ad",
+        "depth": "full"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01TAbPVvVSrWsDd9bLPHQcwS",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"activeProject\":{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"description\":\"Ritual cold brew: 15 s vertical ads for Meta and TikTok\",\"assetCount\":5,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-10T18:00:00.000Z\",\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}],\"libraryItemCount\":3},\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        15,
+        18,
+        4,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01EydQf7yCDM1mTxhJvJsT9R",
+      "error": false,
+      "text": "{\"topic\":\"slates-direct-response-ad\",\"tier\":\"free\",\"depth\":\"full\",\"bytes\":2429,\"guide\":\"# Product-led direct response\\n\\nUse `slates-script-craft` for the words, evidence and hook/bridge variations. This guide supplies an optional product-led approach. A person can appear; a presenter, fixed duration, fixed frame count or hyper-motion treatment is not required.\\n\\n## Choose the product's job in the picture\\n\\nRead the brief and references. Identify the intended audience situation, the supplied claim, what can demonstrate it, and the actual next action. A close product detail, use in context, a visible problem/solution and a final product view are possible ingredients. Omit or reorder any that do not serve the piece.\\n\\nFor example, a keys tray can interrupt a sliding key, show where it lands, then hold on the result. A quiet demonstration may work without narration. A technical product may need an explanatory exchange. Do not invent product finishes, guarantees or quantified benefits from a reference picture.\\n\\n## Keep the work editable\\n\\nUse the current project unless another destination is requested. Save the script as document text, with non-spoken direction separate. Create shots only for the requested production units and file them into explicit scenes. Alternative openings live beside the shared body as saved versions of a section. Preserve manual edits and reference identity.\\n\\nRead the composed requests before any media call. Model selection, reference slots, durations and resolution come from current capabilities and `slates-model-selection`, never a copied ad recipe. Every prompt stays visible on its shot. A preset imports ordinary editable content and does not authorize generation.\\n\\n## Production when requested\\n\\nFollow `slates-cost-discipline` and the user's authorization for the exact selected requests. Estimate the set through the existing quote operation. An extra stochastic take remains an extra requested take; compatible existing media can be deliberately reused.\\n\\nInspect results against the demonstration and supplied references. A failed job is not authorization for an unchanged reroll. Keep earlier takes accessible. Assemble into an explicitly named cut when comparing variations, inspect playback, and export the selected cuts with their results. `slates-one-prompt-film` covers this delivery task when a finished video is requested.\\n\\nNo conversion outcome is promised by this format. Creative clarity, observed distribution and measured purchases are different evidence.\"}",
+      "numbers": [
+        2429
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_019z21fRcTh1a6Me6U4VkRUr",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-model-selection",
+        "depth": "card"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_019z21fRcTh1a6Me6U4VkRUr",
+      "error": false,
+      "text": "{\"topic\":\"slates-model-selection\",\"tier\":\"free\",\"depth\":\"card\",\"bytes\":812,\"guide\":\"# Model selection for the intended piece\\n\\nChoose from the current catalogue using the brief, existing media and delivery requirements. The agent makes this production choice; the user supplies the vision, explicit preferences and approval. A named model takes priority when it can do the requested job. If it cannot, explain the specific conflict and choose a supported route within the brief.\\n\\nSections (request with query, or depth \\\"full\\\"):\\n- Model selection for the intended piece\\n- Decide from constraints and evidence\\n- Current catalogue\\n- image generate\\n- video generate\\n- video edit\\n- audio generate\\n- Seedance craft triggers\\n- Dated production comparisons\\n- Existing footage and edit fidelity\\n- Motion transfer and lip sync\\n- Image and style production\\n- Sound as a production choice\\n- Spend and delivery\"}",
+      "numbers": [
+        812
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01GrFYsTbNNRBomMmMdMHt7j",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_list_assets,mcp__slates__slates_list_library,mcp__slates__slates_list_shots,mcp__slates__slates_get_script",
+        "max_results": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01GrFYsTbNNRBomMmMdMHt7j",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01FYdDagXMBP6CGS8ibznCkb",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01FYdDagXMBP6CGS8ibznCkb",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21,
+        30000,
+        55,
+        70000,
+        3,
+        20,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_013QCvZw31oCe7PHDpQ6CtMx",
+      "name": "mcp__slates__slates_list_assets",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "call",
+      "id": "toolu_015nwAU8vTeYN12si9uX4vKT",
+      "name": "mcp__slates__slates_list_library",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_013QCvZw31oCe7PHDpQ6CtMx",
+      "error": false,
+      "text": "{\"total_matching\":5,\"total_in_project\":5,\"truncated\":false,\"assets\":[{\"id\":\"a55e0000-0000-4000-8000-000000000001\",\"code\":\"IMG-A1\",\"label\":\"Mara, kitchen window, morning\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000002\",\"code\":\"IMG-A2\",\"label\":\"Can on wet slate, hero\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000003\",\"code\":\"IMG-A3\",\"label\":\"Pour over ice, macro\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000004\",\"code\":\"VID-V1\",\"label\":\"Mara first sip\",\"type\":\"video\"},{\"id\":\"a55e0000-0000-4000-8000-000000000005\",\"code\":\"AUD-S1\",\"label\":\"VO take 1\",\"type\":\"audio\"}]}",
+      "numbers": [
+        5,
+        55,
+        0,
+        4000,
+        8000,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "kind": "result",
+      "id": "toolu_015nwAU8vTeYN12si9uX4vKT",
+      "error": false,
+      "text": "{\"categories\":[{\"id\":\"ca7e0000-0000-4000-8000-000000000001\",\"name\":\"Characters\",\"kind\":\"character\",\"position\":0},{\"id\":\"ca7e0000-0000-4000-8000-000000000002\",\"name\":\"Products\",\"kind\":\"prop\",\"position\":1},{\"id\":\"ca7e0000-0000-4000-8000-000000000003\",\"name\":\"Locations\",\"kind\":\"location\",\"position\":2}],\"items\":[{\"id\":\"11b00000-0000-4000-8000-000000000001\",\"name\":\"Mara\",\"categoryId\":\"ca7e0000-0000-4000-8000-000000000001\",\"kind\":\"character\",\"mention\":\"@Mara\",\"description\":\"Thirties, dark curly hair, linen shirt, warm and unhurried\",\"imageAssetId\":\"a55e0000-0000-4000-8000-000000000001\",\"voiceAssetId\":null,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"11b00000-0000-4000-8000-000000000002\",\"name\":\"Ritual can\",\"categoryId\":\"ca7e0000-0000-4000-8000-000000000002\",\"kind\":\"prop\",\"mention\":\"@Ritual-can\",\"description\":\"Matte black 330 ml can, gold sunrise mark, condensation\",\"imageAssetId\":\"a55e0000-0000-4000-8000-000000000002\",\"voiceAssetId\":null,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"11b00000-0000-4000-8000-000000000003\",\"name\":\"Kitchen\",\"categoryId\":\"ca7e0000-0000-4000-8000-000000000003\",\"kind\":\"location\",\"mention\":\"#Kitchen\",\"description\":\"Small bright kitchen, white tile, window over the sink\",\"imageAssetId\":null,\"voiceAssetId\":null,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "numbers": [
+        7,
+        0,
+        4000,
+        8000,
+        1,
+        2,
+        3,
+        11,
+        55,
+        40,
+        2026,
+        10,
+        17,
+        21,
+        330
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "I found your Morning Ritual Coffee project. It already has a board, \"Cold brew 15s v1\", but it runs 20 s, so I'm reading the shots before I plan the 15 s cut."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01NT2D3tjTz2zjLCMgZHiPmh",
+      "name": "mcp__slates__slates_list_shots",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01NT2D3tjTz2zjLCMgZHiPmh",
+      "error": false,
+      "text": "{\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"name\":\"Hook: Mara to camera\",\"scene\":\"Hook\",\"position\":0,\"place\":\"1A\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Your morning coffee shouldn’t taste like a punishment.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"name\":\"Crack and pour\",\"scene\":\"Hook\",\"position\":1,\"place\":\"1B\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"extreme close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":null},{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"name\":\"Proof line\",\"scene\":\"Proof and close\",\"position\":0,\"place\":\"2A\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Eighteen hours, cold. Nothing bitter left.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"medium\",\"camera\":\"slow push in\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"name\":\"Hero end card\",\"scene\":\"Proof and close\",\"position\":1,\"place\":\"2B\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32}],\"total_credits\":96,\"unpriced\":1,\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        70000,
+        0,
+        4000,
+        8000,
+        1,
+        3,
+        32,
+        2,
+        4,
+        96,
+        20,
+        15,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_015Ds2emhLigLxWhfT1RtFX9",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_015Ds2emhLigLxWhfT1RtFX9",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"script\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"start\":0,\"end\":57,\"line\":\"Your morning coffee shouldn’t taste like a punishment.\"},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"start\":58,\"end\":95,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        70000,
+        57,
+        2,
+        58,
+        95,
+        3
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01G2pjnmecviGvmDu6hHAbAu",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01G2pjnmecviGvmDu6hHAbAu",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000002\",\"script\":\"MARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"start\":0,\"end\":47,\"line\":\"Eighteen hours, cold. Nothing bitter left.\"},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"start\":48,\"end\":80,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        2,
+        1,
+        70000,
+        3,
+        47,
+        4,
+        48,
+        80
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01JwnJCG4Av4sK2yvrc6VsMC",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-model-selection",
+        "depth": "section",
+        "query": "video generate"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01JwnJCG4Av4sK2yvrc6VsMC",
+      "error": false,
+      "text": "{\"topic\":\"slates-model-selection\",\"tier\":\"free\",\"depth\":\"section\",\"bytes\":4533,\"guide\":\"### video generate\\n\\nSeedance 2.0: THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare \\\"seedance\\\" still resolves here for older CLIs that expect 4K.\\nSeedance 2.5: DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. No 4K, and dearer than 2.0 at every shared resolution: go to 2.0 for 4K or the same resolution cheaper. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.\\nKling 3.0: THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue and lip-sync; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.\\nGemini Omni Flash: 720p seat with native synced audio included. Route here for drafts with sound in one pass and reference-to-video character-consistency trials; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.\\nMiniMax H3: THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.\\nMiniMax H3 Max: THE SPEED SEAT, dearer than base H3 at 768p and equal at 480p — never the cheap H3 and never the default. A post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call, the same as base H3: frames and references go to different endpoints. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.\\nMiniMax H3 Max Turbo: THE BUDGET SEAT of the MiniMax family: a second post-train of the H3 weights, billed at half H3 Max's rate at every tier. Its 1080p is a refinement of the native 768p render, not a native 1080p generation. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video and start/end frames only, with no reference endpoint, so reference-driven consistency goes to H3 Max or base H3. Route here for drafts, volume and cheap coverage, then re-run the keeper on H3 Max or a hero seat.\\nLTX-2.5: THE VOLUME SEAT — the cheapest 1080p second with sound included, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It supports native high-resolution output and longer takes than most seats; use the capability surface for its resolution-dependent duration limits. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.\\nLTX-2.5 Pro: THE FIDELITY SEAT of the LTX pair — the full diffusion build against the base row's distilled one. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, which is the opposite of every other Pro seat here: it reaches a SHORTER resolution ladder and makes SHORTER clips, and it costs more at both tiers they share. Reaching for it because the name says Pro costs more AND takes away reach. Everything else matches the base row. Route here only when a specific shot needs the fidelity and fits inside its narrower envelope.\"}",
+      "numbers": [
+        4533,
+        2,
+        4,
+        2.5,
+        5,
+        3,
+        720,
+        768,
+        480,
+        2026,
+        8,
+        27,
+        12,
+        1080
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01RXsFBtfMzmBnKd78HkLbWV",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-prompting-kling-v3",
+        "depth": "card"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01RXsFBtfMzmBnKd78HkLbWV",
+      "error": false,
+      "text": "{\"topic\":\"slates-prompting-kling-v3\",\"tier\":\"free\",\"depth\":\"card\",\"bytes\":2717,\"guide\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nSections (request with query, or depth \\\"full\\\"):\\n- Kling V3.0 — prompting\\n- Subject definition rule (verbatim, published guide)\\n- Dialogue syntax\\n- Voice direction formula (Omni)\\n- The `Immediately` keyword (Omni only)\\n- Speaker label discipline\\n- Multi-character dialogue (Omni)\\n- Sound effects, ambient noise, music\\n- Image-to-video guidance\\n- Multi-shot — what makes them hit\\n- Element references\\n- Reference discipline (character / environment refs)\\n- For Kling specifically\\n- Negative prompting — has a real field\\n- Cinematic tactics\\n- Tier choice\\n- Benchmark prompt structure\\n- Pre-flight: references arrive inline, refer by code\\n- Video-to-video EDIT (`slates_edit_video`) — @Video1 / @ElementN / @ImageN\\n- Sources\"}",
+      "numbers": [
+        3,
+        2717,
+        1,
+        40,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01GGv5xbj2LifTEixcdhFBkp",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 4
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01GGv5xbj2LifTEixcdhFBkp",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-4s-audio\",\"quantity\":1,\"cost_per_credits\":26,\"total_credits\":26,\"requires_confirm\":true,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        3,
+        4,
+        1,
+        26,
+        40,
+        2,
+        5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01MgqjCET3cMHo4q96sL2mV5",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 3,
+        "sound": false
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01MgqjCET3cMHo4q96sL2mV5",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-3s\",\"quantity\":1,\"cost_per_credits\":13,\"total_credits\":13,\"requires_confirm\":false,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        3,
+        1,
+        13,
+        40,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_018GG7n2Sc4veo738erFaQcF",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 4,
+        "sound": false
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_018GG7n2Sc4veo738erFaQcF",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-4s\",\"quantity\":1,\"cost_per_credits\":17,\"total_credits\":17,\"requires_confirm\":false,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        3,
+        4,
+        1,
+        17,
+        40,
+        2,
+        5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01JWvMMREWWXD8Cp21FvUtTB",
+      "name": "mcp__slates__slates_get_credit_balance",
+      "input": {}
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01JWvMMREWWXD8Cp21FvUtTB",
+      "error": false,
+      "text": "{\"success\":true,\"credit_balance\":1240}",
+      "numbers": [
+        1240
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_015LmbM8Z8ykW8RRz3D7YXDt",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 3
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_015LmbM8Z8ykW8RRz3D7YXDt",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-3s-audio\",\"quantity\":1,\"cost_per_credits\":19,\"total_credits\":19,\"requires_confirm\":true,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        3,
+        1,
+        19,
+        40,
+        2,
+        4,
+        5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01K8xwXqXXKPk9DxWBUkkzsa",
+      "name": "mcp__slates__slates_load_tools",
+      "input": {
+        "names": [
+          "slates_update_shot",
+          "slates_get_shot",
+          "slates_get_board_quote"
+        ]
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01K8xwXqXXKPk9DxWBUkkzsa",
+      "error": false,
+      "text": "{\"tools\":[{\"name\":\"slates_update_shot\",\"description\":\"Change part of a Shot, or attach/detach it from a board frame — anything you omit is left exactly as it was. shotSize and camera are FREE TEXT and are never rejected or rewritten. They are bucketed only for the variety count — shot size into wide / medium / close / extreme-close / other, camera into static / push / pull / handheld / orbit / crane / other — and anything unrecognised counts as \\\"other\\\", which is a fine answer.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"shotId\":{\"type\":\"string\",\"description\":\"The Shot id, or its SHOT-A code as shown on the row.\"},\"projectId\":{\"type\":\"string\",\"format\":\"uuid\",\"description\":\"The Shot's project — badge codes and entity ids resolve against it.\"},\"name\":{\"type\":\"string\",\"maxLength\":120},\"prompt\":{\"type\":\"string\",\"maxLength\":4000},\"model\":{\"type\":\"string\"},\"params\":{\"type\":\"object\",\"properties\":{\"aspectRatio\":{\"type\":\"string\",\"enum\":[\"1:1\",\"16:9\",\"9:16\",\"4:3\",\"3:4\",\"21:9\",\"3:2\",\"2:3\",\"5:4\",\"4:5\"]},\"duration\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":360},\"videoResolution\":{\"type\":\"string\",\"enum\":[\"480p\",\"720p\",\"768p\",\"1080p\",\"1440p\",\"2k\",\"4k\"]},\"imageResolution\":{\"type\":\"string\",\"enum\":[\"1k\",\"2k\",\"3k\",\"4k\"]},\"gptQuality\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\",\"xhigh\",\"max\"]},\"gptBackground\":{\"type\":\"string\",\"enum\":[\"auto\",\"transparent\",\"opaque\"]},\"detachedVoiceCharacterIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\"},\"description\":\"Character voices removed from this recipe.\"},\"imageQuantity\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":10},\"negativePrompt\":{\"type\":\"string\"},\"sound\":{\"type\":\"boolean\"},\"seedanceFace\":{\"type\":\"boolean\"},\"audioDurationSeconds\":{\"type\":\"integer\",\"minimum\":1,\"maximum\":120},\"voiceId\":{\"type\":\"string\"},\"voiceReferenceAssetId\":{\"type\":\"string\"},\"voiceDescription\":{\"type\":\"string\"},\"quality\":{\"type\":\"string\"},\"gridMode\":{\"type\":\"string\",\"enum\":[\"off\",\"2x2\",\"3x3\"]},\"audioLanguage\":{\"type\":\"string\",\"enum\":[\"en\",\"zh\",\"ja\",\"ko\",\"es\"]},\"audioAccent\":{\"type\":\"string\",\"enum\":[\"american\",\"british\",\"indian\"]},\"generateMusic\":{\"type\":\"boolean\"},\"multiShot\":{\"type\":\"boolean\"},\"multiShotSegments\":{\"anyOf\":[{\"type\":\"array\",\"items\":{\"type\":\"object\",\"properties\":{\"prompt\":{\"type\":\"string\"},\"duration\":{\"type\":\"number\"},\"camera\":{\"type\":\"string\"},\"shotSize\":{\"type\":\"string\"}},\"required\":[\"prompt\",\"duration\",\"camera\",\"shotSize\"],\"additionalProperties\":false}},{\"type\":\"null\"}]},\"cameraControls\":{\"type\":\"object\",\"properties\":{\"horizontal\":{\"type\":\"number\"},\"vertical\":{\"type\":\"number\"},\"pan\":{\"type\":\"number\"},\"tilt\":{\"type\":\"number\"},\"roll\":{\"type\":\"number\"},\"zoom\":{\"type\":\"number\"}},\"required\":[\"horizontal\",\"vertical\",\"pan\",\"tilt\",\"roll\",\"zoom\"],\"additionalProperties\":false},\"audioLoop\":{\"type\":\"boolean\"},\"audioPromptInfluence\":{\"type\":\"number\",\"minimum\":0,\"maximum\":1},\"audioMultilingual\":{\"type\":\"boolean\"}},\"additionalProperties\":false,\"description\":\"Same shape as slates_create_shot — see it for what each field means. Generation settings for the Shot.\"},\"refs\":{\"type\":\"object\",\"properties\":{\"reference\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"subject\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"style\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"video-reference\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"audio-reference\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}},\"additionalProperties\":false,\"description\":\"Same shape as slates_create_shot — see it for what each field means. Attachments by ROLE, ordered within each role. The role decides the sentence the model is told, so a subject reference and a plain one are not interchangeable.\"},\"firstFrameAssetId\":{\"type\":\"string\"},\"lastFrameAssetId\":{\"type\":\"string\"},\"audioRefSpokenText\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"characterIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"format\":\"uuid\"}},\"environmentIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"format\":\"uuid\"}},\"styleIds\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"format\":\"uuid\"}},\"attachFrameId\":{\"type\":\"string\",\"format\":\"uuid\",\"description\":\"Attach this Shot to a board frame.\"},\"detachFrameId\":{\"type\":\"string\",\"format\":\"uuid\",\"description\":\"Detach it from a frame. Not its last one: pass attachFrameId too, or delete the Shot.\"},\"posterAssetId\":{\"type\":[\"string\",\"null\"],\"description\":\"Which reference represents this Shot as a thumbnail. Defaulted automatically (first frame, else the first image reference, else the newest take) — only set it to OVERRIDE, and pass null to go back to the default.\"},\"speaker\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"line\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"delivery\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"action\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"prop\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"shotSize\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"camera\":{\"anyOf\":[{\"type\":\"string\",\"maxLength\":2000},{\"type\":\"null\"}]},\"recipeMode\":{\"type\":\"string\",\"enum\":[\"script\",\"custom\"],\"description\":\"Script mode compiles active words with production fields. Custom keeps the authored prompt exactly.\"},\"promptScriptLine\":{\"type\":[\"string\",\"null\"],\"description\":\"The exact script line reviewed when authoring this custom prompt.\"},\"continues\":{\"type\":\"boolean\"}},\"required\":[\"shotId\",\"projectId\"],\"additionalProperties\":false},\"annotations\":{\"readOnlyHint\":false,\"destructiveHint\":false,\"idempotentHint\":true,\"openWorldHint\":false}},{\"name\":\"slates_get_shot\",\"description\":\"Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, its exact credit quote, and its place on the board (2C, as the window shows it). Audit your own work here before firing.\",\"inputSchema\":{\"type\":\"object\",\"properties\":{\"shotId\":{\"type\":\"string\",\"description\":\"The Shot id, or its SHOT-A code as shown on the row.\"}},\"required\":[\"shotId\"],\"additionalProperties\":false\n[trimmed 1343 chars]",
+      "numbers": [
+        120,
+        4000,
+        1,
+        16,
+        9,
+        4,
+        3,
+        21,
+        2,
+        5,
+        360,
+        480,
+        720,
+        768,
+        1080,
+        1440,
+        10,
+        0,
+        2000
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01WZJASR8MymoMW9JJ9hEpn3",
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A1",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, logos, warped hands, extra fingers, distorted face"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000001",
+        "recipeMode": "custom",
+        "prompt": "Mara, thirties, dark curly hair, linen shirt, stands at the kitchen window in soft morning light. Mara looks straight into the lens, raises an eyebrow and speaks dryly with a half-smile. [Mara: woman, thirties, warm low voice, unhurried, wry]: \"Your morning coffee shouldn't taste like a punishment.\" Camera holds static, close-up. Ambient noise: quiet kitchen, faint birdsong through the window.",
+        "promptScriptLine": "Your morning coffee shouldn’t taste like a punishment.",
+        "shotSize": "close-up",
+        "camera": "static"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01WZJASR8MymoMW9JJ9hEpn3",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_update_shot has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Q4k2gqF7Kigu616VbBFPvV",
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A2",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 3,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, warped can, misshapen logo, spilled liquid, extra hands"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000003",
+        "recipeMode": "custom",
+        "prompt": "Dark cold brew pours slowly from the matte black Ritual can over clear ice, swirling and filling the glass; ice cubes shift and crackle as the coffee rises. Camera pushes in gently, macro. SFX: aluminium can tab cracking open with a sharp hiss, coffee splashing over ice cubes, ice crackling in the glass.",
+        "action": "She cracks the can. Ice. A slow pour.",
+        "shotSize": "extreme close-up",
+        "camera": "slow push in"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Q4k2gqF7Kigu616VbBFPvV",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_update_shot has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01WD5vqnCy7CAGkrMT6wtR8N",
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A3",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, warped hands, extra fingers, distorted face, misshapen can"
+        },
+        "refs": {
+          "subject": [
+            "a55e0000-0000-4000-8000-000000000001",
+            "a55e0000-0000-4000-8000-000000000002"
+          ]
+        },
+        "recipeMode": "custom",
+        "prompt": "Mara, thirties, dark curly hair, linen shirt, leans on the counter of a small bright kitchen with white tile, holding a glass of iced cold brew beside the matte black Ritual can with its gold sunrise mark. Mara takes a slow sip, lowers the glass, and speaks to the lens, relaxed and satisfied. [Mara: woman, thirties, warm low voice, unhurried, confident]: \"Eighteen hours, cold. Nothing bitter left.\" Camera pushes in slowly from medium to medium close-up. Ambient noise: quiet kitchen, ice clinking in the glass.",
+        "promptScriptLine": "Eighteen hours, cold. Nothing bitter left.",
+        "shotSize": "medium",
+        "camera": "slow push in"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01WD5vqnCy7CAGkrMT6wtR8N",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_update_shot has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01DdPtbFVquzceSmkFj73CQS",
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A4",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": false,
+          "negativePrompt": "on-screen text, captions, warped can, misshapen logo, extra objects"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000002",
+        "recipeMode": "custom",
+        "prompt": "Condensation beads slowly run down the matte black Ritual can on the wet slate; a thin wisp of cold mist drifts past. Camera orbits slowly a few degrees to the right and settles, leaving clean space in the upper third for the end-card text.",
+        "action": "Ritual. Cold brew, done right. (Super + CTA added in the edit.)",
+        "shotSize": "close-up",
+        "camera": "slow orbit"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01DdPtbFVquzceSmkFj73CQS",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_update_shot has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "numbers": []
+    },
+    {
+      "kind": "text",
+      "text": "I've drafted the 15 s plan and priced it, but **I couldn't save it to your project.** Editing shots was blocked by the current permission mode, so nothing in Morning Ritual Coffee has changed. If you allow shot edits, I'll write the plan below onto your board.\n\n**Starting point:** your board \"Cold brew 15s v1\" already has the right structure: hook, pour, proof, end card. It has Mara (IMG-A1), the hero can (IMG-A2) and the pour macro (IMG-A3). But it's four 5 s shots, which makes 20 s. The plan cuts it to 15 s, sets everything to 9:16 vertical, and keeps Kling 3.0, which is the cheaper model and good at dialogue.\n\n## Plan (15 s, 9:16)\n\n| Shot | Length | What happens | Starts from | Sound |\n|---|---|---|---|---|\n| 1A Hook | 4 s | Close-up, Mara says to camera: *\"Your morning coffee shouldn't taste like a punishment.\"* | IMG-A1 | Yes (her line) |\n| 1B Crack and pour | 3 s | Macro of cold brew pouring over ice, slow push in | IMG-A3 | Yes (can hiss, ice crackle) |\n| 2A Proof | 4 s | Mara sips, then says: *\"Eighteen hours, cold. Nothing bitter left.\"* Slow push in | Uses IMG-A1 and IMG-A2 as references | Yes (her line) |\n| 2B End card | 4 s | Hero can, slow orbit, space left at the top for text | IMG-A2 | No (music and voiceover go on in the edit) |\n\nThe shot sizes change from shot to shot. The camera now moves in three of the four shots, which fixes the run of static shots the board flagged.\n\n## Cost (from the quotes)\n\n| Shot | Price key | Credits |\n|---|---|---|\n| 1A | Kling 3.0 Std, 4 s, with sound | 26 |\n| 1B | Kling 3.0 Std, 3 s, with sound | 19 |\n| 2A | Kling 3.0 Std, 4 s, with sound | 26 |\n| 2B | Kling 3.0 Std, 4 s, silent | 17 |\n| **Total** | one take per shot | **88 credits** |\n\nYour balance is **1,240 credits**. Each extra take of a shot costs that shot's price again.\n\n## Before I go ahead\n1. **Offer and call to action:** a direct response ad needs a next step, and the board doesn't have one yet. What should the end card say (e.g. \"20% off your first case, tap Shop Now\")? I'll add it as text in the edit, not in the generated video, so it stays sharp and easy to change.\n2. **Saving the plan:** allow shot edits so I can write this onto the board.\n3. **Approving the spend:** say yes to the 88 credits, or tell me what to change.\n\nYou also have VID-V1 \"Mara first sip\" and AUD-S1 \"VO take 1\". I haven't watched or listened to either yet. If one fits shot 2A, we can use it and save 26 credits."
+    }
+  ],
+  "reply": "I've drafted the 15 s plan and priced it, but **I couldn't save it to your project.** Editing shots was blocked by the current permission mode, so nothing in Morning Ritual Coffee has changed. If you allow shot edits, I'll write the plan below onto your board.\n\n**Starting point:** your board \"Cold brew 15s v1\" already has the right structure: hook, pour, proof, end card. It has Mara (IMG-A1), the hero can (IMG-A2) and the pour macro (IMG-A3). But it's four 5 s shots, which makes 20 s. The plan cuts it to 15 s, sets everything to 9:16 vertical, and keeps Kling 3.0, which is the cheaper model and good at dialogue.\n\n## Plan (15 s, 9:16)\n\n| Shot | Length | What happens | Starts from | Sound |\n|---|---|---|---|---|\n| 1A Hook | 4 s | Close-up, Mara says to camera: *\"Your morning coffee shouldn't taste like a punishment.\"* | IMG-A1 | Yes (her line) |\n| 1B Crack and pour | 3 s | Macro of cold brew pouring over ice, slow push in | IMG-A3 | Yes (can hiss, ice crackle) |\n| 2A Proof | 4 s | Mara sips, then says: *\"Eighteen hours, cold. Nothing bitter left.\"* Slow push in | Uses IMG-A1 and IMG-A2 as references | Yes (her line) |\n| 2B End card | 4 s | Hero can, slow orbit, space left at the top for text | IMG-A2 | No (music and voiceover go on in the edit) |\n\nThe shot sizes change from shot to shot. The camera now moves in three of the four shots, which fixes the run of static shots the board flagged.\n\n## Cost (from the quotes)\n\n| Shot | Price key | Credits |\n|---|---|---|\n| 1A | Kling 3.0 Std, 4 s, with sound | 26 |\n| 1B | Kling 3.0 Std, 3 s, with sound | 19 |\n| 2A | Kling 3.0 Std, 4 s, with sound | 26 |\n| 2B | Kling 3.0 Std, 4 s, silent | 17 |\n| **Total** | one take per shot | **88 credits** |\n\nYour balance is **1,240 credits**. Each extra take of a shot costs that shot's price again.\n\n## Before I go ahead\n1. **Offer and call to action:** a direct response ad needs a next step, and the board doesn't have one yet. What should the end card say (e.g. \"20% off your first case, tap Shop Now\")? I'll add it as text in the edit, not in the generated video, so it stays sharp and easy to change.\n2. **Saving the plan:** allow shot edits so I can write this onto the board.\n3. **Approving the spend:** say yes to the 88 credits, or tell me what to change.\n\nYou also have VID-V1 \"Mara first sip\" and AUD-S1 \"VO take 1\". I haven't watched or listened to either yet. If one fits shot 2A, we can use it and save 26 credits.",
+  "usage": {
+    "input_tokens": 22,
+    "cache_creation_input_tokens": 34064,
+    "cache_read_input_tokens": 191381,
+    "output_tokens": 6477,
+    "output_tokens_details": {
+      "thinking_tokens": 1131
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 34064,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 1081,
+        "cache_read_input_tokens": 33002,
+        "cache_creation_input_tokens": 3662,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 3662
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 26,
+  "durationMs": 82425,
+  "denials": [
+    {
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A1",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, logos, warped hands, extra fingers, distorted face"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000001",
+        "recipeMode": "custom",
+        "prompt": "Mara, thirties, dark curly hair, linen shirt, stands at the kitchen window in soft morning light. Mara looks straight into the lens, raises an eyebrow and speaks dryly with a half-smile. [Mara: woman, thirties, warm low voice, unhurried, wry]: \"Your morning coffee shouldn't taste like a punishment.\" Camera holds static, close-up. Ambient noise: quiet kitchen, faint birdsong through the window.",
+        "promptScriptLine": "Your morning coffee shouldn’t taste like a punishment.",
+        "shotSize": "close-up",
+        "camera": "static"
+      }
+    },
+    {
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A2",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 3,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, warped can, misshapen logo, spilled liquid, extra hands"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000003",
+        "recipeMode": "custom",
+        "prompt": "Dark cold brew pours slowly from the matte black Ritual can over clear ice, swirling and filling the glass; ice cubes shift and crackle as the coffee rises. Camera pushes in gently, macro. SFX: aluminium can tab cracking open with a sharp hiss, coffee splashing over ice cubes, ice crackling in the glass.",
+        "action": "She cracks the can. Ice. A slow pour.",
+        "shotSize": "extreme close-up",
+        "camera": "slow push in"
+      }
+    },
+    {
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A3",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": true,
+          "negativePrompt": "on-screen text, captions, warped hands, extra fingers, distorted face, misshapen can"
+        },
+        "refs": {
+          "subject": [
+            "a55e0000-0000-4000-8000-000000000001",
+            "a55e0000-0000-4000-8000-000000000002"
+          ]
+        },
+        "recipeMode": "custom",
+        "prompt": "Mara, thirties, dark curly hair, linen shirt, leans on the counter of a small bright kitchen with white tile, holding a glass of iced cold brew beside the matte black Ritual can with its gold sunrise mark. Mara takes a slow sip, lowers the glass, and speaks to the lens, relaxed and satisfied. [Mara: woman, thirties, warm low voice, unhurried, confident]: \"Eighteen hours, cold. Nothing bitter left.\" Camera pushes in slowly from medium to medium close-up. Ambient noise: quiet kitchen, ice clinking in the glass.",
+        "promptScriptLine": "Eighteen hours, cold. Nothing bitter left.",
+        "shotSize": "medium",
+        "camera": "slow push in"
+      }
+    },
+    {
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "SHOT-A4",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "model": "kling-v3.0-std",
+        "params": {
+          "aspectRatio": "9:16",
+          "duration": 4,
+          "sound": false,
+          "negativePrompt": "on-screen text, captions, warped can, misshapen logo, extra objects"
+        },
+        "firstFrameAssetId": "a55e0000-0000-4000-8000-000000000002",
+        "recipeMode": "custom",
+        "prompt": "Condensation beads slowly run down the matte black Ritual can on the wet slate; a thin wisp of cold mist drifts past. Camera orbits slowly a few degrees to the right and settles, leaving clean space in the upper third for the end-card text.",
+        "action": "Ritual. Cold brew, done right. (Super + CTA added in the edit.)",
+        "shotSize": "close-up",
+        "camera": "slow orbit"
+      }
+    }
+  ],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/members/manifest.json",
+      "query": {},
+      "status": 402
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects/get",
+      "query": {
+        "id": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/library",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"shotIds\":[\"5a070000-0000-4000-8000-000000000001\",\"5a070000-0000-4000-8000-000000000002\",\"5a070000-0000-4000-8000-000000000003\",\"5a070000-0000-4000-8000-000000000004\"]}"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/credits/balance",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    }
+  ]
+}

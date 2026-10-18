@@ -1,0 +1,116 @@
+{
+  "case": "howto-same-face",
+  "arm": "candidate",
+  "run": 3,
+  "model": "claude-opus-5-5",
+  "wallMs": 26162,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 150,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_015t89LK96EsvzAxkE7sA7Mh",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_prompting_guide",
+        "max_results": 1
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_015t89LK96EsvzAxkE7sA7Mh",
+      "error": false,
+      "text": "[tool_reference]",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01EsdxUtBWMycVqg4AYDoadk",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "app-manual",
+        "query": "character consistency same face identity reference across shots"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01EsdxUtBWMycVqg4AYDoadk",
+      "error": false,
+      "text": "{\"topic\":\"app-manual\",\"bytes\":1360,\"guide\":\"## WORKFLOWS — start to finish: a script to a finished video, one picture to an ad, the same character in every shot, cheap previews first, letting an AI do it\\n\\n### Workflow: keep a character or product the same in every shot (Library, @name, identity sheet, voice)\\n\\n1. Save one clean picture of them to the Library: **More › Save to Library…** on the picture, or **New {Noun}** on a category page. For a character, an **Identity sheet** helps.\\n2. Write `@name` in every prompt that shows them. Their picture attaches as a numbered reference; See what gets sent shows the words the model receives.\\n3. For one look across the film, make a Looks item and write `#name` in each prompt.\\n4. Give a character a voice (their card → **Add voice**). On video models that take one, the voice attaches with the `@name`.\\n5. Check the reference rail before pressing **Generate**: a tile marked **Not sent** is past the model's limit.\\n\\nDetails: THE LIBRARY; \\\"Prompt box: @ and # mentions, image 1 citations\\\".\\n\\nRelated sections (ask by heading): Library: New dialog Generate form (character sheet, identity prompt, location prompt, style change, source images, Create & Generate) · Library: sheet tools (Identity sheet, Establishing image, turnaround, character sheet, price) · Videos · Prompt box: pick a model (model picker, search models, families, Face, tools)\"}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_018kntbeLEDA7zmezLoEVx4L",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "app-manual",
+        "query": "Library: sheet tools (Identity sheet, Establishing image, turnaround, character sheet, price)"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_018kntbeLEDA7zmezLoEVx4L",
+      "error": false,
+      "text": "{\"topic\":\"app-manual\",\"bytes\":1286,\"guide\":\"## THE LIBRARY — characters, locations, products, props and looks; @name and #name; categories; New; Save to Library; sheet tools; voices\\n\\n### Library: sheet tools (Identity sheet, Establishing image, turnaround, character sheet, price)\\n- **Identity sheet**: a portrait plus front and back full-body views of one character.\\n- **Establishing image**: one clean, empty wide view of a place.\\n- Every thing can use either tool, whatever its category. A look has none. The picker starts on Identity sheet for Things and Characters items and on Establishing image for Locations items.\\n- Where: the New dialog's Generate form, **Generate Library Sheet**, and **Generate sheet…** on a card. The result becomes that item's one picture.\\n- The tools run on the app's default image model; no control picks another. The line **Est. ~{price} for 1 image at {resolution}** shows the price before you confirm, and the run bills the same figure.\\n- They need an active licence. With no credit route the run says \\\"Out of credits. Add credits in Settings -> Account to keep generating.\\\"\\n- No product sheet exists: for a product or prop, use a clean picture.\\n- Agent: slates_estimate_generation_cost first, then slates_generate_character_identity or slates_generate_environment_plate with any item's id.\"}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "text",
+      "text": "The way to do this in Slates is to save your character to the **Library** and then mention them by name in every prompt.\n\n**1. Save one clean picture of the character to the Library**\n- If you already have a good picture of them, open it and choose **More › Save to Library…**\n- Or start from scratch with **New Character** on the Characters page.\n- It's worth making an **Identity sheet**: a portrait plus front and back full-body views. You can make one from the New dialog's Generate form, with **Generate Library Sheet**, or with **Generate sheet…** on the character's card. The sheet becomes that character's picture. The price shows as **Est. ~… for 1 image** before you confirm.\n\n**2. Write `@name` in every prompt that shows them**\n- For example: `@Mara walks into the diner, rain on her coat`.\n- Their picture attaches to the prompt as a numbered reference. **See what gets sent** shows the exact words the model receives.\n\n**3. (Optional) Keep the whole film in one visual style**\n- Make a **Looks** item and write `#name` in each prompt.\n\n**4. (Optional) Give them a voice**\n- On the character's card, choose **Add voice**. On video models that take a voice, it attaches automatically when you write `@name`.\n\n**5. Check the reference rail before you press Generate**\n- If a tile is marked **Not sent**, you've gone past that model's reference limit, and that reference (possibly your character) won't be used. Remove some other references or pick a model that takes more.\n\nTips:\n- Use a clean, well-lit picture where the face is clearly visible. The references can only be as good as that picture.\n- Use the same `@name` in every shot, including wide shots and close-ups.\n\nI can set up the character for you in your current project. If you want that, I'll show you the cost of the Identity sheet first and wait for your OK before generating anything."
+    }
+  ],
+  "reply": "The way to do this in Slates is to save your character to the **Library** and then mention them by name in every prompt.\n\n**1. Save one clean picture of the character to the Library**\n- If you already have a good picture of them, open it and choose **More › Save to Library…**\n- Or start from scratch with **New Character** on the Characters page.\n- It's worth making an **Identity sheet**: a portrait plus front and back full-body views. You can make one from the New dialog's Generate form, with **Generate Library Sheet**, or with **Generate sheet…** on the character's card. The sheet becomes that character's picture. The price shows as **Est. ~… for 1 image** before you confirm.\n\n**2. Write `@name` in every prompt that shows them**\n- For example: `@Mara walks into the diner, rain on her coat`.\n- Their picture attaches to the prompt as a numbered reference. **See what gets sent** shows the exact words the model receives.\n\n**3. (Optional) Keep the whole film in one visual style**\n- Make a **Looks** item and write `#name` in each prompt.\n\n**4. (Optional) Give them a voice**\n- On the character's card, choose **Add voice**. On video models that take a voice, it attaches automatically when you write `@name`.\n\n**5. Check the reference rail before you press Generate**\n- If a tile is marked **Not sent**, you've gone past that model's reference limit, and that reference (possibly your character) won't be used. Remove some other references or pick a model that takes more.\n\nTips:\n- Use a clean, well-lit picture where the face is clearly visible. The references can only be as good as that picture.\n- Use the same `@name` in every shot, including wide shots and close-ups.\n\nI can set up the character for you in your current project. If you want that, I'll show you the cost of the Identity sheet first and wait for your OK before generating anything.",
+  "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 6028,
+    "cache_read_input_tokens": 24285,
+    "output_tokens": 977,
+    "output_tokens_details": {
+      "thinking_tokens": 63
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 6028,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 610,
+        "cache_read_input_tokens": 7948,
+        "cache_creation_input_tokens": 640,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 640
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 4,
+  "durationMs": 24219,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": []
+}

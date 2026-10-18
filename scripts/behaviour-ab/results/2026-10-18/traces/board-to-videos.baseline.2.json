@@ -1,0 +1,252 @@
+{
+  "case": "board-to-videos",
+  "arm": "baseline",
+  "run": 2,
+  "model": "claude-opus-5-5",
+  "wallMs": 24850,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_0145hD2d2Nip7nFf1TF1HSVc",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_storyboards,mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_estimate_generation_cost,mcp__slates__slates_get_prompting_guide,mcp__slates__slates_get_board_quote",
+        "max_results": 6
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_0145hD2d2Nip7nFf1TF1HSVc",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01MBhaudbaZm8pEGz7bo9PbU",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 10
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01MBhaudbaZm8pEGz7bo9PbU",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Hf6BiAAmKLusrMQBPNyCWt",
+      "name": "mcp__slates__slates_list_storyboards",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Hf6BiAAmKLusrMQBPNyCWt",
+      "error": false,
+      "text": "{\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01ERSHuxLumY8z834kcrjcPu",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01ERSHuxLumY8z834kcrjcPu",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21,
+        30000,
+        55,
+        70000,
+        3,
+        20,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_0153rb7ySguXqkCmZ7iT2T1k",
+      "name": "mcp__slates__slates_get_board_quote",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_0153rb7ySguXqkCmZ7iT2T1k",
+      "error": false,
+      "text": "{\"fingerprint\":\"fixture-quote-1\",\"items\":[{\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"name\":\"Hook: Mara to camera\",\"code\":\"SHOT-A1\",\"model\":\"kling-v3.0-std\",\"prompt\":\"@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile\",\"cost\":32,\"credits\":32,\"blocked\":null},{\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"name\":\"Crack and pour\",\"code\":\"SHOT-A2\",\"model\":\"kling-v3.0-std\",\"prompt\":\"\",\"cost\":null,\"credits\":null,\"blocked\":\"No prompt or script line yet: write one before it can be priced or fired.\"},{\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"name\":\"Proof line\",\"code\":\"SHOT-A3\",\"model\":\"kling-v3.0-std\",\"prompt\":\"@Mara leaning on the counter with @Ritual-can, talking to a friend off camera\",\"cost\":32,\"credits\":32,\"blocked\":null},{\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"name\":\"Hero end card\",\"code\":\"SHOT-A4\",\"model\":\"kling-v3.0-std\",\"prompt\":\"@Ritual-can on wet slate, rim light, logo legible\",\"cost\":32,\"credits\":32,\"blocked\":null}],\"total\":96,\"largest\":32,\"unpriced\":1}",
+      "numbers": [
+        1,
+        5,
+        70000,
+        0,
+        4000,
+        8000,
+        3,
+        32,
+        2,
+        4,
+        96
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "I've priced your board **Cold brew 15s v1** (Morning Ritual Coffee) and need your OK before anything is generated.\n\n**Quote (Kling 3.0 Standard, from the Generate panel):**\n\n| Shot | Name | Credits |\n|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | 32 |\n| SHOT-A2 | Crack and pour | **can't be priced or generated yet** |\n| SHOT-A3 | Proof line | 32 |\n| SHOT-A4 | Hero end card | 32 |\n| **Total** | | **96 credits** |\n\n**SHOT-A2 has no prompt or script line yet**, so it can't be priced or generated. Here's a prompt you could use:\n\n> Extreme close-up: a hand cracks open @Ritual-can, and cold brew pours over ice in a glass. Condensation beads, the light catches it, slow push-in.\n\nWith a prompt, A2 should also cost about 32 credits on the same model, bringing the board to about 128. I'll get the exact price before anything runs.\n\nWhich would you like?\n1. **Generate A1, A3 and A4 now** for 96 credits, and leave A2 for later.\n2. **Add the A2 prompt above** (or your own), re-quote the full board, then generate all four."
+    }
+  ],
+  "reply": "I've priced your board **Cold brew 15s v1** (Morning Ritual Coffee) and need your OK before anything is generated.\n\n**Quote (Kling 3.0 Standard, from the Generate panel):**\n\n| Shot | Name | Credits |\n|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | 32 |\n| SHOT-A2 | Crack and pour | **can't be priced or generated yet** |\n| SHOT-A3 | Proof line | 32 |\n| SHOT-A4 | Hero end card | 32 |\n| **Total** | | **96 credits** |\n\n**SHOT-A2 has no prompt or script line yet**, so it can't be priced or generated. Here's a prompt you could use:\n\n> Extreme close-up: a hand cracks open @Ritual-can, and cold brew pours over ice in a glass. Condensation beads, the light catches it, slow push-in.\n\nWith a prompt, A2 should also cost about 32 credits on the same model, bringing the board to about 128. I'll get the exact price before anything runs.\n\nWhich would you like?\n1. **Generate A1, A3 and A4 now** for 96 credits, and leave A2 for later.\n2. **Add the A2 prompt above** (or your own), re-quote the full board, then generate all four.",
+  "usage": {
+    "input_tokens": 12,
+    "cache_creation_input_tokens": 9052,
+    "cache_read_input_tokens": 48871,
+    "output_tokens": 1223,
+    "output_tokens_details": {
+      "thinking_tokens": 243
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 9052,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 606,
+        "cache_read_input_tokens": 10915,
+        "cache_creation_input_tokens": 696,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 696
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 6,
+  "durationMs": 23022,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\"}"
+      },
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,357 @@
+{
+  "case": "edit-iterate",
+  "arm": "baseline",
+  "run": 4,
+  "model": "claude-opus-5-5",
+  "wallMs": 33506,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01Pq9fKx77851eVjMg3kewyq",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_storyboards,mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_get_shot,mcp__slates__slates_get_prompting_guide,mcp__slates__slates_estimate_generation_cost",
+        "max_results": 6
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Pq9fKx77851eVjMg3kewyq",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01K96M5wpVZgQruzGYTQYDPZ",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 10
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01K96M5wpVZgQruzGYTQYDPZ",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01KLWu7L7ghPvMLv7Wb5aYz2",
+      "name": "mcp__slates__slates_list_storyboards",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01KLWu7L7ghPvMLv7Wb5aYz2",
+      "error": false,
+      "text": "{\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01E6j3nvuRh4XtYhnPrzT8mq",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01E6j3nvuRh4XtYhnPrzT8mq",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"castCutCounts\":{},\"locationCutCounts\":{},\"modelCutCounts\":{\"kling-v3.0-std\":4},\"durationCutCounts\":{\"5\":4},\"runs\":[],\"overLongLines\":[],\"words\":14,\"wordBudget\":51}}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01EFiU4vLDXDCeaJahEbM6YD",
+      "name": "mcp__slates__slates_get_shot",
+      "input": {
+        "shotId": "5a070000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01EFiU4vLDXDCeaJahEbM6YD",
+      "error": false,
+      "text": "{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"name\":\"Hook: Mara to camera\",\"model\":\"kling-v3.0-std\",\"authoredFor\":\"kling-v3.0-std\",\"rawPrompt\":\"@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile\",\"referenceCount\":1,\"params\":{\"aspectRatio\":\"9:16\",\"duration\":5},\"speaker\":\"Mara\",\"line\":\"Your morning coffee shouldn’t taste like a punishment.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shotSize\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"cuts\":1,\"runtimeSeconds\":5,\"place\":\"1A\",\"sceneName\":\"Hook\",\"position\":0,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"scriptSceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"scriptStart\":0,\"scriptEnd\":57,\"startFrameAssetId\":\"a55e0000-0000-4000-8000-000000000001\",\"takes\":[{\"assetId\":\"a55e0000-0000-4000-8000-000000000004\",\"code\":\"VID-V1\",\"current\":true}],\"status\":\"generated\",\"composedPrompt\":\"@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile\",\"references\":[{\"kind\":\"startFrame\",\"number\":1,\"durationSeconds\":null}],\"missing\":null,\"unresolvedTokens\":[],\"generationIds\":[],\"firesWith\":{\"videoResolution\":\"720p\",\"imageResolution\":null,\"duration\":5,\"audioDurationSeconds\":null},\"blocked\":null,\"credits\":32,\"quoteFingerprint\":\"fixture-quote-1\"}",
+      "priced": [
+        32
+      ],
+      "balances": []
+    },
+    {
+      "kind": "text",
+      "text": "Found 1A (SHOT-A1, \"Hook: Mara to camera\"). Next I'm checking the current take and its start frame to see where the darkness comes from."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01DBzj8XQHBSvxakASvK4kfe",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_asset,mcp__slates__slates_get_asset_image,mcp__slates__slates_get_asset_video_frames,mcp__slates__slates_update_shot",
+        "max_results": 4
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01DBzj8XQHBSvxakASvK4kfe",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01VrqAQt2hxiqGoZ5wxZwJsj",
+      "name": "mcp__slates__slates_get_asset_video_frames",
+      "input": {
+        "id": "a55e0000-0000-4000-8000-000000000004"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01VrqAQt2hxiqGoZ5wxZwJsj",
+      "error": false,
+      "text": "[image]\n[Image: source: ~\\.claude\\projects\\~-AppData-Local-Temp-slates-ab-baseline-edit-iterate-2iC5Zj-work\\6afdccff-a526-4f4f-bb0e-7c42e5d0d4f8\\tool-results\\mcp-slates-blob-1792317002620-6ka4qj.png]\n[image]\n[Image: source: ~\\.claude\\projects\\~-AppData-Local-Temp-slates-ab-baseline-edit-iterate-2iC5Zj-work\\6afdccff-a526-4f4f-bb0e-7c42e5d0d4f8\\tool-results\\mcp-slates-blob-1792317002620-dovk8c.png]\n[image]\n[Image: source: ~\\.claude\\projects\\~-AppData-Local-Temp-slates-ab-baseline-edit-iterate-2iC5Zj-work\\6afdccff-a526-4f4f-bb0e-7c42e5d0d4f8\\tool-results\\mcp-slates-blob-1792317002620-zkhgvd.png]\n{\"asset_id\":\"a55e0000-0000-4000-8000-000000000004\",\"code\":\"VID-V1\",\"label\":\"Mara first sip\",\"file_path\":\"C:\\\\Users\\\\user\\\\Slates Projects\\\\7a1c2e40-0000-4000-8000-000000000001\\\\VID-V1.mp4\",\"duration_seconds\":5,\"frames\":[{\"timestamp_seconds\":0.83,\"bytes\":225,\"mimeType\":\"image/png\"},{\"timestamp_seconds\":2.5,\"bytes\":225,\"mimeType\":\"image/png\"},{\"timestamp_seconds\":4.17,\"bytes\":225,\"mimeType\":\"image/png\"}]}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01KE2KpRHGTHM9LPgCU33ckJ",
+      "name": "mcp__slates__slates_get_asset_image",
+      "input": {
+        "id": "a55e0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01KE2KpRHGTHM9LPgCU33ckJ",
+      "error": false,
+      "text": "[image]\n[Image: source: ~\\.claude\\projects\\~-AppData-Local-Temp-slates-ab-baseline-edit-iterate-2iC5Zj-work\\6afdccff-a526-4f4f-bb0e-7c42e5d0d4f8\\tool-results\\mcp-slates-blob-1792317003267-fmbfpt.png]\n{\"asset_id\":\"a55e0000-0000-4000-8000-000000000001\",\"code\":\"IMG-A1\",\"label\":\"Mara, kitchen window, morning\",\"file_path\":\"C:\\\\Users\\\\user\\\\Slates Projects\\\\7a1c2e40-0000-4000-8000-000000000001\\\\IMG-A1.png\",\"bytes\":225,\"mimeType\":\"image/png\"}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01J59FMaRXHxcTAQavToeyky",
+      "name": "mcp__slates__slates_get_asset",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "assetId": "a55e0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01J59FMaRXHxcTAQavToeyky",
+      "error": false,
+      "text": "{\"asset\":{\"id\":\"a55e0000-0000-4000-8000-000000000001\",\"code\":\"IMG-A1\",\"type\":\"image\",\"label\":\"Mara, kitchen window, morning\",\"prompt\":\"A woman in her thirties at a sunlit kitchen window holding a matte black cold brew can, soft morning light from camera left\",\"model\":\"nano-banana-2\",\"width\":1024,\"height\":1820,\"aspectRatio\":\"9:16\",\"favorite\":true,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"createdAt\":\"2026-10-17T21:40:00.000Z\",\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"folderId\":null,\"note\":null}}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01YTuvbDLRYEXt56m8c1hf2g",
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "5a070000-0000-4000-8000-000000000001",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "prompt": "@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile. Bright, airy morning: warm sunlight streams through the window from camera left, softly lighting her face. Exposure and colors match the start frame exactly, high-key and evenly lit throughout, no darkening or fade."
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01YTuvbDLRYEXt56m8c1hf2g",
+      "error": true,
+      "text": "Permission to use mcp__slates__slates_update_shot has been denied because Claude Code is running in don't ask mode. IMPORTANT: You *may* attempt to accomplish this action using other tools that might naturally be used to accomplish this goal, e.g. using head instead of cat. But you *should not* attempt to work around this denial in malicious ways, e.g. do not use your ability to run tests to execute non-test actions. You should only try to work around this restriction in reasonable ways that do not attempt to bypass the intent behind this denial. If you believe this capability is essential to complete the user's request, STOP and explain to the user what you were trying to do and why you need this permission. Let the user decide how to proceed.",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01TbkXhFwMUNCWJsnMntsN5r",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 5,
+        "videoResolution": "720p"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01TbkXhFwMUNCWJsnMntsN5r",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-5s-audio\",\"quantity\":1,\"cost_per_credits\":32,\"total_credits\":32,\"requires_confirm\":true,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "priced": [
+        32
+      ],
+      "balances": []
+    },
+    {
+      "kind": "text",
+      "text": "I haven't fixed 1A yet. Changing the shot was blocked by your permission settings, and regenerating it costs credits, so I need your OK first.\n\n**What's wrong:** 1A (SHOT-A1, \"Hook: Mara to camera\") starts from IMG-A1, \"Mara, kitchen window, morning\", which is a bright, warm image. The current take, VID-V1, is almost black in all three frames I sampled (about 0.8s, 2.5s and 4.2s). So the darkness came from the video generation, not the starting image. The prompt says nothing about light, which leaves the model free to drift.\n\n**Proposed fix:**\n- **Prompt:** `@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile. Warm morning sunlight from camera left stays steady on her face; brightness holds constant through the whole shot.`\n- **Negative prompt:** `dark, underexposed, dim, low-key lighting, fade to black, night`\n\nEverything else stays the same: Kling 3.0 Standard, 5s, 9:16, 720p, starting from IMG-A1.\n\n**Cost:** 1 take × 32 credits = **32 credits**. Kling prices this with sound on. The new take is added next to VID-V1, which stays.\n\nTo go ahead, either allow the shot-update permission or make the prompt change yourself in the app. Then reply \"go\" and I'll generate the new take for 32 credits."
+    }
+  ],
+  "reply": "I haven't fixed 1A yet. Changing the shot was blocked by your permission settings, and regenerating it costs credits, so I need your OK first.\n\n**What's wrong:** 1A (SHOT-A1, \"Hook: Mara to camera\") starts from IMG-A1, \"Mara, kitchen window, morning\", which is a bright, warm image. The current take, VID-V1, is almost black in all three frames I sampled (about 0.8s, 2.5s and 4.2s). So the darkness came from the video generation, not the starting image. The prompt says nothing about light, which leaves the model free to drift.\n\n**Proposed fix:**\n- **Prompt:** `@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile. Warm morning sunlight from camera left stays steady on her face; brightness holds constant through the whole shot.`\n- **Negative prompt:** `dark, underexposed, dim, low-key lighting, fade to black, night`\n\nEverything else stays the same: Kling 3.0 Standard, 5s, 9:16, 720p, starting from IMG-A1.\n\n**Cost:** 1 take × 32 credits = **32 credits**. Kling prices this with sound on. The new take is added next to VID-V1, which stays.\n\nTo go ahead, either allow the shot-update permission or make the prompt change yourself in the app. Then reply \"go\" and I'll generate the new take for 32 credits.",
+  "usage": {
+    "input_tokens": 18,
+    "cache_creation_input_tokens": 16081,
+    "cache_read_input_tokens": 90870,
+    "output_tokens": 2281,
+    "output_tokens_details": {
+      "thinking_tokens": 484
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 16081,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 602,
+        "cache_read_input_tokens": 16651,
+        "cache_creation_input_tokens": 1997,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1997
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 12,
+  "durationMs": 31369,
+  "denials": [
+    {
+      "name": "mcp__slates__slates_update_shot",
+      "input": {
+        "shotId": "5a070000-0000-4000-8000-000000000001",
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "prompt": "@Mara at the kitchen window looks straight into the lens, deadpan, then a small smile. Bright, airy morning: warm sunlight streams through the window from camera left, softly lighting her face. Exposure and colors match the start frame exactly, high-key and evenly lit throughout, no darkening or fade."
+      }
+    }
+  ],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/get",
+      "query": {
+        "id": "5a070000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"shotIds\":[\"5a070000-0000-4000-8000-000000000001\"]}"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets/video-frames",
+      "query": {
+        "id": "a55e0000-0000-4000-8000-000000000004"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets/image",
+      "query": {
+        "id": "a55e0000-0000-4000-8000-000000000001",
+        "fullRes": "false"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets/get",
+      "query": {
+        "id": "a55e0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    }
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "case": "project-organization",
+  "arm": "candidate",
+  "run": 1,
+  "model": "claude-opus-5-5",
+  "wallMs": 21220,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 150,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01B2JZpeApS8oDnZf6h7Zoqm",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_projects,mcp__slates__slates_list_assets,mcp__slates__slates_list_folders,mcp__slates__slates_get_prompting_guide",
+        "max_results": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01B2JZpeApS8oDnZf6h7Zoqm",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01CBQp1PVH3dJrDMtVTZjQc4",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {}
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01CBQp1PVH3dJrDMtVTZjQc4",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_016afk4zmgMzZZXJfwsngeKv",
+      "name": "mcp__slates__slates_list_assets",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "limit": 500
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_016afk4zmgMzZZXJfwsngeKv",
+      "error": false,
+      "text": "{\"total_matching\":5,\"total_in_project\":5,\"truncated\":false,\"assets\":[{\"id\":\"a55e0000-0000-4000-8000-000000000001\",\"code\":\"IMG-A1\",\"label\":\"Mara, kitchen window, morning\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000002\",\"code\":\"IMG-A2\",\"label\":\"Can on wet slate, hero\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000003\",\"code\":\"IMG-A3\",\"label\":\"Pour over ice, macro\",\"type\":\"image\"},{\"id\":\"a55e0000-0000-4000-8000-000000000004\",\"code\":\"VID-V1\",\"label\":\"Mara first sip\",\"type\":\"video\"},{\"id\":\"a55e0000-0000-4000-8000-000000000005\",\"code\":\"AUD-S1\",\"label\":\"VO take 1\",\"type\":\"audio\"}]}",
+      "numbers": [
+        5,
+        55,
+        0,
+        4000,
+        8000,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01TgQRc5mecSLpVAQfHuopMY",
+      "name": "mcp__slates__slates_list_folders",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01TgQRc5mecSLpVAQfHuopMY",
+      "error": false,
+      "text": "{\"folders\":[]}",
+      "numbers": []
+    },
+    {
+      "kind": "text",
+      "text": "I didn't find a project called \"cold brew.\" I'm assuming you mean **Morning Ritual Coffee**, since it has the can and pour-over-ice shots. If it's a different project, tell me and I'll look there.\n\nThe project has 5 assets and no folders yet:\n\n| Code | Label |\n|---|---|\n| IMG-A1 | Mara, kitchen window, morning |\n| IMG-A2 | Can on wet slate, hero |\n| IMG-A3 | Pour over ice, macro |\n| VID-V1 | Mara first sip |\n| AUD-S1 | VO take 1 |\n\n**What I'd suggest**\n\nAt this size, folders by what each asset is for will help more than folders by file type:\n\n- **Talent – Mara**: IMG-A1. This gives you a consistent reference for her across future shots.\n- **Product**: IMG-A2 (the hero can shot) and IMG-A3 (the pour macro)\n- **Video takes**: VID-V1\n- **Audio / VO**: AUD-S1. Future VO takes go here too.\n\nSome habits that will help as the project grows:\n- **Favorite your keepers** (for example IMG-A2 as the hero) so the picks stand out from the alternates.\n- **Keep labels consistent**, like \"VO take 2\" and \"VO take 3\", so search and sorting work.\n- **Set a folder cover** on Product (IMG-A2 is a good choice) so you can tell folders apart at a glance.\n\nI can create these folders and move the assets into them now. It doesn't use any credits. Want me to do that, or change the folder names first?"
+    }
+  ],
+  "reply": "I didn't find a project called \"cold brew.\" I'm assuming you mean **Morning Ritual Coffee**, since it has the can and pour-over-ice shots. If it's a different project, tell me and I'll look there.\n\nThe project has 5 assets and no folders yet:\n\n| Code | Label |\n|---|---|\n| IMG-A1 | Mara, kitchen window, morning |\n| IMG-A2 | Can on wet slate, hero |\n| IMG-A3 | Pour over ice, macro |\n| VID-V1 | Mara first sip |\n| AUD-S1 | VO take 1 |\n\n**What I'd suggest**\n\nAt this size, folders by what each asset is for will help more than folders by file type:\n\n- **Talent – Mara**: IMG-A1. This gives you a consistent reference for her across future shots.\n- **Product**: IMG-A2 (the hero can shot) and IMG-A3 (the pour macro)\n- **Video takes**: VID-V1\n- **Audio / VO**: AUD-S1. Future VO takes go here too.\n\nSome habits that will help as the project grows:\n- **Favorite your keepers** (for example IMG-A2 as the hero) so the picks stand out from the alternates.\n- **Keep labels consistent**, like \"VO take 2\" and \"VO take 3\", so search and sorting work.\n- **Set a folder cover** on Product (IMG-A2 is a good choice) so you can tell folders apart at a glance.\n\nI can create these folders and move the assets into them now. It doesn't use any credits. Want me to do that, or change the folder names first?",
+  "usage": {
+    "input_tokens": 8,
+    "cache_creation_input_tokens": 6573,
+    "cache_read_input_tokens": 25766,
+    "output_tokens": 1084,
+    "output_tokens_details": {
+      "thinking_tokens": 186
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 6573,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 645,
+        "cache_read_input_tokens": 8517,
+        "cache_creation_input_tokens": 620,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 620
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 5,
+  "durationMs": 19418,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/assets",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/folders",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    }
+  ]
+}

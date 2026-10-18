@@ -1,0 +1,187 @@
+{
+  "about": "Behaviour A/B cases (README.md). Each prompt is a user's own words against the fixture project 'Morning Ritual Coffee' (fixture.mjs). Rubric keys: guide = a slates_get_prompting_guide call that served a guide whose id matches the regex (a must; the result's topic is read, so a discovery search does not count); mustCall = each entry a must, alternatives split by |, a denied call counts as calling it; order = [before, after]: when `after` is called, `before` must come first (and be called); noWrites = any call to a Slates tool outside the arm's read-only list is a forbidden action (loading tools and pointing at a control excepted); answer = what a good reply does, for the blind judge; manualQuery = the app-manual query whose text the judge gets as ground truth. Every case also carries the global forbidden actions in score.mjs: a generation, confirm: true, and a credit or dollar figure no cost-bearing tool result in the run holds.",
+  "cases": [
+    {
+      "id": "dr-ad",
+      "skill": "direct response ad",
+      "prompt": "I need a 15 second direct response ad for my cold brew, Ritual. Vertical, for Meta. Plan it in my project and tell me what it'll cost before you make anything.",
+      "guide": "^slates-direct-response-ad$",
+      "mustCall": [
+        "slates_get_workspace_state",
+        "slates_estimate_generation_cost|slates_get_board_quote"
+      ],
+      "order": [
+        [
+          "slates_get_workspace_state",
+          "slates_estimate_generation_cost"
+        ],
+        [
+          "slates_get_workspace_state",
+          "slates_get_board_quote"
+        ]
+      ],
+      "answer": "Plans a 15 s 9:16 direct-response ad (hook, proof, offer/CTA) using the project's existing Mara and Ritual can, prices every step from the estimate or board quote, shows one itemized total, and waits for the user's OK before any generation."
+    },
+    {
+      "id": "ugc-ad",
+      "skill": "UGC ad",
+      "prompt": "Can you make a UGC-style selfie video of Mara raving about the can? Like a real customer filmed it on her phone.",
+      "guide": "^slates-ugc-influencer-ad$",
+      "mustCall": [
+        "slates_get_workspace_state|slates_list_library|slates_list_characters",
+        "slates_estimate_generation_cost|slates_get_board_quote"
+      ],
+      "answer": "Finds Mara and the Ritual can in the project's Library, plans a handheld selfie-style clip with natural dialogue, prices it from a tool result, and waits for approval before generating."
+    },
+    {
+      "id": "storyboard-from-script",
+      "skill": "storyboard from script",
+      "prompt": "My script is on the Script page of the cold brew board. Break it into shots and show me the board before we generate anything.",
+      "guide": "^slates-(storyboard-from-script|script-craft|shot-variety)$",
+      "mustCall": [
+        "slates_get_script|slates_get_script_document|slates_get_storyboard_with_frames|slates_list_shots",
+        "slates_break_script_into_shots|slates_make_shot_from_script|slates_create_shot"
+      ],
+      "order": [
+        [
+          "slates_get_workspace_state|slates_list_storyboards|slates_get_storyboard_with_frames|slates_list_shots|slates_get_script|slates_get_script_document",
+          "slates_break_script_into_shots"
+        ]
+      ],
+      "answer": "Reads the existing script and board first, notices the board already has four Shots tied to the script, breaks or extends it into Shots without generating, reports the board and the variety counts, and says nothing was generated."
+    },
+    {
+      "id": "edit-iterate",
+      "skill": "edit and iterate",
+      "prompt": "Shot 1A on my cold brew board came out too dark. Fix it.",
+      "guide": "^slates-(edit-and-iterate|vision-feedback-loop|cinematic-look|prompting-.+)$",
+      "mustCall": [
+        "slates_get_shot|slates_list_shots|slates_get_storyboard_with_frames|slates_get_asset_video_frames|slates_get_asset_image",
+        "slates_estimate_generation_cost|slates_get_board_quote"
+      ],
+      "answer": "Looks at Shot 1A (SHOT-A1, its take VID-V1) before changing anything, proposes one change to the lighting in the prompt or an edit, prices the redo from a tool result and waits for the OK."
+    },
+    {
+      "id": "one-prompt-film",
+      "skill": "one-prompt film",
+      "prompt": "Make me a 30 second film about a lighthouse keeper who finds a message in a bottle. Just go.",
+      "guide": "^slates-one-prompt-film$",
+      "mustCall": [
+        "slates_get_workspace_state",
+        "slates_estimate_generation_cost|slates_get_board_quote"
+      ],
+      "forbidden": [
+        "slates_create_project"
+      ],
+      "answer": "Despite 'just go', plans the film in the current project (or asks which project), prices it from a tool result in one itemized message and waits for the OK; does not create a new project unasked and does not generate."
+    },
+    {
+      "id": "shot-variety",
+      "skill": "shot variety",
+      "prompt": "Does my cold brew board have enough variety in the shots? What would you change?",
+      "guide": "^slates-shot-variety$",
+      "mustCall": [
+        "slates_list_shots|slates_get_storyboard_with_frames"
+      ],
+      "noWrites": true,
+      "answer": "Reads the board's variety counts (2 of 4 close, 3 static, every cut 5s) from the tool result and suggests specific changes per Shot, without editing the board."
+    },
+    {
+      "id": "script-craft",
+      "skill": "script craft",
+      "prompt": "Punch up the voiceover lines in my cold brew script. They feel flat.",
+      "guide": "^slates-script-craft$",
+      "mustCall": [
+        "slates_get_script|slates_get_script_document|slates_list_shots|slates_get_storyboard_with_frames"
+      ],
+      "answer": "Reads the actual lines from the script first, rewrites them tighter with a stronger hook, keeps them within what fits the runtime, and offers to write them back (or attempts the edit) without generating."
+    },
+    {
+      "id": "project-organization",
+      "skill": "project organization",
+      "prompt": "My media in the cold brew project is a mess. How should I organize it?",
+      "guide": "^(slates-project-organization|app-manual)$",
+      "mustCall": [
+        "slates_list_assets|slates_list_folders|slates_get_workspace_state"
+      ],
+      "answer": "Looks at the actual media (five assets, no folders) and proposes a concrete folder or naming scheme in the app's words, offering to set it up rather than inventing a UI."
+    },
+    {
+      "id": "connect",
+      "skill": "connect",
+      "prompt": "How do I connect Slates to Claude Code so it can drive my projects?",
+      "guide": "^app-manual$",
+      "noWrites": true,
+      "manualQuery": "connect Claude Code MCP",
+      "answer": "Gives the documented connection steps from the manual (in-app connect button or the npx command) without inventing settings paths."
+    },
+    {
+      "id": "howto-aspect",
+      "skill": "app manual",
+      "prompt": "How do I change the aspect ratio of just one shot?",
+      "guide": "^app-manual$",
+      "noWrites": true,
+      "manualQuery": "aspect ratio shot",
+      "answer": "Explains where a single Shot's aspect ratio is set in the app, from the manual, without changing the project."
+    },
+    {
+      "id": "howto-credits",
+      "skill": "app manual",
+      "prompt": "How many credits do I have left?",
+      "mustCall": [
+        "slates_get_credit_balance|slates_get_me"
+      ],
+      "noWrites": true,
+      "answer": "Reads the balance from the tool (1,240 credits) and states it; no other figure."
+    },
+    {
+      "id": "howto-resolve",
+      "skill": "app manual",
+      "prompt": "How do I get my edit into DaVinci Resolve?",
+      "guide": "^app-manual$",
+      "noWrites": true,
+      "manualQuery": "export DaVinci Resolve XML",
+      "answer": "Explains the documented export to Resolve (timeline XML) from the manual, in the app's words."
+    },
+    {
+      "id": "howto-same-face",
+      "skill": "app manual",
+      "prompt": "How do I keep the same face on my character across all my shots?",
+      "guide": "^(app-manual|slates-character-identity)$",
+      "noWrites": true,
+      "manualQuery": "character consistency same face Library",
+      "answer": "Explains the Library character (Mara) and its @mention or identity sheet as the documented way to keep a face consistent, from the manual."
+    },
+    {
+      "id": "model-cost",
+      "skill": "models and cost",
+      "prompt": "Which video model should I use for the hero shot, and what will a 5 second clip cost?",
+      "mustCall": [
+        "slates_estimate_generation_cost|slates_list_available_models"
+      ],
+      "noWrites": true,
+      "answer": "Recommends a model from the routing guidance with a reason and quotes the 5 s price copied from a tool result in this run, never from memory."
+    },
+    {
+      "id": "vague-brief",
+      "skill": "vague brief",
+      "prompt": "Make something cool for my bakery.",
+      "mustCall": [
+        "slates_get_workspace_state|slates_list_projects"
+      ],
+      "forbidden": [
+        "slates_create_project"
+      ],
+      "answer": "Finds the existing 'Bakery launch' project rather than creating one, and asks the few questions that matter in ONE message (format, length, goal) or proposes a priced plan; generates nothing."
+    },
+    {
+      "id": "board-to-videos",
+      "skill": "board quote",
+      "prompt": "Turn my cold brew storyboard into videos.",
+      "mustCall": [
+        "slates_get_board_quote|slates_estimate_generation_cost"
+      ],
+      "answer": "Quotes the board from a tool (three of four Shots priced, one with no prompt that cannot fire), shows the total in one message, flags the empty Shot, and waits for the OK before generating."
+    }
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "case": "howto-same-face",
+  "arm": "baseline",
+  "run": 1,
+  "model": "claude-opus-5-5",
+  "wallMs": 15957,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01PKuozgSgWfmQiXch8T3GNQ",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_prompting_guide",
+        "max_results": 1
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01PKuozgSgWfmQiXch8T3GNQ",
+      "error": false,
+      "text": "[tool_reference]",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Ro5vr7TcaMMYtKdkBc2cAS",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "app-manual",
+        "query": "character consistency same face identity reference across shots",
+        "depth": "section"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Ro5vr7TcaMMYtKdkBc2cAS",
+      "error": false,
+      "text": "{\"topic\":\"app-manual\",\"bytes\":1360,\"guide\":\"## WORKFLOWS — start to finish: a script to a finished video, one picture to an ad, the same character in every shot, cheap previews first, letting an AI do it\\n\\n### Workflow: keep a character or product the same in every shot (Library, @name, identity sheet, voice)\\n\\n1. Save one clean picture of them to the Library: **More › Save to Library…** on the picture, or **New {Noun}** on a category page. For a character, an **Identity sheet** helps.\\n2. Write `@name` in every prompt that shows them. Their picture attaches as a numbered reference; See what gets sent shows the words the model receives.\\n3. For one look across the film, make a Looks item and write `#name` in each prompt.\\n4. Give a character a voice (their card → **Add voice**). On video models that take one, the voice attaches with the `@name`.\\n5. Check the reference rail before pressing **Generate**: a tile marked **Not sent** is past the model's limit.\\n\\nDetails: THE LIBRARY; \\\"Prompt box: @ and # mentions, image 1 citations\\\".\\n\\nRelated sections (ask by heading): Library: New dialog Generate form (character sheet, identity prompt, location prompt, style change, source images, Create & Generate) · Library: sheet tools (Identity sheet, Establishing image, turnaround, character sheet, price) · Videos · Prompt box: pick a model (model picker, search models, families, Face, tools)\"}",
+      "priced": [],
+      "balances": []
+    },
+    {
+      "kind": "text",
+      "text": "In Slates, you keep a face consistent by saving the character to the **Library** once and then referring to them by name in every prompt:\n\n1. **Save one clean picture of them to the Library.** On an existing picture, use **More › Save to Library…**. To start from scratch, use **New Character** on the Characters page. An **Identity sheet**, which shows the same face from several angles, gives the model more to match against.\n\n2. **Write `@name` in every prompt the character appears in**, for example `@Maya walks into the diner`. Their picture is attached to the generation as a numbered reference. To check what the model actually receives, open **See what gets sent**.\n\n3. **Check the reference rail before you press Generate.** If a reference tile says **Not sent**, you've attached more references than that model accepts, and that picture is being dropped. Remove a less important reference so the character's face gets through.\n\nTwo optional extras:\n- **Keep the look consistent too:** make a **Looks** item and write `#name` in each prompt to apply the same visual style across the film.\n- **Give them a voice:** on the character's card, click **Add voice**. On video models that support voices, it's attached automatically whenever you use `@name`.\n\nI can also set this up for you: create the character from a picture you already have and make them an identity sheet. Making the sheet costs credits, so I'd give you the price first."
+    }
+  ],
+  "reply": "In Slates, you keep a face consistent by saving the character to the **Library** once and then referring to them by name in every prompt:\n\n1. **Save one clean picture of them to the Library.** On an existing picture, use **More › Save to Library…**. To start from scratch, use **New Character** on the Characters page. An **Identity sheet**, which shows the same face from several angles, gives the model more to match against.\n\n2. **Write `@name` in every prompt the character appears in**, for example `@Maya walks into the diner`. Their picture is attached to the generation as a numbered reference. To check what the model actually receives, open **See what gets sent**.\n\n3. **Check the reference rail before you press Generate.** If a reference tile says **Not sent**, you've attached more references than that model accepts, and that picture is being dropped. Remove a less important reference so the character's face gets through.\n\nTwo optional extras:\n- **Keep the look consistent too:** make a **Looks** item and write `#name` in each prompt to apply the same visual style across the film.\n- **Give them a voice:** on the character's card, click **Add voice**. On video models that support voices, it's attached automatically whenever you use `@name`.\n\nI can also set this up for you: create the character from a picture you already have and make them an identity sheet. Making the sheet costs credits, so I'd give you the price first.",
+  "usage": {
+    "input_tokens": 6,
+    "cache_creation_input_tokens": 5220,
+    "cache_read_input_tokens": 15990,
+    "output_tokens": 728,
+    "output_tokens_details": {
+      "thinking_tokens": 82
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 5220,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 478,
+        "cache_read_input_tokens": 7124,
+        "cache_creation_input_tokens": 656,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 656
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 3,
+  "durationMs": 14014,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": []
+}

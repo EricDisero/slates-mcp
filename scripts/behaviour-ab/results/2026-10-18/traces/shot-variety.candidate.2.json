@@ -1,0 +1,283 @@
+{
+  "case": "shot-variety",
+  "arm": "candidate",
+  "run": 2,
+  "model": "claude-opus-5-5",
+  "wallMs": 50046,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 150,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01KnR2bhn8sEksnvhhEQRfCg",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_storyboards,mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_get_prompting_guide",
+        "max_results": 4
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01KnR2bhn8sEksnvhhEQRfCg",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01CWdeRbAQCC5G7D5mLV8VcW",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 10
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01CWdeRbAQCC5G7D5mLV8VcW",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01HBpuySWD5tX5JYnJE64evc",
+      "name": "mcp__slates__slates_list_storyboards",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01HBpuySWD5tX5JYnJE64evc",
+      "error": false,
+      "text": "{\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01UVPTpkQrbFvMf5jW5TMqxy",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01UVPTpkQrbFvMf5jW5TMqxy",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"castCutCounts\":{},\"locationCutCounts\":{},\"modelCutCounts\":{\"kling-v3.0-std\":4},\"durationCutCounts\":{\"5\":4},\"runs\":[],\"overLongLines\":[],\"words\":14,\"wordBudget\":51}}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01BKpfdwi3RVHpLrDgKXNjJ6",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_list_shots,mcp__slates__slates_get_shot",
+        "max_results": 2
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01BKpfdwi3RVHpLrDgKXNjJ6",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]",
+      "priced": []
+    },
+    {
+      "kind": "text",
+      "text": "Pulling up each shot's details on your \"Cold brew 15s v1\" board so I can review the variety."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Y2Li1DqQiTUNsLgQhpviqk",
+      "name": "mcp__slates__slates_list_shots",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Y2Li1DqQiTUNsLgQhpviqk",
+      "error": false,
+      "text": "{\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"name\":\"Hook: Mara to camera\",\"scene\":\"Hook\",\"position\":0,\"place\":\"1A\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Your morning coffee shouldn’t taste like a punishment.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"name\":\"Crack and pour\",\"scene\":\"Hook\",\"position\":1,\"place\":\"1B\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"extreme close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":null},{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"name\":\"Proof line\",\"scene\":\"Proof and close\",\"position\":0,\"place\":\"2A\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Eighteen hours, cold. Nothing bitter left.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"medium\",\"camera\":\"slow push in\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"name\":\"Hero end card\",\"scene\":\"Proof and close\",\"position\":1,\"place\":\"2B\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32}],\"total_credits\":96,\"unpriced\":1,\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"castCutCounts\":{},\"locationCutCounts\":{},\"modelCutCounts\":{\"kling-v3.0-std\":4},\"durationCutCounts\":{\"5\":4},\"runs\":[],\"overLongLines\":[],\"words\":14,\"wordBudget\":51}}",
+      "priced": [
+        32,
+        96
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Bfp4yYfE5fdM4Tg9eXWsTi",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "working-method",
+        "query": "variety shot size camera move duration rules",
+        "depth": "section"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Bfp4yYfE5fdM4Tg9eXWsTi",
+      "error": false,
+      "text": "{\"topic\":\"working-method\",\"bytes\":13981,\"guide\":\"Turn the user's vision into finished work in Slates. Find craft with slates_get_prompting_guide(query: the brief); reuse current guidance. Tools generate real media and spend credits. Before generation, estimate every step, show the itemized total and wait for approval. Work in the current project. Choose tools to fit the brief.\\n\\n## Essentials\\n\\n- FINDING TOOLS: every Slates capability is its own slates_* tool. If your client shows tool names only, search your tools for the task (for example \\\"slates generate video\\\") and load that tool before calling it. slates_load_tools searches Slates tools by task and returns exact schemas.\\n- SPENDING: before ANY generation, price every step with slates_estimate_generation_cost, show the user the itemized total in ONE message, and wait for their OK. Pass confirm: true only to relay an explicit user OK for that exact spend.\\n- REAL NUMBERS ONLY: every cost, balance or count you state is copied from a tool result in this session. Never describe how a generation looks unless you fetched it this session.\\n- PROJECT: call slates_get_workspace_state once, work in the user's current project, and never create a project unless asked.\\n- CRAFT: discover relevant guides with slates_get_prompting_guide(query: the brief). Reuse current cards and guidance; fetch sections for missing craft. For UI help, use topic \\\"app-manual\\\".\\n- Speak in the app's words and name assets by code and label (IMG-A12), never by tool name or UUID.\\n\\n## How you work\\n\\nFor HOW/WHERE questions, load slates_get_prompting_guide with topic \\\"app-manual\\\" and relevant query keywords. Teach the documented buttons and tabs, preserving model-specific conditions; do not invent UI paths or mutate the project when the user only asks for instructions. When the control is on screen, offer to point at it (slates_highlight_control); show a picture of a screen (slates_get_manual_picture) only when the user cannot find something or asks what it looks like. Slates is a sandbox of optional tools, not a required pipeline.\\n1. UNDERSTAND the outcome the user wants. If intent is clear, act with sane defaults — don't interrogate. If genuinely ambiguous, batch every question into ONE message.\\n2. ORIENT: call slates_get_workspace_state once at the start of a workflow. Work in the user's CURRENT project — this chat lives inside it. NEVER create a new project unless explicitly asked; if there's no current project, ask which to use.\\n3. LOAD KNOWLEDGE ON DEMAND: discover craft from the brief with slates_get_prompting_guide(query: the need); no topic returns ranked guides, no query returns the catalog. With a topic, read a short card or query a section/technique when needed. Before quoting a model, read its tool schema or routing guide. Use workspace generationDefaults when the user has no preference. Read the model card delivered by the estimate; fetch a section or full guide for an unfamiliar mode or missing detail. Reuse guidance already in context; retrieve it again when omitted or stale.\\n4. PLAN + GET APPROVAL: before ANY generation, price every step with slates_estimate_generation_cost and put the itemized total in front of the user in ONE message, then wait for their answer. There is no present_plan tool on this surface — consent is per call: a generation over the confirm threshold returns requires_confirm, and confirm: true is only ever a relay of an explicit user OK for that exact spend. Never pass confirm: true to clear a gate the user has not seen.\\n5. EXECUTE: run the approved steps, passing confirm: true only for the spend the user actually OK'd. Use background: true + status polling for video.\\n6. QUALITY-CHECK: you have vision. Inspect images or sampled video frames against the brief (slates-vision-feedback-loop). Frames establish visible appearance, not continuous motion, lip sync or sound: review those through actual playback or an audio-capable host when available; otherwise state they remain unreviewed. Fix real problems and change ONE variable per regeneration.\\n7. REPORT: when done, summarize what was made and where it landed. Concise and concrete.\\n\\n## Hard rules\\n\\n- COST DISCIPLINE (slates-cost-discipline): never fire a billable generation the user has not agreed to. Estimate before you promise. Batch related generations into one quote so the user approves a total, not a drip.\\n- CONTENT POLICY: before writing prompts involving real people/celebrities, minors, brands/logos, weapons, or gore, load slates-content-policy and build the scene safe from the first word. If a provider rejects (e.g. real-face detection), explain in plain language — refunds for provider rejections are automatic.\\n- PROMPT IS LAW (reference doctrine): references are cited inline by name and image number (\\\"Marcus (images 1 and 2)\\\"); the prompt text leads. Never write role-essays about what each reference is \\\"for\\\".\\n- NAMES AND DESCRIPTIONS ARE THE USER'S UI, NOT YOUR NOTEPAD. A project, board or shot name is rendered at the top of the user's screen at all times. Name it after the piece (\\\"Kaiju selfie\\\"), never after your process, and NEVER append your own status or housekeeping — no \\\"shot list\\\", no \\\"v2\\\", no \\\"Written from IMG-A172 and IMG-A182\\\", no \\\"Delete freely\\\", no \\\"scratch\\\". Leave the description empty unless the user gave you one worth keeping: a note-to-self at the top of the screen reads as part of the product, and the user has to look at it every day. Say that kind of thing in your reply to them instead.\\n- SAY THE APP'S WORDS. Tool and parameter names keep older nouns; the screen does not, and the user only ever sees the screen. Say board (not storyboard), location (not environment) and look (not style) for Library items, timeline (a saved version of it is a cut), version (a saved rewrite of a script section; not alternative), Words or Words + shots (the Script page's switch), the Generate panel (not the quote), and tab (Media, Script and \n[trimmed 8120 chars]",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01LU4EHANAiS5txSWKUYNiR2",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-shot-variety",
+        "depth": "card"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01LU4EHANAiS5txSWKUYNiR2",
+      "error": false,
+      "text": "{\"topic\":\"slates-shot-variety\",\"tier\":\"free\",\"depth\":\"card\",\"bytes\":477,\"guide\":\"# Visual rhythm across a sequence\\n\\n`slates_list_shots` and `slates_get_storyboard_with_frames` supply shot-size and camera-move distributions and repeated runs from authored shot fields. Read across the sequence, then decide whether repetition serves the intended effect. A dominant bucket is a question, not a defect or generation barrier.\\n\\nSections (request with query, or depth \\\"full\\\"):\\n- Visual rhythm across a sequence\\n- Compare neighboring cuts\\n- Re-cut only for a reason\"}",
+      "priced": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_011kRyD9NnRrzSXq6D8PZVoj",
+      "name": "mcp__slates__slates_get_shot",
+      "input": {
+        "shotId": "SHOT-A2"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_011kRyD9NnRrzSXq6D8PZVoj",
+      "error": false,
+      "text": "{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"name\":\"Crack and pour\",\"model\":\"kling-v3.0-std\",\"authoredFor\":\"kling-v3.0-std\",\"rawPrompt\":\"\",\"referenceCount\":0,\"params\":{\"aspectRatio\":\"9:16\",\"duration\":5},\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shotSize\":\"extreme close-up\",\"camera\":\"static\",\"continues\":false,\"cuts\":1,\"runtimeSeconds\":5,\"place\":\"1B\",\"sceneName\":\"Hook\",\"position\":1,\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"scriptSceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"scriptStart\":58,\"scriptEnd\":95,\"startFrameAssetId\":null,\"takes\":[],\"status\":\"empty\",\"composedPrompt\":\"\",\"references\":[],\"missing\":null,\"unresolvedTokens\":[],\"generationIds\":[],\"firesWith\":{\"videoResolution\":\"720p\",\"imageResolution\":null,\"duration\":5,\"audioDurationSeconds\":null},\"blocked\":\"No prompt or script line yet: write one before it can be priced or fired.\",\"credits\":null,\"quoteFingerprint\":\"fixture-quote-1\"}",
+      "priced": []
+    },
+    {
+      "kind": "text",
+      "text": "Short answer: the shot sizes have enough variety, but the camera work doesn't, and there are a few problems on the board apart from variety.\n\n**What's working**\n- **Shot sizes:** close-up, then extreme close-up, then medium, then close-up. No two shots in a row have the same framing, which is a good spread for 4 cuts.\n- **The static end card (2B) is fine.** A product hero shot that holds still is normal, so I'd keep it.\n\n**What I'd change**\n\n1. **Too much static camera.** 3 of your 4 shots don't move, and the first two (1A and 1B) are both static. That's the part of the ad that has to grab people. My suggestion:\n   - **1B \"Crack and pour\":** change it from static to a slow push-in, or a tilt that follows the pour down into the glass. A pour is the most natural moving shot you have.\n   - Keep 1A static. A creator talking straight to camera should feel steady.\n   - That gives you static, moving, push-in, static, which alternates nicely.\n\n2. **1B is empty.** It has no prompt or script line, so it can't be priced or generated yet. It needs a prompt whatever you decide about the camera.\n\n3. **The runtime doesn't match the title.** The board is called \"Cold brew 15s v1\", but it's 4 shots × 5s = 20s. Every shot being exactly 5s also makes the pacing feel even and flat. One option that adds up to 15s, if Kling v3 Standard allows these lengths:\n   - 1A at 4s\n   - 1B at 3s, a quick product beat\n   - 2A at 5s, the proof line\n   - 2B at 3s\n\n4. **Mara may not look the same in both shots.** 1A uses a reference image of her, but 2A (\"Proof line\") has none. Without the same reference, the second clip could show a different-looking person. I'd attach the 1A reference to 2A as well.\n\n5. **Optional:** the widest shot is the medium in 2A. If you want one shot that shows the setting, like a kitchen or a café counter, 2A could be a medium-wide. For a 15s vertical ad, though, staying tight is a fair choice.\n\nEditing shots doesn't cost any credits. Want me to make these changes: update 1B's camera and write its prompt, set the new durations, and add Mara's reference to 2A? I'll price everything and show you the total before anything is generated."
+    }
+  ],
+  "reply": "Short answer: the shot sizes have enough variety, but the camera work doesn't, and there are a few problems on the board apart from variety.\n\n**What's working**\n- **Shot sizes:** close-up, then extreme close-up, then medium, then close-up. No two shots in a row have the same framing, which is a good spread for 4 cuts.\n- **The static end card (2B) is fine.** A product hero shot that holds still is normal, so I'd keep it.\n\n**What I'd change**\n\n1. **Too much static camera.** 3 of your 4 shots don't move, and the first two (1A and 1B) are both static. That's the part of the ad that has to grab people. My suggestion:\n   - **1B \"Crack and pour\":** change it from static to a slow push-in, or a tilt that follows the pour down into the glass. A pour is the most natural moving shot you have.\n   - Keep 1A static. A creator talking straight to camera should feel steady.\n   - That gives you static, moving, push-in, static, which alternates nicely.\n\n2. **1B is empty.** It has no prompt or script line, so it can't be priced or generated yet. It needs a prompt whatever you decide about the camera.\n\n3. **The runtime doesn't match the title.** The board is called \"Cold brew 15s v1\", but it's 4 shots × 5s = 20s. Every shot being exactly 5s also makes the pacing feel even and flat. One option that adds up to 15s, if Kling v3 Standard allows these lengths:\n   - 1A at 4s\n   - 1B at 3s, a quick product beat\n   - 2A at 5s, the proof line\n   - 2B at 3s\n\n4. **Mara may not look the same in both shots.** 1A uses a reference image of her, but 2A (\"Proof line\") has none. Without the same reference, the second clip could show a different-looking person. I'd attach the 1A reference to 2A as well.\n\n5. **Optional:** the widest shot is the medium in 2A. If you want one shot that shows the setting, like a kitchen or a café counter, 2A could be a medium-wide. For a 15s vertical ad, though, staying tight is a fair choice.\n\nEditing shots doesn't cost any credits. Want me to make these changes: update 1B's camera and write its prompt, set the new durations, and add Mara's reference to 2A? I'll price everything and show you the total before anything is generated.",
+  "usage": {
+    "input_tokens": 20,
+    "cache_creation_input_tokens": 14909,
+    "cache_read_input_tokens": 97318,
+    "output_tokens": 2254,
+    "output_tokens_details": {
+      "thinking_tokens": 552
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 14909,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 1170,
+        "cache_read_input_tokens": 16774,
+        "cache_creation_input_tokens": 701,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 701
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 10,
+  "durationMs": 48237,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001",
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"shotIds\":[\"5a070000-0000-4000-8000-000000000001\",\"5a070000-0000-4000-8000-000000000002\",\"5a070000-0000-4000-8000-000000000003\",\"5a070000-0000-4000-8000-000000000004\"]}"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/get",
+      "query": {
+        "id": "SHOT-A2"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"shotIds\":[\"5a070000-0000-4000-8000-000000000002\"]}"
+      },
+      "status": 200
+    }
+  ]
+}

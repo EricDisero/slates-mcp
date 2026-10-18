@@ -1,0 +1,496 @@
+{
+  "case": "model-cost",
+  "arm": "baseline",
+  "run": 1,
+  "model": "claude-opus-5-5",
+  "wallMs": 41844,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 142,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_013sN4BCrvDoAWS1SXpTGYBD",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_available_models,mcp__slates__slates_estimate_generation_cost,mcp__slates__slates_get_prompting_guide",
+        "max_results": 4
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_013sN4BCrvDoAWS1SXpTGYBD",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01TTXgEoMy7ce3XqBgKgQqcD",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "limit": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01TTXgEoMy7ce3XqBgKgQqcD",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Sxu9T5a1LePCtwtyUaSgVj",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "query": "hero shot cinematic video model choice"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Sxu9T5a1LePCtwtyUaSgVj",
+      "error": false,
+      "text": "{\"query\":\"hero shot cinematic video model choice\",\"fallback\":false,\"total\":27,\"offset\":0,\"nextOffset\":8,\"guides\":[{\"name\":\"slates-prompting-kling-v3\",\"description\":\"Prompt Kling V3.0 video generation and Kling O3 video edits. Use with Kling models on slates_generate_video or slates_edit_video; covers subjects, dialogue, sound syntax, multi-shot direction and edit fidelity.\",\"tier\":\"free\",\"matched\":[\"shot\",\"cinematic\",\"model\",\"choice\"],\"sections\":[\"Multi-shot — what makes them hit\",\"Cinematic tactics\",\"Tier choice\"]},{\"name\":\"slates-prompting-gpt-image-2-5\",\"description\":\"Prompt or edit images with GPT Image 2.5 Flare or Sunburst. Use with slates_generate_image or slates_edit_image on these models; covers reference roles, lighting, text, panels, quality choices and edits.\",\"tier\":\"free\",\"matched\":[\"model\",\"choice\"],\"sections\":[]},{\"name\":\"slates-cinematic-look\",\"description\":\"Choose lighting, exposure, grade, lens, atmosphere and imperfection techniques for a filmed look. Use for photographic direction or an image that looks too clean, evenly exposed or studio-lit.\",\"tier\":\"free\",\"matched\":[\"cinematic\",\"model\"],\"sections\":[\"Cinematic look — make a generated frame read as filmed\",\"Model notes\"]},{\"name\":\"slates-style-prompting\",\"description\":\"Translate a visual-style brief into model-specific image or video direction and maintain the look across shots. Covers photoreal, anime, painterly and 3D styles, references and optional start-frame control.\",\"tier\":\"free\",\"matched\":[\"shot\",\"model\"],\"sections\":[]},{\"name\":\"slates-prompting-nano-banana-2\",\"description\":\"Prompt Nano Banana 2, Lite or Pro image generation and edits. Use on these models; covers photographic craft, subject and reference binding, typography, prompt structure and family differences.\",\"tier\":\"free\",\"matched\":[\"cinematic\",\"model\"],\"sections\":[\"Nano Banana 2 — cinematic & photorealistic prompting\"]},{\"name\":\"slates-prompting-seedance\",\"description\":\"Prompt Seedance 2.0 (seedance-2), and retrieve the shared Seedance craft used by 2.5. Covers subject binding, shot-number storyboards, camera moves, physical action and inline constraints.\",\"tier\":\"free\",\"matched\":[\"shot\",\"model\"],\"sections\":[\"Shot structure — \\\"Shot 1 / Shot 2 / Shot 3\\\" `[official :1563-1598]`\",\"⚠️ Don't cross-pollinate image-model syntax\"]},{\"name\":\"slates-model-selection\",\"description\":\"Choose image, video, edit and audio models for the brief, including animating photos, making films or directing voices. Load before choosing or defaulting a model or quoting a plan; retrieve model-specific craft after selection.\",\"tier\":\"free\",\"matched\":[\"model\",\"choice\"],\"sections\":[\"Model selection for the intended piece\",\"Sound as a production choice\"]},{\"name\":\"slates-camera-language\",\"description\":\"Build or refine Blender camera rigs for a previs pass: orbits, floor rises, whip-and-lock moves, handheld, speed ramps and shot transitions. Use when the intended camera path needs deterministic control.\",\"tier\":\"free\",\"matched\":[\"shot\"],\"sections\":[\"Camera language — from a shot list to a rig\"]}],\"rest\":[{\"name\":\"slates-blocking-to-prompt\",\"description\":\"Translate a rendered blocking clip into a video prompt that preserves its camera, cuts, timing and spatial relationships. Use for previs-guided generation or when output ignores the blocking.\",\"tier\":\"free\"},{\"name\":\"slates-character-identity\",\"description\":\"Prepare and bind a reusable character identity sheet from an image or description. Use when creating cast or preserving the same character across shots.\",\"tier\":\"free\"},{\"name\":\"slates-chatgpt-images\",\"description\":\"Generate and save images through a connected ChatGPT account or the host image tool, preserving Slates prompts, references and project context. Use when ChatGPT generation is requested.\",\"tier\":\"free\"},{\"name\":\"slates-content-policy\",\"description\":\"Check provider-sensitive content before prompting a brief with conflict, creatures, crowds, violence, destruction, weapons, real likenesses or young characters. Use its scoped refusal receipts and scene alternatives alongside the selected model guide.\",\"tier\":\"free\"},{\"name\":\"slates-cost-discipline\",\"description\":\"Estimate and announce generation spend, aggregate batches, follow existing consent and inspect uncertain jobs before retrying. Use when planning or submitting paid media generation.\",\"tier\":\"free\"},{\"name\":\"slates-dialogue-blocking\",\"description\":\"Block a multi-character conversation (at a table, in a car, walking) in Blender when seating, eyelines or screen direction must hold across cuts, or generation has lost that continuity. Includes performance and off-screen dialogue direction.\",\"tier\":\"free\"},{\"name\":\"slates-direct-response-ad\",\"description\":\"Develop a product-led direct-response ad from an offer and references. Use for demonstrations, proof, argument and the next action; combine with script craft and presenter direction as needed.\",\"tier\":\"free\"},{\"name\":\"slates-edit-and-iterate\",\"description\":\"Refine an existing Slates image with a targeted edit or revised generation. Use for changes such as warmer light, removing a figure, reframing or a different look; preserve the original and its lineage.\",\"tier\":\"free\"},{\"name\":\"slates-one-prompt-film\",\"description\":\"Turn a video brief into a finished, editable Slates production and verified export. Use for requests to make a film, short, trailer, music video, ad or other complete video, entering through writing, imported footage or an existing edit.\",\"tier\":\"free\"},{\"name\":\"slates-previs-blocking\",\"description\":\"Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip. Use when those controls are required or prompting has failed to hold them.\",\"tier\":\"free\"},{\"name\":\"slates-project-organization\",\"description\":\"Navigate and organize Slates projects, asset codes such as IMG-A12 or VID-V3, folders, Library references and templates. Use when locating media, preparing a reusable pro\n[trimmed 4624 chars]",
+      "numbers": [
+        27,
+        0,
+        8,
+        3,
+        2,
+        5,
+        2.5,
+        1,
+        1563,
+        1598,
+        12,
+        9356
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01CNmz9ENdS1jq9DLRrdPUdB",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-model-selection",
+        "depth": "card"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01CNmz9ENdS1jq9DLRrdPUdB",
+      "error": false,
+      "text": "{\"topic\":\"slates-model-selection\",\"tier\":\"free\",\"depth\":\"card\",\"bytes\":812,\"guide\":\"# Model selection for the intended piece\\n\\nChoose from the current catalogue using the brief, existing media and delivery requirements. The agent makes this production choice; the user supplies the vision, explicit preferences and approval. A named model takes priority when it can do the requested job. If it cannot, explain the specific conflict and choose a supported route within the brief.\\n\\nSections (request with query, or depth \\\"full\\\"):\\n- Model selection for the intended piece\\n- Decide from constraints and evidence\\n- Current catalogue\\n- image generate\\n- video generate\\n- video edit\\n- audio generate\\n- Seedance craft triggers\\n- Dated production comparisons\\n- Existing footage and edit fidelity\\n- Motion transfer and lip sync\\n- Image and style production\\n- Sound as a production choice\\n- Spend and delivery\"}",
+      "numbers": [
+        812
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_0145QAh48Zfcjte42cnzwLas",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_0145QAh48Zfcjte42cnzwLas",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"activeProject\":{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"description\":\"Ritual cold brew: 15 s vertical ads for Meta and TikTok\",\"assetCount\":5,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-10T18:00:00.000Z\",\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}],\"libraryItemCount\":3},\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        15,
+        18,
+        4,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01VXvQzHjuaSPVezdFvNdgWV",
+      "name": "mcp__slates__slates_get_prompting_guide",
+      "input": {
+        "topic": "slates-model-selection",
+        "depth": "section",
+        "query": "video generate"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01VXvQzHjuaSPVezdFvNdgWV",
+      "error": false,
+      "text": "{\"topic\":\"slates-model-selection\",\"tier\":\"free\",\"depth\":\"section\",\"bytes\":4533,\"guide\":\"### video generate\\n\\nSeedance 2.0: THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare \\\"seedance\\\" still resolves here for older CLIs that expect 4K.\\nSeedance 2.5: DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. No 4K, and dearer than 2.0 at every shared resolution: go to 2.0 for 4K or the same resolution cheaper. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.\\nKling 3.0: THE COST-EFFECTIVE SEAT — strong start-frame adherence (identity, layout, text), acting, dialogue and lip-sync; pick it when the budget matters and the shot is a performance or a start-frame animation. Kling is also the ONLY engine behind the Motion Transfer and Lip Sync tools.\\nGemini Omni Flash: 720p seat with native synced audio included. Route here for drafts with sound in one pass and reference-to-video character-consistency trials; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.\\nMiniMax H3: THE AUTHORED-AUDIO SEAT — reach for H3 when the sound is part of the shot rather than a switch on it: synchronised dialogue, scene sound and an audience-only score directed as three separate layers in ONE pass, across eleven languages. Kling and Seedance treat audio as on/off. Only H3 also carries a DECLARED REFERENCE RELATIONSHIP (kept whole, partly kept, transferred, or a loose echo). VIDEO-ONLY. Its top two resolution tiers are UPSCALES of the native render, not larger generations — judge at native and upscale in post. Reference images past the fifth are a PAID key dimension: pass referenceImages when quoting.\\nMiniMax H3 Max: THE SPEED SEAT, dearer than base H3 at 768p and equal at 480p — never the cheap H3 and never the default. A post-train of the H3 weights: MEASURED 2026-08-27 at about 12x faster than base H3 on the same prompt and params, queue to finished file, plus a thin vendor-reported quality edge. It tops out at a 1080p refinement of its 768p render. It takes the same omni-reference set as base H3 and animates start and end frames — but not both in one call, the same as base H3: frames and references go to different endpoints. Never describe this row as taking no image or reference input. Route here when a fast turnaround on text-to-video or a start-frame shot is worth the premium.\\nMiniMax H3 Max Turbo: THE BUDGET SEAT of the MiniMax family: a second post-train of the H3 weights, billed at half H3 Max's rate at every tier. Its 1080p is a refinement of the native 768p render, not a native 1080p generation. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video and start/end frames only, with no reference endpoint, so reference-driven consistency goes to H3 Max or base H3. Route here for drafts, volume and cheap coverage, then re-run the keeper on H3 Max or a hero seat.\\nLTX-2.5: THE VOLUME SEAT — the cheapest 1080p second with sound included, and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It supports native high-resolution output and longer takes than most seats; use the capability surface for its resolution-dependent duration limits. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.\\nLTX-2.5 Pro: THE FIDELITY SEAT of the LTX pair — the full diffusion build against the base row's distilled one. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, which is the opposite of every other Pro seat here: it reaches a SHORTER resolution ladder and makes SHORTER clips, and it costs more at both tiers they share. Reaching for it because the name says Pro costs more AND takes away reach. Everything else matches the base row. Route here only when a specific shot needs the fidelity and fits inside its narrower envelope.\"}",
+      "numbers": [
+        4533,
+        2,
+        4,
+        2.5,
+        5,
+        3,
+        720,
+        768,
+        480,
+        2026,
+        8,
+        27,
+        12,
+        1080
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01HfmHh9qPyYBPQp9U7ZhLxk",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_list_shots,mcp__slates__slates_get_storyboard_with_frames",
+        "max_results": 2
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01HfmHh9qPyYBPQp9U7ZhLxk",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01KBN2chvSgbgFgpKsQx5wFQ",
+      "name": "mcp__slates__slates_list_shots",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01KBN2chvSgbgFgpKsQx5wFQ",
+      "error": false,
+      "text": "{\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"name\":\"Hook: Mara to camera\",\"scene\":\"Hook\",\"position\":0,\"place\":\"1A\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Your morning coffee shouldn’t taste like a punishment.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"name\":\"Crack and pour\",\"scene\":\"Hook\",\"position\":1,\"place\":\"1B\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"extreme close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":null},{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"name\":\"Proof line\",\"scene\":\"Proof and close\",\"position\":0,\"place\":\"2A\",\"model\":\"kling-v3.0-std\",\"references\":0,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":\"Mara\",\"line\":\"Eighteen hours, cold. Nothing bitter left.\",\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"medium\",\"camera\":\"slow push in\",\"continues\":false,\"credits\":32},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"name\":\"Hero end card\",\"scene\":\"Proof and close\",\"position\":1,\"place\":\"2B\",\"model\":\"kling-v3.0-std\",\"references\":1,\"cuts\":1,\"runtime_seconds\":5,\"speaker\":null,\"line\":null,\"delivery\":null,\"action\":null,\"prop\":null,\"shot_size\":\"close-up\",\"camera\":\"static\",\"continues\":false,\"credits\":32}],\"total_credits\":96,\"unpriced\":1,\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        70000,
+        0,
+        4000,
+        8000,
+        1,
+        3,
+        32,
+        2,
+        4,
+        96,
+        20,
+        15,
+        50
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "Found it: the hero shot is SHOT-A4, \"Hero end card\" (2B). I'm checking its references now so I can make a recommendation."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01Mf2A6XzNa8rmjKBskq4Lzs",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01Mf2A6XzNa8rmjKBskq4Lzs",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21,
+        30000,
+        55,
+        70000,
+        3,
+        20,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_014ruiNUfAUo1HjTx654uxB1",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "seedance-2.5",
+        "duration": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_014ruiNUfAUo1HjTx654uxB1",
+      "error": false,
+      "text": "{\"model\":\"seedance-2.5\",\"cost_key\":\"seedance-2.5-720p-5s\",\"quantity\":1,\"cost_per_credits\":58,\"total_credits\":58,\"requires_confirm\":true,\"craft_card\":\"**Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.\\n\\n**The five levers**\\n1. **Timestamps work here**: integer seconds, and the model acts on them: `[0s-4s] she reads the letter. [4s-9s] she folds it and looks up.` 2.0 ignores exactly this syntax.\\n2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.\\n3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.\\n4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.\\n5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.\\n\\n**Examples**\\n- `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`\\n- `[0s-10s] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10s-20s] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`\\n\\n**Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-seedance-2-5\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-seedance-2-5\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-seedance-2-5: \\\"edit\\\", \\\"extend\\\", \\\"continue the video\\\", \\\"same video but\\\", \\\"f/1.4\\\", \\\"Portra 400\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        2.5,
+        720,
+        5,
+        1,
+        58,
+        2,
+        0,
+        4,
+        9,
+        30,
+        15,
+        6,
+        12,
+        18,
+        3,
+        10,
+        20,
+        480,
+        1080,
+        1.4,
+        400
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_012CP9iQmRjELAdaY1yaaQuM",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "kling-v3.0-std",
+        "duration": 5
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_012CP9iQmRjELAdaY1yaaQuM",
+      "error": false,
+      "text": "{\"model\":\"kling-v3.0-std\",\"cost_key\":\"kling-v3-standard-5s-audio\",\"quantity\":1,\"cost_per_credits\":32,\"total_credits\":32,\"requires_confirm\":true,\"craft_card\":\"**Card — Kling V3.0.** Define the core subjects clearly at the START and keep those descriptions identical across shots. Strong image-to-video identity hold; use the current capability surface for duration and multi-shot limits, and the model catalogue for routing.\\n\\n**The five levers**\\n1. **Dialogue in quotes** — `Character says, \\\"exact words here\\\"`. On Omni, direct the voice with `Gender + Age + Voice quality + Speech rate + Emotional tone + Language`: `[Character A: Detective, mid-40s, raspy, slow cadence, weary]: \\\"I've seen this before.\\\"`\\n2. **Unique speaker labels, no pronouns after the introduction.** `he`, `the agent`, any synonym causes voice drift.\\n3. **Sound has real syntax** — `SFX: heavy boots on wet pavement, distant siren wailing`, `Ambient noise: city traffic`, `Background music: low cello`. Always physical-cause specific; `SFX: footsteps` is not enough.\\n4. **Motion adverbs modulate energy directly** — `slowly`, `rapidly`, `gently`, `explosively`. One primary camera move per shot, never stacked.\\n5. **On image-to-video, do NOT re-describe the image.** It is an anchor; prompt how the scene EVOLVES from it — movement, camera, environmental change.\\n\\n**Examples**\\n- `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: \\\"I've seen this before.\\\" SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`\\n- `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`\\n\\n**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-kling-v3\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-kling-v3\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-kling-v3: \\\"SFX: footsteps\\\", \\\"he\\\", \\\"the agent\\\", \\\"single continuous take\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        3,
+        5,
+        1,
+        32,
+        40,
+        2,
+        4
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01ADvxvxMBbyWFKfGS9RnMCk",
+      "name": "mcp__slates__slates_estimate_generation_cost",
+      "input": {
+        "model": "seedance-2.5",
+        "duration": 5,
+        "videoResolution": "1080p"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01ADvxvxMBbyWFKfGS9RnMCk",
+      "error": false,
+      "text": "{\"model\":\"seedance-2.5\",\"cost_key\":\"seedance-2.5-1080p-5s\",\"quantity\":1,\"cost_per_credits\":142,\"total_credits\":142,\"requires_confirm\":true,\"craft_card\":\"**Card — Seedance 2.5.** Shares 2.0's grammar exactly (subject binding, camera vocabulary, externalised emotion, inline constraints — read `slates-prompting-seedance` for those). Two things are different, and both matter.\\n\\n**The five levers**\\n1. **Timestamps work here**: integer seconds, and the model acts on them: `[0s-4s] she reads the letter. [4s-9s] she folds it and looks up.` 2.0 ignores exactly this syntax.\\n2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.\\n3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.\\n4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.\\n5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.\\n\\n**Examples**\\n- `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`\\n- `[0s-10s] A single continuous handheld follow behind a courier climbing a fire escape, rain. [10s-20s] She reaches the landing, turns, and the city opens behind her. Cinematic texture, soft lighting.`\\n\\n**Hard constraint:** it is the default AND the dearer seat, and it has NO 4K — 480p/720p/1080p only, dearer than 2.0 at every resolution they share. Long takes multiply cost linearly: quote a 30-second take before you fire it.\\n\\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: \\\"slates-prompting-seedance-2-5\\\", depth: \\\"full\\\"}); use query for one section.\",\"craft_card_skill\":\"slates-prompting-seedance-2-5\",\"banned_tokens\":\"Avoid these phrases for slates-prompting-seedance-2-5: \\\"edit\\\", \\\"extend\\\", \\\"continue the video\\\", \\\"same video but\\\", \\\"f/1.4\\\", \\\"Portra 400\\\". Describe the intended result specifically.\"}",
+      "numbers": [
+        2.5,
+        1080,
+        5,
+        1,
+        142,
+        2,
+        0,
+        4,
+        9,
+        30,
+        15,
+        6,
+        12,
+        18,
+        3,
+        10,
+        20,
+        480,
+        720,
+        1.4,
+        400
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "I recommend **Kling 3.0 Standard**, the model SHOT-A4 already uses. **A 5-second clip costs 32 credits.**\n\nSHOT-A4 (\"Hero end card\", 2B) is a static close-up built from a picture you've already made. Slates' model guide says Kling holds a starting picture best, keeping layout, identity and on-screen text intact. That matters most on an end card, where the bottle label and branding need to stay sharp. It's also the cheapest of the strong options.\n\n**Upgrade option: Seedance 2.5** (your project's default video model). The guide calls it the strongest model for hero shots, physics and effects, so it's worth it if you want the end card to have real motion, like a pour, condensation or splash, rather than a held product shot.\n\n| Model | 5 s clip | Credits |\n|---|---|---|\n| Kling 3.0 Standard (with sound) | default resolution | **32** |\n| Seedance 2.5 | 720p | 58 |\n| Seedance 2.5 | 1080p | 142 |\n\nThese are quotes from Slates for one take each. I haven't generated anything or spent any credits. To get delivery-quality vertical video from Seedance, you'd want 1080p, which costs about 4.4× as much as Kling. If you'd like the end card silent and want to know whether that's cheaper with Kling, I can get that quote too.\n\nShould I generate SHOT-A4 with Kling for 32 credits, or would you rather use Seedance 2.5?"
+    }
+  ],
+  "reply": "I recommend **Kling 3.0 Standard**, the model SHOT-A4 already uses. **A 5-second clip costs 32 credits.**\n\nSHOT-A4 (\"Hero end card\", 2B) is a static close-up built from a picture you've already made. Slates' model guide says Kling holds a starting picture best, keeping layout, identity and on-screen text intact. That matters most on an end card, where the bottle label and branding need to stay sharp. It's also the cheapest of the strong options.\n\n**Upgrade option: Seedance 2.5** (your project's default video model). The guide calls it the strongest model for hero shots, physics and effects, so it's worth it if you want the end card to have real motion, like a pour, condensation or splash, rather than a held product shot.\n\n| Model | 5 s clip | Credits |\n|---|---|---|\n| Kling 3.0 Standard (with sound) | default resolution | **32** |\n| Seedance 2.5 | 720p | 58 |\n| Seedance 2.5 | 1080p | 142 |\n\nThese are quotes from Slates for one take each. I haven't generated anything or spent any credits. To get delivery-quality vertical video from Seedance, you'd want 1080p, which costs about 4.4× as much as Kling. If you'd like the end card silent and want to know whether that's cheaper with Kling, I can get that quote too.\n\nShould I generate SHOT-A4 with Kling for 32 credits, or would you rather use Seedance 2.5?",
+  "usage": {
+    "input_tokens": 18,
+    "cache_creation_input_tokens": 19993,
+    "cache_read_input_tokens": 120118,
+    "output_tokens": 2311,
+    "output_tokens_details": {
+      "thinking_tokens": 628
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 19993,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 804,
+        "cache_read_input_tokens": 21371,
+        "cache_creation_input_tokens": 1192,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 1192
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 13,
+  "durationMs": 40021,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/members/manifest.json",
+      "query": {},
+      "status": 402
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/projects/get",
+      "query": {
+        "id": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/shots/quote",
+      "query": {
+        "input": "{\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"shotIds\":[\"5a070000-0000-4000-8000-000000000001\",\"5a070000-0000-4000-8000-000000000002\",\"5a070000-0000-4000-8000-000000000003\",\"5a070000-0000-4000-8000-000000000004\"]}"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/api/agent/models",
+      "query": {},
+      "status": 200
+    }
+  ]
+}

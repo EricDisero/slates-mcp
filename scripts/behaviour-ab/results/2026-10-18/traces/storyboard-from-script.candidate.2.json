@@ -1,0 +1,336 @@
+{
+  "case": "storyboard-from-script",
+  "arm": "candidate",
+  "run": 2,
+  "model": "claude-opus-5-5",
+  "wallMs": 25247,
+  "exitCode": 0,
+  "init": {
+    "model": "claude-opus-5-5",
+    "tools": 150,
+    "mcp_servers": [
+      {
+        "name": "slates",
+        "status": "connected",
+        "source": "dynamic"
+      }
+    ]
+  },
+  "events": [
+    {
+      "kind": "call",
+      "id": "toolu_01NJbyBSafAnpJkLbRzPcfUG",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_workspace_state,mcp__slates__slates_list_storyboards,mcp__slates__slates_get_script,mcp__slates__slates_break_script_into_shots,mcp__slates__slates_get_storyboard_with_frames,mcp__slates__slates_get_prompting_guide",
+        "max_results": 6
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01NJbyBSafAnpJkLbRzPcfUG",
+      "error": false,
+      "text": "[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]\n[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01ENJNsTZ9ewnhn47diPnNLo",
+      "name": "mcp__slates__slates_get_workspace_state",
+      "input": {}
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01ENJNsTZ9ewnhn47diPnNLo",
+      "error": false,
+      "text": "{\"projects\":[{\"id\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Morning Ritual Coffee\",\"asset_count\":5,\"updated_at\":\"2026-10-17T21:40:00.000Z\"},{\"id\":\"7a1c2e40-0000-4000-8000-000000000002\",\"name\":\"Bakery launch\",\"asset_count\":0,\"updated_at\":\"2026-10-12T16:00:00.000Z\"}],\"project_count\":2,\"generationDefaults\":{\"imageModel\":\"gpt-image-2-5-sunburst\",\"imageResolution\":\"3k\",\"gptQuality\":\"high\",\"videoModel\":\"seedance-2.5\"}}",
+      "numbers": [
+        7,
+        1,
+        2,
+        40,
+        0,
+        4000,
+        8000,
+        5,
+        2026,
+        10,
+        17,
+        21,
+        12,
+        16,
+        3,
+        2.5
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01P9AR2nvNrnb282n5g74Zw7",
+      "name": "mcp__slates__slates_list_storyboards",
+      "input": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01P9AR2nvNrnb282n5g74Zw7",
+      "error": false,
+      "text": "{\"storyboards\":[{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"}]}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01QhDHqbEM4fnQ8EpapJHHSU",
+      "name": "mcp__slates__slates_get_storyboard_with_frames",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01QhDHqbEM4fnQ8EpapJHHSU",
+      "error": false,
+      "text": "{\"storyboard\":{\"id\":\"5b0a0000-0000-4000-8000-000000000001\",\"projectId\":\"7a1c2e40-0000-4000-8000-000000000001\",\"name\":\"Cold brew 15s v1\",\"description\":\"Hook, proof, end card\",\"sceneCount\":2,\"shotCount\":4,\"updatedAt\":\"2026-10-17T21:40:00.000Z\",\"createdAt\":\"2026-10-17T21:40:00.000Z\"},\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\",\"position\":0,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000001\",\"position\":0,\"assetId\":\"a55e0000-0000-4000-8000-000000000001\",\"shotId\":\"5a070000-0000-4000-8000-000000000001\",\"label\":\"Hook: Mara to camera\"},{\"id\":\"f4a30000-0000-4000-8000-000000000002\",\"position\":1,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000002\",\"label\":\"Crack and pour\"}]},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"name\":\"Proof and close\",\"position\":1,\"frames\":[{\"id\":\"f4a30000-0000-4000-8000-000000000003\",\"position\":0,\"assetId\":null,\"shotId\":\"5a070000-0000-4000-8000-000000000003\",\"label\":\"Proof line\"},{\"id\":\"f4a30000-0000-4000-8000-000000000004\",\"position\":1,\"assetId\":\"a55e0000-0000-4000-8000-000000000002\",\"shotId\":\"5a070000-0000-4000-8000-000000000004\",\"label\":\"Hero end card\"}]}],\"variety\":{\"cuts\":4,\"generations\":4,\"runtimeSeconds\":20,\"cutsWithoutDuration\":0,\"shotSizes\":[{\"bucket\":\"close\",\"count\":2},{\"bucket\":\"extreme-close\",\"count\":1},{\"bucket\":\"medium\",\"count\":1}],\"cameraMoves\":[{\"bucket\":\"static\",\"count\":3},{\"bucket\":\"push\",\"count\":1}],\"runs\":[{\"dimension\":\"camera\",\"bucket\":\"static\",\"length\":2,\"from\":0}],\"overLongLines\":[],\"words\":15,\"wordBudget\":50}}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        7,
+        2,
+        40,
+        15,
+        4,
+        2026,
+        10,
+        17,
+        21,
+        30000,
+        55,
+        70000,
+        3,
+        20,
+        50
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_019PBgqFmyjYUeKzm7wzpDcN",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_019PBgqFmyjYUeKzm7wzpDcN",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000001\",\"script\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000001\",\"code\":\"SHOT-A1\",\"start\":0,\"end\":57,\"line\":\"Your morning coffee shouldn’t taste like a punishment.\"},{\"id\":\"5a070000-0000-4000-8000-000000000002\",\"code\":\"SHOT-A2\",\"start\":58,\"end\":95,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        70000,
+        57,
+        2,
+        58,
+        95,
+        3
+      ]
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01C5pMGisNiFDcCQTVD7bbiR",
+      "name": "mcp__slates__slates_get_script",
+      "input": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01C5pMGisNiFDcCQTVD7bbiR",
+      "error": false,
+      "text": "{\"sceneId\":\"5c0a0000-0000-4000-8000-000000000002\",\"script\":\"MARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\",\"rev\":\"r1\",\"shots\":[{\"id\":\"5a070000-0000-4000-8000-000000000003\",\"code\":\"SHOT-A3\",\"start\":0,\"end\":47,\"line\":\"Eighteen hours, cold. Nothing bitter left.\"},{\"id\":\"5a070000-0000-4000-8000-000000000004\",\"code\":\"SHOT-A4\",\"start\":48,\"end\":80,\"line\":null}],\"revision\":3}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        2,
+        1,
+        70000,
+        3,
+        47,
+        4,
+        48,
+        80
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "Checking the board's full script page to make sure no text is left unshot."
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01DYy8zbkQ1WeAZ4Uesy9mjE",
+      "name": "ToolSearch",
+      "input": {
+        "query": "select:mcp__slates__slates_get_script_document",
+        "max_results": 1
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01DYy8zbkQ1WeAZ4Uesy9mjE",
+      "error": false,
+      "text": "[tool_reference]",
+      "numbers": []
+    },
+    {
+      "kind": "call",
+      "id": "toolu_01W1REZpALPC4Ahjgt2mA6Bx",
+      "name": "mcp__slates__slates_get_script_document",
+      "input": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      }
+    },
+    {
+      "kind": "result",
+      "id": "toolu_01W1REZpALPC4Ahjgt2mA6Bx",
+      "error": false,
+      "text": "{\"storyboardId\":\"5b0a0000-0000-4000-8000-000000000001\",\"revision\":3,\"scenes\":[{\"id\":\"5c0a0000-0000-4000-8000-000000000001\",\"name\":\"Hook\"},{\"id\":\"5c0a0000-0000-4000-8000-000000000002\",\"name\":\"Proof and close\"}],\"text\":\"MARA: Your morning coffee shouldn’t taste like a punishment.\\nShe cracks the can. Ice. A slow pour.\\nMARA: Eighteen hours, cold. Nothing bitter left.\\nRitual. Cold brew, done right.\"}",
+      "numbers": [
+        5,
+        0,
+        4000,
+        8000,
+        1,
+        3,
+        2
+      ]
+    },
+    {
+      "kind": "text",
+      "text": "I didn't need to split anything. Every line of the script on the **Cold brew 15s v1** board (in Morning Ritual Coffee) already belongs to a shot, so \"Break the script into shots\" would have changed nothing. I left the board as it was and generated nothing.\n\nHere's how it reads now:\n\n**Scene 1: Hook**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | MARA: \"Your morning coffee shouldn't taste like a punishment.\" | Has one |\n| SHOT-A2 | Crack and pour | *She cracks the can. Ice. A slow pour.* | Empty |\n\n**Scene 2: Proof and close**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A3 | Proof line | MARA: \"Eighteen hours, cold. Nothing bitter left.\" | Empty |\n| SHOT-A4 | Hero end card | *Ritual. Cold brew, done right.* | Has one |\n\n**Overall:**\n- **Length:** the shots add up to **20 seconds**, but the board is named \"15s\". Shortening a shot or two would bring it down to 15.\n- **Shot sizes:** 1 extreme close-up, 2 close-ups and 1 medium.\n- **Camera:** 3 shots stay still and 1 pushes in. The first two shots in a row are both still.\n- **Dialogue:** 15 words, well under the 50-word limit for this length.\n\nTo fill the board, SHOT-A2 and SHOT-A3 need pictures. SHOT-A1 and SHOT-A4 already have one, so you can keep them or replace them. Tell me which shots to generate and whether you want stills, video or both, and I'll show you the cost of each before anything runs. If you'd rather fix the length or the camera movement first, I can adjust the shots now."
+    }
+  ],
+  "reply": "I didn't need to split anything. Every line of the script on the **Cold brew 15s v1** board (in Morning Ritual Coffee) already belongs to a shot, so \"Break the script into shots\" would have changed nothing. I left the board as it was and generated nothing.\n\nHere's how it reads now:\n\n**Scene 1: Hook**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A1 | Hook: Mara to camera | MARA: \"Your morning coffee shouldn't taste like a punishment.\" | Has one |\n| SHOT-A2 | Crack and pour | *She cracks the can. Ice. A slow pour.* | Empty |\n\n**Scene 2: Proof and close**\n| Shot | Label | Script | Picture |\n|---|---|---|---|\n| SHOT-A3 | Proof line | MARA: \"Eighteen hours, cold. Nothing bitter left.\" | Empty |\n| SHOT-A4 | Hero end card | *Ritual. Cold brew, done right.* | Has one |\n\n**Overall:**\n- **Length:** the shots add up to **20 seconds**, but the board is named \"15s\". Shortening a shot or two would bring it down to 15.\n- **Shot sizes:** 1 extreme close-up, 2 close-ups and 1 medium.\n- **Camera:** 3 shots stay still and 1 pushes in. The first two shots in a row are both still.\n- **Dialogue:** 15 words, well under the 50-word limit for this length.\n\nTo fill the board, SHOT-A2 and SHOT-A3 need pictures. SHOT-A1 and SHOT-A4 already have one, so you can keep them or replace them. Tell me which shots to generate and whether you want stills, video or both, and I'll show you the cost of each before anything runs. If you'd rather fix the length or the camera movement first, I can adjust the shots now.",
+  "usage": {
+    "input_tokens": 16,
+    "cache_creation_input_tokens": 8878,
+    "cache_read_input_tokens": 67201,
+    "output_tokens": 1596,
+    "output_tokens_details": {
+      "thinking_tokens": 216
+    },
+    "server_tool_use": {
+      "web_search_requests": 0,
+      "web_fetch_requests": 0
+    },
+    "service_tier": "standard",
+    "cache_creation": {
+      "ephemeral_1h_input_tokens": 8878,
+      "ephemeral_5m_input_tokens": 0
+    },
+    "inference_geo": "global",
+    "iterations": [
+      {
+        "input_tokens": 2,
+        "output_tokens": 705,
+        "cache_read_input_tokens": 11141,
+        "cache_creation_input_tokens": 314,
+        "cache_creation": {
+          "ephemeral_5m_input_tokens": 0,
+          "ephemeral_1h_input_tokens": 314
+        },
+        "type": "message"
+      }
+    ],
+    "speed": "standard",
+    "fallback_credit": null
+  },
+  "turns": 9,
+  "durationMs": 23387,
+  "denials": [],
+  "isError": false,
+  "fixtureRequests": [
+    {
+      "method": "GET",
+      "path": "/agent/projects",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards",
+      "query": {
+        "projectId": "7a1c2e40-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/storyboards/get",
+      "query": {
+        "id": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/scenes/full",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/healthz",
+      "query": {},
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script",
+      "query": {
+        "sceneId": "5c0a0000-0000-4000-8000-000000000002"
+      },
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/agent/script/document",
+      "query": {
+        "storyboardId": "5b0a0000-0000-4000-8000-000000000001"
+      },
+      "status": 200
+    }
+  ]
+}
