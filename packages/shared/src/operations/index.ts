@@ -257,6 +257,9 @@ const CENTS_PER_CREDIT = 3 // peg: 1 credit = 3¢ billed = 2¢ COGS (mirror of s
  */
 export const DEVIATION_FACTOR = 1.2
 
+/** For an asset param that takes a UUID only (no resolveAssetRefs in its run). */
+const ASSET_UUID_ONLY = 'Asset UUID, not a badge code: pass the code to slates_list_assets as search to resolve it.'
+
 /**
  * The confirm-gate sentence, rendered ONCE from CONFIRM_CREDITS.
  *
@@ -268,11 +271,13 @@ export const DEVIATION_FACTOR = 1.2
 // The consent half rides every generation tool because a host may drop the
 // server instructions: Codex CLI 0.159.1 passed none to the model (probes
 // 2026-09-30 and 2026-10-02), so a small spend had no approval rule in view.
-/** For an asset param that takes a UUID only (no resolveAssetRefs in its run). */
-const ASSET_UUID_ONLY = 'Asset UUID, not a badge code: pass the code to slates_list_assets as search to resolve it.'
-
-const CONFIRM_GATE_SENTENCE =
-  `Show the user the estimate and wait for their OK before any generation, however small. Cost above ${CONFIRM_CREDITS} credits (and, on image and video, any attached reference) also returns requires_confirm — pass confirm=true only to relay that OK.`
+//
+// `alsoWhen` names a second trigger, only on an op whose run gates on it.
+const confirmGateSentence = (alsoWhen?: string) =>
+  `Show the user the estimate and wait for their OK before any generation, however small. Cost above ${CONFIRM_CREDITS} credits${alsoWhen ? `, or ${alsoWhen},` : ''} also returns requires_confirm — pass confirm=true only to relay that OK.`
+const CONFIRM_GATE_SENTENCE = confirmGateSentence()
+/** The confirm param, one wording: it relays the user's OK of a quoted spend. */
+const CONFIRM_PARAM = `Set true only to relay the user's explicit OK of this exact spend.`
 
 // Declared HERE, above every op, because `slates_estimate_generation_cost`
 // renders them into its `duration` description at MODULE LOAD — a const
@@ -1490,6 +1495,13 @@ export const EDIT_VIDEO_MODELS = [
 ] as const
 
 type EditVideoModel = (typeof EDIT_VIDEO_MODELS)[number]
+// The op's default, not MODEL_FACTS' edit tier default: the desktop route defaults to the same Kling
+// engine (slate routes.ts, /agent/generation/edit-video), so moving it is a two-repo change.
+const EDIT_VIDEO_DEFAULT: EditVideoModel = 'kling-v3.0-omni-edit'
+/** The edit engines that take character and style references (elements); the run refuses them on the rest. */
+const EDIT_VIDEO_ELEMENT_MODELS: readonly EditVideoModel[] = EDIT_VIDEO_MODELS.filter((m) => (getModelCapability(m)?.maxIngredientImages ?? 0) > 0)
+const EDIT_VIDEO_ELEMENT_CAP = Math.max(...EDIT_VIDEO_ELEMENT_MODELS.map((m) => getModelCapability(m)?.maxIngredientImages ?? 0))
+const EDIT_VIDEO_ELEMENTS_ONLY = `Only ${EDIT_VIDEO_ELEMENT_MODELS.join(' and ')} take them; the other engines refuse them.`
 
 /**
  * Source-clip length an edit engine accepts, read from the SSOT.
@@ -2034,7 +2046,7 @@ export const getAssetVideoFrames: Operation<{ id: string; count?: number }> = {
   description:
     'Extract evenly-spaced sampled still frames from a video asset and return them inline as JPEGs. Inspect visible appearance, composition and identity before revising a prompt. Stills do not verify continuous motion, timing, lip sync or sound; actual playback through a capable host is needed for those claims. Default 3 samples; count can request more. The response includes the asset code and label; use them when discussing the clip.',
   input: z.object({
-    id: z.string().uuid(),
+    id: z.string().uuid().describe(ASSET_UUID_ONLY),
     count: z.number().int().min(1).max(8).optional().describe('Number of frames to extract. Default 3.'),
   }),
   async run(input, ctx) {
@@ -3045,7 +3057,7 @@ export const generateImage: Operation<{
     // description, so the generated roster lives on the model param, as on the
     // video and audio ops (it pushed the default seat's line past the cut).
     'Generate an image via Slates credits. Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except nano-banana-2 require projectId (no headless path). Pass aspectRatio (the server returns requires_clarification when missing); resolution defaults to the model\'s own. ' +
-    CONFIRM_GATE_SENTENCE +
+    confirmGateSentence('any referenceAssetIds') +
     ' MCP/CLI generation always charges credits. The estimate returns the model\'s prompting card; load its slates-prompting-* guide with slates_get_prompting_guide for anything the card leaves out. ' +
     // GENERATED from the skill file's own never-use list -- the one piece of
     // prompting doctrine that is ALWAYS in context, because the agent has
@@ -3070,7 +3082,7 @@ export const generateImage: Operation<{
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true only to relay the user\'s explicit OK.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
@@ -3508,15 +3520,15 @@ export const editImage: Operation<{
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid(),
-    sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
+    sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project. ' + ASSET_UUID_ONLY),
     prompt: z.string().min(1).max(4000).describe('The change, not the whole image.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
-    referenceAssetIds: z.array(z.string().uuid()).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
+    referenceAssetIds: z.array(z.string().uuid().describe(ASSET_UUID_ONLY)).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
-    confirm: z.boolean().optional().describe('Set true only to relay the user\'s explicit OK.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
   async run(input, ctx) {
@@ -3700,7 +3712,7 @@ export const extractGridCells: Operation<{
     aspectRatio: z.string().optional().describe("Output aspect ratio, one the seat offers. Default: the ratio nearest the grid's own shape."),
     prompt: z.string().max(2500).optional().describe('Words for every cell (what the shot is). On the default seat @name and #look attach their pictures; the crop is image 1.'),
     referenceAssetIds: z.array(z.string()).max(13).optional().describe('Pictures added beside the crop (default seat only), UUIDs or badge codes.'),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
   async run(input, ctx) {
@@ -4296,7 +4308,7 @@ export const generateVideo: Operation<{
     'Generate video via Slates credits. Choose the model with slates-model-selection. Video models prompt very differently: the estimate returns the chosen model\'s prompting card, and its full guide (' +
     VIDEO_MODEL_GUIDES +
     ') covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). ' +
-    CONFIRM_GATE_SENTENCE +
+    confirmGateSentence('any image reference (frame, ingredient, character, environment or style)') +
     ' Image-to-video via firstFrameAssetId; a last frame via lastFrameAssetId and ingredients via ingredientAssetIds, each param stating which models take it. Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
     // surfaces, so it survives an agent that skips slates_get_prompting_guide.
@@ -4374,11 +4386,11 @@ export const generateVideo: Operation<{
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling model with sound on — auto-generate background music.'),
     seedanceFace: z.boolean().optional().describe('Seedance only: a reference shows an AI character\'s face. Without it, faces are blocked; the estimate prices it. A real person fails here with [REAL_FACE_DETECTED]; see seedanceRealFace.'),
-    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, about 1.4x the Face price (about 2x faceless) — quote it first. REQUIRES realFaceConsent=true.'),
+    seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, priced above Face: estimate it with the flag set first. REQUIRES realFaceConsent=true.'),
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every tier.'),
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true after explicit user OK to bypass the confirm gate (which fires for almost every video gen since they\'re expensive).'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     folderId: folderIdField,
   }),
   async run(input, ctx) {
@@ -5067,7 +5079,7 @@ export const generateAudio: Operation<{
       .min(TTS_VOICE_CLONE.designPromptChars.min)
       .max(TTS_VOICE_CLONE.designPromptChars.max)
       .optional()
-      .describe(`${TTS_MODEL} — a voice from words (${TTS_VOICE_CLONE.designPromptChars.min}-${TTS_VOICE_CLONE.designPromptChars.max} chars) for a character with no recording; keep it via slates_update_character voiceAssetId.`),
+      .describe(`${TTS_MODEL} — a voice from words (${TTS_VOICE_CLONE.designPromptChars.min}-${TTS_VOICE_CLONE.designPromptChars.max} chars) for a character with no recording; keep it via slates_update_library_item voiceAssetId.`),
     speed: z.number().min(0.5).max(2).optional().describe('seed-audio only — 0.5-2.0. Reach for it when dialogue races or drags against picture.'),
     volume: z.number().min(0.5).max(2).optional().describe('seed-audio only — output gain, 0.5-2.0 (1 = unchanged). Prefer the timeline fader for mix decisions.'),
     pitch: z.number().int().min(-12).max(12).optional().describe('seed-audio only — semitones. Small moves; ±3 is already a lot.'),
@@ -5086,7 +5098,7 @@ export const generateAudio: Operation<{
       .optional()
       .describe('seed-audio only — ONE image asset to score what is in frame. MUTUALLY EXCLUSIVE with audioReferenceAssetIds.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate after explicit user OK.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     folderId: folderIdField,
   }),
   run: async (input, ctx) => {
@@ -5131,7 +5143,7 @@ export const generateAudio: Operation<{
         return ok({
           requires_clarification: true,
           missing: ['voiceId'],
-          message: `${TTS_MODEL} needs a voice — exactly one of three. Speaking AS a character: pass its voiceAssetId (slates_list_characters) as voiceReferenceAssetId. A stock voice: slates_list_voices lists presets by gender, accent and age; pass one's voiceId. No recording of the voice: voiceDescription (words), or voiceReferenceAssetId with any clean clip of one speaker. A voice worth reusing can be kept on a character with slates_update_character, but nothing requires that — ask the user which they want only when the request does not say.`,
+          message: `${TTS_MODEL} needs a voice — exactly one of three. Speaking AS a character: pass its voiceAssetId (slates_list_characters) as voiceReferenceAssetId. A stock voice: slates_list_voices lists presets by gender, accent and age; pass one's voiceId. No recording of the voice: voiceDescription (words), or voiceReferenceAssetId with any clean clip of one speaker. A voice worth reusing can be kept on a Library item with slates_update_library_item, but nothing requires that — ask the user which they want only when the request does not say.`,
         })
       }
       if (voiceSources.length > 1) {
@@ -5342,7 +5354,7 @@ export const generateLipSync: Operation<{
   billable: true,
   description:
     'Lip-sync a still image (avatar) or a video clip to audio. Kling only: this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Billed per 5s of the output (the clip, or on a still the voice track). For a Seedance version there is no engine switch here: run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. The craft is slates-prompting-lip-sync; the confirm response shows the exact cost before anything is charged. projectId is required. ' +
-    CONFIRM_GATE_SENTENCE,
+    confirmGateSentence('a length it cannot read'),
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
     sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed. ' + ASSET_UUID_ONLY),
@@ -5355,7 +5367,7 @@ export const generateLipSync: Operation<{
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
     avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard for general use; avatar-pro for sharper face fidelity. Price each with slates_estimate_generation_cost.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true only to relay the user\'s OK; avatar-pro always needs it.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
   }),
   async run(input, ctx) {
     if (input.audioMethod === 'tts' && !input.ttsText) {
@@ -5488,16 +5500,16 @@ export const generateMotionTransfer: Operation<{
   billable: true,
   description:
     'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, billed per 5s of the driving clip. For a Seedance version there is no engine switch here: run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. The craft is slates-prompting-motion-transfer; the confirm response shows the exact cost before anything is charged. projectId is REQUIRED — both assets must exist in the project. ' +
-    CONFIRM_GATE_SENTENCE,
+    confirmGateSentence('a source length it cannot read'),
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
     sourceVideoAssetId: z.string().uuid().describe('Asset id of the reference video — its motion will be retargeted onto the target image. Must already exist in the project. Up to 30s with characterOrientation video, 10s with image; billed per 5s block.'),
-    targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project.'),
+    targetImageAssetId: z.string().uuid().describe('Asset id of the target image (the character that will perform the motion). Must already exist in the project. ' + ASSET_UUID_ONLY),
     motionModel: z.enum(['kling-mc-std', 'kling-mc-pro']).optional().describe('kling-mc-std general motion; kling-mc-pro cleaner anatomy — default. Quote both with slates_estimate_generation_cost.'),
     characterOrientation: z.enum(['video', 'image']).optional().describe('"video" = use the source video\'s framing. "image" = use the target image\'s framing. Default video.'),
     prompt: z.string().optional().describe('Optional refinement. Read slates-prompting-motion-transfer.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required — both tiers exceed.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
@@ -5629,8 +5641,8 @@ export const editVideo: Operation<{
     // point to in a tool result) and go stale on the next rate change; the
     // windows are owned by MODEL_CAPABILITIES and are generated below into the
     // params that enforce them.
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engine routing, clip-length and resolution windows are on the `model` param (only the Kling engines take subject/style refs); seedanceFace:true for AI-character faces on seedance-2.5-edit. Cost is per second: output seconds on Kling and Omni Flash, input + output on Seedance; quote it with slates_estimate_generation_cost. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: the `model` param and slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash. ' +
-    CONFIRM_GATE_SENTENCE,
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engine routing, clip-length and resolution windows are on the `model` param (subject and style refs: ' + EDIT_VIDEO_ELEMENT_MODELS.join(' and ') + ' only); seedanceFace:true for AI-character faces on seedance-2.5-edit. Cost is per second: output seconds on Kling and Omni Flash, input + output on Seedance; quote it with slates_estimate_generation_cost. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: the `model` param and slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash. ' +
+    confirmGateSentence('any character or style reference'),
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Clip-length windows per engine are on `model`.'),
@@ -5640,19 +5652,19 @@ export const editVideo: Operation<{
       // Routing GENERATED from MODEL_FACTS; the paragraph that stood here was
       // hand-written and carried per-second prices, which drift and which the
       // agent's own REAL NUMBERS ONLY rule forbids it repeating.
-      `Default kling-v3.0-omni-edit. Neither omni-flash-edit nor seedance-2.5-edit takes character/style refs on this op.\n` +
+      `Default ${EDIT_VIDEO_DEFAULT}. Character and style references: ${EDIT_VIDEO_ELEMENTS_ONLY}\n` +
         `${describeRouting('video', 'edit')}\n` +
         `Source-clip length per engine: ${describeDurations(EDIT_VIDEO_MODELS)}. Output resolution: ${describeVideoResolutions(EDIT_VIDEO_MODELS)}`
     ),
-    characterAssetIds: z.array(z.string()).max(4).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes a Kling element (@ElementN). KLING MODELS ONLY — rejected on omni-flash-edit.'),
-    styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
+    characterAssetIds: z.array(z.string()).max(EDIT_VIDEO_ELEMENT_CAP).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes an element (@ElementN). ' + EDIT_VIDEO_ELEMENTS_ONLY),
+    styleAssetIds: z.array(z.string()).max(EDIT_VIDEO_ELEMENT_CAP).optional().describe(`Style/appearance reference images (@ImageN). Max ${EDIT_VIDEO_ELEMENT_CAP} combined with characterAssetIds. ` + EDIT_VIDEO_ELEMENTS_ONLY),
     keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit and seedance-2.5-edit output carry their own audio).'),
     videoResolution: zEnum(EDIT_VIDEO_RESOLUTIONS).optional().describe(
       `seedance-2.5-edit ONLY (default ${defaultVideoResolutionFor('seedance-2.5-edit')}). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.`
     ),
-    seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Without it a face is blocked outright; with it the edit costs about 40-50% more. A face edit submitted without this flag is rejected, not silently downgraded.'),
+    seedanceFace: z.boolean().optional().describe(`seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Without it a face is blocked outright; with it the edit is priced higher: quote it with slates_estimate_generation_cost by its cost key as model (${seedanceEditCostKey({ duration: SEEDANCE_25_EDIT_MIN_SECONDS, videoResolution: defaultVideoResolutionFor('seedance-2.5-edit') as VideoResolution, seedanceFace: true })} for ${SEEDANCE_25_EDIT_MIN_SECONDS}s at ${defaultVideoResolutionFor('seedance-2.5-edit')}). A face edit submitted without this flag is rejected, not silently downgraded.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the cost confirm gate after the user OKs the spend.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     folderId: folderIdField,
   }),
   async run(input, ctx) {
@@ -5663,16 +5675,16 @@ export const editVideo: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    const model = input.model ?? 'kling-v3.0-omni-edit'
+    const model = input.model ?? EDIT_VIDEO_DEFAULT
     const isOmniFlashEdit = model === 'omni-flash-edit'
     const isSeedanceEdit = model === 'seedance-2.5-edit'
     // Source-clip window, read from the capability SSOT per engine — never a
     // model-id ternary. (Kling 3–15s, Omni Flash 3–10s, Seedance 2.5 4–30s.)
     const { min: minClipSeconds, max: maxClipSeconds } = editClipBounds(model)
 
-    if ((isOmniFlashEdit || isSeedanceEdit) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
+    if (!EDIT_VIDEO_ELEMENT_MODELS.includes(model) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
       throw new Error(
-        `${model} takes the prompt and the source clip only on this op — no character/style reference images. Drop the refs, or switch to kling-v3.0-omni-edit which supports elements.`
+        `${model} takes the prompt and the source clip only on this op — no character/style reference images. Drop the refs, or switch to ${EDIT_VIDEO_ELEMENT_MODELS.join(' or ')}, which take them.`
       )
     }
 
@@ -5689,8 +5701,8 @@ export const editVideo: Operation<{
     const styleAssetIds = (input.styleAssetIds ?? []).map(rid)
     const refEcho = describeResolvedRefs(refInputs, resolved)
 
-    if (characterAssetIds.length + styleAssetIds.length > 4) {
-      throw new Error('Kling O3 edit takes max 4 combined subject + style references.')
+    if (characterAssetIds.length + styleAssetIds.length > EDIT_VIDEO_ELEMENT_CAP) {
+      throw new Error(`${model} takes at most ${EDIT_VIDEO_ELEMENT_CAP} subject and style references combined.`)
     }
 
     // The billed key needs the clip's duration (ceiled). Read it from the
@@ -6548,7 +6560,7 @@ export const deleteAsset: Operation<{ id: string }> = {
   id: 'slates_delete_asset',
   description:
     'Delete an asset from its project. Permanent: also deletes the media file from disk, so ask the user first.',
-  input: z.object({ id: z.string().uuid() }),
+  input: z.object({ id: z.string().uuid().describe(ASSET_UUID_ONLY) }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/assets/delete', { id: input.id }))
   },
@@ -6580,7 +6592,7 @@ export const setFolderCover: Operation<{ folderId: string; assetId: string | nul
   description: 'Set the cover image of an asset folder (or clear it with assetId=null).',
   input: z.object({
     folderId: z.string().uuid(),
-    assetId: z.string().uuid().nullable(),
+    assetId: z.string().uuid().nullable().describe(ASSET_UUID_ONLY),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/folders/set-cover', input))
@@ -7071,7 +7083,7 @@ export const updateFrame: Operation<{
     frameId: z.string().uuid(),
     shotLabel: z.string().optional(),
     notes: z.string().optional(),
-    assetId: z.string().uuid().nullable().optional(),
+    assetId: z.string().uuid().nullable().optional().describe(ASSET_UUID_ONLY),
     sceneId: z.string().uuid().optional(),
     position: z.number().int().min(0).optional(),
     preferredClipId: z.string().min(1).nullable().optional().describe('The clip the timeline takes for this slot: a video asset id or badge code in the project; null clears it.'),
@@ -7129,7 +7141,7 @@ export const batchUpdateFrames: Operation<{
           frameId: z.string().uuid(),
           shotLabel: z.string().optional(),
           notes: z.string().optional(),
-          assetId: z.string().uuid().nullable().optional(),
+          assetId: z.string().uuid().nullable().optional().describe(ASSET_UUID_ONLY),
           sceneId: z.string().uuid().optional(),
           position: z.number().int().min(0).optional(),
           preferredClipId: z.string().min(1).nullable().optional().describe('A video asset id or badge code in the project; null clears it.'),
@@ -8534,7 +8546,7 @@ export const generateFromShots: Operation<{
     'Generate results for saved Shots, spending credits. Call without confirm for the itemized prices the Generate panel shows and a fingerprint; show the user the total and wait for their OK, then pass confirm with that fingerprint. Changed recipes require a fresh price. Runs sequentially; after a timeout inspect generations (slates_list_generations, status processing) instead of re-firing. Pass draft to generate previews instead: one picture for each Shot that has none, kept as a take of that Shot; the Shot\'s recipe does not change.',
   input: z.object({
     shotIds: z.array(z.string()).min(1).max(20),
-    confirm: z.boolean().optional(),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM + " Pass it with the quote's fingerprint."),
     fingerprint: z.string().optional(),
     draft: DRAFT_INPUT.describe(
       'Generate previews: pass {} to price ONE picture for each Shot in scope that has no picture, instead of each Shot recipe, at the chosen image model’s default settings. Works on a Shot with no model. No Shot row changes; the picture becomes a take of that Shot. Pass the same value when confirming.'
@@ -8871,7 +8883,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
   description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
   input: z.object({
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
-    topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules). Omit to search by intent or browse.`),
+    topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules for an MCP client; the app's Studio Agent has its own). Omit to search by intent or browse.`),
     depth: z.enum(['card', 'index', 'section', 'full']).optional().describe('Default card is a short overview; index lists sections; query selects a section; full returns the complete guide.'),
     limit: z.number().int().min(1).max(20).optional().describe('Page size for a search (default 8) or a catalog listing (default: the whole catalog); continue with offset from nextOffset. Does not change guide bodies.'),
     offset: z.number().int().min(0).optional().describe('Catalog/search offset from nextOffset in the preceding result.'),
