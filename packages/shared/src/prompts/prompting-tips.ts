@@ -62,6 +62,7 @@ export type PromptingTipsKey =
   | 'omni-flash-edit'
   | 'minimax-h3'
   | 'ltx-2-5'
+  | 'wan-3'
   | 'nano-banana'
   | 'nano-banana-lite'
   | 'gpt-image-2-5'
@@ -315,12 +316,18 @@ const KLING_EDIT: PromptingTipsEntry = {
 }
 
 const OMNI_FLASH: PromptingTipsEntry = {
-  label: 'Gemini Omni Flash',
+  label: 'Gemini Omni Flash 1.1',
   intro: [
-    'Gemini Omni Flash is the 720p tier with native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, one start frame, or up to 7 reference images. No last frame, no video/audio references.',
+    'Gemini Omni Flash 1.1 renders 720p natively, with 1080p and 4K as upscales, and native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, a start frame with an optional last frame, or references: up to 10 images and 3 videos of 3s or less. A last frame never mixes with references, and there are no audio references.',
   ],
   columns: [
     [
+      {
+        heading: 'Ask for one shot',
+        example: 'In a single continuous shot, ...',
+        note: 'By default it cuts between a few shots of its own. Say "single continuous shot" or "no scene cuts" when you want one.',
+        critical: true,
+      },
       {
         heading: 'Structure like a shot brief',
         example: 'subject + action + setting + camera + lighting + tone',
@@ -341,7 +348,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
       {
         heading: 'Name references inline',
         example: 'Marcus (image 1) walks into the cafe...',
-        note: 'Up to 7 reference images merge into one list — refer to them by number in the prompt.',
+        note: 'Up to 10 reference images merge into one list — refer to them by number. A reference video carries a likeness only; its sound is ignored.',
       },
       {
         heading: 'Negatives as plain instructions',
@@ -359,7 +366,7 @@ const OMNI_FLASH: PromptingTipsEntry = {
 const OMNI_FLASH_EDIT: PromptingTipsEntry = {
   label: 'Omni Flash Edit',
   intro: [
-    'Omni Flash Edit changes what the prompt names in an existing 3-10s clip, footage-synced — prop, effect, environment, and lighting swaps. Prompt + source clip only: no reference images (identity swaps that need refs → Kling O3 Edit). 720p output; voice editing unsupported.',
+    'Omni Flash Edit changes what the prompt names in an existing 3-10s clip, footage-synced — prop, effect, environment, and lighting swaps. Prompt + source clip only: no reference images (identity swaps that need refs → Kling O3 Edit). 720p output by default, 1080p and 4K as upscales; voice editing unsupported.',
   ],
   columns: [
     [
@@ -828,6 +835,52 @@ const INWORLD_TTS: PromptingTipsEntry = {
 }
 
 
+const WAN_3: PromptingTipsEntry = {
+  label: 'Wan 3.0',
+  intro: [
+    'Wan 3.0 is Alibaba\'s all-in-one video model: 2-30s at 480p, 720p or 1080p, sound on or off. Text-to-video, a start frame with an optional last frame, or references: up to 10 images, 5 videos and 5 audio clips in one request (reference video and audio 15s total each). Frames and references never mix.',
+  ],
+  columns: [
+    [
+      {
+        heading: 'Cite references by type and order',
+        example: 'The courier in Image 1 rides through the market in Image 2 · Voice timbre references Audio 1',
+        note: 'Images, videos and audio are numbered separately in upload order, so Image 1 and Video 1 exist side by side. A wrong number cites the wrong file.',
+        critical: true,
+      },
+      {
+        heading: 'Number and time your shots',
+        example: 'Shot 1 [0-3s] wide: rain over the harbour. Shot 2 [3-6s] close-up: ...',
+        note: 'Shots run end to end, 2-5s each. For one shot, open with "One continuous shot".',
+      },
+      {
+        heading: 'Say what a reference lends',
+        example: 'Reference the camera movement of Video 1 · Style references Image 2',
+        note: 'One file can be cited several times: appearance, motion, voice, style.',
+      },
+    ],
+    [
+      {
+        heading: 'Dialogue with a colon and quotes',
+        example: 'She whispers: "Not here."',
+        note: 'Write "No dialogue" when you want none, or it decides for itself.',
+      },
+      {
+        heading: 'Sound and music outright',
+        example: 'splashing through puddles · cello enters very softly · No background music',
+        note: 'Described actions and materials fill the sound on their own; name music, or remove it.',
+      },
+      {
+        heading: 'Reference video bills on top',
+        note: 'Reference video seconds are billed in addition to the output, so trim a reference clip to the part you need.',
+      },
+    ],
+  ],
+  footer: [
+    'Slates turns off the provider\'s prompt rewriter, so what you write is what the model reads. End with a short list of what must not appear (No subtitles, No watermark), never padded with what the prompt already says.',
+  ],
+}
+
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   'seedance-2-5': SEEDANCE_25,
@@ -838,6 +891,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'omni-flash-edit': OMNI_FLASH_EDIT,
   'minimax-h3': MINIMAX_H3,
   'ltx-2-5': LTX_2_5,
+  'wan-3': WAN_3,
   'nano-banana': NANO_BANANA,
   'nano-banana-lite': NANO_BANANA_LITE,
   'gpt-image-2-5': GPT_IMAGE_25,
