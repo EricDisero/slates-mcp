@@ -48,6 +48,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['timeline', 'the timeline'],
   ['timeline-tracks', 'timeline tracks and settings'],
   ['export', 'video and XML export'],
+  ['ad-variant-export', 'variant batch export, grid, delivery framing and selection'],
   ['chatgpt-image-generation', 'connected ChatGPT images'],
   ['external-image-metadata', 'saving an external image with its generation record'],
   ['selection', 'reading the live selection'],

@@ -2,18 +2,20 @@ import assert from 'node:assert/strict'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { ToolListChangedNotificationSchema, ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ALL_OPERATIONS, toolDefinitions } from '../packages/shared/dist/index.js'
+import { mcpFixture } from './ad-variant-export-check.mjs'
 
 const serverPath = fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))
 
 // Every launch has the full list, including legacy flags retained for compatibility.
 // Tool discovery returns schemas; it never changes capability availability.
 for (const flags of [[], ['--tools=compact'], ['--tools=flat']]) {
-  const transport = new StdioClientTransport({ command: process.execPath, args: [serverPath, ...flags], stderr: 'pipe' })
+  const isolated = await mcpFixture()
+  const transport = new StdioClientTransport({ command: process.execPath, args: [...isolated.args, ...flags], env: isolated.env, stderr: 'pipe' })
   const client = new Client({ name: 'fixed-surface-check', version: '1.0.0' })
   let changed = 0
   client.setNotificationHandler(ToolListChangedNotificationSchema, () => { changed++ })
@@ -48,7 +50,7 @@ for (const flags of [[], ['--tools=compact'], ['--tools=flat']]) {
       assert.ok(result.structuredContent.guide.length > 100)
     }
     console.log(`fixed-mcp ${flags.join(' ') || 'default'}: ${initial.length} tools / ${Buffer.byteLength(JSON.stringify(initial))} bytes; discovery, permission hints, errors and guides passed`)
-  } finally { await client.close(); await transport.close() }
+  } finally { await client.close(); await transport.close(); await isolated.close() }
 }
 
 // Mock only the billable operation to exercise the real MCP approval protocol.
@@ -64,7 +66,8 @@ ALL_OPERATIONS.find(o => o.id === 'slates_generate_image').run = async input => 
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_from_shots').run = async input => input.confirm && input.fingerprint === 'quote-1'
   ? {text: 'Completed fixture batch', data: {results: [], total: 0}}
   : {text: 'Approve fixture batch', data: {requires_confirm: true, fingerprint: 'quote-1', total_credits: 30}};`)
-const approvalTransport = new StdioClientTransport({command: process.execPath, args: ['--import', pathToFileURL(fixture).href, fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))], stderr: 'pipe'})
+const isolatedApproval = await mcpFixture()
+const approvalTransport = new StdioClientTransport({command: process.execPath, args: ['--import', isolatedApproval.args[1], '--import', pathToFileURL(fixture).href, serverPath], env: isolatedApproval.env, stderr: 'pipe'})
 const approvalClient = new Client({name: 'approval-shape-check', version: '1.0.0'}, {capabilities: {elicitation: {}}})
 let approvalRequests = 0
 approvalClient.setRequestHandler(ElicitRequestSchema, async () => { approvalRequests++; return {action: 'accept', content: {confirm: true}} })
@@ -78,4 +81,4 @@ try {
   assert.equal(approvalRequests, 2)
   assert.equal(batch.content[0].text, 'Completed fixture batch', 'an approved batch fires with the fingerprint of the quote shown')
   console.log('MCP approval: text and structured content both describe the final operation result; an approved batch carries the fingerprint of its quote')
-} finally { await approvalClient.close(); await approvalTransport.close() }
+} finally { await approvalClient.close(); await approvalTransport.close(); await isolatedApproval.close(); rmSync(fixtureDir, { recursive: true, force: true }) }
