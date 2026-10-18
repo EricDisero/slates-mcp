@@ -2506,7 +2506,7 @@ export const createCharacter: Operation<{
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omitted: realistic.')),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE("Omitted: keeps the reference's medium (Slates 1.6.2 and older use realistic).")),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/characters', input))
@@ -2554,7 +2554,7 @@ export const createEnvironment: Operation<{
     projectId: z.string().uuid(),
     name: z.string().min(1).max(120),
     description: z.string().optional(),
-    style: z.string().max(200).optional().describe(STYLE_DESCRIBE('Omitted: realistic.')),
+    style: z.string().max(200).optional().describe(STYLE_DESCRIBE("Omitted: keeps the reference's medium (Slates 1.6.2 and older use realistic).")),
   }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/environments', input))
