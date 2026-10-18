@@ -28,7 +28,7 @@
     },
     {
       "path": "skills/slates-prompting-omni-flash.md",
-      "sha256": "8d834d89f11434424c895973534261461356e40763407fdd1c3bca8944c86561"
+      "sha256": "011e8ca2b1b815b7557c775c0775559962aea2ba3ec4dc617b41dbd4622cc415"
     },
     {
       "path": "skills/slates-prompting-seedance-2-5.md",
@@ -48,15 +48,15 @@
     },
     {
       "path": "src/prompts/model-capabilities.ts",
-      "sha256": "297d5f60fa644dd74f28c75f94fd039ce142652ae01b0512a5fc26bcb8c027ad"
+      "sha256": "1f3ea8f851718af39061cf699b33cc167f563252a6b161521c6629e60c661c6e"
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "569ebb1da385664acda13725b6f540b6a5f2dc06e43237deffb80263e80e3a4d"
+      "sha256": "d557cec55116af6621f6b630f93027bddf938b82511f69c24d620f7709c3e667"
     },
     {
       "path": "src/prompts/partials.generated.ts",
-      "sha256": "10709e96691a1de4debf24aaf37a592ba957bf4fd8df69970727356c467ed9f3"
+      "sha256": "3499d6d7a05dbbed909d2ba5377ed02c245d5aad9680f7e45e5a9a3363844c32"
     },
     {
       "path": "src/prompts/reference-rules.ts",
@@ -70,8 +70,8 @@
   "outputs": [
     {
       "path": "SKILL.md",
-      "bytes": 9525,
-      "sha256": "50eeac386641a30c5cb843bf4b18314f70112d0d088224297928f8198ec6832d"
+      "bytes": 9157,
+      "sha256": "c8946925df07e853a446d84b18df65c5bb82ea2f14ca269bf1f8fd42de183166"
     },
     {
       "path": "reference-character.md",
@@ -105,8 +105,8 @@
     },
     {
       "path": "reference-omni-flash.md",
-      "bytes": 10364,
-      "sha256": "c4fc0d3c2efc0144db3f3f230ba260b7e7cab2dbb9876f3c89549df8ba1dde66"
+      "bytes": 8593,
+      "sha256": "a6401f822a04162186e4839392040aa5017aeb34e75862a73be406461f2d77b1"
     },
     {
       "path": "reference-content-policy.md",
@@ -116,8 +116,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 70392,
-    "sha256": "3079faff973a30dcbfbe1b0e7c01b19a14f4924410a2d8dc12184a60480a0065",
+    "bytes": 69490,
+    "sha256": "afd288a461dd10853f4c97cea574a2c48755b179eab537dbb9b857830cbd0401",
     "entries": [
       "SKILL.md",
       "reference-character.md",

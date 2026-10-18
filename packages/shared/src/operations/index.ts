@@ -1316,13 +1316,7 @@ export const VIDEO_MODELS = [
   // not here; edit models live on slates_edit_video, same as the Kling and Omni
   // Flash ones.
   'seedance-2.5',
-  // Gemini Omni Flash, version 1.1 since 2026-10-17: swapped in place, same id,
-  // fal's `google/gemini-omni-flash/v1.1/*` endpoints.
   'omni-flash',
-  // Wan 3.0 (Alibaba, added 2026-10-17): 2-30s at 480p-1080p, sound on or off,
-  // start and end frames OR references (10 images, 5 videos, 5 audio clips).
-  // Reference video seconds bill on top of output seconds, so it has a vref key.
-  'wan-3.0',
   // MiniMax H3, three seats in one family. Base H3 (2026-08-27) is the
   // AUTHORED-AUDIO seat — three directable sound layers in one pass, declared
   // reference relationships, 480p to 4K. H3 Max (2026-08-27) is fal's
@@ -1371,7 +1365,7 @@ const VIDEO_ASPECT_RATIOS = aspectRatioUnion(VIDEO_MODELS, AGENT_ROUTE_PROVIDER)
 const VIDEO_RESOLUTIONS = videoResolutionUnion(VIDEO_MODELS)
 /** Widest legal duration window across every video model. */
 const VIDEO_DURATION_BOUNDS = durationBounds(VIDEO_MODELS)
-/** Omni Flash's combined reference-image cap, read from the SSOT (10 on 1.1). */
+/** Omni Flash's combined reference-image cap, read from the SSOT (7). */
 const omniFlashRefCap = getModelCapability('omni-flash')?.maxIngredientImages ?? 0
 
 /** Every resolution token any video model speaks, for the forgiving cost-key
@@ -1419,10 +1413,6 @@ const MINIMAX_FREE_REF_IMAGES_BY_MODEL: Record<string, number> = {
  * in slate/src/shared/pricing.ts.
  */
 const LTX_MODELS = new Set<string>(['ltx-2-5', 'ltx-2-5-pro'])
-
-/** Max billed seconds on a Wan 3.0 take: 30s of output plus 15s of reference
- *  video, which fal bills "in addition to output duration". */
-const WAN_3_VREF_MAX_TOTAL = 45
 
 /** K for the `-ref{K}` suffix: images past the free five, capped by the model's
  *  own declared ceiling. 0 for h3-max (no reference transport) and for anything
@@ -1479,9 +1469,9 @@ function editClipBounds(model: string): { min: number; max: number } {
   return { min: d.min, max: d.max }
 }
 
-/** Resolutions any edit engine exposes as a PARAM. Seedance's and Omni Flash
- *  1.1's edit prices move with resolution; the Kling rows follow the source. */
-const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit', 'omni-flash-edit'])
+/** Resolutions any edit engine exposes as a PARAM. Only Seedance's edit price
+ *  moves with resolution; the Kling and Omni Flash rows are fixed to the source. */
+const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit'])
 
 export const estimateGenerationCost: Operation<{
   model: string
@@ -3922,28 +3912,9 @@ export function videoCostKey(input: {
     return `${tier}-${input.duration}s${input.sound !== false ? '-audio' : ''}`
   }
   if (input.model === 'omni-flash') {
-    // Mirrors omniFlashCreditKey() in slate/src/shared/pricing.ts. Omni Flash
-    // 1.1 prices each output second by resolution, so the key carries it. Audio
-    // is native and included, and references do not move fal's 1.1 price.
-    // 1.0's flat `omni-flash-{N}s` keys are legacy: only desktops released
-    // before the swap send them.
-    const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
-    return `omni-flash-${res}-${input.duration}s`
-  }
-  if (input.model === 'wan-3.0') {
-    // Mirrors wanCreditKey() in slate/src/shared/pricing.ts. Output seconds at
-    // the chosen resolution. A reference video adds its own seconds ("billed in
-    // addition to output duration", fal) and flips to `-vref-{res}-{T}s`,
-    // T = in + out. Sound on or off, reference images and reference audio do
-    // not move the price.
-    const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
-    const vrefSecs = input.videoRefSeconds ?? 0
-    if (vrefSecs > 0) {
-      // ceil(x - 0.05) matches the server's probe rounding, so quote = bill.
-      const total = Math.min(WAN_3_VREF_MAX_TOTAL, Math.ceil(vrefSecs - 0.05) + input.duration)
-      return `wan-3.0-vref-${res}-${total}s`
-    }
-    return `wan-3.0-${res}-${input.duration}s`
+    // Mirrors omniFlashCreditKey() in slate/src/shared/pricing.ts — flat 720p
+    // rate, audio native + included, no resolution/audio key dimension.
+    return `omni-flash-${input.duration}s`
   }
   throw new Error(`Unknown video model: ${input.model}`)
 }
@@ -3962,11 +3933,9 @@ export function klingEditCostKey(
 
 // Omni Flash video-edit cost key — mirrors omniFlashCreditKey() in
 // slate/src/shared/pricing.ts (must byte-match; checked by the slates-api
-// pricing-consistency script). Duration is the CEILED source-clip length. The
-// resolution is the output's, because Omni Flash 1.1 prices edit seconds by it.
-export function omniFlashEditCostKey(duration: number, videoResolution?: VideoResolution): string {
-  const res = videoResolution ?? defaultVideoResolutionFor('omni-flash-edit')
-  return `omni-flash-edit-${res}-${duration}s`
+// pricing-consistency script). Duration is the CEILED source-clip length.
+export function omniFlashEditCostKey(duration: number): string {
+  return `omni-flash-edit-${duration}s`
 }
 
 /** Max billed (input + output) seconds on a Seedance video-reference gen.
@@ -4170,15 +4139,6 @@ function resolveVideoModel(raw: string): {
     'gemini-omni-flash': 'omni-flash',
     'gemini-omni-flash-preview': 'omni-flash',
     'omni-flash-preview': 'omni-flash',
-    'gemini-omni-1.1-flash': 'omni-flash',
-    'gemini-omni-flash-1.1': 'omni-flash',
-    'omni-flash-1.1': 'omni-flash',
-    'wan-3': 'wan-3.0',
-    'wan-3-0': 'wan-3.0',
-    'wan3': 'wan-3.0',
-    'wan3.0': 'wan-3.0',
-    'alibaba-wan-3.0': 'wan-3.0',
-    wan: 'wan-3.0',
     // The MAX and TURBO spellings must come out as themselves. Bare `minimax`,
     // `h3` and `hailuo-3` all mean the BASE row — it holds the full ladder and
     // the references, and it is cheaper than Max at the tier they share.
@@ -4298,7 +4258,7 @@ export const generateVideo: Operation<{
     VIDEO_MODEL_GUIDES +
     ') covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). ' +
     CONFIRM_GATE_SENTENCE +
-    ' Image-to-video via firstFrameAssetId; first+last frames on every model; ingredients via ingredientAssetIds (Kling Omni, Seedance, Omni Flash, Wan 3.0, H3 and H3 Max; Kling Std/Pro only with a first frame). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
+    ' Image-to-video via firstFrameAssetId; first+last frames on every model except Omni Flash; ingredients via ingredientAssetIds (Kling Omni, Seedance, Omni Flash, H3 and H3 Max; Kling Std/Pro only with a first frame). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
     // surfaces, so it survives an agent that skips slates_get_prompting_guide.
     describeBannedTokens('video'),
@@ -4343,7 +4303,7 @@ export const generateVideo: Operation<{
     // demand, by the one session that needs it. If you are about to explain
     // WHY here, you are writing the skill in the wrong file.
     firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video (UUID or badge code, resolved at call time).'),
-    lastFrameAssetId: z.string().optional().describe('Ending frame. Pairs with firstFrameAssetId.'),
+    lastFrameAssetId: z.string().optional().describe('Ending frame; every model except Omni Flash. Pairs with firstFrameAssetId.'),
     ingredientAssetIds: z.array(z.string()).max(30).optional().describe(
       // Caps DERIVED from MODEL_CAPABILITIES — the hand-typed list omitted
       // kling-v3.0-omni-pro entirely and read as if 7 were an Omni Flash-only rule.
@@ -4360,7 +4320,7 @@ export const generateVideo: Operation<{
     // multimodalRefSummary) rather than hand-typed, so a cap change in one
     // place cannot leave a stale number in a description an LLM reads.
     videoReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. On Seedance and Wan 3.0, billing switches to the vref key (input+output seconds); Omni Flash caps each clip at 3s. Pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
+      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. On Seedance, billing switches to the vref key (input+output seconds) — pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
     ),
     videoReferenceSecondsEach: z.array(z.number()).optional().describe(
       'REQUIRED with videoReferenceAssetIds, same order and length: each clip\'s duration in seconds. Feeds the vref cost key; the server re-probes and corrects an understated value upward.'
@@ -4371,7 +4331,7 @@ export const generateVideo: Operation<{
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
       'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'
     ),
-    sound: z.boolean().optional().describe('Kling (every tier), LTX and Wan 3.0: sound on (default) or silent (false); Kling bills audio as its own key. Seedance, Omni Flash and H3 always generate audio.'),
+    sound: z.boolean().optional().describe('Kling (every tier) and LTX: sound on (default) or silent (false); Kling bills audio as its own key. Seedance, Omni Flash and H3 always generate audio.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling model with sound on — auto-generate background music.'),
     seedanceFace: z.boolean().optional().describe('Seedance ONLY: a reference shows an AI CHARACTER\'s face. Without it, faces are blocked; with it the generation costs ~45% more. A REAL person fails here with [REAL_FACE_DETECTED] — see seedanceRealFace.'),
@@ -4453,85 +4413,35 @@ export const generateVideo: Operation<{
     const capErr = assertVideoCapabilities(input)
     if (capErr) return ok(capErr)
 
-    // Omni Flash 1.1's SHAPE constraints. Frames ride image-to-video (a start
-    // frame and an optional end frame); references ride reference-to-video (up
-    // to 10 images and 3 videos of 3s or less). With references, the desktop
-    // sends a start frame as reference image 1 (as it did on 1.0), so it counts
-    // toward the image cap; a last frame has no slot there and is refused. There
-    // is no audio reference at all (Google: "Uploading audio references is
-    // unsupported"). Counts are read from the capability SSOT; duration and
-    // resolution are covered by the capability gate above.
+    // Omni Flash's SHAPE constraints — t2v, single-start-frame i2v, or ref2v
+    // with reference IMAGES. No last frame, no video/audio refs. (Its duration
+    // and resolution are covered by the capability gate above; the 3-10s check
+    // that used to live here was a hand-typed duplicate of registry data.)
     if (input.model === 'omni-flash') {
-      const cap = getModelCapability('omni-flash')
-      const maxVideos = cap?.maxReferenceVideos ?? 0
-      const maxClip = cap?.referenceVideoDuration?.max ?? 3
-      const videoRefs = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
-      const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
-      const imageRefs =
-        (input.ingredientAssetIds?.length ?? 0) +
-        (input.characterAssetIds?.length ?? 0) +
-        (input.environmentAssetIds?.length ?? 0) +
-        (input.styleAssetIds?.length ?? 0)
-      const hasRefs = imageRefs + videoRefs > 0
-      const refCount = imageRefs + (hasRefs && input.firstFrameAssetId ? 1 : 0)
-      const shapeError =
-        audioRefs > 0
-          ? 'Omni Flash takes no audio references. Drop them, or switch to seedance-2.5 or wan-3.0, which read reference audio.'
-          : hasRefs && input.lastFrameAssetId
-            ? 'Omni Flash takes a last frame only without references: references ride a different endpoint, with no end-frame slot. Drop the last frame or the references.'
-            : input.lastFrameAssetId && !input.firstFrameAssetId
-              ? 'Omni Flash needs a start frame (firstFrameAssetId) with a last frame.'
-              : refCount > omniFlashRefCap
-                ? `Omni Flash takes at most ${omniFlashRefCap} reference images combined, a start frame included (you passed ${refCount}). Trim the list.`
-                : videoRefs > maxVideos
-                  ? `Omni Flash takes at most ${maxVideos} reference videos (you passed ${videoRefs}).`
-                  : [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].some((d) => d > maxClip + 0.05)
-                    ? `Each Omni Flash reference video must be ${maxClip}s or shorter. Trim it first with slates_trim_video.`
-                    : null
-      if (shapeError) {
-        return ok({ requires_clarification: true, missing: [], message: shapeError })
+      if (
+        input.lastFrameAssetId ||
+        input.videoReferenceAssetId || input.audioReferenceAssetId ||
+        (input.videoReferenceAssetIds?.length ?? 0) > 0 ||
+        (input.audioReferenceAssetIds?.length ?? 0) > 0
+      ) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message:
+            `Omni Flash takes a prompt, an optional start frame, and up to ${omniFlashRefCap} reference IMAGES — last frames and video/audio references are not supported. Drop those, or switch to seedance-2.5 (video/audio refs, last frame).`,
+        })
       }
-    }
-
-    // Wan 3.0's SHAPE constraints. The same split as Omni Flash: image-to-video
-    // takes a start frame and an optional end frame, reference-to-video takes
-    // images, videos and audio, and Alibaba calls the two modes "mutually
-    // exclusive". The reference endpoint has no frame slot, so frames with
-    // references are refused, never dropped (the MiniMax H3 rule, slate
-    // .claude/rules/models.md invariant 7). Caps are read from the SSOT.
-    if (input.model === 'wan-3.0') {
-      const cap = getModelCapability('wan-3.0')
-      const imageRefs =
+      const refCount =
         (input.ingredientAssetIds?.length ?? 0) +
         (input.characterAssetIds?.length ?? 0) +
         (input.environmentAssetIds?.length ?? 0) +
         (input.styleAssetIds?.length ?? 0)
-      const videoRefs = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
-      const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
-      const refImages = imageRefs
-      const refAll = refImages + videoRefs + audioRefs
-      const videoSecs = [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].reduce((n, d) => n + (d > 0 ? d : 0), 0)
-      const maxVideoSecs = cap?.maxReferenceVideoSeconds ?? 15
-      const overCap = (
-        [
-          [refImages, cap?.maxIngredientImages, 'reference images'],
-          [videoRefs, cap?.maxReferenceVideos, 'reference videos'],
-          [audioRefs, cap?.maxReferenceAudio, 'reference audio clips'],
-          [refAll, cap?.maxReferenceFilesTotal, 'reference files across all types'],
-        ] as Array<[number, number | undefined, string]>
-      ).find(([n, max]) => max !== undefined && n > max)
-      const shapeError =
-        refAll > 0 && (input.firstFrameAssetId || input.lastFrameAssetId)
-          ? 'Wan 3.0 takes first/last frames OR references, not both: Alibaba calls the two modes mutually exclusive. Drop one side.'
-          : input.lastFrameAssetId && !input.firstFrameAssetId
-            ? 'Wan 3.0 needs a start frame (firstFrameAssetId) with a last frame.'
-            : overCap
-              ? `Wan 3.0 takes at most ${overCap[1]} ${overCap[2]} (you passed ${overCap[0]}).`
-              : videoSecs > maxVideoSecs + 0.05
-                ? `Wan 3.0 takes at most ${maxVideoSecs}s of reference video in total (you passed ${videoSecs.toFixed(1)}s). Trim a clip first with slates_trim_video.`
-                : null
-      if (shapeError) {
-        return ok({ requires_clarification: true, missing: [], message: shapeError })
+      if (refCount > omniFlashRefCap) {
+        return ok({
+          requires_clarification: true,
+          missing: [],
+          message: `Omni Flash takes at most ${omniFlashRefCap} reference images combined (you passed ${refCount}). Trim the list.`,
+        })
       }
     }
 
@@ -4742,28 +4652,25 @@ export const generateVideo: Operation<{
     // The quote needs a length for EVERY reference clip, in both shapes. A
     // missing one doesn't fail the generation (the server probes and corrects
     // upward) — it silently under-quotes, which is worse than asking.
-    // Wan 3.0 bills reference video seconds on top of output seconds too, and
-    // Omni Flash's 3s clip cap needs every length to check.
     const isSeedance = input.model.startsWith('seedance')
-    const needsRefSeconds = isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash'
-    if (input.videoReferenceAssetId && needsRefSeconds && !input.videoReferenceSeconds) {
+    if (input.videoReferenceAssetId && isSeedance && !input.videoReferenceSeconds) {
       return ok({
         requires_clarification: true,
         missing: ['videoReferenceSeconds'],
         message:
-          'A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at 3s. Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+          'A Seedance video reference bills on combined input+output seconds (on a 2.5 Face row, max(input, output) + output). Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
       })
     }
     const pluralRefCount = input.videoReferenceAssetIds?.length ?? 0
     if (
-      pluralRefCount > 0 && needsRefSeconds &&
+      pluralRefCount > 0 && isSeedance &&
       (input.videoReferenceSecondsEach?.length ?? 0) !== pluralRefCount
     ) {
       return ok({
         requires_clarification: true,
         missing: ['videoReferenceSecondsEach'],
         message:
-          `A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at 3s. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
+          `A Seedance video reference bills on combined input+output seconds (on a 2.5 Face row, max(input, output) + output). Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
     const cloud = ctx.cloud()
@@ -5701,7 +5608,7 @@ export const editVideo: Operation<{
     styleAssetIds: z.array(z.string()).max(4).optional().describe('Style/appearance reference images (@ImageN). Max 4 combined with characterAssetIds. KLING MODELS ONLY — rejected on omni-flash-edit.'),
     keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit and seedance-2.5-edit output carry their own audio).'),
     videoResolution: zEnum(EDIT_VIDEO_RESOLUTIONS).optional().describe(
-      `seedance-2.5-edit (default ${defaultVideoResolutionFor('seedance-2.5-edit')}) and omni-flash-edit (default ${defaultVideoResolutionFor('omni-flash-edit')}; its 1080p and 4K are upscales). Ignored by the Kling engines, whose output follows the source clip.`
+      `seedance-2.5-edit ONLY (default ${defaultVideoResolutionFor('seedance-2.5-edit')}). Ignored by the Kling and Omni Flash engines, whose output follows the source clip.`
     ),
     seedanceFace: z.boolean().optional().describe('seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Without it a face is blocked outright; with it the edit costs about 40-50% more. A face edit submitted without this flag is rejected, not silently downgraded.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -5780,7 +5687,7 @@ export const editVideo: Operation<{
           seedanceFace: input.seedanceFace === true,
         })
       : isOmniFlashEdit
-        ? omniFlashEditCostKey(billedSeconds, (input.videoResolution ?? defaultVideoResolutionFor('omni-flash-edit')) as VideoResolution)
+        ? omniFlashEditCostKey(billedSeconds)
         : klingEditCostKey(model as 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit', billedSeconds)
 
     const cloud = ctx.cloud()
@@ -8697,7 +8604,6 @@ export function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
-  if (t.startsWith('wan') || t === 'alibaba-wan-3.0') return 'slates-prompting-wan-3'
   // MiniMax H3 — both seats share one skill. Placed BEFORE the seed/seedance
   // block for the same reason seed-audio is: no prefix collision exists today,
   // but a `minimax-*` id must never fall through to a Seedance guide.

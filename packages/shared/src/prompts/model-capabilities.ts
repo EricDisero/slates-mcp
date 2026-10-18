@@ -99,17 +99,8 @@ const KLING_DIRECT_ASPECT_RATIOS: AspectRatio[] = [
 const KLING_FAL_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1']
 
 
-/** Gemini Omni Flash (fal schema, 16:9 default): two. Unchanged on 1.1. */
+/** Gemini Omni Flash (fal schema, 16:9 default): two. */
 const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
-
-/**
- * Wan 3.0: five. Read off fal's live OpenAPI 2026-10-17 for all three
- * `alibaba/wan-3.0/*` endpoints: `adaptive`, `16:9`, `4:3`, `1:1`, `3:4`,
- * `9:16`. We never send `adaptive` (it is not an AspectRatio in this
- * vocabulary, and the composer always has an explicit ratio), the same call
- * the H3 rows make.
- */
-const WAN_3_ASPECT_RATIOS: AspectRatio[] = ['16:9', '4:3', '1:1', '3:4', '9:16']
 
 /** Seedance (both seats, and the edit row): six — notably NO `4:5`. */
 const SEEDANCE_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
@@ -542,76 +533,20 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxIngredientImages: 4,
   },
 
-  // ── Gemini Omni Flash 1.1 ──────────────────────────────────────────────────
-  //
-  // These two ids carry Gemini Omni Flash 1.1 since 2026-10-17 (1.0 swapped out
-  // in place: same ids, new endpoints `google/gemini-omni-flash/v1.1/*`). Every
-  // value READ OFF fal's live OpenAPI for the four 1.1 endpoints, 2026-10-17.
-  // Harvest and ledger: second-brain/business/projects/slates/research/
-  // 2026-10-17-omni-flash-1-1-and-wan-3-0.md.
-  //
-  // Resolution: fal's enum is 360p / 720p / 1080p / 4k, default 720p, on all
-  // four endpoints. Google: "1080p output (upscaled)", "4K output (upscaled)".
-  // 360p is NOT offered: it sits below every other row's floor and would need
-  // a new resolution token in every exhaustive map. Add it if drafts are wanted.
+  // ── Gemini Omni Flash ──────────────────────────────────────────────────────
 
   'omni-flash': {
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
-    videoResolution: { options: ['720p', '1080p', '4k'], default: '720p' },
+    videoResolution: { options: ['720p'], fixed: '720p' },
     duration: { min: 3, max: 10, mode: 'continuous' },
-    // fal's reference-to-video `image_urls`: maxItems 10 on 1.1 (and on 1.0,
-    // where we capped at 7 off a July reading of Google's limit).
-    maxIngredientImages: 10,
-    // `reference_video_urls`: maxItems 3, "Each video must be at most three
-    // seconds long". Google: "Video references work best with likenesses; any
-    // audio in a video reference is ignored." No minimum is published.
-    maxReferenceVideos: 3,
-    referenceVideoDuration: { min: 1, max: 3 },
-    maxReferenceVideoSeconds: 9,
-    // Neither fal nor Google publishes a combined ceiling, so the total is the
-    // two arms summed; it never binds below them. No audio references.
-    maxReferenceFilesTotal: 13,
+    maxIngredientImages: 7,
   },
 
   'omni-flash-edit': {
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
-    // The 1.1 edit endpoint takes `resolution` too (same enum and default).
-    videoResolution: { options: ['720p', '1080p', '4k'], default: '720p' },
-    // Source clip: Google, "Input videos for editing and extension must be 10
-    // seconds or less when uploading". fal's 1.1 edit schema states no bound.
+    videoResolution: { options: ['720p'], fixed: '720p' },
     duration: { min: 3, max: 10, mode: 'continuous' },
     maxIngredientImages: 0,
-  },
-
-  // ── Wan 3.0 (Alibaba, on fal — added 2026-10-17) ──────────────────────────
-  //
-  // Every value READ OFF fal's live OpenAPI, 2026-10-17:
-  //   alibaba/wan-3.0/{text-to-video,image-to-video,reference-to-video}
-  // Wan 3.0 Prime (`alibaba/wan-3.0-prime/*`, the same model faster and 40%
-  // dearer) is deliberately absent. Frames ride image-to-video and references
-  // ride reference-to-video; Alibaba: "First-and-last-frame mode and
-  // all-reference mode are mutually exclusive."
-
-  'wan-3.0': {
-    aspectRatios: WAN_3_ASPECT_RATIOS,
-    // fal enum 480p / 720p / 1080p, schema default 1080p. Our default is 720p
-    // for the Seedance 2.5 reason: a 30s take at 1080p is 300 credits, and
-    // reaching a tier and defaulting to it are different decisions.
-    videoResolution: { options: ['480p', '720p', '1080p'], default: '720p' },
-    // integer 2-30, or null for "smart duration" (the model picks the length).
-    // We never send null: there is no key for a length we did not choose.
-    duration: { min: 2, max: 30, mode: 'continuous' },
-    // reference_image_urls maxItems 10; reference_video_urls maxItems 5,
-    // "totaling at most 15 seconds. Each clip must be at least 16 fps. Input
-    // video duration is billed in addition to output duration.";
-    // reference_audio_urls maxItems 5, "totaling at most 15 seconds".
-    // Alibaba: "up to 20 multi-modal reference materials" per request.
-    maxIngredientImages: 10,
-    maxReferenceVideos: 5,
-    maxReferenceAudio: 5,
-    maxReferenceFilesTotal: 20,
-    maxReferenceVideoSeconds: 15,
-    maxReferenceAudioSeconds: 15,
   },
 
   // ── Seedance ───────────────────────────────────────────────────────────────
@@ -1149,7 +1084,7 @@ export function describeAspectRatios(models: readonly string[], provider?: strin
   return groupBy(models, (m) => aspectRatiosFor(m, provider).join(', '))
 }
 
-/** e.g. "seedance-2: 480p, 720p, 1080p, 4k (default 1080p) · ltx-2-5-pro: 720p, 1080p (default 1080p)" */
+/** e.g. "seedance-2: 480p, 720p, 1080p, 4k (default 1080p) · omni-flash: 720p only (fixed)" */
 export function describeVideoResolutions(models: readonly string[]): string {
   return groupBy(models, (m) => {
     const vr = MODEL_CAPABILITIES[m]?.videoResolution
@@ -1185,7 +1120,7 @@ export function describeDurations(models: readonly string[]): string {
   })
 }
 
-/** e.g. "seedance-2: 9 · seedance-2.5: 30 · omni-flash: 10 · seedance-2.5-edit: 0 (prompt + source clip only)" */
+/** e.g. "seedance-2: 9 · seedance-2.5: 30 · omni-flash: 7 · seedance-2.5-edit: 0 (prompt + source clip only)" */
 export function describeReferenceImageCaps(models: readonly string[]): string {
   return groupBy(models, (m) => {
     const cap = MODEL_CAPABILITIES[m]
