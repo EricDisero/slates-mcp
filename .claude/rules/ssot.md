@@ -44,9 +44,13 @@ Each one moved a fact to a single home and left a rebuild-and-publish obligation
     each one names a mechanism that genuinely differs: `present_plan` is a desktop loop-level tool
     the MCP surface cannot see, and only the desktop loop auto-polls generation status and renders
     orchestration cost. Two hand-maintained copies is the drift this file deletes.
-  - **The MCP instructions have a PINNED BYTE CEILING** (`MCP_INSTRUCTIONS_CEILING`, 14,000). They are
+  - **The MCP instructions have a PINNED BYTE CEILING** (`MCP_INSTRUCTIONS_CEILING`). They are
     injected into every client session with no prompt cache behind them, unlike the desktop's
-    byte-stable prefix (measured 97.4% cache hit). Down from 37,976 at the cut below. **The current
+    byte-stable prefix (measured 97.4% cache hit). Down from 37,976 at the cut below. Since
+    2026-10-17 the server sends `buildMcpInstructions()` (the Essentials, the every-request rules
+    picked from the doctrine by their opening words, and a pointer), and the full MCP doctrine is
+    served by `slates_get_prompting_guide(topic: "working-method")` under its own
+    `MCP_WORKING_METHOD_CEILING`; check 2 asserts both and that the topic returns it byte for byte. **The current
     figure is PRINTED by `npm run check:agent-surface` on every build — read it there, never from
     this sentence.** A number written into prose is a number that goes stale silently; this one had,
     by 11%, within three days. Raise the ceiling deliberately, never to green a red build.

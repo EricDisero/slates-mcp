@@ -8731,18 +8731,27 @@ async function fetchMemberGuideCatalog(ctx: OperationContext): Promise<{ entries
   }
 }
 
+/** The guide topic that serves the full MCP working method (agent-doctrine.ts, buildMcpInstructions). */
+export const WORKING_METHOD_TOPIC = 'working-method'
+
 export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; query?: string; limit?: number; offset?: number }> = {
   id: 'slates_get_prompting_guide',
   description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
   input: z.object({
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
-    topic: z.string().min(1).optional().describe('Optional guide name, model id, style name, catalog, or app-manual. Omit to search by intent or browse.'),
+    topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules). Omit to search by intent or browse.`),
     depth: z.enum(['card', 'index', 'section', 'full']).optional().describe('Default card is a short overview; index lists sections; query selects a section; full returns the complete guide.'),
     limit: z.number().int().min(1).max(20).optional().describe('Page size for a search (default 8) or a catalog listing (default: the whole catalog); continue with offset from nextOffset. Does not change guide bodies.'),
     offset: z.number().int().min(0).optional().describe('Catalog/search offset from nextOffset in the preceding result.'),
   }),
   async run(input, ctx) {
     const topic = input.topic?.trim().toLowerCase()
+    if (topic === WORKING_METHOD_TOPIC) {
+      // Imported here: agent-doctrine imports this module at load.
+      const { buildAgentDoctrine } = await import('../prompts/agent-doctrine.js')
+      const content = buildAgentDoctrine({ surface: 'mcp' })
+      return { text: content, data: { topic: WORKING_METHOD_TOPIC, bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
+    }
     if (topic === 'app-manual') {
       const content = input.query || input.depth === 'full' ? appManualSections(input.query) : appManualIndex()
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }

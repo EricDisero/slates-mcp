@@ -9,7 +9,7 @@ export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, IMAGE_MODELS, defaultContex
 // is the op-level confirm gate; `DEVIATION_FACTOR` is the Studio Agent's
 // re-ask multiplier, which lived only in `loop.ts` while `slates-cost-discipline`
 // told the agent a different number. One home, both readers.
-export { CONFIRM_CREDITS, DEVIATION_FACTOR } from './operations/index.js'
+export { CONFIRM_CREDITS, DEVIATION_FACTOR, WORKING_METHOD_TOPIC } from './operations/index.js'
 // 🚨 THE ONE SCHEMA RENDERER + the tier/annotation tables. The desktop rendered
 // `$refStrategy:'none'` and the MCP server rendered `openApi3`, so surface
 // parity was proven of the ID SET and unproven of the BYTES. Both call this now.
@@ -58,7 +58,7 @@ export {
 // stay off the public surface — an export nothing calls is an export nothing
 // keeps honest, which is why `buildModelRouting` was deleted rather than left
 // here "in case".
-export { buildAgentDoctrine, type AgentSurface } from './prompts/agent-doctrine.js'
+export { buildAgentDoctrine, buildMcpInstructions, type AgentSurface } from './prompts/agent-doctrine.js'
 // Banned prompt tokens — EXTRACTED from the skills' own never-use lists and
 // inlined into the generate ops' descriptions. Enforcement of "load the guide"
 // that the model cannot skip, because a description is always in context.

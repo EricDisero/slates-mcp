@@ -89,12 +89,19 @@ const desktopOpsPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'ops.ts'
  * within three days of being written, which is the whole argument for printing
  * a number rather than narrating it.)
  *
+ * 2026-10-17: the server sends buildMcpInstructions() (the Essentials and the
+ * every-request rules) and serves the full MCP doctrine through the guide topic
+ * "working-method", so the always-loaded ceiling dropped from 14,000 to 8,000.
+ * The full doctrine keeps its own ceiling below: it is still read, once per
+ * production workflow, on request.
+ *
  * ⚠️ AND THE INSTRUCTIONS ARE NOT THE BIG NUMBER — the TOOL SURFACE is, by an
  * order of magnitude. Check 7 owns that ceiling and prints the per-turn total.
  * If you came here to shrink the agent's context, this constant is the small
  * end of the problem.
  */
-const MCP_INSTRUCTIONS_CEILING = 14_000
+const MCP_INSTRUCTIONS_CEILING = 8_000
+const MCP_WORKING_METHOD_CEILING = 14_000
 
 const failures = []
 const warnings = []
@@ -168,6 +175,8 @@ const shared = await import(pathToFileURL(distIndex).href)
 const {
   ALL_OPERATIONS,
   buildAgentDoctrine,
+  buildMcpInstructions,
+  WORKING_METHOD_TOPIC,
   BANNED_PROMPT_TOKENS,
   describeBannedTokens,
   bannedTokensForSkill,
@@ -262,28 +271,27 @@ console.log('agent-surface-lockstep-check')
   const CHECK = '2 mcp-instructions'
   const server = readFileSync(mcpServerPath, 'utf8').replace(/\r\n/g, '\n')
   // Evaluate the actual consumer composition with deterministic inputs. It may
-  // split the canonical doctrine to put its first paragraph before the notice;
-  // it must preserve every doctrine byte and introduce no private guidance.
+  // split the canonical instructions to put their first paragraph before the
+  // notice; it must preserve every byte and introduce no private guidance.
   try {
     const ast = ts.createSourceFile(mcpServerPath, server, ts.ScriptTarget.Latest, true)
     const declarations = ast.statements.filter(statement => ts.isVariableStatement(statement)
       && statement.declarationList.declarations.some(declaration => ['doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
     const code = declarations.map(statement => statement.getText(ast)).join('\n') + '\ninstructions'
     const javascript = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
-    const canonical = buildAgentDoctrine({ surface: 'mcp' })
+    const canonical = buildMcpInstructions()
     const boundary = canonical.indexOf('\n\n')
     for (const notice of [undefined, 'UPDATE AVAILABLE: fixture notice']) {
       let calls = 0
       const composed = runInNewContext(javascript, {
         pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', updateAdvice: notice,
-        buildAgentDoctrine: options => {
-          if (options.surface !== 'mcp') throw new Error('wrong doctrine surface')
+        buildMcpInstructions: () => {
           calls++
           return canonical
         },
       }, { timeout: 1000 })
       const expected = ['Slates MCP server v0.0.0 (@slatesvideo/mcp-server).', canonical.slice(0, boundary), notice, canonical.slice(boundary + 2)].filter(Boolean).join('\n\n')
-      if (calls !== 1 || composed !== expected) fail(CHECK, 'MCP instructions do not preserve the canonical doctrine with its first paragraph ahead of the optional notice.')
+      if (calls !== 1 || composed !== expected) fail(CHECK, 'MCP instructions do not preserve buildMcpInstructions() with its first paragraph ahead of the optional notice.')
     }
   } catch (error) {
     fail(CHECK, `${mcpServerPath}: cannot verify canonical instruction composition: ${error.message}`)
@@ -302,14 +310,31 @@ console.log('agent-surface-lockstep-check')
   }
   const mcp = buildAgentDoctrine({ surface: 'mcp' })
   const desktop = buildAgentDoctrine({ surface: 'desktop' })
+  const sent = buildMcpInstructions()
   if (mcp.length === 0) fail(CHECK, 'buildAgentDoctrine({surface:"mcp"}) returned an empty string.')
-  if (mcp.length > MCP_INSTRUCTIONS_CEILING) {
+  if (sent.length > MCP_INSTRUCTIONS_CEILING) {
     fail(
       CHECK,
-      `MCP instructions are ${mcp.length} chars, over the ${MCP_INSTRUCTIONS_CEILING} ceiling. ` +
+      `MCP instructions are ${sent.length} chars, over the ${MCP_INSTRUCTIONS_CEILING} ceiling. ` +
         `This is injected into every client session with no prompt cache behind it. ` +
-        `Cut it, or raise the ceiling deliberately with a reason in the constant's comment.`
+        `Move a rule behind the "${WORKING_METHOD_TOPIC}" topic, or raise the ceiling deliberately with a reason in the constant's comment.`
     )
+  }
+  if (mcp.length > MCP_WORKING_METHOD_CEILING) {
+    fail(CHECK, `the full MCP working method is ${mcp.length} chars, over the ${MCP_WORKING_METHOD_CEILING} ceiling.`)
+  }
+  // What the server sends: the Essentials first, the every-request rules, and
+  // the pointer that makes everything else reachable.
+  for (const spine of ['## Essentials', '## Every request', 'REAL NUMBERS ONLY', 'MODEL KINDS', `topic: "${WORKING_METHOD_TOPIC}"`, 'Working without skill files']) {
+    if (!sent.includes(spine)) fail(CHECK, `the MCP instructions are missing "${spine}".`)
+  }
+  // The pointer must resolve: the guide op serves the full MCP doctrine, byte for byte.
+  try {
+    const guideOp = ALL_OPERATIONS.find((o) => o.id === 'slates_get_prompting_guide')
+    const served = await guideOp.run({ topic: WORKING_METHOD_TOPIC }, {})
+    if (served?.data?.guide !== mcp) fail(CHECK, `slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}") does not return the full MCP doctrine.`)
+  } catch (error) {
+    fail(CHECK, `slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}") failed: ${error.message}`)
   }
   // Both surfaces must actually carry the shared spine. If a fork ever ate one
   // of these, the check that "the shared rules are one string" is worthless.
@@ -321,7 +346,7 @@ console.log('agent-surface-lockstep-check')
     if (!mcp.includes(spine)) fail(CHECK, `mcp doctrine is missing "${spine}".`)
   }
   if (!failures.some((f) => f.startsWith(`[${CHECK}]`))) {
-    pass(CHECK, `desktop ${desktop.length} chars, mcp ${mcp.length} chars (ceiling ${MCP_INSTRUCTIONS_CEILING})`)
+    pass(CHECK, `desktop ${desktop.length} chars, mcp instructions ${sent.length} chars (ceiling ${MCP_INSTRUCTIONS_CEILING}), full mcp working method ${mcp.length} chars (ceiling ${MCP_WORKING_METHOD_CEILING})`)
   }
 }
 

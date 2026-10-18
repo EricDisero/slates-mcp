@@ -57,7 +57,7 @@
 
 import { SKILLS } from '../skills/content.js'
 import { guideCatalog } from './guide-discovery.js'
-import { VIDEO_MODELS, AUDIO_MODELS } from '../operations/index.js'
+import { VIDEO_MODELS, AUDIO_MODELS, WORKING_METHOD_TOPIC } from '../operations/index.js'
 
 /**
  * Which agent surface is being briefed.
@@ -215,8 +215,8 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // slates_get_workspace_state, with a project id it made up, read the empty
   // answer as "IMG-A8 does not exist" and stopped (slate scripts/agent-eval
   // README, round 5). Dependent calls wait; independent ones may still run together.
-  // Desktop loop only: the invented id came from the desktop brain, and the MCP
-  // instructions sit at their 14,000-character ceiling (agent-surface check).
+  // Desktop loop only: the invented id came from the desktop brain, and the full
+  // MCP working method sits near its 14,000-character ceiling (agent-surface check).
   fork(
     `- IDS COME FROM RESULTS: pass only a project, asset, shot, folder or board id you read in a tool result in this conversation. When a call needs another call's answer (the open project's id from slates_get_workspace_state, an asset's id from slates_list_assets), make the first call, read its result, then make the second; never fill the id in ahead of the answer. Calls that do not depend on each other may run together. "No project …" or "No asset …" means the id was wrong, not that the thing is missing: get the real id and try again.`,
     ``
@@ -270,6 +270,55 @@ const MCP_FOOTER = `## Working without skill files
 
 If slates-* skill files are not installed in this client, every one of them is still reachable as data: call slates_get_prompting_guide with the skill name (or a model id — it resolves aliases). Query the brief or browse topic "catalog" for generated discovery and entitled member playbooks. "No skill installed" is never a reason to prompt a model blind.
 `
+
+// ── The MCP instructions: what every request needs ────────────────
+//
+// Every MCP client session pays for its instructions with no prompt cache
+// behind them, while the desktop's doctrine is a cached prefix. So the server
+// sends the Essentials plus the rules that hold on every request, and the full
+// MCP doctrine below is served by slates_get_prompting_guide(topic:
+// WORKING_METHOD_TOPIC). Entries are PICKED from WORKING_METHOD and HARD_RULES
+// by their opening words, never copied, so the two cannot drift; an opener that
+// matches no entry, or two, throws when the instructions are built. 2026-10-17: 13,997 characters to
+// about half, the Essentials still first.
+const MCP_EVERY_REQUEST = [
+  'For HOW/WHERE questions',
+  '4. PLAN + GET APPROVAL',
+  '6. QUALITY-CHECK',
+  "- SAY THE APP'S WORDS",
+  "- NAMES AND DESCRIPTIONS ARE THE USER'S UI",
+  '- ASSET CODES + STALENESS',
+  '- A SHOT LIST IS SHOTS',
+  '- MODEL KINDS',
+  '- CREDITS ONLY',
+  '- CONTENT POLICY',
+  '- RESOLUTION DEFAULT',
+]
+
+/**
+ * The MCP server's `instructions`: the Essentials, the every-request rules and
+ * a pointer to the full working method. The server adds only its version line
+ * and the update notice (lockstep check 2).
+ */
+export function buildMcpInstructions(): string {
+  const pool = [...WORKING_METHOD, ...HARD_RULES].map((entry) => entry.mcp)
+  const lines = MCP_EVERY_REQUEST.map((opener) => {
+    const hits = pool.filter((text) => text.startsWith(opener))
+    if (hits.length !== 1) throw new Error(`MCP instructions: "${opener}" matches ${hits.length} doctrine entries`)
+    return `- ${hits[0].replace(/^(\d\. |- )/, '')}`
+  })
+  return `${PREAMBLE.mcp}
+
+## Every request
+
+${lines.join('\n')}
+
+## The full working method
+
+The rest of the working method and the hard rules (cost and token discipline, exact model ids, the variety counts, Seed Audio length) and the guide index: slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}"). Read it once when a production workflow starts.
+
+${MCP_FOOTER}`
+}
 
 /**
  * THE doctrine string for a surface. The desktop's whole system prompt and the

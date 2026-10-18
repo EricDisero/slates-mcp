@@ -83,7 +83,7 @@ so nothing downstream has to restate them in prose (which is how they went stale
 | # | Asserts |
 |---|---|
 | 1 | Both surfaces render through the ONE `toolDefinitions()`, same op id set, no surface-private capability (`present_plan` is the documented exception) |
-| 2 | The MCP server passes non-empty `instructions` from `buildAgentDoctrine` within the byte ceiling, and advertises the four protocol capabilities |
+| 2 | The MCP server passes `buildMcpInstructions()` within its ceiling, the guide topic `working-method` serves the full MCP doctrine within its own, and the server advertises the four protocol capabilities |
 | 3 | Neither consumer contains doctrine prose of its own |
 | 4 | Every banned token inlined into an op description still appears in its source skill's `@banned` block |
 | 5 | `MODEL_FACTS.notes` stays ROUTING — no prices, durations or counts — and every lane reaches an op |

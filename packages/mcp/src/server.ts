@@ -21,7 +21,7 @@ import {
   MODEL_CAPABILITIES,
   MODEL_FACTS,
   SlatesCloudClient,
-  buildAgentDoctrine,
+  buildMcpInstructions,
   APP_MANUAL,
   defaultContext,
   toolDefinitions,
@@ -68,11 +68,12 @@ const pkg = JSON.parse(
 // (@slatesvideo/shared → prompts/agent-doctrine.ts), surface-aware only where
 // the mechanism genuinely differs.
 //
-// ⚠️ SIZE IS DELIBERATE. This is injected into EVERY client session and some
-// clients truncate or ignore long instructions, so it ships the working method
-// + hard rules + guide index and leaves the long-form skills to
-// slates_get_prompting_guide. scripts/agent-surface-lockstep-check.mjs pins the
-// byte count so growth is a review decision, not an accident.
+// ⚠️ SIZE IS DELIBERATE. This is injected into EVERY client session with no
+// prompt cache, and some clients truncate long instructions, so it ships the
+// Essentials and the every-request rules; the full working method and the guide
+// index are a slates_get_prompting_guide call away (topic "working-method").
+// scripts/agent-surface-lockstep-check.mjs pins the byte count so growth is a
+// review decision, not an accident.
 const PKG_NAME = '@slatesvideo/mcp-server'
 // The first line names the running version so an agent can answer "what
 // version am I on"; the notice appears only when the on-disk cache (refreshed
@@ -84,7 +85,7 @@ const updateAdvice = updateNotice(
   cachedLatestVersion(PKG_NAME),
   'Newer models and parameters are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client (Claude Desktop, Codex, Cursor) so npx fetches the new version; if it was installed globally, run `npm i -g @slatesvideo/mcp-server@latest` first.'
 )
-const doctrine = buildAgentDoctrine({ surface: 'mcp' })
+const doctrine = buildMcpInstructions()
 const firstParagraphEnd = doctrine.indexOf('\n\n')
 const instructions = [
   `Slates MCP server v${pkg.version} (${PKG_NAME}).`,

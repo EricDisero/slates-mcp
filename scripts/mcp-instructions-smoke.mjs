@@ -101,11 +101,12 @@ check(
 if (typeof instructions === 'string') {
   // The spine. If a fork ever ate one of these, an MCP client would be briefed
   // on less than the desktop is and nobody would notice until a user did.
+  // Since 2026-10-17 the wire carries the Essentials and the every-request
+  // rules; the full working method is served by the guide topic checked below.
   for (const spine of [
-    '## How you work',
-    '## Hard rules',
-    '## Guide index',
-    'LOAD KNOWLEDGE ON DEMAND',
+    '## Essentials',
+    '## Every request',
+    'topic: "working-method"',
     'REAL NUMBERS ONLY',
     // 'MODEL ROUTING' became 'MODEL KINDS' on 2026-08-30: the per-seat table
     // moved onto the ops that make the choice, and what stays in the
@@ -253,7 +254,12 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   // here for a month after the corpus reached 34).
   const { SKILLS } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
   const { buildAgentDoctrine } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
-  check('wire instructions preserve every canonical doctrine byte', (() => { const canonical = buildAgentDoctrine({ surface: 'mcp' }); const first = canonical.indexOf('\n\n'); const wire = (instructions ?? '').slice((instructions ?? '').indexOf('\n\n') + 2); return wire.startsWith(canonical.slice(0, first)) && wire.endsWith(canonical.slice(first + 2)) })())
+  const { buildMcpInstructions } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  check('wire instructions preserve every canonical instruction byte', (() => { const canonical = buildMcpInstructions(); const first = canonical.indexOf('\n\n'); const wire = (instructions ?? '').slice((instructions ?? '').indexOf('\n\n') + 2); return wire.startsWith(canonical.slice(0, first)) && wire.endsWith(canonical.slice(first + 2)) })())
+  // The pointer in the instructions resolves over the real call path.
+  const method = await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: 'working-method' } })
+  const methodText = method.content?.[0]?.text ?? ''
+  check('the "working-method" guide serves the full MCP doctrine', methodText === buildAgentDoctrine({ surface: 'mcp' }) && methodText.includes('LOAD KNOWLEDGE ON DEMAND') && methodText.includes('## Guide index'))
   const skillCount = Object.keys(SKILLS).length
   check('every bundled skill is exposed as an MCP prompt', prompts.length === skillCount, `${prompts.length} of ${skillCount}`)
   const got = await client.getPrompt({ name: 'slates-cost-discipline' })
