@@ -268,6 +268,9 @@ export const DEVIATION_FACTOR = 1.2
 // The consent half rides every generation tool because a host may drop the
 // server instructions: Codex CLI 0.159.1 passed none to the model (probes
 // 2026-09-30 and 2026-10-02), so a small spend had no approval rule in view.
+/** For an asset param that takes a UUID only (no resolveAssetRefs in its run). */
+const ASSET_UUID_ONLY = 'Asset UUID, not a badge code: pass the code to slates_list_assets as search to resolve it.'
+
 const CONFIRM_GATE_SENTENCE =
   `Show the user the estimate and wait for their OK before any generation, however small. Cost above ${CONFIRM_CREDITS} credits (and, on image and video, any attached reference) also returns requires_confirm — pass confirm=true only to relay that OK.`
 
@@ -450,7 +453,7 @@ function backgroundSubmitted(
 export const getWorkspaceState: Operation<{ projectId?: string; limit?: number }> = {
   id: 'slates_get_workspace_state',
   description:
-    'Snapshot of the user\'s Slates workspace: the project list (most recent first) plus the active project in full when you name one.',
+    'Snapshot of the user\'s Slates workspace: the project list (most recent first) plus the active project in full when you name one. It also returns generationDefaults (the default image and video model and image settings) for when the user states no preference.',
   input: z.object({
     projectId: z.string().optional(),
     limit: z.number().int().min(1).max(200).optional().describe('How many projects to list, newest first. Default 40.'),
@@ -1229,7 +1232,7 @@ export const linkAssetSource: Operation<{ projectId: string; assetId: string; im
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
-    "Save one frame of a clip as a new picture in Media, as the clip card's camera does: at 'first', 'last' (default 'first') or a second. Free. The usual continuity move: extract a clip's last frame and use it as the next clip's first frame.",
+    "Save one frame of a clip as a new picture in Media, as the clip card's camera does: at 'first', 'last' (default 'first') or a second. Free. The usual continuity move: extract a clip's last frame and use it as the next clip's first frame. To only look at a clip, use slates_get_asset_video_frames; this one adds a picture to the project.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -1256,7 +1259,7 @@ export const getMe: Operation<Record<string, never>> = {
 
 export const getCreditBalance: Operation<Record<string, never>> = {
   id: 'slates_get_credit_balance',
-  description: 'Current Slates credit balance (abstract credits — never expire). Call before any generation that costs credits.',
+  description: 'Current credit balance only (credits never expire); slates_get_me also returns identity and license tier. Read it to answer a balance question or to check there is enough for a quoted total.',
   input: z.object({}).strict(),
   async run(_input, ctx) {
     const r = await ctx.cloud().get<CreditsBalance>('/api/agent/credits/balance')
@@ -1495,7 +1498,7 @@ export const estimateGenerationCost: Operation<{
 }> = {
   id: 'slates_estimate_generation_cost',
   description:
-    'Quote credits before any generate_* op. Accepts the generation model ids and parameters (edit seats other than Kling, lip-sync and motion-transfer engines need an exact registry cost key), or an exact registry cost key. Pairs with the confirm gate.',
+    'Quote credits before any generate_* op. For saved Shots, a board or a scene, quote with slates_get_board_quote instead. Accepts the generation model ids and parameters (edit seats other than Kling, lip-sync and motion-transfer engines need an exact registry cost key), or an exact registry cost key. Show the user the total and wait for their OK before the generate call; the result flags requires_confirm above the threshold and carries the model\'s prompting card.',
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
@@ -1519,9 +1522,9 @@ export const estimateGenerationCost: Operation<{
     ),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only. Omit for the model default; pass the same value to generation.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
-    aspectRatio: z.string().optional().describe('GPT Image only: 1:1, 4:3 and 3:4 cost more than 16:9.'),
-    sound: z.boolean().optional().describe('Kling 3.0: the audio flag changes the cost key. Omitted means sound on, as generation bills it; pass false to price a silent take. Kling 4K keys include audio.'),
-    seedanceFace: z.boolean().optional().describe('Seedance Face row, for an AI character\'s face (pricier key).'),
+    aspectRatio: z.string().optional().describe('GPT Image: the frame shape changes the price; pass the generation\'s value.'),
+    sound: z.boolean().optional().describe('Kling 3.0: a silent take prices differently from one with sound. Omitted means sound on, as generation bills it; pass false to price a silent take. Kling 4K keys include audio.'),
+    seedanceFace: z.boolean().optional().describe('Seedance Face row, for an AI character\'s face.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance with a consented real person (premium key).'),
     videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
     audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, including attached character voices.'),
@@ -1730,7 +1733,7 @@ export const estimateGenerationCost: Operation<{
 
 export const listProjects: Operation<Record<string, never>> = {
   id: 'slates_list_projects',
-  description: 'List all Slates projects in the desktop workspace.',
+  description: 'Full records for every project in the desktop workspace, unbounded. To start a session use slates_get_workspace_state instead: the compact list, the active project and generation defaults.',
   input: z.object({}).strict(),
   async run(_input, ctx) {
     const r = await ctx.desktop().get<{ projects: unknown[] }>('/agent/projects')
@@ -1740,7 +1743,7 @@ export const listProjects: Operation<Record<string, never>> = {
 
 export const createProject: Operation<{ name: string }> = {
   id: 'slates_create_project',
-  description: 'Create a new Slates project. Returns the new project record.',
+  description: 'Create a new Slates project, only when the user asks for one; otherwise work in the current project (slates_get_workspace_state). Returns the new project record.',
   input: z.object({ name: z.string().min(1).max(120) }),
   async run(input, ctx) {
     const r = await ctx.desktop().post<{ project: unknown }>('/agent/projects', { name: input.name })
@@ -1872,7 +1875,7 @@ export const listAssets: Operation<{
   limit?: number
 }> = {
   id: 'slates_list_assets',
-  description: 'List assets in a Slates project as COMPACT rows (id, code, label, type) — newest first, default limit 50. Each asset carries its short code (IMG-A12 / VID-V3 / AUD-S1 — the badge the user sees on the gallery card) and label. When the user names an asset by code ("use IMG-A36 as the reference"), pass it as `search` to resolve the assetId. Always speak about assets by code + label, never by UUID. A favorited asset carries `isFavorite: true` (absent means not favorited). NOTE: generate_* results already return the new asset ids — do NOT call this to find an asset you just created.',
+  description: 'List assets in a Slates project as compact rows (id, code, label, type) — newest first, default limit 50. Each asset carries its short code (IMG-A12 / VID-V3 / AUD-S1 — the badge the user sees on the gallery card) and label. When the user names an asset by code ("use IMG-A36 as the reference"), pass it as `search` to resolve the assetId. Always speak about assets by code + label, never by UUID. A favorited asset carries `isFavorite: true` (absent means not favorited). Generate results already return new asset ids, so do not list to find one you just created.',
   input: z.object({
     projectId: z.string().uuid(),
     type: z.enum(['image', 'video', 'audio']).optional().describe('Only this asset type'),
@@ -1913,7 +1916,7 @@ export const listAssets: Operation<{
 export const getAssetImage: Operation<{ id: string; fullRes?: boolean }> = {
   id: 'slates_get_asset_image',
   description:
-    'Read an asset image off disk and return it inline as base64 so the calling LLM sees the actual pixels. The response also carries the asset\'s short code (e.g. IMG-A12) and human label — USE these when referring to the asset in chat with the user (e.g. "I\'m using IMG-A12 — Beach Sunset as the first frame") so they can match it to the badged thumbnail in the Slates gallery. Default JPEG 85% ≤1024px long-edge for token economy. Pass fullRes=true for the original PNG.',
+    'Read an asset image off disk and return it inline as base64 so the calling LLM sees the actual pixels. The response also carries the asset\'s short code (e.g. IMG-A12) and human label; use these when referring to the asset in chat with the user (e.g. "I\'m using IMG-A12 — Beach Sunset as the first frame") so they can match it to the badged thumbnail in the Slates gallery. Default JPEG 85% ≤1024px long-edge for token economy. Pass fullRes=true for the original PNG. Takes the asset UUID, not a badge code.',
   input: z.object({
     id: z.string().uuid(),
     fullRes: z.boolean().optional(),
@@ -1949,7 +1952,7 @@ export const getAssetsBatch: Operation<{ ids: string[] }> = {
   description:
     'Fetch up to 8 image-asset thumbnails inline in a single call. Use this when picking the right reference from a project gallery — one round trip beats N. Each returned image carries its short code (IMG-A12) and label. Video assets are not supported here — call slates_get_asset_video_frames for those.',
   input: z.object({
-    ids: z.array(z.string().uuid()).min(1).max(8).describe('1-8 image-asset ids. Order is preserved in the response.'),
+    ids: z.array(z.string().uuid()).min(1).max(8).describe('1-8 image-asset UUIDs (not badge codes). Order is preserved in the response.'),
   }),
   async run(input, ctx) {
     const r = await ctx.desktop().post<{
@@ -2059,7 +2062,7 @@ export const generateChatGptImage: Operation<{
   projectId: string; requestId: string; prompt: string; aspectRatio?: string; referenceAssetIds?: string[]; background?: boolean; folderId?: string | null
 }> = {
   id: 'slates_generate_chatgpt_image',
-  description: 'Generate an image through the local Codex host using the connected ChatGPT account, then save it in Slates with its exact submitted prompt, reference lineage and measured dimensions. Uses ChatGPT account limits, never Slates credits or a paid API fallback. Check slates_get_chatgpt_status first. Supply a new UUID requestId once per intended generation; reuse it for retries to avoid duplicate generation/import. No explicit image model, quality or size controls are exposed. Prompt may request visual properties without guaranteeing them. Background returns a generationId for slates_get_generation_status.',
+  description: 'Generate an image through the local Codex host using the connected ChatGPT account, then save it in Slates with its exact submitted prompt, reference lineage and measured dimensions. Uses ChatGPT account limits, never Slates credits or a paid API fallback. Check slates_get_chatgpt_status first. Supply a new UUID requestId once per intended generation; reuse it for retries to avoid duplicate generation/import. No explicit image model, quality or size controls are exposed. Prompt may request visual properties without guaranteeing them. Background returns a generationId for slates_get_generation_status. After an error, start no new run unless the user asks; a retry reuses the same requestId.',
   input: z.object({ projectId: z.string().uuid(), requestId: z.string().uuid(), prompt: z.string().min(1),
     aspectRatio: z.enum(CHATGPT_FRAMING_RATIOS as [string, ...string[]]).optional().describe('Optional framing request appended verbally to the prompt, not an exact output-size guarantee.'),
     referenceAssetIds: z.array(z.string().min(1)).optional(), background: z.boolean().optional(), folderId: folderIdField }),
@@ -2232,7 +2235,7 @@ export const moveAssetsToFolder: Operation<{ assetIds: string[]; folderId: strin
   id: 'slates_move_assets_to_folder',
   description: 'Move one or more assets into a folder, or to the project root (folderId=null).',
   input: z.object({
-    assetIds: z.array(z.string().uuid()).min(1),
+    assetIds: z.array(z.string().uuid()).min(1).describe(ASSET_UUID_ONLY),
     folderId: z.string().uuid().nullable(),
   }),
   async run(input, ctx) {
@@ -2245,7 +2248,7 @@ export const setAssetFavorite: Operation<{ assetId: string; favorite: boolean }>
   description:
     'Mark or unmark one asset as a favorite. The heart persists on the card in the app, and slates_list_assets reports it as isFavorite.',
   input: z.object({
-    assetId: z.string().uuid(),
+    assetId: z.string().uuid().describe(ASSET_UUID_ONLY),
     favorite: z.boolean(),
   }),
   async run(input, ctx) {
@@ -2259,7 +2262,7 @@ export const exportAssets: Operation<{ assetIds: string[]; directory: string }> 
   description:
     'Copy the ORIGINAL files of one or more assets (images, clips or audio) into a directory on this machine, named by their codes (IMG-A12.png). Never overwrites: a clash gets -2, -3. The project is untouched. Works for an image-only project with no shot, video or timeline. Returns each exported path and any asset whose file is missing.',
   input: z.object({
-    assetIds: z.array(z.string().uuid()).min(1),
+    assetIds: z.array(z.string().uuid()).min(1).describe(ASSET_UUID_ONLY),
     directory: z.string().min(1).describe('Absolute path; created if it does not exist.'),
   }),
   async run(input, ctx) {
@@ -2397,7 +2400,7 @@ export const moveEntityToProject: Operation<{
 }> = {
   id: 'slates_move_entity_to_project',
   description:
-    "Move a Library item (a character, location, product, look…) into another project, taking every image it references with it; it lands in the target's category of the same name. This is the fix when slates_move_assets_to_project refuses an asset because a Library item still uses it: the image can't leave on its own, but the whole item can. Refuses (rather than cascading) if one of its images is ALSO used by something else — copy the images instead in that case. mentioningShots lists this project's Shots that mention it: they keep the words and fire without it until it comes back. Board frames are not movable this way; moving a frame's image out would empty the shot.",
+    "Move a Library item (a character, location, product, look…) into another project, taking every image it references with it; it lands in the target's category of the same name. This is the fix when slates_move_assets_to_project refuses an asset because a Library item still uses it: the image can't leave on its own, but the whole item can. Refuses (rather than cascading) if one of its images is also used by something else; then use slates_copy_library_item_to_project to copy the whole item, or slates_copy_assets_to_project for the images alone. mentioningShots lists this project's Shots that mention it: they keep the words and fire without it until it comes back. Board frames are not movable this way; moving a frame's image out would empty the shot.",
   input: z.object({
     kind: z
       .enum(['library', 'character', 'environment', 'style'])
@@ -2451,7 +2454,7 @@ export const setCharacterIdentity: Operation<{ characterId: string; assetId: str
     'Bind one image asset as the character identity (or clear with assetId=null). The user sees the character card update live.',
   input: z.object({
     characterId: z.string().uuid(),
-    assetId: z.string().uuid().nullable(),
+    assetId: z.string().uuid().nullable().describe(ASSET_UUID_ONLY),
   }),
   async run(input, ctx) {
     return ok(
@@ -2503,11 +2506,11 @@ export const generateCharacterIdentity: Operation<{
   id: 'slates_generate_character_identity',
   billable: true,
   description:
-    "Generate one character identity sheet from a base portrait asset and bind it as the character's canonical reference. Call after slates_create_character. Read slates-character-identity before calling and quote the cost from slates_estimate_generation_cost.",
+    "Generate one identity sheet (a portrait plus front and back full-body views) from a base portrait and bind it as the item's canonical picture. Works on a character or any Library thing; the item must exist (slates_create_character or slates_create_library_item). Craft: slates-character-identity. Show the user the estimate from slates_estimate_generation_cost and wait for their OK before calling: this tool has no confirm gate.",
   input: z.object({
     characterId: z.string().uuid().describe('A character, or the id of any Library thing: both sheet tools run on any thing, and the result binds as its image.'),
     projectId: z.string().uuid(),
-    baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from.'),
+    baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from. ' + ASSET_UUID_ONLY),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
       .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
@@ -2552,7 +2555,7 @@ export const generateEnvironmentPlate: Operation<{
   id: 'slates_generate_environment_plate',
   billable: true,
   description:
-    "Generate one clean establishing image from an optional base image and bind it as the location's canonical reference. Call after slates_create_environment and quote the cost from slates_estimate_generation_cost.",
+    "Generate one clean, empty establishing image of a place from an optional base image and bind it as the item's canonical picture. Works on a location or any Library thing; the item must exist (slates_create_environment or slates_create_library_item). Show the user the estimate from slates_estimate_generation_cost and wait for their OK before calling: this tool has no confirm gate.",
   input: z.object({
     environmentId: z.string().uuid().describe('A location, or the id of any Library thing: both sheet tools run on any thing, and the result binds as its image.'),
     projectId: z.string().uuid(),
@@ -2665,7 +2668,7 @@ export const addFrame: Operation<{
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid(),
     sceneId: z.string().uuid(),
-    assetId: z.string().uuid(),
+    assetId: z.string().uuid().describe(ASSET_UUID_ONLY),
     shotLabel: z.string().optional(),
     notes: z.string().optional(),
     position: z.number().int().min(0).optional(),
@@ -3004,23 +3007,24 @@ export const generateImage: Operation<{
   id: 'slates_generate_image',
   billable: true,
   description:
-    // Rules first: Claude Code keeps only the first 2,048 characters of a tool
-    // description, and the generated roster below runs past that cut.
-    'Generate an image via Slates credits. Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except nano-banana-2 REQUIRE projectId (no headless path). You MUST pass aspectRatio (the server returns requires_clarification when missing); resolution defaults to the model\'s own. ' +
+    // Rules only: Claude Code keeps the first 2,048 characters of a tool
+    // description, so the generated roster lives on the model param, as on the
+    // video and audio ops (it pushed the default seat's line past the cut).
+    'Generate an image via Slates credits. Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except nano-banana-2 require projectId (no headless path). Pass aspectRatio (the server returns requires_clarification when missing); resolution defaults to the model\'s own. ' +
     CONFIRM_GATE_SENTENCE +
     ' MCP/CLI generation always charges credits. The estimate returns the model\'s prompting card; load its slates-prompting-* guide with slates_get_prompting_guide for anything the card leaves out. ' +
     // GENERATED from the skill file's own never-use list -- the one piece of
     // prompting doctrine that is ALWAYS in context, because the agent has
     // demonstrably skipped the call that would have taught it.
-    describeBannedTokens('image') +
-    // GENERATED from MODEL_FACTS — the hand-typed model list that stood here
-    // was a third copy of the routing doctrine, and it had already gone stale
-    // (it still described nano-banana-2-lite by a capability the param owns).
-    `\n${describeRouting('image')}\n` +
-    'Full table: the slates-model-selection skill.',
+    describeBannedTokens('image'),
   input: z.object({
     prompt: z.string().min(1).max(4000),
-    model: zEnum(IMAGE_MODELS).optional().describe(`Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, nano-banana-2 (the only headless seat) without. Routing: slates-model-selection skill.`),
+    // Routing GENERATED from MODEL_FACTS.
+    model: zEnum(IMAGE_MODELS).optional().describe(
+      `Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, nano-banana-2 (the only headless seat) without.\n` +
+        `${describeRouting('image')}\n` +
+        'Full table: the slates-model-selection skill.'
+    ),
     projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Omit for the selected model default. Override for a specific delivery size; use the same setting when estimating.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image only. Default ${DEFAULT_GPT_QUALITY}; estimate the chosen tier before generation.`),
@@ -3032,7 +3036,7 @@ export const generateImage: Operation<{
     referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
     referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
+    confirm: z.boolean().optional().describe('Set true only to relay the user\'s explicit OK.'),
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
@@ -3466,7 +3470,8 @@ export const editImage: Operation<{
   id: 'slates_edit_image',
   billable: true,
   description:
-    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the model the app\'s Edit box opens on). Every model also takes referenceAssetIds, up to its reference cap less one: the source is image 1 of the request. Use slates-edit-and-iterate for missing edit craft; reuse current guidance already in context.',
+    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the model the app\'s Edit box opens on). Every model also takes referenceAssetIds, up to its reference cap less one: the source is image 1 of the request. Use slates-edit-and-iterate for missing edit craft; reuse current guidance already in context. ' +
+    CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project.'),
@@ -3477,7 +3482,7 @@ export const editImage: Operation<{
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate.'),
+    confirm: z.boolean().optional().describe('Set true only to relay the user\'s explicit OK.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
   async run(input, ctx) {
@@ -4258,7 +4263,7 @@ export const generateVideo: Operation<{
     VIDEO_MODEL_GUIDES +
     ') covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). ' +
     CONFIRM_GATE_SENTENCE +
-    ' Image-to-video via firstFrameAssetId; first+last frames on every model except Omni Flash; ingredients via ingredientAssetIds (Kling Omni, Seedance, Omni Flash, H3 and H3 Max; Kling Std/Pro only with a first frame). Asset params take UUIDs or badge codes ("IMG-A8"). ' +
+    ' Image-to-video via firstFrameAssetId; a last frame via lastFrameAssetId and ingredients via ingredientAssetIds, each param stating which models take it. Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
     // surfaces, so it survives an agent that skips slates_get_prompting_guide.
     describeBannedTokens('video'),
@@ -4334,7 +4339,7 @@ export const generateVideo: Operation<{
     sound: z.boolean().optional().describe('Kling (every tier) and LTX: sound on (default) or silent (false); Kling bills audio as its own key. Seedance, Omni Flash and H3 always generate audio.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling model with sound on — auto-generate background music.'),
-    seedanceFace: z.boolean().optional().describe('Seedance ONLY: a reference shows an AI CHARACTER\'s face. Without it, faces are blocked; with it the generation costs ~45% more. A REAL person fails here with [REAL_FACE_DETECTED] — see seedanceRealFace.'),
+    seedanceFace: z.boolean().optional().describe('Seedance only: a reference shows an AI character\'s face. Without it, faces are blocked; the estimate prices it. A real person fails here with [REAL_FACE_DETECTED]; see seedanceRealFace.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, about 1.4x the Face price (about 2x faceless) — quote it first. REQUIRES realFaceConsent=true.'),
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every tier.'),
     negativePrompt: z.string().optional(),
@@ -4894,7 +4899,7 @@ export const generateVideo: Operation<{
  */
 export const listVoices: Operation<{ gender?: string; accent?: string; age?: string; query?: string }> = {
   id: 'slates_list_voices',
-  description: `Browse ${TTS_MODEL} preset voices. Pass a returned voiceId to slates_generate_audio. Filters AND together.`,
+  description: `Browse the ${TTS_MODEL} preset voices; browsing spends nothing. Pass a returned voiceId to slates_generate_audio with model ${TTS_MODEL}. Filters AND together.`,
   input: z.object({
     gender: z.string().optional().describe('male | female'),
     accent: z.string().optional().describe('Region ("GB") or languageCode ("en-GB"); available accents come from the shelf.'),
@@ -4947,7 +4952,7 @@ export const listVoices: Operation<{ gender?: string; accent?: string; age?: str
       line: shelf.line,
       count: voices.length,
       voices,
-      next: `Pass a voiceId to slates_generate_audio (model ${TTS_MODEL}) as voiceId. To keep one on a character for reuse, generate a clip with it and set slates_update_character voiceAssetId.`,
+      next: `Pass a voiceId to slates_generate_audio (model ${TTS_MODEL}) as voiceId. To keep one for reuse, generate a clip with it and set it as a Library item's voice (slates_update_library_item voiceAssetId).`,
     })
   },
 }
@@ -4983,9 +4988,9 @@ export const generateAudio: Operation<{
   id: 'slates_generate_audio',
   billable: true,
   description:
-    `Generate project audio using credits. Choose the surface via the model routing below. ` +
+    `Generate speech (voice-over), a scene sound bed or a sound effect into a project, using credits. The model param lists the surfaces and their routing. ` +
     'The estimate returns the chosen surface\'s prompting card; its full guide (slates-prompting-seed-audio | slates-prompting-elevenlabs | slates-prompting-inworld-tts) covers what the card leaves out. ' +
-    'Seed Audio bills the requested duration, which is appended to the prompt regardless of output length. Kling "SFX:" / "Ambient noise:" syntax does not transfer. ' +
+    'Seed Audio bills the requested duration, which is appended to the prompt regardless of output length. ' +
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the audio asset lands in. Required — the renderer refreshes live.'),
@@ -5302,21 +5307,21 @@ export const generateLipSync: Operation<{
   id: 'slates_generate_lip_sync',
   billable: true,
   description:
-    'Lip-sync a still image (avatar) or a video clip to audio. KLING-ONLY — this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Billed per 5s of the output (the clip, or on a still the voice track). For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. The craft is slates-prompting-lip-sync; the confirm response shows the exact cost before anything is charged. projectId is REQUIRED. ' +
+    'Lip-sync a still image (avatar) or a video clip to audio. Kling only: this tool wraps Kling\'s dedicated lip-sync endpoints and nothing else: sourceType=video re-syncs a clip, sourceType=image animates a still avatar (avatar-standard, or avatar-pro for the premium seat). Quote each with slates_estimate_generation_cost rather than from memory. Audio from TTS (ttsText + ttsVoice) or an uploaded file. Billed per 5s of the output (the clip, or on a still the voice track). For a Seedance version there is no engine switch here: run a normal slates_generate_video on seedance-2 with the clip attached as a video reference and the dialogue written into the prompt; that is the same call, with the prompt visible and editable. The craft is slates-prompting-lip-sync; the confirm response shows the exact cost before anything is charged. projectId is required. ' +
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Slates project the source asset lives in. The new lip-synced video lands here.'),
-    sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed.'),
+    sourceAssetId: z.string().uuid().describe('Asset id of the still image (avatar flow) or video clip (lip-sync flow). Must already exist in the project — use slates_upload_reference_image or slates_generate_image / slates_generate_video first if needed. ' + ASSET_UUID_ONLY),
     sourceType: z.enum(['image', 'video']).describe('"image" = animate a still portrait (avatar). "video" = re-sync an existing talking-head clip. Determines pricing — be deliberate.'),
     audioMethod: z.enum(['tts', 'upload']).describe('"tts" = generate speech from ttsText. "upload" = use the file at audioFilePath (absolute path on the user\'s machine).'),
-    ttsText: z.string().min(1).max(2000).optional().describe('Required when audioMethod=tts. The exact words the avatar/clip will speak.'),
+    ttsText: z.string().min(1).max(2000).optional().describe('Required when audioMethod=tts. The exact words the avatar/clip will speak, up to 120 characters (longer is cut off); for a longer line upload audio or make it with slates_generate_audio.'),
     ttsVoice: z.string().optional().describe('Voice id (e.g. "oversea_male1"). See slates-prompting-lip-sync skill for the voice catalog.'),
     ttsLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('TTS language. Default EN.'),
     ttsSpeed: z.number().min(0.5).max(2).optional().describe('TTS speech rate. Default 1.0. Range 0.5-2.0.'),
     audioFilePath: z.string().optional().describe('Required when audioMethod=upload. Absolute path to the audio file on the user\'s machine (mp3, wav, m4a).'),
-    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard (~14 credits/5s) for general use. avatar-pro (~29 credits/5s) for sharper face fidelity.'),
+    avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard for general use; avatar-pro for sharper face fidelity. Price each with slates_estimate_generation_cost.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
-    confirm: z.boolean().optional().describe('Set true to bypass the confirm gate. Required for avatar-pro.'),
+    confirm: z.boolean().optional().describe('Set true only to relay the user\'s OK; avatar-pro always needs it.'),
   }),
   async run(input, ctx) {
     if (input.audioMethod === 'tts' && !input.ttsText) {
@@ -5448,7 +5453,7 @@ export const generateMotionTransfer: Operation<{
   id: 'slates_generate_motion_transfer',
   billable: true,
   description:
-    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, billed per 5s of the driving clip. For a Seedance version, do NOT look for an engine switch here — run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. The craft is slates-prompting-motion-transfer; the confirm response shows the exact cost before anything is charged. projectId is REQUIRED — both assets must exist in the project. ' +
+    'Transfer the motion from a reference video onto a target image character. KLING-ONLY — this tool wraps Kling Motion Control and nothing else: kling-mc-std or kling-mc-pro, structured skeleton/depth retargeting, billed per 5s of the driving clip. For a Seedance version there is no engine switch here: run a normal slates_generate_video on seedance-2 with the driving clip attached as a video reference and the motion described in the prompt ("the character from image 1 performs the exact motion from video 1"); that is the same call, with the prompt visible and editable. The craft is slates-prompting-motion-transfer; the confirm response shows the exact cost before anything is charged. projectId is REQUIRED — both assets must exist in the project. ' +
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Slates project. Both source and target assets must live here.'),
@@ -5590,10 +5595,11 @@ export const editVideo: Operation<{
     // point to in a tool result) and go stale on the next rate change; the
     // windows are owned by MODEL_CAPABILITIES and are generated below into the
     // params that enforce them.
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engines: Kling O3 edit (default — subject/style refs via elements), omni-flash-edit (PROMPT-ONLY, no refs, priced level with Kling O3 Edit Standard; the first pick in the routing guide for footage-synced edits), or seedance-2.5-edit (the only engine that takes a clip over 15s; seedanceFace:true for AI-character faces). Clip-length and resolution windows per engine are on the `model` param. Cost is per second of OUTPUT (≈ clip length, rounded up), and an edit bills input + output seconds on Seedance and output seconds on Kling and Omni Flash — read the quote from the confirm gate or slates_estimate_generation_cost, never from memory. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: Kling edit is the default (element lock + audio intact); omni-flash-edit for cheap prompt-only footage-synced swaps; Seedance edit for style-transfer-heavy jobs — see slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash.',
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engine routing, clip-length and resolution windows are on the `model` param (only the Kling engines take subject/style refs); seedanceFace:true for AI-character faces on seedance-2.5-edit. Cost is per second: output seconds on Kling and Omni Flash, input + output on Seedance; quote it with slates_estimate_generation_cost. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: the `model` param and slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash. ' +
+    CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
-    sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Kling: 3–15s clips; omni-flash-edit: 3–10s.'),
+    sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Clip-length windows per engine are on `model`.'),
     prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
     // Clip windows and resolutions GENERATED from MODEL_CAPABILITIES.
     model: zEnum(EDIT_VIDEO_MODELS).optional().describe(
@@ -5787,7 +5793,7 @@ export const trimVideo: Operation<{
 }> = {
   id: 'slates_trim_video',
   description:
-    'Trim a video asset to an exact [inSec, outSec] window and save the result as a NEW clip linked to the original (the original is untouched). This is the fit-to-model primitive: an 11s clip will not run on omni-flash-edit (3–10s), a 16s one not on Kling edit (3–15s), and a Seedance 2.0 video reference must be 2–15s (2.5 takes up to 30s combined) — trim it first, then edit the trimmed clip. EXACT re-encode (not a keyframe-snapped cut) so the result honors hard duration caps to the frame; any phone rotation flag is baked into the pixels in the same pass. The new clip lands with correct duration/width/height immediately. inSec defaults to 0. Pass pieces to cut the window into SEVERAL clips in one call, as the Trim & split dialog does (split points, or Auto-split by longest piece, with seconds shared between neighbours); every new clip comes back.',
+    'Trim a video asset to an exact [inSec, outSec] window and save the result as a NEW clip linked to the original (the original is untouched). This is the fit-to-model primitive: when a clip is longer than the edit or reference window the chosen model accepts (its `model` param and estimate state the window), trim it first, then edit the trimmed clip. Exact re-encode (not a keyframe-snapped cut) so the result honors hard duration caps to the frame; any phone rotation flag is baked into the pixels in the same pass. The new clip lands with correct duration/width/height immediately. inSec defaults to 0. Pass pieces to cut the window into SEVERAL clips in one call, as the Trim & split dialog does (split points, or Auto-split by longest piece, with seconds shared between neighbours); every new clip comes back.',
   input: z.object({
     projectId: z.string().uuid().describe('Project the clip lives in.'),
     assetId: z
@@ -5853,7 +5859,7 @@ export const trimVideo: Operation<{
 export const getGenerationStatus: Operation<{ generationId: string; waitSeconds?: number }> = {
   id: 'slates_get_generation_status',
   description:
-    'Poll one generation by id. Returns status (pending/processing/completed/failed/cancelled), the error message on failure, and the finished asset record (with id, code, filePath) on completion. Use after submitting any generate_* op with background=true. ALWAYS pass waitSeconds (use 45) — the call long-polls internally and returns early the moment the generation reaches a terminal state, so ONE call replaces a dozen rapid polls (each poll turn re-reads your whole context; rapid polling is the #1 orchestration-cost leak). Video generations commonly take 1-5 minutes: expect 1-4 long-poll calls, never a tight loop. Generations survive app restarts (the desktop resumes in-flight provider jobs on boot).',
+    'Poll one generation by id after a background=true submit. Returns status (pending/processing/completed/failed/cancelled), the error message on failure, and the finished asset record (with id, code, filePath) on completion. Pass waitSeconds 45: the call long-polls and returns the moment the generation ends, so one call replaces many quick polls, each of which re-reads your whole context. A video commonly takes a few long-poll calls. Generations survive app restarts (the desktop resumes in-flight provider jobs on boot).',
   input: z.object({
     generationId: z.string().uuid(),
     waitSeconds: z
@@ -5954,7 +5960,7 @@ const exportCutsInput = z.object({ projectId: z.string().uuid(), directory: z.st
   action: z.enum(['start','status','cancel']).optional().describe('start (default) begins, or re-attaches to a running export; status reads it; cancel stops after the output being rendered.'),
   items: z.array(z.object({ timelineId: z.string().uuid(), format: z.enum(['mp4','xml']) })).min(1).optional().describe('Required to start.') })
 export const exportCuts: Operation<z.infer<typeof exportCutsInput>> = {
-  id: 'slates_export_cuts', description: 'Export explicit named cuts to distinct local files with a frozen manifest of timeline settings, media, script revisions and generation provenance. Returns at once while rendering continues; poll with action status. Starting again with the same manifestId and selection retries unfinished outputs under the same filenames and skips finished ones. Existing outputs are never overwritten, and export never generates media. Uses current video/XML fidelity limits.',
+  id: 'slates_export_cuts', description: 'Export explicit named cuts to distinct local files with a frozen manifest of timeline settings, media, script revisions and generation provenance. Returns at once while rendering continues; poll with action status. Starting again with the same manifestId and selection retries unfinished outputs under the same filenames and skips finished ones. Existing outputs are never overwritten, and export never generates media. Uses current video/XML fidelity limits. For one cut, slates_export_video is enough.',
   input: exportCutsInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('named-cuts', 'named cuts')
@@ -6023,7 +6029,7 @@ export const addClipToTimeline: Operation<{
 }> = {
   id: 'slates_add_clip_to_timeline',
   description:
-    "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions.",
+    "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions. To lay a board's chosen clips in board order, use slates_edit_cut (build) instead.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     assetId: z.string().uuid().describe('Video or audio asset already in the project.'),
@@ -6201,7 +6207,7 @@ export const updateTimelineSettings: Operation<{
 }> = {
   id: 'slates_update_timeline_settings',
   description:
-    "Update the project timeline's output settings: resolution, frame rate (24/30/60 — all clips are conformed to it on export), and masterVolume, the output fader (linear gain, -∞ to +12 dB) applied to the final mix in both preview and MP4 export (use it to prevent clipping when stacking loud tracks). Note these are normally auto-managed: the first video clip sets fps + resolution, and higher-res clips raise the canvas. Changing frameRate after clips are placed retimes them — avoid unless the timeline is empty.",
+    "Update the project timeline's output settings: resolution, frame rate (24/30/60 — all clips are conformed to it on export), and masterVolume, the output fader (linear gain, -∞ to +12 dB) applied to the final mix in both preview and MP4 export (use it to prevent clipping when stacking loud tracks). Note these are normally auto-managed: the first video clip sets fps + resolution, and higher-res clips raise the canvas. Changing frameRate keeps clip positions, lengths and markers in seconds, rounded to the nearest new frame.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     width: z.number().int().min(16).optional(),
@@ -6229,7 +6235,7 @@ export const exportVideo: Operation<{
 }> = {
   id: 'slates_export_video',
   description:
-    "Render the project's timeline to an MP4 file on disk via the desktop app's ffmpeg pipeline (H.264 + AAC, gaps rendered as black). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline.",
+    "Render the project's timeline to an MP4 file on disk via the desktop app's ffmpeg pipeline (H.264 + AAC, gaps rendered as black). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
   input: z
     .object({
       projectId: z.string().uuid().optional(),
@@ -6278,7 +6284,7 @@ export const exportTimelineXml: Operation<{
 }> = {
   id: 'slates_export_timeline_xml',
   description:
-    "Export the project's timeline as FCP7/XMEML XML — the file DaVinci Resolve imports directly (File → Import → Timeline) to recreate the edit with references to the original clip media on disk. Use this for DaVinci Resolve or Premiere; current Final Cut Pro requires FCPXML, which this tool does not export. Pass an absolute outputPath ending in .xml; fails if the file exists unless overwrite=true.",
+    "Export the project's timeline as FCP7/XMEML XML — the file DaVinci Resolve imports directly (File → Import → Timeline) to recreate the edit with references to the original clip media on disk. Use this for DaVinci Resolve or Premiere; current Final Cut Pro requires FCPXML, which this tool does not export. Pass an absolute outputPath ending in .xml; fails if the file exists unless overwrite=true. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
   input: z
     .object({
       projectId: z.string().uuid().optional(),
@@ -6409,7 +6415,7 @@ export const undoRelocateProject: Operation<{ id: string }> = {
 export const deleteAsset: Operation<{ id: string }> = {
   id: 'slates_delete_asset',
   description:
-    'Delete an asset from its project. Permanent — also deletes the media file from disk.',
+    'Delete an asset from its project. Permanent: also deletes the media file from disk, so ask the user first.',
   input: z.object({ id: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/assets/delete', { id: input.id }))
@@ -6430,7 +6436,7 @@ export const renameFolder: Operation<{ folderId: string; name: string }> = {
 
 export const deleteFolder: Operation<{ folderId: string }> = {
   id: 'slates_delete_folder',
-  description: 'Delete an asset folder.',
+  description: 'Delete an asset folder only; its files return to No folder. To delete the files too, call slates_delete_asset on them first.',
   input: z.object({ folderId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/folders/delete', { id: input.folderId }))
@@ -6701,7 +6707,7 @@ export const updateLibraryItem: Operation<{
 
 export const deleteLibraryItem: Operation<{ itemId: string }> = {
   id: 'slates_delete_library_item',
-  description: 'Delete a Library item. Its images and voice clip stay in the project as ordinary assets.',
+  description: 'Delete a Library item. Saved Shots that mention it stop attaching it, so tell the user how many. Its images and voice clip stay in the project as ordinary assets.',
   input: z.object({ itemId: z.string().uuid() }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('library', 'the Library')
@@ -6866,7 +6872,7 @@ export const updateStoryboard: Operation<{
 
 export const deleteStoryboard: Operation<{ storyboardId: string }> = {
   id: 'slates_delete_storyboard',
-  description: 'Delete a board with all its scenes and frames (the referenced assets are untouched).',
+  description: 'Delete a board with all its scenes and Shots; the media they made stays, and a Shot that also sits on another board survives. The app cannot undo this, so confirm with the user first.',
   input: z.object({ storyboardId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/storyboards/delete', { id: input.storyboardId }))
@@ -6893,7 +6899,7 @@ export const updateScene: Operation<{ sceneId: string; name?: string; position?:
 
 export const deleteScene: Operation<{ sceneId: string }> = {
   id: 'slates_delete_scene',
-  description: 'Delete a scene (and its frames) from a board.',
+  description: 'Delete a scene and every Shot in it; the pictures and clips they made stay in Media. The app cannot undo this, so confirm with the user first. To drop only the scene break and keep its Shots, use slates_merge_scene.',
   input: z.object({ sceneId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/scenes/delete', { id: input.sceneId }))
@@ -7022,7 +7028,7 @@ export const batchUpdateFrames: Operation<{
 
 export const deleteFrame: Operation<{ frameId: string }> = {
   id: 'slates_delete_frame',
-  description: 'Delete a frame from its scene (the referenced asset is untouched).',
+  description: 'Delete a Shot by deleting its slot (frame): this is the delete-Shot tool, and it also removes an exploration slot. The takes stay in Media. The user can press Ctrl+Z in the app to bring a deleted Shot back.',
   input: z.object({ frameId: z.string().uuid() }),
   async run(input, ctx) {
     return ok(await ctx.desktop().post('/agent/frames/delete', { id: input.frameId }))
@@ -7131,7 +7137,7 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
     sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
     seedanceFace: d(
       z.boolean().optional(),
-      "Seedance only — a reference shows an AI character's FACE; without it faces are blocked, and it costs ~45% more."
+      "Seedance only — a reference shows an AI character's face; without it faces are blocked. The estimate prices it."
     ),
     audioDurationSeconds: d(
       z.number().int().min(1).max(120).optional(),
@@ -7550,7 +7556,7 @@ export const createShot: Operation<
 > = {
   id: 'slates_create_shot',
   description:
-    'Write one beat of the piece — a Shot: its script line, its references with their roles, its model and params, and the prompt that fires. It needs NO image to exist, so a whole film can be written, arranged and priced before anything is generated. It lands in the board automatically (the open scene, else the most recent board) — never unfiled. ' +
+    'Write one beat of the piece — a Shot: its script line, its references with their roles, its model and params, and the prompt that fires. It needs NO image to exist, so a whole film can be written, arranged and priced before anything is generated. It lands in the board automatically (the open scene, else the most recent board) — never unfiled. Saves only: it generates and spends nothing; price with slates_get_board_quote and fire with slates_generate_from_shots after the user approves. ' +
     FRAMING_NOTE,
   input: z.object({
     projectId: z.string().uuid(),
@@ -7667,7 +7673,7 @@ export const updateShot: Operation<
 > = {
   id: 'slates_update_shot',
   description:
-    'Change part of a Shot, or attach/detach it from a board frame — anything you omit is left exactly as it was. ' +
+    'Change part of a Shot, or attach/detach it from a board frame — anything you omit is left exactly as it was. Saves only: it generates and spends nothing. ' +
     FRAMING_NOTE,
   input: z.object({
     shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
@@ -7813,7 +7819,7 @@ function describeVarietyReport(v: VarietyReport | null | undefined): string {
 export const listShots: Operation<{ projectId: string; storyboardId?: string; frameId?: string }> = {
   id: 'slates_list_shots',
   description:
-    "Read the shot list — every Shot as a compact row IN BOARD ORDER (scene, then position), with its place on the board (2C: scene number and slot letter, as the window shows it and the user says it), the piece's cut count, runtime, saved-recipe price and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
+    "Read the shot list — every Shot as a compact row in board order (scene, then position), with its place on the board (2C: scene number and slot letter, as the window shows it and the user says it), the piece's cut count, runtime, saved-recipe price and its variety distribution. Read this before firing a set: if one shot size is the plurality or three cuts in a row share a camera move, the batch is wrong before a credit is spent.",
   input: z.object({
     projectId: z.string().uuid(),
     storyboardId: z.string().uuid().optional().describe('Only Shots attached to a frame in this board.'),
@@ -8026,7 +8032,7 @@ export const splitTake: Operation<{
 }> = {
   id: 'slates_split_take',
   description:
-    "A take founds its own Shot. The result (a take under `shotId`) moves to a NEW Shot whose recipe is the take's RECORDED one — the prompt, model, params and references it was actually made from, which may differ from what the source Shot says now. The new Shot lands directly after the source by default; the source keeps its other takes and its recipe untouched, and is never deleted when emptied. Script fields (line, speaker) start empty on the new row.",
+    "Move a take to a NEW Shot made from its recorded recipe (to move it to an existing Shot, use slates_refile_take). The result (a take under `shotId`) moves to a new Shot whose recipe is the take's RECORDED one — the prompt, model, params and references it was actually made from, which may differ from what the source Shot says now. The new Shot lands directly after the source by default; the source keeps its other takes and its recipe untouched, and is never deleted when emptied. Script fields (line, speaker) start empty on the new row.",
   input: z.object({
     shotId: z.string().describe('The source Shot id, or its SHOT-A code.'),
     assetId: z.string().describe('The take to move — an asset id or its IMG-A / VID-A code. Must be a take of `shotId`.'),
@@ -8056,7 +8062,7 @@ export const splitTake: Operation<{
 export const refileTake: Operation<{ assetId: string; fromShotId?: string | null; toShotId: string }> = {
   id: 'slates_refile_take',
   description:
-    'Move a take (a result) from one Shot to another in the same project. Only the attribution moves: neither Shot\'s recipe changes, the asset stays where it is in Media, and a clip that a frame prefers keeps that role. `fromShotId` is a guard — the take moves only if it still hangs under that Shot (omit it to claim an unattributed result). An emptied Shot is kept, never deleted.',
+    'Move a take (a result) from one Shot to another in the same project. Only the attribution moves: neither Shot\'s recipe changes, the asset stays where it is in Media, and a clip that a frame prefers keeps that role. `fromShotId` is a guard — the take moves only if it still hangs under that Shot (omit it to claim an unattributed result). An emptied Shot is kept, never deleted. To start a new Shot from the take, use slates_split_take.',
   input: z.object({
     assetId: z.string().describe('The take — an asset id or its IMG-A / VID-A code.'),
     fromShotId: z.string().nullable().optional().describe('The Shot it hangs under now (id or SHOT-A code). Omitted or null = an unattributed result.'),
@@ -8078,7 +8084,7 @@ export const refileTake: Operation<{ assetId: string; fromShotId?: string | null
 export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
   id: 'slates_merge_shots',
   description:
-    "Merge two adjacent Shots into one. Texts join, references union, the FIRST Shot's model and params win, and the durations SUM — which may exceed the model's window, in which case it is shown and never blocked. Lossy in one direction: the second Shot's model and params are discarded, and there is no undo (the takes are the history).",
+    "Merge two adjacent Shots into one. Texts join, references union, the FIRST Shot's model and params win, and the durations SUM — which may exceed the model's window, in which case it is shown and never blocked. Lossy in one direction: the second Shot's model and params are discarded. There is no undo op; the user can press Ctrl+Z in the app straight after, and the takes stay as the history.",
   input: z.object({
     firstId: z.string().describe('The Shot that survives — its model and params win. Id or SHOT-A code.'),
     secondId: z.string().describe('The Shot folded into it. Id or SHOT-A code.'),
@@ -8109,7 +8115,7 @@ export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
 export const getScript: Operation<{ sceneId: string }> = {
   id: 'slates_get_script',
   description:
-    "A scene's script — the ONE text its Shots' lines are ranges of — with every ranged Shot's [start, end) offsets and code. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet. `rev` names this exact text and `revision` the whole script document: pass either to slates_edit_script so an edit measured on it is refused, not misplaced, if the words changed in between (1.6.0 desktops; older ones return neither).",
+    "A scene's script, the one text its Shots' lines are ranges of, with every ranged Shot's [start, end) offsets and code. For the whole board's document (headings, formatting, every scene) use slates_get_script_document. Read this before slates_edit_script or slates_make_shot_from_script: offsets are character positions into exactly this text. Text no Shot holds is unshot; a Shot listed by slates_list_shots but absent here has no words on the page yet. `rev` names this exact text and `revision` the whole script document: pass either to slates_edit_script so an edit measured on it is refused, not misplaced, if the words changed in between.",
   input: z.object({
     sceneId: z.string().uuid().describe('The scene (slates_get_storyboard_with_frames lists them, each with its script).'),
   }),
@@ -8158,7 +8164,7 @@ async function resolveVariationRefs(input: z.infer<typeof variationSchema>, ctx:
 
 export const getScriptUses: Operation<{ sectionId: string }> = {
   id: 'slates_get_script_uses',
-  description: 'Review each reused passage before updating it: current and proposed words, destination revision, and local-edit conflicts. Pass only explicitly selected non-conflicting uses to slates_update_script_section.',
+  description: 'Review each reused passage before updating it: current and proposed words, destination revision, and local-edit conflicts. Pass only explicitly selected non-conflicting uses to slates_update_script_section (updateUses). sectionId comes from slates_get_script_sections.',
   input: z.object({ sectionId: z.string().uuid() }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8166,7 +8172,7 @@ export const getScriptUses: Operation<{ sectionId: string }> = {
 }
 export const getShotInputs: Operation<{ projectId: string; shotId: string }> = {
   id: 'slates_get_shot_inputs',
-  description: 'Read take input history and compatible reusable media. Earlier and unknown inputs remain playable; they are never treated as a fresh match. No generation.',
+  description: 'Read this Shot\'s take input history and the finished takes elsewhere in the project made from its exact inputs; add one free with slates_reuse_shot_take. Earlier and unknown inputs remain playable but never count as a match. No generation.',
   input: z.object({ projectId: z.string().uuid(), shotId: z.string() }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8174,7 +8180,7 @@ export const getShotInputs: Operation<{ projectId: string; shotId: string }> = {
 }
 export const reuseShotTake: Operation<{ projectId: string; shotId: string; assetId: string }> = {
   id: 'slates_reuse_shot_take',
-  description: 'Explicitly link a take with matching saved request and recipe inputs to this shot. Keeps the original generation and independent shot recipe. Input changes are rechecked before reuse; costs no credits.',
+  description: 'Explicitly link a take with matching saved request and recipe inputs to this shot. Keeps the original generation and independent shot recipe. Input changes are rechecked before reuse; costs no credits. Find candidates with slates_get_shot_inputs; slates_refile_take moves a take instead.',
   input: z.object({ projectId: z.string().uuid(), shotId: z.string(), assetId: z.string().describe('Asset UUID or badge code from compatibleTakes.') }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8235,7 +8241,7 @@ const documentBlocks = z.array(z.object({
 }))
 export const getScriptDocument: Operation<{ storyboardId: string }> = {
   id: 'slates_get_script_document',
-  description: 'Read the whole script document: scene strings, UTF-16 block/shot anchors, non-spoken headings/directions and a revision for safe writes. Formatting metadata contains no second copy of paragraph text.',
+  description: 'Read the whole script document: scene strings, UTF-16 block/shot anchors, non-spoken headings/directions and a revision for safe writes. Formatting metadata contains no second copy of paragraph text. slates_get_script reads one scene\'s text with its Shot offsets.',
   input: z.object({ storyboardId: z.string().uuid() }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8252,7 +8258,7 @@ const writeScriptDocumentInput = z.object({
 })
 export const writeScriptDocument: Operation<z.infer<typeof writeScriptDocumentInput>> = {
   id: 'slates_update_script_document',
-  description: 'Apply ordered script edits and optional formatting in one revision-checked transaction. Read the document first. Stale writes are refused without replacing either author’s work. A move carries contained shot anchors; restoreRevision restores an existing text/structure revision. No generation side effect. ensureScene creates an empty scene only if needed.',
+  description: 'Several script changes in one revision-checked write: ordered text edits across scenes, formatting, moving a block, making Shots from ranges (makeShots), splitting or merging scenes (sceneAction). For one text replacement in one scene use slates_edit_script. Read the document first. Stale writes are refused without replacing either author’s work. A move carries contained shot anchors; restoreRevision restores an existing text/structure revision. No generation side effect. ensureScene creates an empty scene only if needed.',
   input: writeScriptDocumentInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('script-documents', 'script documents')
@@ -8262,7 +8268,7 @@ export const writeScriptDocument: Operation<z.infer<typeof writeScriptDocumentIn
 export const editScript: Operation<{ sceneId: string; at: number; removed: number; text: string; rev?: string; expectedRevision?: number }> = {
   id: 'slates_edit_script',
   description:
-    "Edit a scene's script: ONE contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once — this IS editing the Shots. Read slates_get_script first; offsets are into that text. Pass its `rev` (or the document `revision` as `expectedRevision`): when the Script page or anything else changed the words since, the edit is refused ('the script changed since you read it', or SCRIPT_CONFLICT for a stale revision), and you re-read and measure again. The result carries the new `rev` and `revision` for a following edit.",
+    "One text replacement in one scene (for several edits, formatting or scene changes in one write, use slates_update_script_document): one contiguous replacement — `removed` characters at `at` become `text` (insert: removed 0; delete: text ''). Every Shot's range follows the way comment anchors follow a document: text before a Shot moves it, text after leaves it, an edit inside grows or shrinks it, typing at its end extends it unless the text starts a new line, and deleting all of a Shot's words leaves it with no words and no place on the page. Every affected Shot's `line` changes at once: this is editing the Shots. Read slates_get_script first; offsets are into that text. Pass its `rev` (or the document `revision` as `expectedRevision`): when the Script page or anything else changed the words since, the edit is refused ('the script changed since you read it', or SCRIPT_CONFLICT for a stale revision), and you re-read and measure again. The result carries the new `rev` and `revision` for a following edit.",
   input: z.object({
     sceneId: z.string().uuid(),
     expectedRevision: z.number().int().nonnegative().optional().describe('The document `revision` slates_get_script or slates_get_script_document returned. The edit is refused if the document changed since.'),
@@ -8288,7 +8294,7 @@ export const makeShotFromScript: Operation<{
 }> = {
   id: 'slates_make_shot_from_script',
   description:
-    "Do the ONE thing a selection of the script can mean, exactly as the Script page's popover does: Make shot when the selection touches no Shot; Split when it lies inside one Shot (the Shot keeps its first piece and its takes, every other piece becomes a new Shot after it); Extend when it crosses one Shot's edge; Merge when it spans several (the first takes the span — unshot text between them included, nothing deleted — the others give up their words: one holding a take (finished or generating), a prompt, a reference or a picture stays and waits for text; only a completely blank one is removed). Pass `waitingShotId` to give a Shot that has no words yet (made on the Board, split off a take) the selected text instead. `perParagraph: true` over several unshot paragraphs makes one Shot per paragraph. A new Shot is filed after every ranged Shot whose words start before it.",
+    "Turn a selected passage of a scene's script into Shots, as the Script page's popover does; start and end are offsets into slates_get_script's text. The action follows what the selection touches: Make shot when the selection touches no Shot; Split when it lies inside one Shot (the Shot keeps its first piece and its takes, every other piece becomes a new Shot after it); Extend when it crosses one Shot's edge; Merge when it spans several (the first takes the span — unshot text between them included, nothing deleted — the others give up their words: one holding a take (finished or generating), a prompt, a reference or a picture stays and waits for text; only a completely blank one is removed). Pass `waitingShotId` to give a Shot that has no words yet (made on the Board, split off a take) the selected text instead. `perParagraph: true` over several unshot paragraphs makes one Shot per paragraph. A new Shot is filed after every ranged Shot whose words start before it.",
   input: z.object({
     sceneId: z.string().uuid(),
     start: z.number().int().min(0),
@@ -8333,7 +8339,7 @@ export const breakScriptIntoShots: Operation<{ storyboardId?: string; sceneId?: 
 export const splitScene: Operation<{ sceneId: string; lineStart: number; lineEnd: number; name?: string | null }> = {
   id: 'slates_split_scene',
   description:
-    "Open a scene at a heading line, the Notion way: the text from `lineEnd` on moves into a NEW scene directly after this one, with its Shots and their slots; the heading line [lineStart, lineEnd) itself is consumed and `name` becomes the new scene's name. Use slates_paste_script to do this for every SCENE / INT. / EXT. / # line of a pasted script at once.",
+    "Open a scene at a heading line: the text from `lineEnd` on moves into a NEW scene directly after this one, with its Shots and their slots; the heading line [lineStart, lineEnd) itself is consumed and `name` becomes the new scene's name. Use slates_paste_script to do this for every SCENE / INT. / EXT. / # line of a pasted script at once.",
   input: z.object({
     sceneId: z.string().uuid(),
     lineStart: z.number().int().min(0).describe('Offset where the heading line starts.'),
@@ -8393,7 +8399,7 @@ export const generateFromShots: Operation<{
   id: 'slates_generate_from_shots',
   billable: true,
   description:
-    'Preview the itemized prices the Generate panel shows for saved Shots. After explicit approval, pass confirm and the returned fingerprint. Changed recipes require a fresh price. Runs sequentially; after a timeout inspect generations instead of re-firing. Pass draft to generate previews instead: one picture for each Shot that has none, never saved to the Shot.',
+    'Generate results for saved Shots, spending credits. Call without confirm for the itemized prices the Generate panel shows and a fingerprint; show the user the total and wait for their OK, then pass confirm with that fingerprint. Changed recipes require a fresh price. Runs sequentially; after a timeout inspect generations (slates_list_generations, status processing) instead of re-firing. Pass draft to generate previews instead: one picture for each Shot that has none, kept as a take of that Shot; the Shot\'s recipe does not change.',
   input: z.object({
     shotIds: z.array(z.string()).min(1).max(20),
     confirm: z.boolean().optional(),
@@ -8488,7 +8494,7 @@ export const editCut: Operation<{
 }> = {
   id: 'slates_edit_cut',
   description:
-    'Read pending preferred-take changes, explicitly replace one clip, sync a board’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
+    'Build the timeline from the board\'s chosen clips (a marker per scene), or keep it in step with the board\'s favourite takes: read pending preferred-take changes, explicitly replace one clip, sync a board’s preferred clips, or build a cut in board order. Read changes first for the count. Swaps keep timeline starts and source timing when possible; shorter takes are visibly marked. Never changes a shot recipe or poster. Undo swaps with restore and the returned before snapshots; undo a build with undo-build and its clipIds/markerIds.',
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     action: z.enum(['changes', 'replace', 'sync', 'build', 'restore', 'undo-build']),
@@ -8732,7 +8738,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
     topic: z.string().min(1).optional().describe('Optional guide name, model id, style name, catalog, or app-manual. Omit to search by intent or browse.'),
     depth: z.enum(['card', 'index', 'section', 'full']).optional().describe('Default card is a short overview; index lists sections; query selects a section; full returns the complete guide.'),
-    limit: z.number().int().min(1).max(20).optional().describe('Page size: a search returns 8 ranked matches by default, browsing the whole catalog. Does not change guide bodies.'),
+    limit: z.number().int().min(1).max(20).optional().describe('Page size for a search (default 8) or a catalog listing (default: the whole catalog); continue with offset from nextOffset. Does not change guide bodies.'),
     offset: z.number().int().min(0).optional().describe('Catalog/search offset from nextOffset in the preceding result.'),
   }),
   async run(input, ctx) {
@@ -8920,7 +8926,7 @@ export const blenderRenderBlocking: Operation<{
 }> = {
   id: 'slates_blender_render_blocking',
   description:
-    "Render the connected Blender scene camera to a grey-box mp4 — the blocking clip that locks camera motion for generation — and, when projectId is given, import it into that Slates project as a video asset in the same call. The returned asset id goes into slates_generate_video's videoReferenceAssetIds and the returned durationSeconds into videoReferenceSecondsEach. Renders through the SCENE camera using scene render settings, never the user's viewport, so output does not depend on where they left their mouse. Untextured is correct: the clip supplies camera path and timing, the references supply the look. Colour in the blocking is NOTATION, not look — a distinct viewport colour per character is what binds a proxy to its reference image across cuts, and a marked face encodes which way a featureless proxy is facing. State every such mapping in the generation prompt AND state that the colours themselves are not inherited, or the model renders a literally red person. See the slates-previs-blocking and slates-blocking-to-prompt skills. Keep it at or under 30s — seedance-2.5 accepts reference videos up to 30s, the other reference-video models up to 15s.",
+    "Render the connected Blender scene camera to a grey-box mp4 — the blocking clip that locks camera motion for generation — and, when projectId is given, import it into that Slates project as a video asset in the same call. The returned asset id goes into slates_generate_video's videoReferenceAssetIds and the returned durationSeconds into videoReferenceSecondsEach. Renders through the SCENE camera using scene render settings, never the user's viewport, so output does not depend on where they left their mouse. Untextured is correct: the clip supplies camera path and timing, the references supply the look. Any colour or marking in the blocking is notation; slates-blocking-to-prompt says how to state it in the generation prompt, and slates-previs-blocking how to build the blocking. Keep the clip within the reference-video length the chosen video model accepts (slates_generate_video's reference params and the estimate state it).",
   input: z.object({
     projectId: z
       .string()
