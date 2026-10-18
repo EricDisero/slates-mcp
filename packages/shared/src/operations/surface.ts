@@ -281,6 +281,19 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
     unknown
   >
   delete schema.$schema
+  // zod-to-json-schema 3 renders a zod 4 schema as `{}`, without an error. That
+  // happens when this package resolves the consumer's zod 4 instead of its own
+  // zod 3: slate's install lost `node_modules/@slatesvideo/shared/node_modules/zod`
+  // after a hand-copy of the shared build (2026-10-17), and every Studio Agent
+  // tool went to the brain with no parameters. Refuse to render a tool like that.
+  if (schema.type !== 'object') {
+    throw new Error(
+      `${op.id}: its input schema rendered as ${JSON.stringify(schema).slice(0, 80)}, not an object. ` +
+        "Either the op's input is not a z.object, or @slatesvideo/shared is reading a zod it cannot convert " +
+        '(zod 4 instead of its own zod 3): reinstall with `npm ci` and rebuild, or put zod 3 back at ' +
+        'node_modules/@slatesvideo/shared/node_modules/zod.'
+    )
+  }
   return {
     name: op.id,
     description: op.description,

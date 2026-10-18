@@ -958,6 +958,33 @@ function zodDescriptions(op) {
   }
 }
 
+// ── 14. a schema the renderer cannot read is refused, never sent as {} ──────
+// zod-to-json-schema 3 turns a zod 4 schema into `{}` without an error; a consumer whose
+// install hands shared the wrong zod would ship every tool with no parameters. The zod 4
+// schema here comes from zod 3's own `zod/v4` entry, the same shape that broke slate.
+{
+  const CHECK = '14 schema-renders'
+  const { toolDefinition } = shared
+  const broken = []
+  for (const op of ALL_OPERATIONS) {
+    try {
+      if (toolDefinition(op).inputSchema.type !== 'object') broken.push(op.id)
+    } catch {
+      broken.push(op.id)
+    }
+  }
+  let probe = 'the empty-schema refusal in toolDefinition() is gone'
+  try {
+    const { z: z4 } = await import('zod/v4')
+    toolDefinition({ id: 'probe_zod4', description: 'probe', input: z4.object({ a: z4.string() }), billable: false })
+  } catch (error) {
+    probe = /not an object/.test(String(error?.message)) ? null : `the probe failed another way: ${error?.message}`
+  }
+  if (broken.length) fail(CHECK, `tools whose schema does not render as an object: ${broken.join(', ')}`)
+  else if (probe) fail(CHECK, `a zod 4 schema rendered without the refusal: ${probe}`)
+  else pass(CHECK, `${ALL_OPERATIONS.length} tools render object schemas; a zod 4 schema is refused`)
+}
+
 // ── report ──────────────────────────────────────────────────────────────────
 for (const w of warnings) console.warn(`  !!  skipped: ${w}`)
 if (failures.length > 0) {
