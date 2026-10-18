@@ -1367,17 +1367,17 @@ export const listAvailableModels: Operation<{ filter?: string }> = {
     // Compact text table — "key credits" lines are ~5x denser than the raw
     // JSON registry (the full pretty-printed dump was an ~8k-token leak).
     const table = models.map((m) => `${m.model} ${creditCost(m)}`).join('\n')
-    return {
-      text:
-        `${models.length} COST keys (credits per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
-        `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on the generate ops takes a BASE id. ` +
-        // Derived from the SSOT arrays, not restated: a hand-written list here
-        // drifts the moment a model lands (it already omitted omni-flash).
-        `slates_generate_video: ${VIDEO_MODELS.join(' | ')} (duration/videoResolution as separate params). ` +
-        `slates_generate_audio: ${AUDIO_MODELS.join(' | ')} (durationSeconds as a separate param):\n` +
-        table,
-      data: { count: models.length },
-    }
+    const text =
+      `${models.length} COST keys (credits per generation)${input.filter ? ` matching "${input.filter}"` : ''}. ` +
+      `NOTE: these are billing keys for cost lookup ONLY — the \`model\` param on the generate ops takes a BASE id. ` +
+      // Derived from the SSOT arrays, not restated: a hand-written list here
+      // drifts the moment a model lands (it already omitted omni-flash).
+      `slates_generate_video: ${VIDEO_MODELS.join(' | ')} (duration/videoResolution as separate params). ` +
+      `slates_generate_audio: ${AUDIO_MODELS.join(' | ')} (durationSeconds as a separate param):\n` +
+      table
+    // The whole text rides in `data` too: the MCP server mirrors `data` as structuredContent, and a host that
+    // shows only structuredContent (Claude Code) otherwise hands the model `{count}` and no prices (2026-10-18).
+    return { text, data: { count: models.length, text } }
   },
 }
 

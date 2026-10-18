@@ -61,7 +61,7 @@ Continue autonomously when the brief is clear, a specific correction is supporte
 
 ### Clips
 
-The same recipe holds for video. Look with `slates_get_asset_video_frames`. A clip that is nearly right: `slates_edit_video` with the change only; the result is a new clip linked to its source. A clip longer than the edit model's window: `slates_trim_video` first, then edit the trimmed clip. A revised generation that continues from a clip: `slates_extract_video_frame` at its last frame, used as the next first frame. Before paying for a regeneration of a Shot, `slates_get_shot_inputs` lists finished takes with the same inputs, and `slates_reuse_shot_take` adds one free.
+The same recipe holds for video. Look with `slates_get_asset_video_frames`. A clip that is nearly right: `slates_edit_video` with the change only; the result is a new clip linked to its source. A clip longer than the edit model's window: `slates_trim_video` first, then edit the trimmed clip. A revised generation that continues from a clip: `slates_extract_video_frame` at its last frame, used as the next first frame. Before paying for a regeneration of a Shot, `slates_get_shot_inputs` lists finished takes with the same inputs, and `slates_reuse_shot_take` adds one free. Otherwise price it with `slates_get_board_quote` for that Shot (or `slates_estimate_generation_cost`) and show the figure before asking for the OK.
 
 ### 5. Hand back
 - "Asset updated. Frame 3 now uses {new_asset_id}."

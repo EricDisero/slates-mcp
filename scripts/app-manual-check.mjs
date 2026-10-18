@@ -35,6 +35,14 @@ for (const [topic, depth] of [['slates-prompting-minimax-h3', 'full'], ['slates-
   assert.equal(r.data.guide, r.text, `${topic} ${depth}: body missing from data.guide`)
   assert.equal(r.data.bytes, Buffer.byteLength(r.text, 'utf8'))
 }
+// The same holds for the price table: Claude Code's model read `{"count":169}` and no prices (2026-10-18).
+{
+  const models = ALL_OPERATIONS.find(o => o.id === 'slates_list_available_models')
+  const fake = { cloud: () => ({ get: async () => ({ models: [{ model: 'kling-v3-standard-5s-audio', cost_credits: 32 }] }) }) }
+  const r = await models.run(models.input.parse({}), fake)
+  assert.equal(r.data.text, r.text, 'list_available_models: the price table missing from data')
+  assert.match(r.data.text, /kling-v3-standard-5s-audio 32/)
+}
 // Every op the manual names exists. The manual tells an agent which op does what a control does; an
 // op name that is not in the registry sends it to call a tool that is not there (1.6.1: a draft cited
 // `slates_get_asset` before it was built). `present_plan` is the Studio Agent's loop tool, not an op.
