@@ -20,7 +20,7 @@ import { SlatesCloudClient, SlatesCloudHttpError, type SlatesUserInfo, type Cred
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
-import { findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
+import { HYPERFRAMES_MAPPING, findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
 import { appManualIndex, appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
@@ -9606,7 +9606,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     const label = (entry: GuideCatalogEntry) => (entry.source === 'hyperframes' ? 'HyperFrames' : entry.tier)
     const guide = result.guides.map(entry => `${entry.name} (${label(entry)}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
     const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${label(entry)}): ${entry.description}`).join('\n')}` : ''
-    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. HyperFrames guides are HyperFrames' own, unmodified; topic hyperframes/SLATES-MAPPING.md maps their CLI and Studio onto Slates. The user does not need to choose guides.`
+    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. HyperFrames guides are HyperFrames' own, unmodified; topic hyperframes/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`
     return { text, data: { ...result, memberAccess: member.access, bytes: Buffer.byteLength(text, 'utf8') } }
   },
 }
