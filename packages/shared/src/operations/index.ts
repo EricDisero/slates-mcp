@@ -6372,7 +6372,7 @@ export const editTimelineClips: Operation<{
 }> = {
   id: 'slates_edit_timeline_clips',
   description:
-    "Trim, roll, ripple, slip, move or split clips on the timeline, as the Cut's tools do; the source files are untouched (to cut a new file, use slates_trim_video). trim moves one edge (edge, then frame or deltaFrames): mode overwrite (default) covers a neighbour it grows into, ripple moves the lane's later clips by the change, roll moves the cut shared with the clip that meets this edge. A trim cuts media and never changes speed. slip changes which part of the media a clip shows without moving it (deltaFrames in timeline frames, or deltaSourceFrames in the file's). move takes clipId or clipIds, keeps their spacing, to startFrame or by deltaFrames, optionally onto trackId (a lane of the same type); mode overwrite cuts what they land on, insert pushes the lane's later clips right. split cuts at frame (or sec) every clip under it on the timeline, or only clipIds. Returns the timeline and the clips it touched; a refused edit says why.",
+    "Trim, roll, ripple, slip, move or split clips on the timeline, as the Cut's tools do; the source files are untouched (to cut a new file, use slates_trim_video). trim moves one edge (edge, then frame or deltaFrames): mode overwrite (default) covers a neighbour it grows into, ripple moves the lane's later clips by the change, roll moves the cut shared with the clip that meets this edge. A trim cuts media and never changes speed. slip changes which part of the media a clip shows without moving it (deltaFrames in timeline frames, or deltaSourceFrames in the file's). move takes clipId or clipIds, keeps their spacing, to startFrame or by deltaFrames, optionally onto trackId (a lane of the same type); mode overwrite cuts what they land on, insert pushes the lane's later clips right (a landing inside a clip moves to its nearer edge). split cuts at frame (or sec) every clip under it on the timeline, or only clipIds. Returns the clips it wrote as they now stand, the ids it deleted, the cut's durationFrames and any staleTransitions (whose clips no longer meet); a refused edit says why.",
   input: z.object({
     projectId: z.string().uuid(),
     action: z.enum(['trim', 'slip', 'move', 'split']),
@@ -6415,7 +6415,7 @@ export const updateClip: Operation<{
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
-    speed: z.number().positive().nullable().optional().describe('1 is normal speed.'),
+    speed: z.number().positive().nullable().optional().describe('1 is normal speed; null is too, at the natural length of the clip.'),
     volume: z.number().min(0).nullable().optional().describe('Linear gain under the lane fader; 1 is unchanged.'),
     audioOffsetFrames: z.number().int().nullable().optional().describe('Video clips: the split edit, in timeline frames.'),
     fadeInFrames: z.number().int().min(0).nullable().optional(),

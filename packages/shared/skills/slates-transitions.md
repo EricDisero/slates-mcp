@@ -24,7 +24,7 @@ A transition sits on a cut: two clips that meet on one lane. Most cuts in a good
 
 ## Short media
 
-If a clip's file runs out inside the transition, it still saves and the result's `shortHandles` says how many frames are missing. Pick one fix with `slates_update_transition`: `fix: "freeze"` holds the edge frame for those frames (fine for a still moment), or `fix: "shorten"` cuts the transition to what the media covers (better when the clip is moving). Tell the user which you chose.
+If a clip's file runs out inside the transition, it still saves and the result's `shortHandles` says how many frames are missing. Pick one fix with `slates_update_transition`: `fix: "freeze"` holds the edge frame for those frames (fine for a still moment), or `fix: "shorten"` cuts the transition to what the media covers (better when the clip is moving). A crossfade on an audio lane can only be shortened. Tell the user which you chose.
 
 ## Sound
 

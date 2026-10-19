@@ -19,7 +19,7 @@ All of these are `slates_edit_timeline_clips`:
 - **Move** (`action: "move"`, `startFrame` or `deltaFrames`, optional `trackId`): `mode: "insert"` pushes the lane's later clips right; `overwrite` covers what it lands on. `trackId` moves clips onto another lane of the same type, such as a B-roll lane above the main one.
 - **Split** (`action: "split"`, `frame` or `sec`): cuts every clip there, or only `clipIds`. Split, then trim or remove a piece, to drop a stumble from the middle of a take.
 
-To close a gap left by a removed clip, use `slates_remove_clip` with `ripple: true`.
+To remove a clip and close its gap, use `slates_remove_clip` with `ripple: true` and the `projectId`.
 
 ## Pacing
 
