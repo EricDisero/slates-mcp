@@ -27,6 +27,15 @@ export function loadHyperframes(): Promise<HyperframesCorpus> {
   return corpus
 }
 
+/**
+ * Catalog lines that replace an upstream first sentence. `hyperframes` opens "Mandatory entry point:
+ * read this first for any request to make ... a video", which beside Slates' guides sent the model
+ * to HyperFrames' CLI workflow before `slates-motion`. Its ranking text stays upstream's.
+ */
+const SUMMARY_OVERRIDES: Readonly<Record<string, string>> = {
+  hyperframes: "HyperFrames' own overview of making and checking a composition, written for its CLI; in Slates, start from slates-motion.",
+}
+
 /** The first sentence of an upstream description, short enough for a catalog line. */
 function summary(description: string, max = 160): string {
   const first = description.replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s/)[0]
@@ -38,7 +47,7 @@ function summary(description: string, max = 160): string {
 export function hyperframesCatalog({ skills, files }: HyperframesCorpus): GuideCatalogEntry[] {
   return skills.map((name) => {
     const { description } = parseSkillMetadata(files[name], name)
-    return { name, description: summary(description), searchText: description, tier: 'free' as const, source: 'hyperframes' as const }
+    return { name, description: SUMMARY_OVERRIDES[name] ?? summary(description), searchText: description, tier: 'free' as const, source: 'hyperframes' as const }
   })
 }
 
