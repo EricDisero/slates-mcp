@@ -6524,12 +6524,14 @@ export const updateClip: Operation<{
       blend: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft-light']).optional(),
       grain: z.number().min(0).max(1).optional(),
       saturation: z.number().min(0).max(2).optional(),
-    }).nullable().optional().describe('The whole look; a field left out is its default (normal, no grain, colour 1).'),
+    }).strict().nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1). null clears it.'),
     ripple: z.boolean().optional().describe("With speed: move the lane's later clips instead of covering them."),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-editing', "a clip's speed, volume, split edit and fades")
+    // An empty look would clear the clip's look without saying so; null is how to ask for that.
+    if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
     return ok(await desktop.post('/agent/timeline/update-clip', input))
   },
