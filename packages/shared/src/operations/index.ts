@@ -6579,7 +6579,7 @@ export const addCaptions: Operation<{
   id: 'slates_add_captions',
   billable: false,
   description:
-    "Caption the speech in a cut: one text clip per phrase on an overlay track, each carrying its words so the spoken word lights up on the frame it is said. Free; any transcription it needs runs on the user's machine. source transcript (the default) uses the words heard in each clip, aligned to within a frame, transcribing first when needed; script spreads the clip's Shot line over the speech, with estimated timing; words takes your own timed words in timeline seconds. By default every clip with sound is captioned on a new Captions track on top. Phrases follow the caption rules unless you pass your own; tiers mark emphasis per word. The result lists mismatches, where what was heard differs from the Shot's written line (the caption shows what was said: fix the line or the captions), and skipped clips with the reason. Craft: slates_get_prompting_guide (query: captions). Change a caption later with slates_update_overlay_clip.",
+    "Caption the speech in a cut: one text clip per phrase on an overlay track, each carrying its words so the spoken word lights up on the frame it is said. Free; any transcription it needs runs on the user's machine. source transcript (the default) uses the words heard in each clip, aligned to within a frame, transcribing first when needed; script spreads the clip's Shot line over the speech, with estimated timing; words takes your own timed words in timeline seconds. By default every clip with sound is captioned on a new Captions track on top. Phrases follow the caption rules unless you pass your own; tiers mark emphasis per word. The result lists mismatches, where what was heard differs from the Shot's written line (the caption shows what was said: fix the line or the captions), and skipped clips with the reason. Craft: slates_get_prompting_guide (topic: slates-captions). Change a caption later with slates_update_overlay_clip.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -9133,6 +9133,7 @@ export function resolveGuideTopic(topic: string): string | null {
   ) {
     return 'slates-previs-blocking'
   }
+  if (['captions', 'caption', 'subtitles', 'subtitle', 'transcribe', 'transcript', 'transcription'].includes(t)) return 'slates-captions'
   if (t === 'camera' || t === 'camera-moves' || t === 'camera moves' || t === 'shot-list' || t === 'shot list') {
     return 'slates-camera-language'
   }
