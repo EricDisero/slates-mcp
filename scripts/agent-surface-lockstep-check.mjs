@@ -1011,6 +1011,7 @@ function zodDescriptions(op) {
       // Captions (L2): the emphasis tiers and the style add-captions falls back to (inline in slate); E4: the registry's item types.
       ['CAPTION_TIERS', list(read('src', 'shared', 'captionBuild.ts'), 'CAPTION_TIERS'), 'CAPTION_TIERS', list(opsSrc, 'CAPTION_TIERS')],
       ['RegistryType', union(read('src', 'main', 'layers', 'registry.ts'), 'RegistryType'), 'MOTION_REGISTRY_TYPES', list(opsSrc, 'MOTION_REGISTRY_TYPES')],
+      ['CAPTION_COMPONENTS', list(read('src', 'main', 'layers', 'captionComponents.ts'), 'CAPTION_COMPONENTS'), 'CAPTION_COMPONENTS', list(opsSrc, 'CAPTION_COMPONENTS')],
       ['addCaptions style default', /const style = input\.style \?\? '([^']+)'/.exec(read('src', 'main', 'transcription', 'captions.ts'))?.[1] ?? null, 'CAPTION_STYLE_DEFAULT', value(opsSrc, 'CAPTION_STYLE_DEFAULT')],
     ]
     for (const [desk, a, mine, b] of values) {

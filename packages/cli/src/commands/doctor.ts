@@ -50,6 +50,8 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['timeline-overlays', 'text and image overlays'],
   ['transcripts', 'transcribing speech on this machine'],
   ['captions', 'captions'],
+  ['transcript-edit', 'correcting a transcript'],
+  ['caption-components', 'captions drawn by a HyperFrames caption component'],
   ['html-clips', 'HTML motion layers and the HyperFrames registry'],
   ['export', 'video and XML export'],
   ['ad-variant-export', 'variant batch export, grid, delivery framing and selection'],

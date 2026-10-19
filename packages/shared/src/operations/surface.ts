@@ -193,6 +193,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_add_image_overlay',
     'slates_update_overlay_clip',
     'slates_add_captions',
+    'slates_edit_asset_transcript',
     'slates_add_html_clip',
     'slates_update_html_clip',
     'slates_check_composition',

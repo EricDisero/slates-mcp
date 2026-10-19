@@ -1356,6 +1356,31 @@ export const getAssetTranscript: Operation<{ projectId: string; assetId: string 
   },
 }
 
+export const editAssetTranscript: Operation<{ projectId: string; assetId: string; text: string; recaption?: boolean }> = {
+  id: 'slates_edit_asset_transcript',
+  billable: false,
+  description:
+    "Correct an asset's transcript by sending its whole text back, edited, as the transcript editor in the app does: a corrected word keeps its time, a removed word goes, and a new word takes time shared out from its neighbours (the silence between them, or the word before it). Paragraph breaks are free; only the words count. By default the captions heard from this asset are made again from the corrected words, on the same tracks in the same style (recaption false skips that); captions estimated from the Shot's line or written from your own words are left alone. Read the current text first with slates_get_asset_transcript. Free. The machine's own words stay stored, so slates_transcribe_asset with force starts fresh.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).describe('A video or audio asset with a transcript: its code (VID-V3) or id.'),
+      text: z.string().min(1).describe('The whole transcript, edited. Words are separated by spaces or line breaks.'),
+      recaption: z.boolean().optional().describe("Make this asset's captions again from the edited words. Default true."),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('transcript-edit', 'transcript editing')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const r = await ctx.desktop().post<{ changed: { corrected: number; added: number; removed: number }; recaptioned: string[] }>('/agent/assets/transcript/edit', {
+      assetId: id, text: input.text, ...(input.recaption === false ? { recaption: false } : {}),
+    })
+    const c = r.changed
+    const summary = { assetId: id, changed: c, recaptioned: r.recaptioned }
+    return ok(summary, `Saved: ${c.corrected} corrected, ${c.added} added, ${c.removed} removed.${r.recaptioned.length ? ` Remade ${r.recaptioned.length} caption clip${r.recaptioned.length === 1 ? '' : 's'}: ${r.recaptioned.join(', ')}.` : ''}`)
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -6559,12 +6584,19 @@ export const updateOverlayClip: Operation<{
 const CAPTION_STYLE_DEFAULT = 'word-pop'
 const CAPTION_TIERS = ['regular', 'italic', 'emphasis', 'slam'] as const
 const MOTION_REGISTRY_TYPES = ['block', 'component', 'example'] as const
+/** Mirrors slate's src/main/layers/captionComponents.ts: the caption-* components checked to draw fed words. */
+const CAPTION_COMPONENTS = [
+  'caption-highlight', 'caption-pill-karaoke', 'caption-weight-shift', 'caption-glitch-rgb', 'caption-neon-glow',
+  'caption-gradient-fill', 'caption-kinetic-slam', 'caption-clip-wipe', 'caption-matrix-decode', 'caption-particle-burst',
+  'caption-neon-accent', 'caption-editorial-emphasis',
+] as const
 
 type CaptionsResult = {
   trackId: string; createdTrack: boolean; clipIds: string[]; words: number; phrases: number; timing: string[]
   mismatches: Array<{ clipId: string; heard: string; written: string; start: number }>
   skipped: Array<{ clipId: string; reason: string }>
   transcribed: string[]
+  findings?: CompositionFindings
 }
 
 export const addCaptions: Operation<{
@@ -6575,6 +6607,7 @@ export const addCaptions: Operation<{
   phrases?: Array<[number, number]>
   tiers?: Record<string, (typeof CAPTION_TIERS)[number]>
   trackId?: string
+  component?: (typeof CAPTION_COMPONENTS)[number]
 }> = {
   id: 'slates_add_captions',
   billable: false,
@@ -6596,17 +6629,22 @@ export const addCaptions: Operation<{
       tiers: z
         .record(z.string().regex(/^\d+$/, 'a word index'), z.enum(CAPTION_TIERS))
         .optional()
-        .describe('Emphasis by word index (the same count as phrases). Unnamed words are regular. Only the HTML caption styles draw the tiers; the text styles show regular.'),
+        .describe('Emphasis by word index (the same count as phrases). Unnamed words are regular. Drawn only by components: caption-editorial-emphasis sets italic and emphasis (slam draws as emphasis); kinetic-slam, clip-wipe, particle-burst, neon-glow and neon-accent colour emphasis and slam words as keywords. The text styles show regular.'),
       trackId: z.string().uuid().optional().describe('An overlay track to use. Default: a new Captions track on top.'),
+      component: z.enum(CAPTION_COMPONENTS).optional().describe("A HyperFrames caption component instead of text clips: one HTML clip animating every word in that component's look (style does not apply). Preview them with slates_list_motion_blocks (query: caption, type: component)."),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('captions', 'captions')
+    if (input.component) await ctx.desktop().requireCapability('caption-components', 'caption components')
+    if (input.component && input.style) throw new Error('style is for text-clip captions; a component brings its own look. Pass one or the other.')
     if (input.words && input.source && input.source !== 'words') throw new Error(`words go with source words; source ${input.source} finds its own.`)
     if (input.source === 'words' && !input.words) throw new Error('source words needs words: [{ text, start, end }] in timeline seconds.')
     const r = await ctx.desktop().post<CaptionsResult>('/agent/timeline/add-captions', input)
     const lines = [
-      `Added ${r.phrases} caption clip${r.phrases === 1 ? '' : 's'} (${r.words} words, timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}.`,
+      input.component
+        ? `Added one ${input.component} clip over ${r.words} words (timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}. ${describeFindings(r.findings)}`
+        : `Added ${r.phrases} caption clip${r.phrases === 1 ? '' : 's'} (${r.words} words, timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}.`,
       r.mismatches.length ? `Heard ≠ written in ${r.mismatches.length} place${r.mismatches.length === 1 ? '' : 's'}: ${r.mismatches.map((m) => `"${m.heard}" for "${m.written}" at ${m.start}s`).join('; ')}.` : '',
       r.skipped.length ? `Skipped: ${r.skipped.map((s) => `${s.clipId} (${s.reason})`).join('; ')}.` : '',
     ].filter(Boolean)
@@ -9615,6 +9653,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   linkAssetSource as unknown as Operation<unknown>,
   transcribeAsset as unknown as Operation<unknown>,
   getAssetTranscript as unknown as Operation<unknown>,
+  editAssetTranscript as unknown as Operation<unknown>,
   extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
