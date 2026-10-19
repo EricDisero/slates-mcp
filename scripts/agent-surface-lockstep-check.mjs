@@ -1014,6 +1014,9 @@ function zodDescriptions(op) {
       ['RegistryType', union(read('src', 'main', 'layers', 'registry.ts'), 'RegistryType'), 'MOTION_REGISTRY_TYPES', list(opsSrc, 'MOTION_REGISTRY_TYPES')],
       ['CAPTION_COMPONENTS', list(read('src', 'main', 'layers', 'captionComponents.ts'), 'CAPTION_COMPONENTS'), 'CAPTION_COMPONENTS', list(opsSrc, 'CAPTION_COMPONENTS')],
       ['addCaptions style default', /const style = input\.style \?\? '([^']+)'/.exec(read('src', 'main', 'transcription', 'captions.ts'))?.[1] ?? null, 'CAPTION_STYLE_DEFAULT', value(opsSrc, 'CAPTION_STYLE_DEFAULT')],
+      // Keyframes: the properties a key can animate, and the named curves (the op's enum; a bezier is the union's other arm).
+      ['KeyframeProperty', union(read('src', 'shared', 'keyframes.ts'), 'KeyframeProperty'), 'KEYFRAME_PROPERTY_IDS', list(opsSrc, 'KEYFRAME_PROPERTY_IDS')],
+      ['Easing', union(read('src', 'shared', 'keyframes.ts'), 'Easing'), 'keyframeEasing', /const keyframeEasing = z\.union\(\[\s*z\.enum\(\[([^\]]*)\]/.exec(opsSrc)?.[1].match(/'[^']+'/g)?.map((x) => x.slice(1, -1)).join(',') ?? null],
     ]
     for (const [desk, a, mine, b] of values) {
       if (a === null || b === null) drift.push(`${a === null ? desk : mine} not found`)
