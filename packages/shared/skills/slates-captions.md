@@ -43,7 +43,7 @@ The automatic grouping knows punctuation, not intent. Reading what a line is doi
 
 Never split a name, a number from what it counts ("44 markdown files") or a prepositional phrase ("in a folder").
 
-`phrases` are `[from, to)` ranges of word indexes: `from` is the phrase's first word and `to` is one past its last, counted across the whole call in timeline order, in order and without overlap. Take the indexes from the transcript you read, or from the `words` you pass.
+`phrases` are `[from, to)` ranges of word indexes: `from` is the phrase's first word and `to` is one past its last, counted across the whole call in timeline order, in order and without overlap. The words counted are the ones the call captions: each clip's words between its in and out points, clip after clip in timeline order. `slates_get_asset_transcript` returns the whole file, so for a trimmed clip skip the words said before its in point (compare their times with the clip's source in and out in `slates_get_timeline`), or pass `words` yourself so the indexes are yours.
 
 ## Emphasis
 

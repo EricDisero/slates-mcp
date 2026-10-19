@@ -87,6 +87,7 @@ const DESTRUCTIVE_IDS = new Set([
   'slates_undo_relocate_project',
   'slates_merge_shots',
   'slates_split_shot',
+  'slates_edit_asset_transcript',
 ])
 
 /** Same input, same end state — `update`/`set`/`reorder`/`rename` all overwrite
