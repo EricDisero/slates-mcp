@@ -6923,7 +6923,7 @@ type MotionRegistryListing = { items: Array<{ name: string; type: (typeof MOTION
 export const listMotionBlocks: Operation<{ query?: string; type?: (typeof MOTION_REGISTRY_TYPES)[number] }> = {
   id: 'slates_list_motion_blocks',
   description:
-    "Search the HyperFrames registry for ready-made motion layers, such as captions, lower thirds and end cards: each item's name, type, title, description and tags. The list is the live registry, so it grows without a Slates update. Put a block on the timeline with slates_add_html_clip (block: its name).",
+    "Search the HyperFrames registry for ready-made motion layers, such as captions, lower thirds and end cards: each item's name, type, title, description and tags. The list is the registry at the HyperFrames version this Slates build runs, so every item in it draws here. Put a block on the timeline with slates_add_html_clip (block: its name).",
   input: z
     .object({
       query: z.string().min(1).max(200).optional().describe('Words to match, such as "lower third" or "kinetic caption".'),

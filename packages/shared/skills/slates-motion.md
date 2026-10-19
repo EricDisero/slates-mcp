@@ -15,7 +15,7 @@ A layer that fills the frame during a run of quick cuts also hides them, which i
 
 ## Start from the registry
 
-Captions, end cards and lower thirds come from the registry. `slates_list_motion_blocks` searches it ("lower third", "end card", "kinetic caption"); the list is live, so it grows without a Slates update. `slates_add_html_clip` with `block` and its `variables` places one. Variables are text, numbers or true/false, and `slates_update_html_clip` changes them later (`null` clears them).
+Captions, end cards and lower thirds come from the registry. `slates_list_motion_blocks` searches it ("lower third", "end card", "kinetic caption"); the list is the registry at the HyperFrames version Slates runs, so every item in it draws. `slates_add_html_clip` with `block` and its `variables` places one. Variables are text, numbers or true/false, and `slates_update_html_clip` changes them later (`null` clears them).
 
 Write your own composition only when no block fits. Passing `html` with `block` replaces the block's document and keeps its files, which is how to restyle a block without rebuilding its assets.
 

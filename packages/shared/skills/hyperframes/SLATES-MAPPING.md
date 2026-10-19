@@ -18,7 +18,7 @@ craft.
 | `render` (any quality, local or `--docker`) | Export the Cut: `slates_export_video` for one cut, `slates_export_cuts` for several cuts or delivery formats at once. HTML clips render with the cut. |
 | `preview`, `play` | The Slates player: the Cut's Viewer. Open it for the user with `slates_set_view`. |
 | `add <name>` | The registry picker in the Cut, or `slates_list_motion_blocks` then `slates_add_html_clip` with `block` set to the item's name. |
-| `catalog --query` | `slates_list_motion_blocks` with `query`. It reads the live registry; there is no on-device tier to offer. |
+| `catalog --query` | `slates_list_motion_blocks` with `query`. It reads the registry at the HyperFrames version Slates runs; there is no on-device tier to offer. |
 | `lint`, `check` (and the old `validate`, `inspect`, `layout`) | `slates_check_composition`. The same check runs on every `slates_add_html_clip` and `slates_update_html_clip`, and its findings come back in the result: fix every error before moving on. |
 | `timeline --json` | `slates_get_timeline`: tracks, clips, their frames and the frame rate. |
 | `tts` | Slates' text-to-speech seat, `inworld-tts-2`, through `slates_generate_audio` (craft: `slates_get_prompting_guide`, topic `tts`). It spends credits: quote first. |
