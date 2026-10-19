@@ -200,6 +200,8 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_update_overlay_clip',
     'slates_set_clip_keyframes',
     'slates_add_captions',
+    'slates_transcribe_asset',
+    'slates_get_asset_transcript',
     'slates_edit_asset_transcript',
     'slates_add_html_clip',
     'slates_update_html_clip',
