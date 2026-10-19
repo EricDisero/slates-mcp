@@ -6270,15 +6270,164 @@ export const reorderClips: Operation<{ trackId: string; clipIds: string[] }> = {
   },
 }
 
-export const removeClip: Operation<{ clipId: string }> = {
+export const removeClip: Operation<{ clipId: string; ripple?: boolean; projectId?: string }> = {
   id: 'slates_remove_clip',
   description:
-    "Remove a clip from the timeline (the source asset is untouched). Leaves a gap at the clip's old position — MP4 export renders gaps as black; on a video or audio track call slates_reorder_clips afterwards to close gaps. An overlay track's text and image clips keep their times, and the gap is just no overlay.",
-  input: z.object({ clipId: z.string().uuid() }),
+    "Remove a clip from the timeline (the source asset is untouched). By default it leaves a gap at the clip's old position, which MP4 export renders as black. ripple: true closes the gap instead: the lane's later clips move left by the clip's length (needs projectId). An overlay track's text and image clips keep their times, and the gap is just no overlay.",
+  input: z.object({
+    clipId: z.string().uuid(),
+    ripple: z.boolean().optional().describe("Close the gap: the lane's later clips move up. Needs projectId."),
+    projectId: z.string().uuid().optional(),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
+    if (input.ripple) {
+      await desktop.requireCapability('timeline-editing', 'ripple delete')
+      if (!input.projectId) throw new Error('ripple needs projectId.')
+    }
     return ok(await desktop.post('/agent/timeline/remove-clip', input))
+  },
+}
+
+// ── Transitions on cuts (timeline engine plan E2) ──────────────
+// A cut is two clips that meet on one lane. The kinds are the desktop's (GET /agent/timeline returns
+// them as transitionKinds), so none is typed here; an unknown kind is refused with the list.
+
+const transitionShape = {
+  kind: z.string().optional().describe("A kind from slates_get_timeline's transitionKinds for this lane: picture kinds on video and overlay lanes, sound kinds on audio lanes. Default: a dissolve, or a crossfade on sound."),
+  durationFrames: z.number().int().positive().optional().describe('How long it lasts, in timeline frames. Default 0.5 s, shortened to what the clips allow; a length you name that is too long is refused with the longest that fits.'),
+  durationSec: z.number().positive().optional().describe('The same, in seconds.'),
+  alignment: z.enum(['center', 'start', 'end']).optional().describe('center (default) straddles the cut; start begins at the cut; end finishes at it.'),
+  params: z.record(z.string(), z.unknown()).optional().describe("The kind's settings. freeze: true holds the edge frame where the media runs short. On a picture transition, audio: false stops the clips' sound crossfading with it."),
+}
+
+export const addTransition: Operation<{
+  projectId: string
+  fromClipId?: string; toClipId?: string; clipId?: string; side?: 'start' | 'end'
+  kind?: string; durationFrames?: number; durationSec?: number; alignment?: 'center' | 'start' | 'end'; params?: Record<string, unknown>
+}> = {
+  id: 'slates_add_transition',
+  description:
+    "Put a transition (dissolve, wipe, crossfade and the other kinds) on a cut between two clips that meet on one lane, as the Cut's clip menu does. Name the cut by fromClipId and toClipId, or by one clipId and side ('end' runs this clip into the next, 'start' the last clip into this one). A cut holds one transition, so adding where one exists changes it. It never refuses short media: the result's shortHandles says how many frames are missing and offers the fixes (slates_update_transition fix: freeze or shorten). For a fade to or from black, set the clip's fades with slates_update_clip instead. The open Cut shows the change.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    fromClipId: z.string().uuid().optional().describe('The clip before the cut.'),
+    toClipId: z.string().uuid().optional().describe('The clip after the cut.'),
+    clipId: z.string().uuid().optional().describe('One clip of the cut, with side.'),
+    side: z.enum(['start', 'end']).optional().describe("With clipId: 'end' (default) or 'start'."),
+    ...transitionShape,
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-transitions', 'transitions')
+    if (!input.fromClipId && !input.toClipId && !input.clipId) throw new Error('Name the cut: fromClipId and toClipId, or clipId with side.')
+    return ok(await desktop.post('/agent/timeline/add-transition', input))
+  },
+}
+
+export const updateTransition: Operation<{
+  projectId: string; transitionId: string; fix?: 'freeze' | 'shorten'
+  kind?: string; durationFrames?: number; durationSec?: number; alignment?: 'center' | 'start' | 'end'; params?: Record<string, unknown>
+}> = {
+  id: 'slates_update_transition',
+  description:
+    "Change a transition's kind, length, alignment or settings by its id (slates_get_timeline lists them under transitions), or apply one of the two fixes for short media: fix 'freeze' holds the edge frame for the missing frames, fix 'shorten' cuts it to the longest the media covers. Only the fields you name change. Returns the transition with its span and any frames still missing.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    transitionId: z.string().uuid(),
+    fix: z.enum(['freeze', 'shorten']).optional().describe('Instead of other fields: the short-media fix.'),
+    ...transitionShape,
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-transitions', 'transitions')
+    return ok(await desktop.post('/agent/timeline/update-transition', input))
+  },
+}
+
+export const removeTransition: Operation<{ projectId: string; transitionId: string }> = {
+  id: 'slates_remove_transition',
+  description:
+    'Take a transition off its cut, leaving a plain cut; the clips are untouched. The id is in slates_get_timeline under transitions.',
+  input: z.object({ projectId: z.string().uuid(), transitionId: z.string().uuid() }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-transitions', 'transitions')
+    return ok(await desktop.post('/agent/timeline/remove-transition', input))
+  },
+}
+
+// ── Editing clips on the timeline (timeline engine plan E3) ────
+// One tool for the edits that move clip edges and positions; slates_update_clip holds a clip's own
+// settings. Both run through the same core as the Cut's own tools.
+
+export const editTimelineClips: Operation<{
+  projectId: string
+  action: 'trim' | 'slip' | 'move' | 'split'
+  clipId?: string; clipIds?: string[]
+  edge?: 'start' | 'end'; frame?: number; sec?: number; deltaFrames?: number; deltaSourceFrames?: number
+  startFrame?: number; trackId?: string; timelineId?: string
+  mode?: 'overwrite' | 'ripple' | 'roll' | 'insert'
+}> = {
+  id: 'slates_edit_timeline_clips',
+  description:
+    "Trim, roll, ripple, slip, move or split clips on the timeline, as the Cut's tools do; the source files are untouched (to cut a new file, use slates_trim_video). trim moves one edge (edge, then frame or deltaFrames): mode overwrite (default) covers a neighbour it grows into, ripple moves the lane's later clips by the change, roll moves the cut shared with the clip that meets this edge. A trim cuts media and never changes speed. slip changes which part of the media a clip shows without moving it (deltaFrames in timeline frames, or deltaSourceFrames in the file's). move takes clipId or clipIds, keeps their spacing, to startFrame or by deltaFrames, optionally onto trackId (a lane of the same type); mode overwrite cuts what they land on, insert pushes the lane's later clips right (a landing inside a clip moves to its nearer edge). split cuts at frame (or sec) every clip under it on the timeline, or only clipIds. Returns the clips it wrote as they now stand, the ids it deleted, the cut's durationFrames and any staleTransitions (whose clips no longer meet); a refused edit says why.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    action: z.enum(['trim', 'slip', 'move', 'split']),
+    clipId: z.string().uuid().optional(),
+    clipIds: z.array(z.string().uuid()).min(1).optional().describe('move or split: several clips of one timeline.'),
+    edge: z.enum(['start', 'end']).optional().describe('trim: which edge.'),
+    frame: z.number().int().min(0).optional().describe('trim: where the edge goes. split: where to cut. Timeline frames.'),
+    sec: z.number().min(0).optional().describe('split: where to cut, in seconds.'),
+    deltaFrames: z.number().int().optional().describe('trim, slip or move: how far, in timeline frames; negative is left (slip: earlier media).'),
+    deltaSourceFrames: z.number().int().optional().describe("slip: how far, in the file's own frames."),
+    startFrame: z.number().int().min(0).optional().describe('move: where the first clip lands.'),
+    trackId: z.string().uuid().optional().describe('move: another lane of the same type.'),
+    timelineId: z.string().uuid().optional().describe("split without clipIds: a named cut; omit for the project's timeline."),
+    mode: z.enum(['overwrite', 'ripple', 'roll', 'insert']).optional().describe('trim: overwrite, ripple or roll. move: overwrite or insert.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-editing', 'editing clips on the timeline')
+    const { action, ...body } = input
+    if ((action === 'trim' || action === 'slip') && !input.clipId) throw new Error(`${action} needs a clipId.`)
+    if (action === 'trim' && !input.edge) throw new Error("trim needs an edge: 'start' or 'end'.")
+    if (action === 'move' && !input.clipId && !input.clipIds) throw new Error('move needs clipId or clipIds.')
+    if (action === 'split' && input.frame === undefined && input.sec === undefined) throw new Error('split needs a frame or sec.')
+    if (action === 'trim') return ok(await desktop.post('/agent/timeline/trim-clip', body))
+    if (action === 'slip') return ok(await desktop.post('/agent/timeline/slip-clip', body))
+    if (action === 'move') return ok(await desktop.post('/agent/timeline/move-clip', body))
+    return ok(await desktop.post('/agent/timeline/split-clip', body))
+  },
+}
+
+export const updateClip: Operation<{
+  projectId: string; clipId: string
+  speed?: number | null; volume?: number | null; audioOffsetFrames?: number | null
+  fadeInFrames?: number | null; fadeOutFrames?: number | null; audioFadeInFrames?: number | null; audioFadeOutFrames?: number | null
+  ripple?: boolean
+}> = {
+  id: 'slates_update_clip',
+  description:
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent).",
+  input: z.object({
+    projectId: z.string().uuid(),
+    clipId: z.string().uuid(),
+    speed: z.number().positive().nullable().optional().describe('1 is normal speed; null is too, at the natural length of the clip.'),
+    volume: z.number().min(0).nullable().optional().describe('Linear gain under the lane fader; 1 is unchanged.'),
+    audioOffsetFrames: z.number().int().nullable().optional().describe('Video clips: the split edit, in timeline frames.'),
+    fadeInFrames: z.number().int().min(0).nullable().optional(),
+    fadeOutFrames: z.number().int().min(0).nullable().optional(),
+    audioFadeInFrames: z.number().int().min(0).nullable().optional(),
+    audioFadeOutFrames: z.number().int().min(0).nullable().optional(),
+    ripple: z.boolean().optional().describe("With speed: move the lane's later clips instead of covering them."),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-editing', "a clip's speed, volume, split edit and fades")
+    return ok(await desktop.post('/agent/timeline/update-clip', input))
   },
 }
 
@@ -8972,6 +9121,9 @@ export function resolveGuideTopic(topic: string): string | null {
   ) {
     return 'slates-previs-blocking'
   }
+  // Timeline craft: placing transitions, and the cutting pass (trim, roll, slip, J- and L-cuts).
+  if (t === 'transition' || t === 'transitions' || t === 'dissolve' || t === 'crossfade' || t === 'wipe') return 'slates-transitions'
+  if (t === 'cut' || t === 'cuts' || t === 'cutting' || t === 'editing' || t === 'pacing' || t === 'trim' || t === 'j-cut' || t === 'l-cut' || t === 'split-edit' || t === 'split edit') return 'slates-cuts'
   if (t === 'camera' || t === 'camera-moves' || t === 'camera moves' || t === 'shot-list' || t === 'shot list') {
     return 'slates-camera-language'
   }
@@ -9502,6 +9654,11 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,
   removeClip as unknown as Operation<unknown>,
+  editTimelineClips as unknown as Operation<unknown>,
+  updateClip as unknown as Operation<unknown>,
+  addTransition as unknown as Operation<unknown>,
+  updateTransition as unknown as Operation<unknown>,
+  removeTransition as unknown as Operation<unknown>,
   manageTimelineMarker as unknown as Operation<unknown>,
   addTimelineTrack as unknown as Operation<unknown>,
   addTextClip as unknown as Operation<unknown>,
