@@ -6821,7 +6821,7 @@ export const addCaptions: Operation<{
         .optional()
         .describe('Emphasis by word index (the same count as phrases). Unnamed words are regular. Drawn only by components: caption-editorial-emphasis sets italic and emphasis (slam draws as emphasis); kinetic-slam, clip-wipe, particle-burst, neon-glow and neon-accent colour emphasis and slam words as keywords. The text styles show regular.'),
       trackId: z.string().uuid().optional().describe('An overlay track to use. Default: a new Captions track on top.'),
-      component: z.enum(CAPTION_COMPONENTS).optional().describe("A HyperFrames caption component instead of text clips: one HTML clip animating every word in that component's look (style does not apply). Preview them with slates_list_motion_blocks (query: caption, type: component)."),
+      component: z.enum(CAPTION_COMPONENTS).optional().describe("A caption component instead of text clips: one HTML clip animating every word in that component's look (style does not apply). Preview them with slates_list_motion_blocks (query: caption, type: component)."),
     })
     .strict(),
   async run(input, ctx) {
@@ -6853,7 +6853,7 @@ const describeFindings = (f: CompositionFindings | undefined): string => {
   return f.warnings.length ? `Check passed with ${f.warnings.length} warning${f.warnings.length === 1 ? '' : 's'}: ${list(f.warnings)}.` : 'Check passed.'
 }
 
-const htmlCompositionInput = z.string().min(1).describe('A HyperFrames composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
+const htmlCompositionInput = z.string().min(1).describe('A composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
 const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false.")
 
 export const addHtmlClip: Operation<{
@@ -6863,7 +6863,7 @@ export const addHtmlClip: Operation<{
 }> = {
   id: 'slates_add_html_clip',
   description:
-    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a HyperFrames composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. HyperFrames' check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (topic: slates-motion).",
+    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. Slates' composition check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (topic: slates-motion).",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -6889,7 +6889,7 @@ export const addHtmlClip: Operation<{
 export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html?: string; variables?: Record<string, string | number | boolean> | null }> = {
   id: 'slates_update_html_clip',
   description:
-    "Change an HTML clip's composition or its variables. HyperFrames' check runs again and its findings come back here: fix every error before moving on. Only what you pass changes. To move or retime one, remove it (slates_remove_clip) and add it again.",
+    "Change an HTML clip's composition or its variables. Slates' composition check runs again and its findings come back here: fix every error before moving on. Only what you pass changes. To move or retime one, remove it (slates_remove_clip) and add it again.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -6909,7 +6909,7 @@ export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html
 export const checkComposition: Operation<{ html: string }> = {
   id: 'slates_check_composition',
   description:
-    "Check a HyperFrames composition before it lands, with HyperFrames' own check: its errors and warnings, each with a code, a message and, where it has one, the selector it found. Writes nothing. slates_add_html_clip and slates_update_html_clip run the same check, so use this one while drafting.",
+    "Check a composition before it lands, with Slates' composition check: its errors and warnings, each with a code, a message and, where it has one, the selector it found. Writes nothing. slates_add_html_clip and slates_update_html_clip run the same check, so use this one while drafting.",
   input: z.object({ html: htmlCompositionInput }).strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('html-clips', 'HTML layers')
@@ -6923,7 +6923,7 @@ type MotionRegistryListing = { items: Array<{ name: string; type: (typeof MOTION
 export const listMotionBlocks: Operation<{ query?: string; type?: (typeof MOTION_REGISTRY_TYPES)[number] }> = {
   id: 'slates_list_motion_blocks',
   description:
-    "Search the HyperFrames registry for ready-made motion layers, such as captions, lower thirds and end cards: each item's name, type, title, description and tags. The list is the registry at the HyperFrames version this Slates build runs, so every item in it draws here. Put a block on the timeline with slates_add_html_clip (block: its name).",
+    "Search the motion block library for ready-made motion layers, such as captions, lower thirds and end cards: each item's name, type, title, description and tags. The list is the library at the version this Slates build runs, so every item in it draws here. Put a block on the timeline with slates_add_html_clip (block: its name).",
   input: z
     .object({
       query: z.string().min(1).max(200).optional().describe('Words to match, such as "lower third" or "kinetic caption".'),
@@ -9549,7 +9549,7 @@ export const WORKING_METHOD_TOPIC = 'working-method'
 
 export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; query?: string; limit?: number; offset?: number }> = {
   id: 'slates_get_prompting_guide',
-  description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. HyperFrames\' own skills are in the catalog too, for HTML motion layers and editing craft; a topic can name one of their files by path. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
+  description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. The motion engine\'s own skills (motion-*) are in the catalog too, for HTML motion layers and editing craft; a topic can name one of their files by path. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
   input: z.object({
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
     topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules for an MCP client; the app's Studio Agent has its own). Omit to search by intent or browse.`),
@@ -9570,14 +9570,14 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
     const hyperframes = await loadHyperframes()
-    // A HyperFrames skill or file by its exact name wins over an alias (`hyperframes-audio` is not `audio`).
+    // A motion skill or file by its exact name wins over an alias (`motion-audio` is not `audio`).
     const hf = topic && !Object.hasOwn(SKILLS, topic) ? findHyperframesGuide(hyperframes, topic) : null
     if (hf) {
       const depth = input.depth ?? 'card'
       const body = depth === 'card' && !input.query?.trim() ? hyperframesCard(hf.content) : retrieveGuide(hf.key, hf.content, depth, input.query)
       const others = (depth === 'card' || depth === 'index') && !input.query ? hyperframesFilesOf(hyperframes, hf.key) : []
       const guide = `${hyperframesGuideHeader(hf.key)}${body}${others.length ? `\n\nIts other files (request each as a topic): ${others.join(', ')}` : ''}`
-      return { text: guide, data: { topic: hf.key, tier: 'free', source: 'hyperframes', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+      return { text: guide, data: { topic: hf.key, tier: 'free', source: 'motion', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     const resolved = topic ? resolveGuideTopic(topic) : null
     if (resolved) {
@@ -9602,10 +9602,10 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
     const catalog = [...[...guideCatalog(SKILLS), ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
     const result = discoverGuides(catalog, { ...SKILLS, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
-    const label = (entry: GuideCatalogEntry) => (entry.source === 'hyperframes' ? 'HyperFrames' : entry.tier)
+    const label = (entry: GuideCatalogEntry) => (entry.source === 'motion' ? 'motion' : entry.tier)
     const guide = result.guides.map(entry => `${entry.name} (${label(entry)}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
     const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${label(entry)}): ${entry.description}`).join('\n')}` : ''
-    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. HyperFrames guides are HyperFrames' own, unmodified; topic hyperframes/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`
+    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. Motion guides are the motion engine's own; topic motion/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`
     return { text, data: { ...result, memberAccess: member.access, bytes: Buffer.byteLength(text, 'utf8') } }
   },
 }
