@@ -508,6 +508,29 @@ export const getWorkspaceState: Operation<{ projectId?: string; limit?: number }
   },
 }
 
+/** Where the user is on the open timeline, as `GET /agent/selection` resolves it (slate's `timelinePosition`). */
+interface TimelinePlace {
+  name: string
+  playhead: { frame: number; timecode: string; seconds: number }
+  selectedClips: { code: string | null; label: string | null }[]
+  underPlayhead: { code: string | null; label: string | null; words: string | null }[]
+}
+
+const clipName = (c: { code: string | null; label: string | null }): string => c.code ?? c.label ?? 'a clip'
+
+/** "here" and "this" on the timeline, in one line: the playhead, the clips under it and the words spoken there. */
+function describePlace(t: TimelinePlace): string {
+  const under = t.underPlayhead.map(clipName)
+  const words = t.underPlayhead.map((c) => c.words).find(Boolean)
+  return (
+    `On the timeline "${t.name}" the playhead is at ${t.playhead.timecode}` +
+    (under.length ? `, over ${under.join(', ')}` : ', over no clip') +
+    (t.selectedClips.length ? `; selected clips: ${t.selectedClips.map(clipName).join(', ')}` : '') +
+    (words ? `; spoken around it: "${words}"` : '') +
+    '.'
+  )
+}
+
 /**
  * What the user has selected in the app RIGHT NOW. The selection band in every
  * grid (images, clips, audio, storyboard shots) reports its ids to the desktop,
@@ -519,7 +542,7 @@ export const getSelection: Operation<Record<string, never>> = {
   description:
     // Lean on purpose: WHEN to call it is the doctrine's ASSET CODES line, and
     // this description is paid on every desktop turn (lockstep § 7).
-    'The user\'s live selection in the Slates app: ticked cards (with codes) and the image open in the viewer.',
+    'The user\'s live selection in the Slates app: ticked cards (with codes), the image open in the viewer, and where they are on the open timeline (playhead, selected clips, the clips under the playhead and the words spoken there).',
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('selection', 'reading the live selection')
@@ -532,6 +555,8 @@ export const getSelection: Operation<Record<string, never>> = {
         updatedAt: string
       } | null
       viewing: { projectId: string | null; item: unknown; updatedAt: string } | null
+      /** Desktops from engine-test item 17 on; older ones omit it. */
+      timeline?: TimelinePlace | null
     }>('/agent/selection')
     const describe = (row: Record<string, unknown>): string =>
       row.code ? (row.label ? `${row.code} — ${row.label}` : String(row.code)) : String(row.id)
@@ -554,6 +579,8 @@ export const getSelection: Operation<Record<string, never>> = {
       )
     }
     if (viewed) lines.push(`Open in the viewer: ${describe(viewed)}.`)
+    const place = r.timeline ?? null
+    if (place) lines.push(describePlace(place))
     if (lines.length === 0) {
       lines.push(
         'Nothing is selected and no image is open in the viewer. Ask the user to select the cards in Slates (click or drag), or to name the codes.'
@@ -574,6 +601,7 @@ export const getSelection: Operation<Record<string, never>> = {
         viewing: viewed
           ? { project_id: r.viewing!.projectId, item: viewed, updated_at: r.viewing!.updatedAt }
           : null,
+        timeline: place,
       },
     }
   },
