@@ -105,12 +105,16 @@ const IDEMPOTENT_PREFIXES = [
 const startsWithAny = (id: string, prefixes: readonly string[]): boolean =>
   prefixes.some((p) => id.startsWith(p))
 
+/** Ops that can fetch from the HyperFrames registry on GitHub: a listing, a block, a caption component. */
+const REGISTRY_IDS: ReadonlySet<string> = new Set(['slates_list_motion_blocks', 'slates_add_html_clip', 'slates_add_captions'])
+
 /**
  * Derive an op's four hints.
  *
  * `openWorldHint` means "reaches something outside this system": every billable
- * op hits a provider, and every Blender op hits a separate process over a
- * socket. Everything else touches only the user's own workspace.
+ * op hits a provider, every Blender op hits a separate process over a socket,
+ * and the registry ops may fetch from GitHub. Everything else touches only the
+ * user's own workspace.
  */
 export function annotate(id: string, billable: boolean | undefined): OperationAnnotations {
   const readOnlyHint = startsWithAny(id, READ_ONLY_PREFIXES)
@@ -119,7 +123,7 @@ export function annotate(id: string, billable: boolean | undefined): OperationAn
     // A read is never destructive, whatever the id looks like.
     destructiveHint: !readOnlyHint && DESTRUCTIVE_IDS.has(id),
     idempotentHint: readOnlyHint || startsWithAny(id, IDEMPOTENT_PREFIXES),
-    openWorldHint: !!billable || id.startsWith('slates_blender_'),
+    openWorldHint: !!billable || id.startsWith('slates_blender_') || REGISTRY_IDS.has(id),
   }
 }
 
