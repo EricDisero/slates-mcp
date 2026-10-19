@@ -63,13 +63,15 @@ assert(!('guides' in (await run({ topic: 'camera', query: 'dolly' })).data))
 assert((await run({ topic: 'app-manual', query: 'export mp4' })).text.length > 0)
 
 // HyperFrames guides carry the craft for layers; for an ad, every Slates match ranks above every one of them.
-for (const query of ['a UGC skincare ad with captions and a lower third', 'a 30 second ad for my app with an end card and captions', 'commercial for a sneaker campaign with kinetic type']) {
+for (const query of ['a UGC skincare ad with captions and a lower third', 'a 30 second ad for my app with an end card and captions', 'commercial for a sneaker campaign with kinetic type', 'Facebook ads for my skincare app with captions']) {
   const ranked = names(await run({ query }))
   const firstHf = ranked.findIndex(hf)
   assert(ranked.some(name => !hf(name)), `${query}: no Slates guide matched (${ranked})`)
   assert(firstHf === -1 || ranked.slice(firstHf).every(hf), `${query}: a HyperFrames guide outranks a Slates guide (${ranked})`)
 }
 assert(names(await run({ query: 'animated lower third GSAP composition for a talking head' })).some(hf), 'a layer brief reaches HyperFrames craft')
+// A paged browse lists Slates' guides first, as the unpaged one does.
+assert(!names(await run({ limit: 8 })).some(hf), `a browse's first page is Slates' guides (${names(await run({ limit: 8 }))})`)
 // A topic retrieves a HyperFrames skill, any of its markdown files or the mapping; an exact name beats an alias.
 for (const [topic, key] of [['hyperframes-core', 'hyperframes-core'], ['hyperframes/hyperframes-animation', 'hyperframes-animation'], ['HYPERFRAMES-REGISTRY', 'hyperframes-registry'], ['hyperframes-audio', 'hyperframes-audio'], ['hyperframes-animation/transitions/overview.md', 'hyperframes-animation/transitions/overview.md'], ['hyperframes/SLATES-MAPPING.md', 'SLATES-MAPPING.md'], ['hyperframes-mapping', 'SLATES-MAPPING.md']]) {
   const result = await run({ topic }, { ...disconnected, cloud: () => { throw new Error('a HyperFrames guide must not reach the cloud') } })

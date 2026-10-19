@@ -16,7 +16,7 @@ export interface GuideCatalogEntry {
 const GUIDE_FILLER = ['create', 'make', 'use', 'video', 'image', 'need', 'how', 'much', 'turn', 'keep', 'get', 'like', 'just', 'about', 'every', 'second', 'minute']
 const words = (text: string): string[] => searchTerms(text, GUIDE_FILLER).filter(word => !/^\d{1,2}$/.test(word))
 // A brief that names an ad: Slates' own guides then rank above every HyperFrames guide (engine plan § 6a).
-const AD_WORDS = new Set(words('ad advert advertisement advertising commercial ugc campaign'))
+const AD_WORDS = new Set(words('ad ads advert advertisement advertising commercial ugc campaign'))
 
 /** Metadata is the catalog; headings supply technique vocabulary without returning whole guides. */
 export function guideCatalog(skills: Readonly<Record<string, string>>): GuideCatalogEntry[] {
@@ -50,7 +50,9 @@ export function discoverGuides(
     const score = matched.reduce((sum, term) => sum + Math.log(1 + own.length / (1 + (frequency.get(term) ?? 0))) * (doc.listed.has(term) ? 3 : 1), 0)
     const sections = doc.headings.filter(section => matched.some(term => section.terms.has(term))).slice(0, 3).map(section => section.heading)
     return { ...doc.entry, matched, sections, score }
-  }).filter(entry => !terms.length || entry.score > 0).sort((a, b) => hyperframesLast(a) - hyperframesLast(b) || b.score - a.score || a.name.localeCompare(b.name))
+  }).filter(entry => !terms.length || entry.score > 0)
+    // A browse keeps the catalog's order, Slates' guides first; only a search re-ranks (the sort is stable).
+    .sort((a, b) => (terms.length ? hyperframesLast(a) - hyperframesLast(b) || b.score - a.score || a.name.localeCompare(b.name) : 0))
   // An unfamiliar brief still exposes the catalog and its pagination; it never asks the user to route it.
   const fallback = terms.length > 0 && ranked.length === 0
   const candidates = fallback ? documents.map(doc => ({ ...doc.entry, matched: [] as string[], sections: [] as string[], score: 0 })) : ranked
