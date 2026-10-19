@@ -217,7 +217,7 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
   // answer as "IMG-A8 does not exist" and stopped (slate scripts/agent-eval
   // README, round 5). Dependent calls wait; independent ones may still run together.
   // Desktop loop only: the invented id came from the desktop brain, and the full
-  // MCP working method sits near its 14,000-character ceiling (agent-surface check).
+  // MCP working method sits near its character ceiling (MCP_WORKING_METHOD_CEILING, agent-surface check).
   fork(
     `- IDS COME FROM RESULTS: pass only a project, asset, shot, folder or board id you read in a tool result in this conversation. When a call needs another call's answer (the open project's id from slates_get_workspace_state, an asset's id from slates_list_assets), make the first call, read its result, then make the second; never fill the id in ahead of the answer. Calls that do not depend on each other may run together. "No project …" or "No asset …" means the id was wrong, not that the thing is missing: get the real id and try again.`,
     ``
