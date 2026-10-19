@@ -3,23 +3,34 @@ import { readFileSync } from 'node:fs'
 import { SKILLS, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
 import { getPromptingGuide, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
+import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
 
 const disconnected = { cloud: () => { throw Object.assign(new Error('no token'), { code: 'CLOUD_TOKEN_MISSING' }) }, desktop: () => { throw new Error('unexpected desktop call') } }
 const run = async (input, ctx = disconnected) => getPromptingGuide.run(getPromptingGuide.input.parse(input), ctx)
 const names = result => result.data.guides.map(guide => guide.name)
+const hf = name => HYPERFRAMES_SKILL_NAMES.includes(name)
+const everyGuide = Object.keys(SKILLS).length + HYPERFRAMES_SKILL_NAMES.length
 
-// The catalog is computed from every source skill, not a hand-maintained subset.
+// The catalog is computed from every source skill, not a hand-maintained subset: Slates' own and
+// HyperFrames' copied folders (skills/hyperframes/, its NOTICE).
 const found = new Set()
 let offset = 0
 for (;;) {
   const result = await run({ offset })
-  assert(result.text.length < 12000, 'the whole catalog stays bounded')
+  // 12,000 until the 21 HyperFrames guides joined it (12,452 on 2026-10-18); their catalog line is
+  // the first sentence of the upstream description, capped at 160 characters.
+  assert(result.text.length < 14000, `the whole catalog stays bounded (${result.text.length})`)
   for (const name of names(result)) { assert(!found.has(name)); found.add(name) }
   if (result.data.nextOffset === null) break
   offset = result.data.nextOffset
 }
-assert.deepEqual([...found].sort(), Object.keys(SKILLS).sort())
-for (const name of found) assert.equal(SKILLS[name] === readFileSync(new URL(`../packages/shared/skills/${name}.md`, import.meta.url), 'utf8'), true, `${name}: embedded body differs from source`)
+assert.deepEqual([...found].sort(), [...Object.keys(SKILLS), ...HYPERFRAMES_SKILL_NAMES].sort())
+for (const name of found) {
+  const source = hf(name) ? `../packages/shared/skills/hyperframes/${name}/SKILL.md` : `../packages/shared/skills/${name}.md`
+  const body = hf(name) ? HYPERFRAMES_FILES[name] : SKILLS[name]
+  assert.equal(body === readFileSync(new URL(source, import.meta.url), 'utf8'), true, `${name}: embedded body differs from source`)
+}
+for (const name of HYPERFRAMES_SKILL_NAMES) assert(!Object.hasOwn(SKILLS, name), `${name}: a HyperFrames guide must not enter SKILLS (prompts, install-skills)`)
 
 for (const [query, expected] of [
   ['a UGC skincare ad with a creator speaking to camera', 'slates-ugc-influencer-ad'],
@@ -29,23 +40,48 @@ for (const [query, expected] of [
   ['two people conversation seating eyelines 180 rule', 'slates-dialogue-blocking'],
   ['screenplay script story dialogue scenes', 'slates-script-craft'],
   ['cinematic lighting lens color grade for a perfume ad', 'slates-cinematic-look'],
+  ['transcribe the founder video and caption it with word highlights', 'slates-captions'],
+  ['a lower third and an end card as motion layers on the cut', 'slates-motion'],
 ]) {
   const result = await run({ query })
   assert(names(result).includes(expected), `${query}: expected ${expected}, got ${names(result)}`)
   assert(result.data.guides.length <= 8)
 }
 const unfamiliar = await run({ query: 'quux flibbertigibbet' })
-assert(unfamiliar.data.fallback && unfamiliar.data.guides.length === Object.keys(SKILLS).length, 'an unmatched brief returns the whole catalog')
+assert(unfamiliar.data.fallback && unfamiliar.data.guides.length === everyGuide, 'an unmatched brief returns the whole catalog')
 // A matched brief still carries every other guide, so the model chooses by meaning, not shared words.
 const diner = await run({ query: 'Make a 30 second movie with two friends at a rainy diner' })
-assert.equal(diner.data.guides.length + diner.data.rest.length, Object.keys(SKILLS).length)
+assert.equal(diner.data.guides.length + diner.data.rest.length, everyGuide)
 assert(!names(diner).includes('slates-prompting-seedance-2-5'), 'a clip duration is not a guide match')
 assert(!unfamiliar.text.includes('ask the user'))
 assert.equal(resolveGuideTopic('constructor'), null)
 assert.equal(resolveGuideTopic('seedance-2.5'), 'slates-prompting-seedance-2-5')
 assert.equal(resolveGuideTopic('video-edit'), 'slates-prompting-omni-flash')
+assert.equal(resolveGuideTopic('subtitles'), 'slates-captions')
+assert.equal(resolveGuideTopic('lower third'), 'slates-motion')
 assert(!('guides' in (await run({ topic: 'camera', query: 'dolly' })).data))
 assert((await run({ topic: 'app-manual', query: 'export mp4' })).text.length > 0)
+
+// HyperFrames guides carry the craft for layers; for an ad, every Slates match ranks above every one of them.
+for (const query of ['a UGC skincare ad with captions and a lower third', 'a 30 second ad for my app with an end card and captions', 'commercial for a sneaker campaign with kinetic type']) {
+  const ranked = names(await run({ query }))
+  const firstHf = ranked.findIndex(hf)
+  assert(ranked.some(name => !hf(name)), `${query}: no Slates guide matched (${ranked})`)
+  assert(firstHf === -1 || ranked.slice(firstHf).every(hf), `${query}: a HyperFrames guide outranks a Slates guide (${ranked})`)
+}
+assert(names(await run({ query: 'animated lower third GSAP composition for a talking head' })).some(hf), 'a layer brief reaches HyperFrames craft')
+// A topic retrieves a HyperFrames skill, any of its markdown files or the mapping; an exact name beats an alias.
+for (const [topic, key] of [['hyperframes-core', 'hyperframes-core'], ['hyperframes/hyperframes-animation', 'hyperframes-animation'], ['HYPERFRAMES-REGISTRY', 'hyperframes-registry'], ['hyperframes-audio', 'hyperframes-audio'], ['hyperframes-animation/transitions/overview.md', 'hyperframes-animation/transitions/overview.md'], ['hyperframes/SLATES-MAPPING.md', 'SLATES-MAPPING.md'], ['hyperframes-mapping', 'SLATES-MAPPING.md']]) {
+  const result = await run({ topic }, { ...disconnected, cloud: () => { throw new Error('a HyperFrames guide must not reach the cloud') } })
+  assert.equal(result.data.topic, key, topic)
+  assert.equal(result.data.source, 'hyperframes')
+  assert(result.text.length > 0 && result.text.length < 9000, `${topic}: card is bounded (${result.text.length})`)
+  if (key !== 'SLATES-MAPPING.md') assert(result.text.startsWith(`HyperFrames guide ${key} (HeyGen, Apache-2.0, unmodified)`), `${topic}: attribution header`)
+}
+const fullCore = await run({ topic: 'hyperframes-core', depth: 'full' })
+assert(fullCore.text.endsWith(HYPERFRAMES_FILES['hyperframes-core'].replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim().split(/\r?\n/).at(-1).trim()), 'full depth serves the whole upstream file')
+assert.equal(resolveGuideTopic('audio'), 'slates-prompting-seed-audio')
+assert.equal((await run({ topic: 'audio' })).data.topic, 'slates-prompting-seed-audio', 'a Slates alias is not captured by a HyperFrames name')
 
 // Private metadata/body only arrive over the authorized cloud client, with no URLs or keys exposed.
 const privateName = 'slates-fixture-ad'
@@ -92,4 +128,4 @@ const offline = { ...disconnected, cloud: () => { throw new Error('a free guide 
 assert((await run({ topic: 'seedance-2.5' }, offline)).text.length > 0)
 assert(!Object.hasOwn(SKILLS, privateName))
 assert(ALL_OPERATIONS.some(op => op.id === getPromptingGuide.id))
-console.log(`Guide discovery: ${found.size} source-matched guides, natural briefs, pagination, aliases, sections, manual and private access passed.`)
+console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), natural briefs, ad ranking, pagination, aliases, sections, manual and private access passed.`)

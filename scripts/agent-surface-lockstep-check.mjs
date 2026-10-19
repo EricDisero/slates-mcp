@@ -42,7 +42,8 @@
 //  12. VIEW LISTS       — the view ops' lenses, timeline sides, navigator
 //                         sections and window layouts equal slate's `@shared/types/view`,
 //                         and the overlay ops' styles, limits, ranges, defaults and batch
-//                         cap equal slate's.
+//                         cap, the caption tiers and default style, and the motion
+//                         registry's item types equal slate's.
 //  13. ASSET NAME LIMITS — the label and note limits equal slate's `assetLabel.ts`.
 //
 // 🚨 A CHECKER NOBODY HAS SEEN FAIL IS NOT A CHECKER. Each of them has been
@@ -103,9 +104,10 @@ const desktopOpsPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'ops.ts'
  * end of the problem.
  */
 const MCP_INSTRUCTIONS_CEILING = 8_000
-// 14,000 → 14,400 (2026-10-18): the guide catalog lists every skill, and the two timeline craft skills
-// (slates-transitions, slates-cuts) were the first added after it reached 13,930. Each entry is one line.
-const MCP_WORKING_METHOD_CEILING = 14_400
+// 14,000 → 15,000 (2026-10-18): the guide index lists every non-model skill's first sentence (capped at
+// 180 characters), and the night's four craft skills (slates-transitions, slates-cuts, slates-captions,
+// slates-motion) took it past 14,000. Each entry is one line.
+const MCP_WORKING_METHOD_CEILING = 15_000
 
 const failures = []
 const warnings = []
@@ -562,6 +564,7 @@ console.log('agent-surface-lockstep-check')
     ['slates_blender_scene', 'runs a read-only scene summary over the bridge'],
     ['slates_blender_docs', 'reads the API reference the add-on ships'],
     ['slates_blender_search_docs', 'reads the API reference the add-on ships'],
+    ['slates_check_composition', 'POSTs because the composition is the payload; the check writes nothing'],
   ])
 
   let missing = 0
@@ -1006,6 +1009,11 @@ function zodDescriptions(op) {
       ['DEFAULT_OVERLAY_SECONDS', value(read('src', 'main', 'editor', 'overlays.ts'), 'DEFAULT_OVERLAY_SECONDS'), 'OVERLAY_DEFAULT_SECONDS', value(opsSrc, 'OVERLAY_DEFAULT_SECONDS')],
       // slate writes the batch cap inline in `overlayItems`.
       ['overlayItems batch cap', /body\.items\.length\s*>\s*(\d+)/.exec(read('src', 'main', 'agent', 'routes-editor.ts'))?.[1] ?? null, 'OVERLAY_BATCH_MAX', value(opsSrc, 'OVERLAY_BATCH_MAX')],
+      // Captions (L2): the emphasis tiers and the style add-captions falls back to (inline in slate); E4: the registry's item types.
+      ['CAPTION_TIERS', list(read('src', 'shared', 'captionBuild.ts'), 'CAPTION_TIERS'), 'CAPTION_TIERS', list(opsSrc, 'CAPTION_TIERS')],
+      ['RegistryType', union(read('src', 'main', 'layers', 'registry.ts'), 'RegistryType'), 'MOTION_REGISTRY_TYPES', list(opsSrc, 'MOTION_REGISTRY_TYPES')],
+      ['CAPTION_COMPONENTS', list(read('src', 'main', 'layers', 'captionComponents.ts'), 'CAPTION_COMPONENTS'), 'CAPTION_COMPONENTS', list(opsSrc, 'CAPTION_COMPONENTS')],
+      ['addCaptions style default', /const style = input\.style \?\? '([^']+)'/.exec(read('src', 'main', 'transcription', 'captions.ts'))?.[1] ?? null, 'CAPTION_STYLE_DEFAULT', value(opsSrc, 'CAPTION_STYLE_DEFAULT')],
     ]
     for (const [desk, a, mine, b] of values) {
       if (a === null || b === null) drift.push(`${a === null ? desk : mine} not found`)

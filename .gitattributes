@@ -30,3 +30,7 @@
 *.db   binary
 *.zip  binary
 *.node binary
+
+# HyperFrames' skills, copied unmodified from upstream: no line-ending conversion, so every
+# byte in the repo equals the tag's (packages/shared/skills/hyperframes/NOTICE).
+packages/shared/skills/hyperframes/** -text
