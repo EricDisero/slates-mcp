@@ -1,0 +1,20 @@
+HyperFrames skills
+Copyright 2026 HeyGen, Inc.
+
+The 21 folders in this directory are the agent skills of HyperFrames, copied
+unmodified from the HyperFrames repository:
+
+  Repository: https://github.com/heygen-com/hyperframes
+  Tag:        v0.8.140
+  Commit:     5c7f6316d3646477a0f725176c00335cb8575560
+  Source:     skills/ (every skill folder; the test file at its root was not copied)
+
+They are licensed under the Apache License, Version 2.0. The full license text
+is in LICENSE-hyperframes beside this file, or at
+http://www.apache.org/licenses/LICENSE-2.0.
+
+Every file in those folders is byte for byte the file at that commit. Slates
+has not modified them. Slates' own additions sit beside them and are not part
+of HyperFrames: this NOTICE, LICENSE-hyperframes (the upstream LICENSE file,
+renamed) and SLATES-MAPPING.md (how the commands and surfaces these skills name
+map onto Slates).
