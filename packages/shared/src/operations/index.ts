@@ -1312,6 +1312,49 @@ export const linkAssetSource: Operation<{ projectId: string; assetId: string; im
   },
 }
 
+// Transcripts (slate's finished-ads plan L2): speech recognition and word alignment run on the user's
+// machine, so neither op spends credits or sends audio anywhere. One transcript per asset, reused by media hash.
+type TranscribeResult = { assetId: string; reused: boolean; noSpeech: boolean; edited: boolean; downloadedModelsMB?: number; transcript: unknown }
+
+export const transcribeAsset: Operation<{ projectId: string; assetId: string; force?: boolean }> = {
+  id: 'slates_transcribe_asset',
+  billable: false,
+  description:
+    "Transcribe a video or audio asset's speech into words timed to within a frame, as the card's Transcribe command does. Free: it runs on the user's machine and spends no credits. The first run downloads the speech models once (the result's downloadedModelsMB says how much) and can take minutes; if the call times out, the desktop keeps working, so read slates_get_asset_transcript before trying again. A repeat, or another asset with the same bytes, reuses the stored transcript (reused: true); force re-runs it, and an edited transcript (edited: true) is kept unless forced. noSpeech: true means the audio holds no speech. slates_add_captions transcribes on its own, so call this when you want the words themselves.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).describe('A video or audio asset: its code (VID-V3) or id.'),
+      force: z.boolean().optional().describe('Transcribe again even when a stored transcript exists.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('transcripts', 'transcripts')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const r = await ctx.desktop().post<TranscribeResult>('/agent/assets/transcribe', { assetId: id, ...(input.force ? { force: true } : {}) })
+    const what = r.noSpeech ? 'No speech in this asset.' : r.reused ? 'Reused the stored transcript.' : 'Transcribed.'
+    const models = r.downloadedModelsMB ? ` Downloaded ${r.downloadedModelsMB} MB of speech models first.` : ''
+    return ok(r, `${what}${models} ${JSON.stringify(r)}`)
+  },
+}
+
+export const getAssetTranscript: Operation<{ projectId: string; assetId: string }> = {
+  id: 'slates_get_asset_transcript',
+  description:
+    "Read an asset's stored transcript: its words with their times in the asset's own seconds, whether it holds speech, whether the user edited it, and when it was made. Never transcribes: transcript null with a hint means nobody has transcribed it yet (slates_transcribe_asset, free).",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).describe('A video or audio asset: its code (VID-V3) or id.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('transcripts', 'transcripts')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    return ok(await ctx.desktop().get('/agent/assets/transcript', { assetId: id }))
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -6509,6 +6552,164 @@ export const updateOverlayClip: Operation<{
   },
 }
 
+// Captions (slate's finished-ads plan L2) and HTML layers (the engine plan's E4). The caption default,
+// the emphasis tiers and the registry's item types mirror slate's `src/main/transcription/captions.ts`,
+// `src/shared/captionBuild.ts` and `src/main/layers/registry.ts`; lockstep check 12 fails when they differ.
+const CAPTION_STYLE_DEFAULT = 'word-pop'
+const CAPTION_TIERS = ['regular', 'italic', 'emphasis', 'slam'] as const
+const MOTION_REGISTRY_TYPES = ['block', 'component', 'example'] as const
+
+type CaptionsResult = {
+  trackId: string; createdTrack: boolean; clipIds: string[]; words: number; phrases: number; timing: string[]
+  mismatches: Array<{ clipId: string; heard: string; written: string; start: number }>
+  skipped: Array<{ clipId: string; reason: string }>
+  transcribed: string[]
+}
+
+export const addCaptions: Operation<{
+  projectId: string; timelineId: string; clipIds?: string[]
+  source?: 'transcript' | 'script' | 'words'
+  words?: z.infer<typeof overlayWordsInput>
+  style?: (typeof TEXT_STYLE_IDS)[number]
+  phrases?: Array<[number, number]>
+  tiers?: Record<string, (typeof CAPTION_TIERS)[number]>
+  trackId?: string
+}> = {
+  id: 'slates_add_captions',
+  billable: false,
+  description:
+    "Caption the speech in a cut: one text clip per phrase on an overlay track, each carrying its words so the spoken word lights up on the frame it is said. Free; any transcription it needs runs on the user's machine. source transcript (the default) uses the words heard in each clip, aligned to within a frame, transcribing first when needed; script spreads the clip's Shot line over the speech, with estimated timing; words takes your own timed words in timeline seconds. By default every clip with sound is captioned on a new Captions track on top. Phrases follow the caption rules unless you pass your own; tiers mark emphasis per word. The result lists mismatches, where what was heard differs from the Shot's written line (the caption shows what was said: fix the line or the captions), and skipped clips with the reason. Craft: slates_get_prompting_guide (query: captions). Change a caption later with slates_update_overlay_clip.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      timelineId: z.string().uuid().describe('The cut (slates_get_timeline or slates_list_timelines).'),
+      clipIds: z.array(z.string().uuid()).min(1).optional().describe('Video or audio clips whose speech to caption. Default with transcript: every clip with sound.'),
+      source: z.enum(['transcript', 'script', 'words']).optional().describe('Default: words when you pass words, else transcript.'),
+      words: overlayWordsInput.min(1).optional().describe('With source words: the words and their times in timeline seconds.'),
+      style: z.enum(TEXT_STYLE_IDS).optional().describe(`Default: ${CAPTION_STYLE_DEFAULT}, which lights up the spoken word.`),
+      phrases: z
+        .array(z.tuple([z.number().int().min(0), z.number().int().min(1)]))
+        .min(1)
+        .optional()
+        .describe("Your own phrases as [from, to) word index ranges, in order and not overlapping: from is the phrase's first word, to is one past its last. Words count across the whole call in timeline order."),
+      tiers: z
+        .record(z.string().regex(/^\d+$/, 'a word index'), z.enum(CAPTION_TIERS))
+        .optional()
+        .describe('Emphasis by word index (the same count as phrases). Unnamed words are regular. Only the HTML caption styles draw the tiers; the text styles show regular.'),
+      trackId: z.string().uuid().optional().describe('An overlay track to use. Default: a new Captions track on top.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('captions', 'captions')
+    if (input.words && input.source && input.source !== 'words') throw new Error(`words go with source words; source ${input.source} finds its own.`)
+    if (input.source === 'words' && !input.words) throw new Error('source words needs words: [{ text, start, end }] in timeline seconds.')
+    const r = await ctx.desktop().post<CaptionsResult>('/agent/timeline/add-captions', input)
+    const lines = [
+      `Added ${r.phrases} caption clip${r.phrases === 1 ? '' : 's'} (${r.words} words, timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}.`,
+      r.mismatches.length ? `Heard ≠ written in ${r.mismatches.length} place${r.mismatches.length === 1 ? '' : 's'}: ${r.mismatches.map((m) => `"${m.heard}" for "${m.written}" at ${m.start}s`).join('; ')}.` : '',
+      r.skipped.length ? `Skipped: ${r.skipped.map((s) => `${s.clipId} (${s.reason})`).join('; ')}.` : '',
+    ].filter(Boolean)
+    return ok(r, `${lines.join(' ')} ${JSON.stringify(r)}`)
+  },
+}
+
+/** What HyperFrames' check found in a composition, returned by the check and on every add and update. */
+type CompositionFinding = { code: string; message: string; selector?: string; fixHint?: string }
+type CompositionFindings = { ok: boolean; errors: CompositionFinding[]; warnings: CompositionFinding[] }
+
+const describeFindings = (f: CompositionFindings | undefined): string => {
+  if (!f) return ''
+  const list = (items: CompositionFinding[]) => items.map((i) => `${i.code}: ${i.message}${i.selector ? ` (${i.selector})` : ''}${i.fixHint ? ` Fix: ${i.fixHint}` : ''}`).join('; ')
+  if (f.errors.length) return `Check found ${f.errors.length} error${f.errors.length === 1 ? '' : 's'}; fix ${f.errors.length === 1 ? 'it' : 'them'} before moving on: ${list(f.errors)}.${f.warnings.length ? ` Warnings: ${list(f.warnings)}.` : ''}`
+  return f.warnings.length ? `Check passed with ${f.warnings.length} warning${f.warnings.length === 1 ? '' : 's'}: ${list(f.warnings)}.` : 'Check passed.'
+}
+
+const htmlCompositionInput = z.string().min(1).describe('A HyperFrames composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
+const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false.")
+
+export const addHtmlClip: Operation<{
+  projectId: string; timelineId: string; trackId?: string
+  startFrame: number; endFrame?: number; durationSec?: number
+  html?: string; block?: string; variables?: Record<string, string | number | boolean>
+}> = {
+  id: 'slates_add_html_clip',
+  description:
+    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a HyperFrames composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. HyperFrames' check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (query: motion graphics layer).",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      timelineId: z.string().uuid().describe('The cut (slates_get_timeline or slates_list_timelines).'),
+      trackId: z.string().uuid().optional().describe('An overlay track (slates_add_timeline_track, type overlay). Without it the desktop picks or makes one; createdTrack says which.'),
+      startFrame: z.number().int().min(0).describe('Where the clip starts, in timeline frames.'),
+      endFrame: z.number().int().min(1).optional().describe('The frame it ends before. Give endFrame or durationSec, not both; without either, the duration the composition or block declares.'),
+      durationSec: z.number().positive().optional().describe('How long it shows, in seconds.'),
+      html: htmlCompositionInput.optional().describe(`${htmlCompositionInput.description} html, block or both.`),
+      block: z.string().min(1).optional().describe('A registry block name from slates_list_motion_blocks.'),
+      variables: htmlVariablesInput.optional(),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('html-clips', 'HTML layers')
+    if (input.html === undefined && input.block === undefined) throw new Error('Give html (a composition document) or block (a registry block name).')
+    if (input.endFrame !== undefined && input.durationSec !== undefined) throw new Error('Give endFrame or durationSec, not both.')
+    const r = await ctx.desktop().post<{ clipId: string; trackId: string; createdTrack: boolean; findings?: CompositionFindings }>('/agent/timeline/add-html-clip', input)
+    return ok(r, `Added HTML clip ${r.clipId} on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}. ${describeFindings(r.findings)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html?: string; variables?: Record<string, string | number | boolean> | null }> = {
+  id: 'slates_update_html_clip',
+  description:
+    "Change an HTML clip's composition or its variables. HyperFrames' check runs again and its findings come back here: fix every error before moving on. Only what you pass changes. To move or retime one, remove it (slates_remove_clip) and add it again.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      clipId: z.string().uuid().describe('An HTML clip (slates_get_timeline).'),
+      html: htmlCompositionInput.optional().describe(`${htmlCompositionInput.description} Replaces the whole document.`),
+      variables: htmlVariablesInput.nullable().optional().describe(`${htmlVariablesInput.description} Replaces them all; null clears them.`),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('html-clips', 'HTML layers')
+    if (input.html === undefined && input.variables === undefined) throw new Error('Pass html or variables to change.')
+    const { projectId: _projectId, ...body } = input
+    const r = await ctx.desktop().post<{ clipId: string; findings?: CompositionFindings }>('/agent/timeline/update-html-clip', body)
+    return ok(r, `Updated HTML clip ${r.clipId}. ${describeFindings(r.findings)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const checkComposition: Operation<{ html: string }> = {
+  id: 'slates_check_composition',
+  description:
+    "Check a HyperFrames composition before it lands, with HyperFrames' own check: its errors and warnings, each with a code, a message and, where it has one, the selector it found. Writes nothing. slates_add_html_clip and slates_update_html_clip run the same check, so use this one while drafting.",
+  input: z.object({ html: htmlCompositionInput }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('html-clips', 'HTML layers')
+    const r = await ctx.desktop().post<CompositionFindings>('/agent/compositions/check', input)
+    return ok(r, `${describeFindings(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+type MotionRegistryListing = { items: Array<{ name: string; type: (typeof MOTION_REGISTRY_TYPES)[number]; title?: string; description?: string; tags?: string[] }>; source: string; fetchedAt: string }
+
+export const listMotionBlocks: Operation<{ query?: string; type?: (typeof MOTION_REGISTRY_TYPES)[number] }> = {
+  id: 'slates_list_motion_blocks',
+  description:
+    "Search the HyperFrames registry for ready-made motion layers, such as captions, lower thirds and end cards: each item's name, type, title, description and tags. The list is the live registry, so it grows without a Slates update. Put a block on the timeline with slates_add_html_clip (block: its name).",
+  input: z
+    .object({
+      query: z.string().min(1).max(200).optional().describe('Words to match, such as "lower third" or "kinetic caption".'),
+      type: z.enum(MOTION_REGISTRY_TYPES).optional().describe('Default: block, the items slates_add_html_clip takes.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('html-clips', 'HTML layers')
+    const r = await ctx.desktop().get<MotionRegistryListing>('/agent/compositions/registry', { query: input.query, type: input.type })
+    const rows = r.items.map((i) => `- ${i.name} (${i.type})${i.title ? `: ${i.title}` : ''}${i.description ? ` — ${i.description}` : ''}${i.tags?.length ? ` [${i.tags.join(', ')}]` : ''}`)
+    return ok(r, `${r.items.length} registry item${r.items.length === 1 ? '' : 's'} from ${r.source}, fetched ${r.fetchedAt}.\n${rows.join('\n')}`)
+  },
+}
+
 export const updateTimelineTrack: Operation<{
   projectId: string
   trackId: string
@@ -9396,6 +9597,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   setAppSettings as unknown as Operation<unknown>,
   getAsset as unknown as Operation<unknown>,
   linkAssetSource as unknown as Operation<unknown>,
+  transcribeAsset as unknown as Operation<unknown>,
+  getAssetTranscript as unknown as Operation<unknown>,
   extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
@@ -9466,6 +9669,11 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addTextClip as unknown as Operation<unknown>,
   addImageOverlay as unknown as Operation<unknown>,
   updateOverlayClip as unknown as Operation<unknown>,
+  addCaptions as unknown as Operation<unknown>,
+  addHtmlClip as unknown as Operation<unknown>,
+  updateHtmlClip as unknown as Operation<unknown>,
+  checkComposition as unknown as Operation<unknown>,
+  listMotionBlocks as unknown as Operation<unknown>,
   updateTimelineTrack as unknown as Operation<unknown>,
   removeTimelineTrack as unknown as Operation<unknown>,
   updateTimelineSettings as unknown as Operation<unknown>,

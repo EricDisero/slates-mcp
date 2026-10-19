@@ -57,6 +57,8 @@ const READ_ONLY_PREFIXES = [
   'slates_blender_scene',
   'slates_blender_docs',
   'slates_blender_search_docs',
+  // Runs HyperFrames' check on a composition and writes nothing; it POSTs because the document is the payload.
+  'slates_check_composition',
 ]
 
 /**
@@ -190,6 +192,11 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_add_text_clip',
     'slates_add_image_overlay',
     'slates_update_overlay_clip',
+    'slates_add_captions',
+    'slates_add_html_clip',
+    'slates_update_html_clip',
+    'slates_check_composition',
+    'slates_list_motion_blocks',
     'slates_update_timeline_track',
     'slates_remove_timeline_track',
     'slates_update_timeline_settings',
@@ -259,7 +266,7 @@ export function tierFor(id: string): OperationTier {
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, favorites, pins, the Library (user-named categories of saved references: characters, locations, products, looks) and styles, templates (list, export, import), exporting original asset files, moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
-  timeline: 'named cuts and exporting several at once; the timeline (tracks, clips, markers, settings), video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
+  timeline: 'named cuts and exporting several at once; the timeline (tracks, clips, markers, settings), text, picture and HTML motion layers, captions, video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
   admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }
