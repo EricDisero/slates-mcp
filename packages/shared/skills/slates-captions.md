@@ -47,7 +47,7 @@ Never split a name, a number from what it counts ("44 markdown files") or a prep
 - **italic**: two or three in a piece, for soft contrast ("just", "only", "even").
 - **slam**: one or two in a piece, on the word the line lands on. It draws largest, so choose a short word; when the payoff is long, slam a shorter word in the same line or make the long one emphasis.
 
-Only the HTML caption layers draw the tiers; the text styles below show every word as regular.
+Only the HTML caption layers draw the tiers (`slates-motion`); the text styles below show every word as regular.
 
 ## Styles
 

@@ -6635,7 +6635,7 @@ export const addHtmlClip: Operation<{
 }> = {
   id: 'slates_add_html_clip',
   description:
-    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a HyperFrames composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. HyperFrames' check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (query: motion graphics layer).",
+    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a HyperFrames composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. HyperFrames' check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (topic: slates-motion).",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -9134,6 +9134,8 @@ export function resolveGuideTopic(topic: string): string | null {
     return 'slates-previs-blocking'
   }
   if (['captions', 'caption', 'subtitles', 'subtitle', 'transcribe', 'transcript', 'transcription'].includes(t)) return 'slates-captions'
+  // `motion-graphics` is HyperFrames' own guide, matched by name before these aliases.
+  if (['motion', 'motion-layers', 'motion layers', 'layers', 'html-clip', 'html clip', 'lower-third', 'lower third', 'end-card', 'end card'].includes(t)) return 'slates-motion'
   if (t === 'camera' || t === 'camera-moves' || t === 'camera moves' || t === 'shot-list' || t === 'shot list') {
     return 'slates-camera-language'
   }
