@@ -6901,8 +6901,7 @@ export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html
   async run(input, ctx) {
     await ctx.desktop().requireCapability('html-clips', 'HTML layers')
     if (input.html === undefined && input.variables === undefined) throw new Error('Pass html or variables to change.')
-    const { projectId: _projectId, ...body } = input
-    const r = await ctx.desktop().post<{ clipId: string; findings?: CompositionFindings }>('/agent/timeline/update-html-clip', body)
+    const r = await ctx.desktop().post<{ clipId: string; findings?: CompositionFindings }>('/agent/timeline/update-html-clip', input)
     return ok(r, `Updated HTML clip ${r.clipId}. ${describeFindings(r.findings)} ${JSON.stringify(r)}`)
   },
 }
