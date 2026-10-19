@@ -1246,7 +1246,6 @@ export const getAppSettings: Operation<Record<string, never>> = {
 type AppSettingsPatch = {
   newProjectLens?: 'media' | 'script' | 'board'
   chatGptImagesEnabled?: boolean
-  enginePlayer?: boolean
   studioAgentHost?: 'slates' | 'codex' | 'claude'
   studioAgentCodexModel?: string
   studioAgentCodexEffort?: string
@@ -1259,12 +1258,11 @@ const HOST_KEYS = ['studioAgentHost', 'studioAgentCodexModel', 'studioAgentCodex
 export const setAppSettings: Operation<AppSettingsPatch> = {
   id: 'slates_set_app_settings',
   description:
-    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), enginePlayer (the Cut monitor draws through the timeline engine: every lane, transitions, keyframes; the palette's Use the engine player), or who does the Studio Agent's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
+    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does the Studio Agent's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
   input: z
     .object({
       newProjectLens: z.enum(['media', 'script', 'board']).optional(),
       chatGptImagesEnabled: z.boolean().optional(),
-      enginePlayer: z.boolean().optional(),
       studioAgentHost: z.enum(['slates', 'codex', 'claude']).optional(),
       studioAgentCodexModel: z.string().max(120).optional(),
       studioAgentCodexEffort: z.string().max(120).optional(),
@@ -1278,7 +1276,6 @@ export const setAppSettings: Operation<AppSettingsPatch> = {
     if (HOST_KEYS.some((key) => input[key] !== undefined)) {
       await ctx.desktop().requireCapability('agent-host', "choosing who does the Studio Agent's thinking")
     }
-    if (input.enginePlayer !== undefined) await ctx.desktop().requireCapability('engine-player', 'the engine player')
     return ok(await ctx.desktop().post('/agent/app-settings', input))
   },
 }
