@@ -6,8 +6,8 @@ export interface GuideCatalogEntry {
   name: string
   description: string
   tier: 'free' | 'paid'
-  /** HyperFrames' own skills (`skills/hyperframes.ts`): they carry the craft, Slates' guides direct. */
-  source?: 'hyperframes'
+  /** The motion engine's own skills (`skills/hyperframes.ts`): they carry the craft, Slates' guides direct. */
+  source?: 'motion'
   /** What ranking reads when `description` is a listing summary. */
   searchText?: string
 }
@@ -40,10 +40,10 @@ export function discoverGuides(
   })
   // Rare terms in the corpus carry more weight than generic production vocabulary. Rarity is measured
   // on Slates' own guides, so adding HyperFrames' 21 never re-weights how Slates' guides rank.
-  const own = documents.filter(doc => doc.entry.source !== 'hyperframes')
+  const own = documents.filter(doc => doc.entry.source !== 'motion')
   const frequency = new Map(terms.map(term => [term, own.filter(doc => doc.metadata.has(term) || doc.headings.some(section => section.terms.has(term))).length]))
   const adBrief = terms.some(term => AD_WORDS.has(term))
-  const hyperframesLast = (entry: GuideCatalogEntry): number => (adBrief && entry.source === 'hyperframes' ? 1 : 0)
+  const hyperframesLast = (entry: GuideCatalogEntry): number => (adBrief && entry.source === 'motion' ? 1 : 0)
   const ranked = documents.map(doc => {
     const matched = terms.filter(term => doc.metadata.has(term) || doc.headings.some(section => section.terms.has(term)))
     // A HyperFrames description is a long trigger list; only its listed summary and name weigh as metadata.

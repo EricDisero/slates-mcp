@@ -4,11 +4,15 @@ import { SKILLS, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
 import { getPromptingGuide, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
 import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
+import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
 
 const disconnected = { cloud: () => { throw Object.assign(new Error('no token'), { code: 'CLOUD_TOKEN_MISSING' }) }, desktop: () => { throw new Error('unexpected desktop call') } }
 const run = async (input, ctx = disconnected) => getPromptingGuide.run(getPromptingGuide.input.parse(input), ctx)
 const names = result => result.data.guides.map(guide => guide.name)
-const hf = name => HYPERFRAMES_SKILL_NAMES.includes(name)
+// The motion engine's guides are served under public names (`motion-core`), white-labelled (engine-test item 8).
+const PUBLIC = HYPERFRAMES_SKILL_NAMES.map(publicGuideName)
+const upstreamOf = Object.fromEntries(HYPERFRAMES_SKILL_NAMES.map(name => [publicGuideName(name), name]))
+const hf = name => PUBLIC.includes(name)
 const everyGuide = Object.keys(SKILLS).length + HYPERFRAMES_SKILL_NAMES.length
 
 // The catalog is computed from every source skill, not a hand-maintained subset: Slates' own and
@@ -24,10 +28,10 @@ for (;;) {
   if (result.data.nextOffset === null) break
   offset = result.data.nextOffset
 }
-assert.deepEqual([...found].sort(), [...Object.keys(SKILLS), ...HYPERFRAMES_SKILL_NAMES].sort())
+assert.deepEqual([...found].sort(), [...Object.keys(SKILLS), ...PUBLIC].sort())
 for (const name of found) {
-  const source = hf(name) ? `../packages/shared/skills/hyperframes/${name}/SKILL.md` : `../packages/shared/skills/${name}.md`
-  const body = hf(name) ? HYPERFRAMES_FILES[name] : SKILLS[name]
+  const source = hf(name) ? `../packages/shared/skills/hyperframes/${upstreamOf[name]}/SKILL.md` : `../packages/shared/skills/${name}.md`
+  const body = hf(name) ? HYPERFRAMES_FILES[upstreamOf[name]] : SKILLS[name]
   assert.equal(body === readFileSync(new URL(source, import.meta.url), 'utf8'), true, `${name}: embedded body differs from source`)
 }
 for (const name of HYPERFRAMES_SKILL_NAMES) assert(!Object.hasOwn(SKILLS, name), `${name}: a HyperFrames guide must not enter SKILLS (prompts, install-skills)`)
@@ -73,15 +77,17 @@ assert(names(await run({ query: 'animated lower third GSAP composition for a tal
 // A paged browse lists Slates' guides first, as the unpaged one does.
 assert(!names(await run({ limit: 8 })).some(hf), `a browse's first page is Slates' guides (${names(await run({ limit: 8 }))})`)
 // A topic retrieves a HyperFrames skill, any of its markdown files or the mapping; an exact name beats an alias.
-for (const [topic, key] of [['hyperframes-core', 'hyperframes-core'], ['hyperframes/hyperframes-animation', 'hyperframes-animation'], ['HYPERFRAMES-REGISTRY', 'hyperframes-registry'], ['hyperframes-audio', 'hyperframes-audio'], ['hyperframes-animation/transitions/overview.md', 'hyperframes-animation/transitions/overview.md'], ['hyperframes/SLATES-MAPPING.md', 'SLATES-MAPPING.md'], ['hyperframes-mapping', 'SLATES-MAPPING.md']]) {
+// The upstream names are still accepted, and answer under the public one.
+for (const [topic, key] of [['motion-core', 'motion-core'], ['hyperframes-core', 'motion-core'], ['motion/motion-animation', 'motion-animation'], ['hyperframes/hyperframes-animation', 'motion-animation'], ['MOTION-REGISTRY', 'motion-registry'], ['motion-audio', 'motion-audio'], ['motion-overview', 'motion-overview'], ['motion-animation/transitions/overview.md', 'motion-animation/transitions/overview.md'], ['motion/SLATES-MAPPING.md', 'SLATES-MAPPING.md'], ['hyperframes-mapping', 'SLATES-MAPPING.md']]) {
   const result = await run({ topic }, { ...disconnected, cloud: () => { throw new Error('a HyperFrames guide must not reach the cloud') } })
   assert.equal(result.data.topic, key, topic)
-  assert.equal(result.data.source, 'hyperframes')
+  assert.equal(result.data.source, 'motion')
+  assert(!/\bHyper[Ff]rames\b/.test(result.text), `${topic}: the vendor's name is served`)
   assert(result.text.length > 0 && result.text.length < 9000, `${topic}: card is bounded (${result.text.length})`)
-  if (key !== 'SLATES-MAPPING.md') assert(result.text.startsWith(`HyperFrames guide ${key} (HeyGen, Apache-2.0, unmodified)`), `${topic}: attribution header`)
+  if (key !== 'SLATES-MAPPING.md') assert(result.text.startsWith(`Motion guide ${key} (Apache-2.0)`), `${topic}: licence header`)
 }
-const fullCore = await run({ topic: 'hyperframes-core', depth: 'full' })
-assert(fullCore.text.endsWith(HYPERFRAMES_FILES['hyperframes-core'].replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim().split(/\r?\n/).at(-1).trim()), 'full depth serves the whole upstream file')
+const fullCore = await run({ topic: 'motion-core', depth: 'full' })
+assert(fullCore.text.endsWith(whiteLabel(HYPERFRAMES_FILES['hyperframes-core']).replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, '').trim().split(/\r?\n/).at(-1).trim()), 'full depth serves the whole upstream file')
 assert.equal(resolveGuideTopic('audio'), 'slates-prompting-seed-audio')
 assert.equal((await run({ topic: 'audio' })).data.topic, 'slates-prompting-seed-audio', 'a Slates alias is not captured by a HyperFrames name')
 

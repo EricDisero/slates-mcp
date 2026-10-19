@@ -1,5 +1,6 @@
-// HyperFrames' own skills, shipped unmodified in `skills/hyperframes/` (its NOTICE and the timeline
-// engine plan § 6a). Slates' skills direct and these carry the craft: guide search lists them beside
+// The motion engine's own skills, shipped unmodified in `skills/hyperframes/` (its NOTICE and the
+// timeline engine plan § 6a), and white-labelled where they are served (`whiteLabel`, engine-test
+// item 8: no vendor is named in anything an agent reads; slate's `.claude/rules/white-label.md`). Slates' skills direct and these carry the craft: guide search lists them beside
 // Slates' guides, ranks Slates' first for an ad (`guide-discovery.ts`), and retrieves any of their
 // markdown files by path. They are never MCP prompts, never installed as skills and never in the
 // doctrine's guide index, so the SKILLS record and everything that reads it stay Slates-only.
@@ -21,6 +22,33 @@ export interface HyperframesCorpus {
 
 let corpus: Promise<HyperframesCorpus> | undefined
 
+/** The upstream skill folder that the public name `motion-overview` stands for. */
+const OVERVIEW = 'hyperframes'
+
+/** A skill's name as agents see it: the vendor's word turned into ours (`hyperframes-core` → `motion-core`). */
+export function publicGuideName(name: string): string {
+  if (name === OVERVIEW) return 'motion-overview'
+  return name.replace(/^hyperframes-/, 'motion-').replace(/^remotion-to-hyperframes$/, 'remotion-to-motion')
+}
+
+/** A file key as agents see it: its skill folder's public name, then its path. */
+const publicKey = (key: string): string => {
+  const slash = key.indexOf('/')
+  return slash < 0 ? publicGuideName(key) : `${publicGuideName(key.slice(0, slash))}${key.slice(slash)}`
+}
+
+/**
+ * Upstream prose with the vendor's name turned into ours. Code an agent must write stays as the
+ * runtime reads it (`__hyperframes`, `@hyperframes/*`, `data-hyperframes-*`), and so do the upstream
+ * CLI's commands, which the mapping file says never to run in Slates.
+ */
+export function whiteLabel(text: string): string {
+  return text
+    .replace(/\bremotion-to-hyperframes\b/g, 'remotion-to-motion')
+    .replace(/(?<![\w@/._-])hyperframes-(animation|audio|cli|core|creative|keyframes|registry|studio)\b/g, 'motion-$1')
+    .replace(/\bHyper[Ff]rames\b/g, 'Slates motion')
+}
+
 /** About 3 MB of markdown, so it loads on the first guide call rather than with the package. */
 export function loadHyperframes(): Promise<HyperframesCorpus> {
   corpus ??= import('./hyperframes-content.js').then((m) => ({ skills: m.HYPERFRAMES_SKILL_NAMES, files: m.HYPERFRAMES_FILES }))
@@ -33,7 +61,7 @@ export function loadHyperframes(): Promise<HyperframesCorpus> {
  * to HyperFrames' CLI workflow before `slates-motion`. Its ranking text stays upstream's.
  */
 const SUMMARY_OVERRIDES: Readonly<Record<string, string>> = {
-  hyperframes: "HyperFrames' own overview of making and checking a composition, written for its CLI; in Slates, start from slates-motion.",
+  [OVERVIEW]: "The motion engine's own overview of making and checking a composition, written for its CLI; in Slates, start from slates-motion.",
 }
 
 /** The first sentence of an upstream description, short enough for a catalog line. */
@@ -47,32 +75,34 @@ function summary(description: string, max = 160): string {
 export function hyperframesCatalog({ skills, files }: HyperframesCorpus): GuideCatalogEntry[] {
   return skills.map((name) => {
     const { description } = parseSkillMetadata(files[name], name)
-    return { name, description: SUMMARY_OVERRIDES[name] ?? summary(description), searchText: description, tier: 'free' as const, source: 'hyperframes' as const }
+    return { name: publicGuideName(name), description: whiteLabel(SUMMARY_OVERRIDES[name] ?? summary(description)), searchText: description, tier: 'free' as const, source: 'motion' as const }
   })
 }
 
 /** SKILL.md bodies by skill name, for the headings guide search matches. */
 export function hyperframesSkillBodies({ skills, files }: HyperframesCorpus): Record<string, string> {
-  return Object.fromEntries(skills.map((name) => [name, files[name]]))
+  return Object.fromEntries(skills.map((name) => [publicGuideName(name), whiteLabel(files[name])]))
 }
 
 /**
- * A topic naming a HyperFrames skill (`hyperframes-core`), one of its files
- * (`hyperframes-animation/transitions/overview.md`) or the mapping. A leading `hyperframes/` is
- * accepted, the way the folder sits in the package. Case-insensitive: topics arrive lowercased.
+ * A topic naming one of these skills by its public name (`motion-core`) or its upstream one
+ * (`hyperframes-core`), one of its files (`motion-animation/transitions/overview.md`) or the mapping.
+ * A leading `motion/` or `hyperframes/` is accepted. Case-insensitive: topics arrive lowercased.
+ * `key` is the public name; the content is white-labelled.
  */
 export function findHyperframesGuide({ files }: HyperframesCorpus, topic: string): { key: string; content: string } | null {
-  const t = topic.trim().toLowerCase().replace(/\\/g, '/')
-  if (MAPPING_ALIASES.has(t)) return { key: HYPERFRAMES_MAPPING, content: files[HYPERFRAMES_MAPPING] }
-  const keys = new Map(Object.keys(files).map((key) => [key.toLowerCase(), key]))
-  const key = keys.get(t) ?? (t.startsWith('hyperframes/') ? keys.get(t.slice('hyperframes/'.length)) : undefined)
-  return key ? { key, content: files[key] } : null
+  const t = topic.trim().toLowerCase().replace(/\\/g, '/').replace(/^(?:motion|hyperframes)\/(?=.)/, '')
+  if (MAPPING_ALIASES.has(t) || t === HYPERFRAMES_MAPPING.toLowerCase()) return { key: HYPERFRAMES_MAPPING, content: whiteLabel(files[HYPERFRAMES_MAPPING]) }
+  const keys = new Map<string, string>()
+  for (const key of Object.keys(files)) { keys.set(key.toLowerCase(), key); keys.set(publicKey(key).toLowerCase(), key) }
+  const key = keys.get(t)
+  return key ? { key: publicKey(key), content: whiteLabel(files[key]) } : null
 }
 
-/** What every HyperFrames guide answer opens with: where it comes from and how it maps onto Slates. */
+/** What every motion guide answer opens with: how it maps onto Slates. */
 export function hyperframesGuideHeader(key: string): string {
   if (key === HYPERFRAMES_MAPPING) return ''
-  return `HyperFrames guide ${key} (HeyGen, Apache-2.0, unmodified), written for HyperFrames' own CLI and Studio. In Slates, topic hyperframes/${HYPERFRAMES_MAPPING} says what each command and surface is; never run npx hyperframes.\n\n`
+  return `Motion guide ${key} (Apache-2.0), written for the motion engine's own CLI and Studio. In Slates, topic motion/${HYPERFRAMES_MAPPING} says what each command and surface is; never run its npx commands.\n\n`
 }
 
 /**
@@ -88,7 +118,7 @@ export function hyperframesCard(content: string, max = 1600): string {
   return `${cut.trim()}${more}\n\nSections (request with query, or depth "full"):\n${sections.map((s) => `- ${s.title}`).join('\n')}`
 }
 
-/** A skill's other markdown files, as the topics that retrieve them. */
+/** A skill's other markdown files (`skill` is its public name), as the topics that retrieve them. */
 export function hyperframesFilesOf({ files }: HyperframesCorpus, skill: string): string[] {
-  return Object.keys(files).filter((key) => key.startsWith(`${skill}/`))
+  return Object.keys(files).map(publicKey).filter((key) => key.startsWith(`${skill}/`))
 }

@@ -1,11 +1,11 @@
 ---
 name: slates-captions
-description: "Caption speech in a cut: free local transcription, correcting a transcript, word-timed captions from the transcript, the Shot's line or your own words, phrasing, emphasis, HyperFrames caption components and mismatches."
+description: "Caption speech in a cut: free local transcription, correcting a transcript, word-timed captions from the transcript, the Shot's line or your own words, phrasing, emphasis, caption components and mismatches."
 ---
 
 # Captions from speech
 
-Captions are text clips on an overlay track, one per phrase, each carrying its words so the spoken word lights up on the frame it is said; or one HTML clip drawn by a HyperFrames caption component. Transcribing and captioning are both free: they run on the user's machine and spend no credits, so there is nothing to estimate.
+Captions are text clips on an overlay track, one per phrase, each carrying its words so the spoken word lights up on the frame it is said; or one HTML clip drawn by a caption component. Transcribing and captioning are both free: they run on the user's machine and spend no credits, so there is nothing to estimate.
 
 ## Transcribe
 
@@ -68,9 +68,9 @@ Keep captions off faces and clear of the platform's buttons: the app's **Show sa
 
 ## Caption components
 
-`component` draws the captions with a HyperFrames caption component instead of text clips: one HTML clip from the first word to the last, animating every word in that component's look, so `style` does not apply. Twelve are checked to draw fed words: caption-highlight, caption-pill-karaoke, caption-weight-shift, caption-glitch-rgb, caption-neon-glow, caption-gradient-fill, caption-kinetic-slam, caption-clip-wipe, caption-matrix-decode, caption-particle-burst, caption-neon-accent and caption-editorial-emphasis. Each has a preview video: `slates_list_motion_blocks` with query `caption` and type `component`.
+`component` draws the captions with a caption component instead of text clips: one HTML clip from the first word to the last, animating every word in that component's look, so `style` does not apply. Twelve are checked to draw fed words: caption-highlight, caption-pill-karaoke, caption-weight-shift, caption-glitch-rgb, caption-neon-glow, caption-gradient-fill, caption-kinetic-slam, caption-clip-wipe, caption-matrix-decode, caption-particle-burst, caption-neon-accent and caption-editorial-emphasis. Each has a preview video: `slates_list_motion_blocks` with query `caption` and type `component`.
 
-Your `phrases` become the component's word groups and your `tiers` its emphasis, so phrase and ration emphasis as above. The result's `findings` is HyperFrames' check of the fed composition; a warning is worth reading, and an error means the clip will not draw. The components are drawn for a 16:9 frame and fit inside a vertical one, so on 9:16 they sit smaller; text-clip captions fill a vertical frame better. A transcript correction does not reach a component clip: after correcting, remove the clip with `slates_remove_clip` and add the captions again.
+Your `phrases` become the component's word groups and your `tiers` its emphasis, so phrase and ration emphasis as above. The result's `findings` is Slates' composition check of the fed composition; a warning is worth reading, and an error means the clip will not draw. The components are drawn for a 16:9 frame and fit inside a vertical one, so on 9:16 they sit smaller; text-clip captions fill a vertical frame better. A transcript correction does not reach a component clip: after correcting, remove the clip with `slates_remove_clip` and add the captions again.
 
 ## Read the result
 
