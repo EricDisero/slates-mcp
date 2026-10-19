@@ -45,6 +45,8 @@ const QUESTIONS = [
   ['add a dissolve between two clips', ['Timeline: transitions']],
   ['how do I make a J-cut so the sound starts early', ['split edit']],
   ['slow a clip down to half speed', ['speed, volume, split edit']],
+  ['make a layer multiply or screen over the clip under it', ['blend, grain and colour']],
+  ['turn a clip black and white', ['blend, grain and colour']],
   ['move the cut between two clips without changing the length', ['roll, slip and ripple']],
   ['add a marker on the timeline', ['Timeline: markers']],
   ['change the timeline frame rate to 30 fps', ['Timeline: settings button']],

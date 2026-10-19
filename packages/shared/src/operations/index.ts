@@ -6504,11 +6504,12 @@ export const updateClip: Operation<{
   projectId: string; clipId: string
   speed?: number | null; volume?: number | null; audioOffsetFrames?: number | null
   fadeInFrames?: number | null; fadeOutFrames?: number | null; audioFadeInFrames?: number | null; audioFadeOutFrames?: number | null
+  look?: { blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light'; grain?: number; saturation?: number } | null
   ripple?: boolean
 }> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent).",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -6519,11 +6520,17 @@ export const updateClip: Operation<{
     fadeOutFrames: z.number().int().min(0).nullable().optional(),
     audioFadeInFrames: z.number().int().min(0).nullable().optional(),
     audioFadeOutFrames: z.number().int().min(0).nullable().optional(),
+    look: z.object({
+      blend: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft-light']).optional(),
+      grain: z.number().min(0).max(1).optional(),
+      saturation: z.number().min(0).max(2).optional(),
+    }).nullable().optional().describe('The whole look; a field left out is its default (normal, no grain, colour 1).'),
     ripple: z.boolean().optional().describe("With speed: move the lane's later clips instead of covering them."),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-editing', "a clip's speed, volume, split edit and fades")
+    if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
     return ok(await desktop.post('/agent/timeline/update-clip', input))
   },
 }
