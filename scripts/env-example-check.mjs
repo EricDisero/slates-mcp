@@ -21,8 +21,10 @@
 // skipping node_modules, dist, build, .next, out, .git, .venv, coverage, and
 // .verify (the verification harness's gitignored working folder; agent audit
 // scripts land there and never ship).
+// Vendored third-party code is skipped too (VENDORED, repo-relative): its scripts
+// read their own env vars, which this repo neither sets nor documents.
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
-import { join, extname, relative } from 'node:path'
+import { join, extname, relative, sep } from 'node:path'
 
 const root = process.cwd()
 const listOnly = process.argv.includes('--list')
@@ -33,6 +35,8 @@ if (!exampleName && !listOnly) {
 }
 
 const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.next', '.next-verify', '.next-clean', '.next-dev', 'out', '.out', '.git', '.venv', 'venv', 'coverage', 'dist-mcpb', '.turbo', 'exports', '.verify'])
+// slates-mcp ships HyperFrames' 21 skills verbatim, scripts included (Apache-2.0, NOTICE beside them).
+const VENDORED = new Set(['packages/shared/skills/hyperframes'])
 const EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.mts', '.cjs', '.py', '.sh', '.ps1'])
 const PLATFORM = new Set(['NODE_ENV', 'PORT', 'VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'FLY_APP_NAME', 'FLY_REGION', 'FLY_ALLOC_ID', 'CI', 'HOME', 'PATH', 'TZ', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'TEMP', 'TMP', 'ELECTRON_RENDERER_URL', 'NODE_OPTIONS', 'npm_config_user_agent', 'npm_lifecycle_event', 'CLAUDE_PROJECT_DIR', 'CUDA_VISIBLE_DEVICES', 'GITHUB_ACTIONS', 'GITHUB_TOKEN', 'RUNNER_OS'])
 
@@ -40,6 +44,7 @@ function* walk(dir) {
   for (const name of readdirSync(dir)) {
     if (SKIP_DIRS.has(name)) continue
     const p = join(dir, name)
+    if (VENDORED.has(relative(root, p).split(sep).join('/'))) continue
     let st
     try { st = statSync(p) } catch { continue }
     if (st.isDirectory()) yield* walk(p)
