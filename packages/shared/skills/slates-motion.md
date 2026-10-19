@@ -41,7 +41,7 @@ When the same finding survives two fixes, revert and redesign the layer rather t
 - **Transforms.** A GSAP scale or move replaces a CSS `translate` used for centering, so the element jumps; centre animated elements through GSAP's percentage offsets instead.
 - **Loops end.** A repeating animation stops before the composition does.
 
-Captions on speech come from `slates_add_captions` (`slates-captions`); an HTML caption block is the layer that draws their emphasis tiers.
+Captions on speech come from `slates_add_captions` (`slates-captions`); its `component` draws them with a HyperFrames caption component as one HTML clip, the only captions that draw emphasis tiers.
 
 ## HyperFrames' guides
 
