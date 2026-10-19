@@ -55,6 +55,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['captions', 'captions'],
   ['transcript-edit', 'correcting a transcript'],
   ['caption-components', 'captions drawn by a caption component'],
+  ['caption-html', 'caption layers an agent writes (html)'],
   ['html-clips', 'HTML motion layers and the motion block library'],
   ['export', 'video and XML export'],
   ['ad-variant-export', 'variant batch export, grid, delivery framing and selection'],

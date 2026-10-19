@@ -6809,6 +6809,9 @@ const CAPTION_COMPONENTS = [
   'caption-neon-accent', 'caption-editorial-emphasis',
 ] as const
 
+const htmlCompositionInput = z.string().min(1).describe('A composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
+const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false.")
+
 type CaptionsResult = {
   trackId: string; createdTrack: boolean; clipIds: string[]; words: number; phrases: number; timing: string[]
   mismatches: Array<{ clipId: string; heard: string; written: string; start: number }>
@@ -6826,11 +6829,12 @@ export const addCaptions: Operation<{
   tiers?: Record<string, (typeof CAPTION_TIERS)[number]>
   trackId?: string
   component?: (typeof CAPTION_COMPONENTS)[number]
+  html?: string; variables?: Record<string, string | number | boolean>
 }> = {
   id: 'slates_add_captions',
   billable: false,
   description:
-    "Caption the speech in a cut: one text clip per phrase on an overlay track, each carrying its words so the spoken word lights up on the frame it is said. Free; any transcription it needs runs on the user's machine. source transcript (the default) uses the words heard in each clip, aligned to within a frame, transcribing first when needed; script spreads the clip's Shot line over the speech, with estimated timing; words takes your own timed words in timeline seconds. By default every clip with sound is captioned on a new Captions track on top. Phrases follow the caption rules unless you pass your own; tiers mark emphasis per word. The result lists mismatches, where what was heard differs from the Shot's written line (the caption shows what was said: fix the line or the captions), and skipped clips with the reason. Craft: slates_get_prompting_guide (topic: slates-captions). Change a caption later with slates_update_overlay_clip.",
+    "Caption the speech in a cut: one text clip per phrase on an overlay track, each carrying its words so the spoken word lights up on the frame it is said. Free; any transcription it needs runs on the user's machine. source transcript (the default) uses the words heard in each clip, aligned to within a frame, transcribing first when needed; script spreads the clip's Shot line over the speech, with estimated timing; words takes your own timed words in timeline seconds. By default every clip with sound is captioned on a new Captions track on top. Phrases follow the caption rules unless you pass your own; tiers mark emphasis per word. The result lists mismatches, where what was heard differs from the Shot's written line (the caption shows what was said: fix the line or the captions), and skipped clips with the reason. Craft: slates_get_prompting_guide (topic: slates-captions). Change a text caption later with slates_update_overlay_clip, and a component or html caption layer with slates_update_html_clip.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -6850,18 +6854,24 @@ export const addCaptions: Operation<{
         .describe('Emphasis by word index (the same count as phrases). Unnamed words are regular. Drawn only by components: caption-editorial-emphasis sets italic and emphasis (slam draws as emphasis); kinetic-slam, clip-wipe, particle-burst, neon-glow and neon-accent colour emphasis and slam words as keywords. The text styles show regular.'),
       trackId: z.string().uuid().optional().describe('An overlay track to use. Default: a new Captions track on top.'),
       component: z.enum(CAPTION_COMPONENTS).optional().describe("A caption component instead of text clips: one HTML clip animating every word in that component's look (style does not apply). Preview them with slates_list_motion_blocks (query: caption, type: component)."),
+      html: htmlCompositionInput.optional().describe("Your own caption layer instead of a component or text clips: a composition that reads var WORDS = [{ text, start, end }], RAW_GROUPS (phrases as [first, last] word indexes), KEYWORDS (a Set of emphasis word indexes) and DURATION, which Slates fills from the words, phrases and tiers. The slates-layer-brand-captions guide is one ready to use and adapt. Its declared values become the clip's Inspector controls. Not with component or style."),
+      variables: htmlVariablesInput.optional().describe(`${htmlVariablesInput.description} With html.`),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('captions', 'captions')
     if (input.component) await ctx.desktop().requireCapability('caption-components', 'caption components')
+    if (input.html !== undefined) await ctx.desktop().requireCapability('caption-html', 'caption layers of your own')
+    if (input.html !== undefined && input.component) throw new Error('html is your own caption layer and component a ready one. Pass one or the other.')
+    if (input.html !== undefined && input.style) throw new Error('style is for text-clip captions; your html brings its own look. Pass one or the other.')
+    if (input.variables && input.html === undefined) throw new Error('variables go with html, the composition that declares them.')
     if (input.component && input.style) throw new Error('style is for text-clip captions; a component brings its own look. Pass one or the other.')
     if (input.words && input.source && input.source !== 'words') throw new Error(`words go with source words; source ${input.source} finds its own.`)
     if (input.source === 'words' && !input.words) throw new Error('source words needs words: [{ text, start, end }] in timeline seconds.')
     const r = await ctx.desktop().post<CaptionsResult>('/agent/timeline/add-captions', input)
     const lines = [
-      input.component
-        ? `Added one ${input.component} clip over ${r.words} words (timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}. ${describeFindings(r.findings)}`
+      input.component || input.html !== undefined
+        ? `Added one ${input.component ?? 'caption layer'} clip over ${r.words} words (timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}. ${describeFindings(r.findings)}`
         : `Added ${r.phrases} caption clip${r.phrases === 1 ? '' : 's'} (${r.words} words, timing ${r.timing.join(', ')}) on ${r.createdTrack ? 'a new' : 'the'} track ${r.trackId}.`,
       r.mismatches.length ? `Heard ≠ written in ${r.mismatches.length} place${r.mismatches.length === 1 ? '' : 's'}: ${r.mismatches.map((m) => `"${m.heard}" for "${m.written}" at ${m.start}s`).join('; ')}.` : '',
       r.skipped.length ? `Skipped: ${r.skipped.map((s) => `${s.clipId} (${s.reason})`).join('; ')}.` : '',
@@ -6881,8 +6891,6 @@ const describeFindings = (f: CompositionFindings | undefined): string => {
   return f.warnings.length ? `Check passed with ${f.warnings.length} warning${f.warnings.length === 1 ? '' : 's'}: ${list(f.warnings)}.` : 'Check passed.'
 }
 
-const htmlCompositionInput = z.string().min(1).describe('A composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
-const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false.")
 
 export const addHtmlClip: Operation<{
   projectId: string; timelineId: string; trackId?: string
