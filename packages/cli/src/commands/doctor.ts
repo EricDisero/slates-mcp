@@ -49,7 +49,6 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['timeline-tracks', 'timeline tracks and settings'],
   ['timeline-overlays', 'text and image overlays'],
   ['timeline-keyframes', 'clip keyframes'],
-  ['engine-player', 'the engine player setting'],
   ['timeline-transitions', 'transitions on cuts'],
   ['timeline-editing', 'trim, roll, ripple, slip, move, split and clip settings'],
   ['transcripts', 'transcribing speech on this machine'],
