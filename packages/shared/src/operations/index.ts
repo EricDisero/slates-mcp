@@ -20,6 +20,7 @@ import { SlatesCloudClient, SlatesCloudHttpError, type SlatesUserInfo, type Cred
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
+import { findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
 import { appManualIndex, appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
 // "never hand-type a fact an LLM will read". These helpers read MODEL_FACTS.
@@ -9313,7 +9314,7 @@ export const WORKING_METHOD_TOPIC = 'working-method'
 
 export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; query?: string; limit?: number; offset?: number }> = {
   id: 'slates_get_prompting_guide',
-  description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
+  description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. HyperFrames\' own skills are in the catalog too, for HTML motion layers and editing craft; a topic can name one of their files by path. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
   input: z.object({
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
     topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules for an MCP client; the app's Studio Agent has its own). Omit to search by intent or browse.`),
@@ -9332,6 +9333,16 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     if (topic === 'app-manual') {
       const content = input.query || input.depth === 'full' ? appManualSections(input.query) : appManualIndex()
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
+    }
+    const hyperframes = await loadHyperframes()
+    // A HyperFrames skill or file by its exact name wins over an alias (`hyperframes-audio` is not `audio`).
+    const hf = topic && !Object.hasOwn(SKILLS, topic) ? findHyperframesGuide(hyperframes, topic) : null
+    if (hf) {
+      const depth = input.depth ?? 'card'
+      const body = depth === 'card' && !input.query?.trim() ? hyperframesCard(hf.content) : retrieveGuide(hf.key, hf.content, depth, input.query)
+      const others = (depth === 'card' || depth === 'index') && !input.query ? hyperframesFilesOf(hyperframes, hf.key) : []
+      const guide = `${hyperframesGuideHeader(hf.key)}${body}${others.length ? `\n\nIts other files (request each as a topic): ${others.join(', ')}` : ''}`
+      return { text: guide, data: { topic: hf.key, tier: 'free', source: 'hyperframes', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     const resolved = topic ? resolveGuideTopic(topic) : null
     if (resolved) {
@@ -9353,11 +9364,13 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const guide = retrieveGuide(privateEntry.name, result.markdown, depth, input.query)
       return { text: guide, data: { topic: privateEntry.name, tier: 'paid', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
-    const catalog = [...guideCatalog(SKILLS), ...member.entries].sort((a, b) => a.name.localeCompare(b.name))
-    const result = discoverGuides(catalog, SKILLS, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
-    const guide = result.guides.map(entry => `${entry.name} (${entry.tier}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
-    const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${entry.tier}): ${entry.description}`).join('\n')}` : ''
-    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. The user does not need to choose guides.`
+    // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
+    const catalog = [...[...guideCatalog(SKILLS), ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
+    const result = discoverGuides(catalog, { ...SKILLS, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
+    const label = (entry: GuideCatalogEntry) => (entry.source === 'hyperframes' ? 'HyperFrames' : entry.tier)
+    const guide = result.guides.map(entry => `${entry.name} (${label(entry)}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
+    const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${label(entry)}): ${entry.description}`).join('\n')}` : ''
+    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. HyperFrames guides are HyperFrames' own, unmodified; topic hyperframes/SLATES-MAPPING.md maps their CLI and Studio onto Slates. The user does not need to choose guides.`
     return { text, data: { ...result, memberAccess: member.access, bytes: Buffer.byteLength(text, 'utf8') } }
   },
 }
