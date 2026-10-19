@@ -720,7 +720,7 @@ interface ViewShape {
   settings?: { open: boolean }
   composer?: { open: boolean }
   /** W3 (slate a4f829b): the layout and which areas show; absent from older desktops. */
-  window?: { layout: 'plan' | 'edit'; lens: boolean; viewer: boolean; inspector: 'column' | 'drawer' | null; timeline: boolean; lensWidth: number }
+  window?: { layout: 'plan' | 'edit'; lens: boolean; viewer: boolean; inspector: 'column' | 'folded' | null; timeline: boolean; lensWidth: number }
   layers?: string[]
   notes?: string[]
   /** When the desktop last reported it. */
@@ -800,7 +800,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Inspector as a column or a drawer), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Inspector as a column or folded to its tab), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -936,7 +936,7 @@ export const setView: Operation<{
         .object({
           layout: z.enum(VIEW_WINDOW_LAYOUTS).optional().describe('edit gives the Viewer the room, with Media, Board and Script a column at its left; plan gives it to them, with the Viewer a column at their right.'),
           viewer: z.boolean().optional().describe('Show or hide the Viewer.'),
-          inspector: z.boolean().optional().describe('Show or hide the Inspector; the window decides column or drawer.'),
+          inspector: z.boolean().optional().describe('Show or hide the Inspector; the window shows it as a column, or folds it to its tab when there is no room.'),
           lensWidth: z.number().optional().describe("The Media, Board and Script column's width in px in the Edit layout."),
         })
         .strict()
