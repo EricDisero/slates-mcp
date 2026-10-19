@@ -6818,7 +6818,7 @@ export const addCaptions: Operation<{
         .array(z.tuple([z.number().int().min(0), z.number().int().min(1)]))
         .min(1)
         .optional()
-        .describe("Your own phrases as [from, to) word index ranges, in order and not overlapping: from is the phrase's first word, to is one past its last. Words count across the whole call in timeline order."),
+        .describe("Your own phrases as [from, to) word index ranges, in order and not overlapping: from is the phrase's first word, to is one past its last. Words count across the whole call in timeline order, and only those inside each clip's in and out points: a trimmed clip's earlier words are not counted (see slates-captions)."),
       tiers: z
         .record(z.string().regex(/^\d+$/, 'a word index'), z.enum(CAPTION_TIERS))
         .optional()
@@ -6922,7 +6922,7 @@ export const checkComposition: Operation<{ html: string }> = {
   },
 }
 
-type MotionRegistryListing = { items: Array<{ name: string; type: (typeof MOTION_REGISTRY_TYPES)[number]; title?: string; description?: string; tags?: string[] }>; source: string; fetchedAt: string }
+type MotionRegistryListing = { items: Array<{ name: string; type: (typeof MOTION_REGISTRY_TYPES)[number]; title?: string; description?: string; tags?: string[] }>; total: number; source: string; fetchedAt: string; offline?: boolean }
 
 export const listMotionBlocks: Operation<{ query?: string; type?: (typeof MOTION_REGISTRY_TYPES)[number] }> = {
   id: 'slates_list_motion_blocks',
@@ -6938,7 +6938,9 @@ export const listMotionBlocks: Operation<{ query?: string; type?: (typeof MOTION
     await ctx.desktop().requireCapability('html-clips', 'HTML layers')
     const r = await ctx.desktop().get<MotionRegistryListing>('/agent/compositions/registry', { query: input.query, type: input.type })
     const rows = r.items.map((i) => `- ${i.name} (${i.type})${i.title ? `: ${i.title}` : ''}${i.description ? ` — ${i.description}` : ''}${i.tags?.length ? ` [${i.tags.join(', ')}]` : ''}`)
-    return ok(r, `${r.items.length} registry item${r.items.length === 1 ? '' : 's'} from ${r.source}, fetched ${r.fetchedAt}.\n${rows.join('\n')}`)
+    const shown = r.total > r.items.length ? `${r.items.length} of ${r.total} registry items (search to narrow it)` : `${r.items.length} registry item${r.items.length === 1 ? '' : 's'}`
+    const from = r.offline ? `the list saved ${r.fetchedAt} (the registry could not be reached)` : `${r.source}, fetched ${r.fetchedAt}`
+    return ok(r, `${shown} from ${from}.\n${rows.join('\n')}`)
   },
 }
 
