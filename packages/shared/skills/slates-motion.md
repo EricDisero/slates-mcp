@@ -1,6 +1,6 @@
 ---
 name: slates-motion
-description: "Put HTML motion layers on a cut: lower thirds, end cards, animated captions, titles, logo stings, callouts and background plates, from the HyperFrames registry or written as a composition, each checked before it lands. Use when a video needs graphics over or behind the picture."
+description: "Put HTML motion layers on a cut (lower thirds, end cards, animated captions, titles, plates) from the HyperFrames registry or your own composition, checked first."
 ---
 
 # Motion layers on a cut

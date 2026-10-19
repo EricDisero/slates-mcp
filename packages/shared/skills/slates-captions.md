@@ -1,6 +1,6 @@
 ---
 name: slates-captions
-description: "Caption the speech in a cut: transcribe it locally for free, add word-timed captions from the transcript, the Shot's line or your own timed words, shape the phrases and the emphasis, and read where what was heard differs from what was written. Use for captions, subtitles or word-by-word highlights on a talking head, a voiceover or an ad."
+description: "Caption speech in a cut: free local transcription, word-timed captions from the transcript, the Shot's line or your own words, phrasing, emphasis and mismatches."
 ---
 
 # Captions from speech

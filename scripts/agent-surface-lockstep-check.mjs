@@ -104,7 +104,9 @@ const desktopOpsPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'ops.ts'
  * end of the problem.
  */
 const MCP_INSTRUCTIONS_CEILING = 8_000
-const MCP_WORKING_METHOD_CEILING = 14_000
+// 15,000 from 14,000 on 2026-10-18: the guide index lists every non-model skill's first sentence
+// (capped at 180 characters), and slates-captions with slates-motion took it past 14,000.
+const MCP_WORKING_METHOD_CEILING = 15_000
 
 const failures = []
 const warnings = []
