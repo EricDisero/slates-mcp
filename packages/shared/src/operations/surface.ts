@@ -190,6 +190,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_add_text_clip',
     'slates_add_image_overlay',
     'slates_update_overlay_clip',
+    'slates_set_clip_keyframes',
     'slates_update_timeline_track',
     'slates_remove_timeline_track',
     'slates_update_timeline_settings',

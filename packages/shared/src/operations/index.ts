@@ -6509,6 +6509,47 @@ export const updateOverlayClip: Operation<{
   },
 }
 
+const KEYFRAME_PROPERTY_IDS = ['positionX', 'positionY', 'scale', 'rotation', 'opacity', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom', 'focusX', 'focusY', 'zoom'] as const
+const keyframeEasing = z.union([
+  z.enum(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'hold']),
+  z.object({ cubicBezier: z.tuple([z.number().min(0).max(1), z.number(), z.number().min(0).max(1), z.number()]) }).strict(),
+])
+const keyframeList = z
+  .array(
+    z
+      .object({
+        frame: z.number().int().min(0).describe("Frames from the clip's start, at the timeline's frame rate."),
+        value: z.number().finite(),
+        easing: keyframeEasing.optional().describe('The curve from this key to the next. Default linear; hold jumps at the next key.'),
+      })
+      .strict()
+  )
+  .max(500)
+
+export const setClipKeyframes: Operation<{
+  projectId: string; timelineId: string; clipId: string
+  properties: Partial<Record<(typeof KEYFRAME_PROPERTY_IDS)[number], z.infer<typeof keyframeList>>>
+}> = {
+  id: 'slates_set_clip_keyframes',
+  description:
+    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. Drawn by the Cut's engine player and its export alike, so a keyframed cut exports through the engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    timelineId: z.string().uuid(),
+    clipId: z.string().uuid().describe('A clip on that timeline (slates_get_timeline).'),
+    properties: z
+      .object(Object.fromEntries(KEYFRAME_PROPERTY_IDS.map((id) => [id, keyframeList.optional()])) as Record<(typeof KEYFRAME_PROPERTY_IDS)[number], z.ZodOptional<typeof keyframeList>>)
+      .strict()
+      .refine((p) => Object.keys(p).length > 0, { message: 'name at least one property' })
+      .describe('Each property to set, with its keys. Example punch-in over one second at 24 fps: {"scale":[{"frame":0,"value":1,"easing":"ease-in-out"},{"frame":24,"value":1.25}]}.'),
+  }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('timeline-keyframes', 'clip keyframes')
+    return ok(await desktop.post('/agent/timeline/keyframes', input))
+  },
+}
+
 export const updateTimelineTrack: Operation<{
   projectId: string
   trackId: string
@@ -9466,6 +9507,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   addTextClip as unknown as Operation<unknown>,
   addImageOverlay as unknown as Operation<unknown>,
   updateOverlayClip as unknown as Operation<unknown>,
+  setClipKeyframes as unknown as Operation<unknown>,
   updateTimelineTrack as unknown as Operation<unknown>,
   removeTimelineTrack as unknown as Operation<unknown>,
   updateTimelineSettings as unknown as Operation<unknown>,
