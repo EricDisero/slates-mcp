@@ -50,6 +50,8 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['timeline-overlays', 'text and image overlays'],
   ['timeline-keyframes', 'clip keyframes'],
   ['engine-player', 'the engine player setting'],
+  ['timeline-transitions', 'transitions on cuts'],
+  ['timeline-editing', 'trim, roll, ripple, slip, move, split and clip settings'],
   ['export', 'video and XML export'],
   ['ad-variant-export', 'variant batch export, grid, delivery framing and selection'],
   ['chatgpt-image-generation', 'connected ChatGPT images'],

@@ -30,7 +30,7 @@ Inspect image composition and reference fidelity. Inspect video performance, mot
 
 ## Arrange and deliver
 
-Read the available timelines. Name the destination cut explicitly for a variation; independent comparisons use independent cuts. To lay a board's preferred takes onto a cut in board order, build it from the board (`slates_edit_cut`); when a shot's preferred take changes, sync the cut rather than re-adding clips. Preserve trims, track levels and any delivery framing, and inspect the actual timeline.
+Read the available timelines. Name the destination cut explicitly for a variation; independent comparisons use independent cuts. To lay a board's preferred takes onto a cut in board order, build it from the board (`slates_edit_cut`); when a shot's preferred take changes, sync the cut rather than re-adding clips. Preserve trims, track levels and any delivery framing, and inspect the actual timeline. The editing pass (trims, J- and L-cuts, speed) is `slates-cuts`; transitions between clips are `slates-transitions`.
 
 Use supported video/XML exports and their stated fidelity limits. For selected named cuts, `slates_export_cuts` records distinct outputs and a manifest; it returns at once, so poll `slates_get_export_batch` until every output is finished, and retry unfinished outputs with the same manifest identity. `slates_export_assets` copies the original clips, stills or audio out. Verify the returned files and playback before reporting success. Describe the completed piece, actual spend where available and output paths. Do not label a render complete merely because its submission succeeded.
 

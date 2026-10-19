@@ -103,7 +103,9 @@ const desktopOpsPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'ops.ts'
  * end of the problem.
  */
 const MCP_INSTRUCTIONS_CEILING = 8_000
-const MCP_WORKING_METHOD_CEILING = 14_000
+// 14,000 → 14,400 (2026-10-18): the guide catalog lists every skill, and the two timeline craft skills
+// (slates-transitions, slates-cuts) were the first added after it reached 13,930. Each entry is one line.
+const MCP_WORKING_METHOD_CEILING = 14_400
 
 const failures = []
 const warnings = []
