@@ -771,7 +771,7 @@ const describeView = (v: ViewShape): string => {
           : `a ${v.cut.width}px column on the ${v.cut.side} of the ${v.lens} tab`
         : 'closed, resting as one line at the bottom'
   const areas = v.window
-    ? [v.window.lens && `the ${v.lens} tab`, v.window.viewer && 'the Viewer', v.window.inspector && `the Inspector as a ${v.window.inspector}`, v.window.timeline && 'the timeline'].filter(Boolean) as string[]
+    ? [v.window.lens && `the ${v.lens} tab`, v.window.viewer && 'the Viewer', v.window.inspector && (v.window.inspector === 'column' ? 'the Inspector drawer open' : 'the Inspector drawer shut for want of room'), v.window.timeline && 'the timeline'].filter(Boolean) as string[]
     : []
   const agent = v.studioAgent.enabled
     ? v.studioAgent.open
@@ -800,7 +800,7 @@ const describeView = (v: ViewShape): string => {
 export const getView: Operation<Record<string, never>> = {
   id: 'slates_get_view',
   description:
-    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Inspector as a column or folded to its tab), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
+    "What the user is looking at in Slates: Home or a project, the tab (Media, Script or Board), the open board and its View and Filter, Media's tab, chosen folder and narrowing, a Library page, the picture viewer, the timeline Viewer's mode and clip, Compare, the animatic, Settings, whether the prompt box is hidden, the timeline and the side panels, and, from a desktop with the one-window layout, the window's layout (Plan or Edit, which areas show, the Viewer's Inspector drawer open or shut for want of room), and any dialog or menu open over the page. New desktops also report cut.format and the selected variant grid rows and aspects. Read it before telling the user where to click.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('view', 'the window layout')
@@ -936,7 +936,7 @@ export const setView: Operation<{
         .object({
           layout: z.enum(VIEW_WINDOW_LAYOUTS).optional().describe('edit gives the Viewer the room, with Media, Board and Script a column at its left; plan gives it to them, with the Viewer a column at their right.'),
           viewer: z.boolean().optional().describe('Show or hide the Viewer.'),
-          inspector: z.boolean().optional().describe('Show or hide the Inspector; the window shows it as a column, or folds it to its tab when there is no room.'),
+          inspector: z.boolean().optional().describe("Open or shut the Inspector, the Viewer's drawer (opening it shows the Viewer); in a window with no room, Media, Board and Script fold to make room."),
           lensWidth: z.number().optional().describe("The Media, Board and Script column's width in px in the Edit layout."),
         })
         .strict()
