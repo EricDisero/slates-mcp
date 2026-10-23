@@ -1,22 +1,28 @@
 {
   "version": "1.1.3",
-  "filename": "agentic-skills-pack-v1.1.3-601eef42c4853a7c.zip",
-  "sha256": "601eef42c4853a7c0a8eb1c73998352814c49ba01d821a1eace8ffce95f33ca6",
-  "bytes": 208461,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.3-601eef42c4853a7c.zip",
-  "skillCount": 38,
+  "filename": "agentic-skills-pack-v1.1.3-d87eee435b957b6d.zip",
+  "sha256": "d87eee435b957b6d4ed99223b344800e16f83cc053c333c10c5018c2fa7a1d0b",
+  "bytes": 228258,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.3-d87eee435b957b6d.zip",
+  "skillCount": 45,
   "freeSkills": [
     "slates-blocking-to-prompt",
     "slates-camera-language",
+    "slates-captions",
     "slates-character-identity",
     "slates-chatgpt-images",
     "slates-cinematic-look",
     "slates-content-policy",
     "slates-cost-discipline",
+    "slates-cuts",
     "slates-dialogue-blocking",
     "slates-direct-response-ad",
     "slates-edit-and-iterate",
+    "slates-layer-brand-captions",
+    "slates-layer-lower-third",
+    "slates-layer-title",
     "slates-model-selection",
+    "slates-motion",
     "slates-one-prompt-film",
     "slates-previs-blocking",
     "slates-project-organization",
@@ -40,6 +46,7 @@
     "slates-shot-variety",
     "slates-storyboard-from-script",
     "slates-style-prompting",
+    "slates-transitions",
     "slates-ugc-influencer-ad",
     "slates-vision-feedback-loop"
   ],
@@ -69,6 +76,11 @@
       "summary": "Build or refine Blender camera rigs for a previs pass: orbits, floor rises, whip-and-lock moves, handheld, speed ramps and shot transitions."
     },
     {
+      "key": "slates-captions",
+      "tier": "free",
+      "summary": "Caption speech in a cut: free local transcription, correcting a transcript, word-timed captions from the transcript, the Shot's line or your own words, phrasing, emphasis, caption components and mismatches."
+    },
+    {
       "key": "slates-character-identity",
       "tier": "free",
       "summary": "Prepare and bind a reusable character identity sheet from an image or description."
@@ -94,6 +106,11 @@
       "summary": "Estimate and announce generation spend, aggregate batches, follow existing consent and inspect uncertain jobs before retrying."
     },
     {
+      "key": "slates-cuts",
+      "tier": "free",
+      "summary": "Tighten an edit on a Slates timeline: trim, roll, ripple, slip, split, speed, J-cuts and L-cuts."
+    },
+    {
       "key": "slates-dialogue-blocking",
       "tier": "free",
       "summary": "Block a multi-character conversation (at a table, in a car, walking) in Blender when seating, eyelines or screen direction must hold across cuts, or generation has lost that continuity."
@@ -101,17 +118,37 @@
     {
       "key": "slates-direct-response-ad",
       "tier": "free",
-      "summary": "Develop a product-led direct-response ad from an offer and references."
+      "summary": "Make a product-led direct-response ad: demonstration, proof, argument and the next action."
     },
     {
       "key": "slates-edit-and-iterate",
       "tier": "free",
-      "summary": "Refine an existing Slates image with a targeted edit or revised generation."
+      "summary": "Refine an existing Slates image or clip with a targeted edit or revised generation."
+    },
+    {
+      "key": "slates-layer-brand-captions",
+      "tier": "free",
+      "summary": "Layer preset: bold word-by-word captions with the emphasis words sized up in a two-colour gradient."
+    },
+    {
+      "key": "slates-layer-lower-third",
+      "tier": "free",
+      "summary": "Layer preset: a lower third naming who is speaking, a name over a role beside an accent bar, sliding in and out."
+    },
+    {
+      "key": "slates-layer-title",
+      "tier": "free",
+      "summary": "Layer preset: a bold title with an optional line under it, rising or slamming in and fading out."
     },
     {
       "key": "slates-model-selection",
       "tier": "free",
       "summary": "Choose image, video, edit and audio models for the brief, including animating photos, making films or directing voices."
+    },
+    {
+      "key": "slates-motion",
+      "tier": "free",
+      "summary": "Put HTML motion layers on a cut (lower thirds, end cards, animated captions, titles, plates) from the motion block library or your own composition, checked first."
     },
     {
       "key": "slates-one-prompt-film",
@@ -126,7 +163,7 @@
     {
       "key": "slates-project-organization",
       "tier": "free",
-      "summary": "Navigate and organize Slates projects, asset codes such as IMG-A12 or VID-V3, folders, Library references and templates."
+      "summary": "Organize a Slates project: asset codes (IMG-A12, VID-V3), folders, favorites, pins, Library references and templates."
     },
     {
       "key": "slates-prompting-elevenlabs",
@@ -229,9 +266,14 @@
       "summary": "Translate a visual-style brief into model-specific image or video direction and maintain the look across shots."
     },
     {
+      "key": "slates-transitions",
+      "tier": "free",
+      "summary": "Choose and place transitions between clips on a Slates timeline, or keep the plain cut."
+    },
+    {
       "key": "slates-ugc-influencer-ad",
       "tier": "free",
-      "summary": "Direct a creator-style spoken ad when the brief calls for a camera-facing person or exchange."
+      "summary": "Make a UGC or influencer-style ad with a camera-facing creator."
     },
     {
       "key": "slates-vision-feedback-loop",

@@ -62,8 +62,9 @@ const root = resolve(here, '..');
 // bounds landed. Rebuilding at the same version is refused for a PUBLISHED zip,
 // but neither rebuild had been uploaded yet, so there was no second file to
 // disagree with and no reason to burn a version number.
-// 2026-09-15 local candidate: updated prompting corpus. Not uploaded or released.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.2';
+// 1.1.3, 2026-10-23: adds the seven skills written since 1.1.2 (captions, cuts,
+// the three layers, motion, transitions). Uploaded, then both URLs moved.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.3';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');
