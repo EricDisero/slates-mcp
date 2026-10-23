@@ -52,11 +52,11 @@
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "d557cec55116af6621f6b630f93027bddf938b82511f69c24d620f7709c3e667"
+      "sha256": "8d6f87dbef8aa515ed427a3371bf462194323b65321d5e3db9620b1118197bb5"
     },
     {
       "path": "src/prompts/partials.generated.ts",
-      "sha256": "3499d6d7a05dbbed909d2ba5377ed02c245d5aad9680f7e45e5a9a3363844c32"
+      "sha256": "9f75ad1c625e6e3b71ece83cceaa9e60f0e36c669f06dd02dfcd2cdf83cbbf67"
     },
     {
       "path": "src/prompts/reference-rules.ts",

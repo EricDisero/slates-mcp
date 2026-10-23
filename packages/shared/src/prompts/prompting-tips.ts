@@ -709,7 +709,7 @@ const LTX_2_5: PromptingTipsEntry = {
   label: 'LTX-2.5',
   intro: [
     'LTX-2.5 scores the picture on the same pass that draws it, so SOUND IS THE FIRST THING YOU WRITE, not the last. Lightricks ranks the six parts of a prompt in this order: sound, camera, character detail, shot type and scene, then scene dressing — and scene dressing is the first thing to cut when a prompt sprawls. Everything goes in ONE flowing paragraph, not a list of labelled sections.',
-    'Two models. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest 1080p second with sound included in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
+    'Two models. Base LTX-2.5 is the distilled build: 720p / 1080p / 1440p / 4K and clips from 6 to 20 seconds, and it is the cheapest native 1080p second with sound included in Slates. LTX-2.5 Pro is the full diffusion build ("Diffusion Fidelity Rendering" spends extra compute on busy frames) but reaches a SHORTER ladder — 1080p and 10 seconds maximum — while costing about a third more. Pro is for a dense final render; base is for iteration, long takes and 4K.',
   ],
   columns: [
     [

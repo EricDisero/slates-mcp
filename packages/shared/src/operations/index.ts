@@ -1516,7 +1516,7 @@ export const VIDEO_MODELS = [
   'minimax-h3-max',
   'minimax-h3-max-turbo',
   // LTX-2.5, two seats in one family (2026-08-29). Base is the VOLUME seat —
-  // cheapest 1080p second with sound included, free native audio at every tier,
+  // cheapest native 1080p second with sound included, free native audio at every tier,
   // the only row reaching 1440p, and clips up to 20s.
   // Pro is the fidelity seat and is NOT a superset: shorter ladder (no
   // 1440p/4K), shorter clips (6/8/10 only) and ~1/3 dearer.
