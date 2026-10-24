@@ -8,7 +8,7 @@ compatibility: Standalone prompt preparation. Generation requires the user's cho
 
 Turn the user's idea into the exact prompt to paste into their generation tool. The deliverable is the prompt, not a lecture about prompting.
 
-This portable skill is deliberately thin. Its reference files are generated directly from the same production skills used by the Slates MCP server, CLI-installed skills, and Studio Agent. Treat those references as authoritative; never recreate their rules from memory.
+This portable skill is deliberately thin. Its reference files are generated directly from the same production skills used by the Slates MCP server, CLI-installed skills, and Slates Director. Treat those references as authoritative; never recreate their rules from memory.
 
 ## Models and routing
 

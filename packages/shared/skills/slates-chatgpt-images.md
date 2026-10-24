@@ -33,7 +33,7 @@ neither this add-on nor Codex.
 Call `slates_get_chatgpt_status`. If connected, use
 `slates_generate_chatgpt_image` with projectId, a fresh UUID requestId, the prompt
 and ordered referenceAssetIds. This is also the path used by Slates' prompt bar
-and Studio Agent. Use background mode for long calls and inspect
+and Slates Director. Use background mode for long calls and inspect
 `slates_get_generation_status` with the returned generationId.
 The desktop bridge removes only its own temporary thread's original image after
 saving and byte-verifying the project copy. Failed cleanup keeps the original.
