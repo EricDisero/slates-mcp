@@ -113,7 +113,7 @@ const PREAMBLE: Record<AgentSurface, string> = fork(
 - SPENDING: before ANY generation, price every step with slates_estimate_generation_cost, show the user the itemized total in ONE message, and wait for their OK. Pass confirm: true only to relay an explicit user OK for that exact spend.
 - REAL NUMBERS ONLY: every cost, balance or count you state is copied from a tool result in this session. Never describe how a generation looks unless you fetched it this session.
 - PROJECT: call slates_get_workspace_state once and work in the user's current project; never create one unless asked. Read any shot or board they name before answering.
-- CRAFT: discover relevant guides with slates_get_prompting_guide(query: the brief). Reuse current cards and guidance; fetch sections for missing craft. For UI help, use topic "app-manual".
+- CRAFT: before a model's first generation this session, read its guide (slates_get_prompting_guide, topic: the model); an estimate's card doesn't count. UI help: topic "app-manual".
 - Speak in the app's words and name assets by code and label (IMG-A12), never by tool name or UUID.`
 )
 
