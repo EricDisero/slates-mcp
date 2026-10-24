@@ -98,6 +98,13 @@ const KLING_DIRECT_ASPECT_RATIOS: AspectRatio[] = [
 /** Kling carried on fal: three. This is the set the CREDITS route uses. */
 const KLING_FAL_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1']
 
+/**
+ * Kling 4.0 (fal `kling/v4/text-to-video`): four, read off fal's OpenAPI rip
+ * 2026-10-23. Image-to-video has no aspect field: "The output aspect ratio
+ * follows the input frames."
+ */
+const KLING_V4_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '21:9']
+
 
 /** Gemini Omni Flash (fal schema, 16:9 default): two. Unchanged on 1.1. */
 const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
@@ -566,6 +573,20 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     videoResolution: { options: ['1080p'], fixed: '1080p' },
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
+  },
+
+  // Kling 4.0 (fal `kling/v4/{text-to-video,image-to-video}`, added 2026-10-23
+  // beside 3.0, which stays the default Kling). Read off fal's OpenAPI rip:
+  // second-brain/business/projects/slates/provider-docs/fal-kling-4-0-openapi-schemas.md.
+  // `resolution` 720p/1080p, schema default 1080p; ours is 720p, as on Wan 3.0
+  // and Seedance 2.5, because the default is the cheaper tier. `duration` an
+  // integer 3-30. NO reference caps: `kling/v4/reference-to-video` is not sold
+  // (Kling O3, Seedance 2.5 and Omni Flash hold the reference seat), so there is
+  // no transport for an ingredient. Frames are frame slots, not references.
+  'kling-v4.0': {
+    aspectRatios: KLING_V4_ASPECT_RATIOS,
+    videoResolution: { options: ['720p', '1080p'], default: '720p' },
+    duration: { min: 3, max: 30, mode: 'continuous' },
   },
 
   // ── Gemini Omni Flash 1.1 ──────────────────────────────────────────────────

@@ -325,6 +325,19 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keepAudio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
   },
   {
+    id: 'kling-v4.0',
+    route: 'generate',
+    tier: 'specialist',
+    // Added 2026-10-23 beside Kling 3.0, which stays the Kling seat (Eric). One
+    // row: no Standard/Pro split. No reference caps: fal's reference-to-video
+    // for 4.0 is not sold, so `caps()` returns nulls and the composer refuses
+    // references. Start/end FRAMES are unaffected.
+    label: 'Kling 4.0',
+    kind: 'video',
+    ...caps('kling-v4.0'),
+    notes: 'The newest Kling, for single takes longer than Kling 3.0 reaches. Dearer per second and slower than 3.0, and on the same start frame 3.0 Pro won on camera and feel, so Kling 3.0 stays the Kling seat for everything else. Sound is always on at no extra cost. Start frame with an optional last frame, multi-shot sequences, or text alone; no reference images. VIDEO-ONLY.',
+  },
+  {
     id: 'omni-flash',
     route: 'generate',
     tier: 'specialist',

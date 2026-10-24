@@ -1506,6 +1506,10 @@ export const VIDEO_MODELS = [
   // start and end frames OR references (10 images, 5 videos, 5 audio clips).
   // Reference video seconds bill on top of output seconds, so it has a vref key.
   'wan-3.0',
+  // Kling 4.0 (added 2026-10-23 beside 3.0, which stays the default Kling):
+  // one row with no Standard/Pro split, frames or text only, sound always on.
+  // `kling-v4.0` never starts with `kling-v3.0`, so no 3.0 branch can take it.
+  'kling-v4.0',
   // MiniMax H3, three seats in one family. Base H3 (2026-08-27) is the
   // AUTHORED-AUDIO seat — three directable sound layers in one pass, declared
   // reference relationships, 480p to 4K. H3 Max (2026-08-27) is fal's
@@ -4120,6 +4124,15 @@ export function videoCostKey(input: {
     }
     return `${tier}-${input.duration}s${input.sound !== false ? '-audio' : ''}`
   }
+  if (input.model === 'kling-v4.0') {
+    // Mirrors kling4CreditKey() in slate/src/shared/pricing.ts. Output seconds
+    // at the chosen resolution, flat: sound is always on and multi-shot does
+    // not move the price (a multi-shot take bills the sum of its shots, which
+    // is the duration the desktop quotes). Never `kling-v3-…`: a v4 key must
+    // not resolve to a 3.0 row.
+    const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
+    return `kling-v4-${res}-${input.duration}s`
+  }
   if (input.model === 'omni-flash') {
     // Mirrors omniFlashCreditKey() in slate/src/shared/pricing.ts. Omni Flash
     // 1.1 prices each output second by resolution, so the key carries it. Audio
@@ -4378,6 +4391,13 @@ function resolveVideoModel(raw: string): {
     'wan3.0': 'wan-3.0',
     'alibaba-wan-3.0': 'wan-3.0',
     wan: 'wan-3.0',
+    // Kling 4.0 spellings. The bare `kling` and `kling-v3` keep meaning 3.0,
+    // the default Kling.
+    'kling-v4': 'kling-v4.0',
+    'kling-v4-0': 'kling-v4.0',
+    'kling-4': 'kling-v4.0',
+    'kling-4.0': 'kling-v4.0',
+    'kling4': 'kling-v4.0',
     // The MAX and TURBO spellings must come out as themselves. Bare `minimax`,
     // `h3` and `hailuo-3` all mean the BASE row — it holds the full ladder and
     // the references, and it is cheaper than Max at the tier they share.
@@ -4570,9 +4590,9 @@ export const generateVideo: Operation<{
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
       'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'
     ),
-    sound: z.boolean().optional().describe('Kling (every tier), LTX and Wan 3.0: sound on (default) or silent (false); Kling bills audio as its own key. Seedance, Omni Flash and H3 always generate audio.'),
-    audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling model with sound on — language for dialogue.'),
-    generateMusic: z.boolean().optional().describe('Any Kling model with sound on — auto-generate background music.'),
+    sound: z.boolean().optional().describe('Kling 3.0 (every tier), LTX and Wan 3.0: sound on (default) or silent (false); Kling 3.0 bills audio as its own key. Seedance, Omni Flash, H3 and Kling 4.0 always generate audio.'),
+    audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling 3.0 model with sound on — language for dialogue.'),
+    generateMusic: z.boolean().optional().describe('Any Kling 3.0 model with sound on — auto-generate background music.'),
     seedanceFace: z.boolean().optional().describe('Seedance only: a reference shows an AI character\'s face. Without it, faces are blocked; the estimate prices it. A real person fails here with [REAL_FACE_DETECTED]; see seedanceRealFace.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, priced above Face: estimate it with the flag set first. REQUIRES realFaceConsent=true.'),
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every tier.'),
@@ -4728,6 +4748,33 @@ export const generateVideo: Operation<{
               : videoSecs > maxVideoSecs + 0.05
                 ? `Wan 3.0 takes at most ${maxVideoSecs}s of reference video in total (you passed ${videoSecs.toFixed(1)}s). Trim a clip first with slates_trim_video.`
                 : null
+      if (shapeError) {
+        return ok({ requires_clarification: true, missing: [], message: shapeError })
+      }
+    }
+
+    // Kling 4.0's SHAPE constraint: FRAMES, NEVER REFERENCES. Only fal's
+    // `kling/v4/image-to-video` (start frame plus an optional end frame) and
+    // `kling/v4/text-to-video` are sold; its reference-to-video is not, so a
+    // reference id has no transport and is refused rather than dropped (the
+    // LTX rule below). An end frame needs the start frame: text-to-video has
+    // no frame slot at all.
+    if (input.model === 'kling-v4.0') {
+      const refs =
+        (input.ingredientAssetIds?.length ?? 0) +
+        (input.characterAssetIds?.length ?? 0) +
+        (input.environmentAssetIds?.length ?? 0) +
+        (input.styleAssetIds?.length ?? 0) +
+        (input.videoReferenceAssetIds?.length ?? 0) +
+        (input.audioReferenceAssetIds?.length ?? 0) +
+        (input.videoReferenceAssetId ? 1 : 0) +
+        (input.audioReferenceAssetId ? 1 : 0)
+      const shapeError =
+        refs > 0
+          ? 'kling-v4.0 takes a prompt and up to two frames (start and/or end); it reads no reference images, video or audio. Drop them, or switch to kling-v3.0-omni, which reads reference images.'
+          : input.lastFrameAssetId && !input.firstFrameAssetId
+            ? 'kling-v4.0 needs a start frame (firstFrameAssetId) with a last frame.'
+            : null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
       }
@@ -9586,7 +9633,9 @@ export function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('ltx') || t === 'lightricks') return 'slates-prompting-ltx-2-5'
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return resolveGuideTopic(defaultModelFor('video', 'edit'))
-  if (t.startsWith('kling-v3')) return 'slates-prompting-kling-v3'
+  // Kling 4.0 shares the Kling guide, which carries its own short 4.0 section:
+  // no Kling 4.0 prompting guide has been published (checked 2026-10-23).
+  if (t.startsWith('kling-v3') || t.startsWith('kling-v4')) return 'slates-prompting-kling-v3'
   // Audio — the TTS seat FIRST, then seed-audio, then eleven-sfx.
   //
   // 🚨 "tts"/"voiceover" ROUTE HERE AGAIN (2026-09-05). They used to land on

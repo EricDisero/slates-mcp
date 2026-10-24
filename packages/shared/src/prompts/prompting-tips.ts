@@ -300,6 +300,7 @@ const KLING: PromptingTipsEntry = {
   ],
   footer: [
     'Keep dialogue concise (under 10 seconds per line). Use the Language and Accent settings in Audio Controls to control speech characteristics.',
+    'Kling 4.0 takes the same craft: single takes up to 30s, sound always on, and each multi-shot prompt at most 512 characters. In image-to-video the frame sets the aspect ratio.',
   ],
 }
 

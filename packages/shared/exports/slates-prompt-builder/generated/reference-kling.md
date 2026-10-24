@@ -22,6 +22,7 @@
 - [Negative prompting — has a real field](#negative-prompting--has-a-real-field)
 - [Cinematic tactics](#cinematic-tactics)
 - [Tier choice](#tier-choice)
+- [Kling 4.0 (kling-v4.0)](#kling-40-kling-v40)
 - [Benchmark prompt structure](#benchmark-prompt-structure)
 - [Video-to-video EDIT — @Video1 / @ElementN / @ImageN](#video-to-video-edit--video1--elementn--imagen)
 - [Sources](#sources)
@@ -39,7 +40,9 @@
 - `A detective in a wet grey overcoat stands under a stairwell light. He steps forward slowly as the light flickers. [Character A: Detective, mid-40s, raspy voice, slow cadence, weary]: "I've seen this before." SFX: heavy boots on wet concrete, distant siren wailing. Ambient noise: rain on metal.`
 - `Camera tracks right alongside a cyclist crossing a bridge at dusk. She rises out of the saddle rapidly as the grade steepens. Ambient noise: wind, tyres on wet asphalt, distant traffic.`
 
-**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.
+**Hard constraint:** `Immediately` (Omni only) removes the natural conversational beat between speakers — use it when timing matters and leave it out when it does not. Kling 3.0 has a real `negativePrompt` field, unlike Seedance; start from the standard block and layer scene-specific suppressions.
+
+**Kling 4.0** (`kling-v4.0`) takes the same craft with three differences: sound is always on, there is no `negativePrompt` field, and each multi-shot prompt is at most 512 characters.
 
 **Never use:**
 - `SFX: footsteps` and any label-only effect — physical-cause specificity or nothing
@@ -148,7 +151,7 @@ camera is.
 
 ## Multi-shot — what makes them hit
 
-**Hard cap: total duration ≤ 15s across all shots. Max 6 cuts.**
+**Hard cap on Kling 3.0: total duration ≤ 15s across all shots. Max 6 cuts.** Kling 4.0's limits are in its own section below.
 
 Hit conditions:
 - Shot labels are explicit: `Shot 1:`, `Shot 2:`
@@ -235,6 +238,16 @@ Layer scene-specific suppressions on top, and never suppress something the promp
 - **Omni**: multi-character dialogue, audio-visual co-gen, language codes, references without a first frame
 
 Every tier can generate dialogue and sound. Sound is on unless `sound: false` is passed; below 4K it bills the audio key, while 4K includes audio. Pick by visual quality and reference needs. Prices change; check current numbers before choosing a tier.
+
+## Kling 4.0 (`kling-v4.0`)
+
+The newest Kling, sold as one row beside 3.0 with no Standard/Pro split. **Kling 3.0 stays the default Kling:** on the same start frame 3.0 Pro won on camera movement and feel, and 4.0 is slower and costs more credits per second. Reach for 4.0 for a single take past 15s (it runs 3-30s), or when the brief asks for the newest Kling. Subjects, dialogue, sound syntax and motion direction above all carry over; no Kling 4.0 prompting guide has been published yet.
+
+- **Sound is always on** and costs nothing extra. There is no sound switch, language setting or music toggle.
+- **Image-to-video output follows the frame's aspect ratio.** There is no aspect setting there, so crop the frame to the shape you want. Text-to-video takes 16:9, 9:16, 1:1 or 21:9.
+- **Multi-shot: each shot's prompt is at most 512 characters**, and the take runs for the sum of the shot lengths, 3-30s in total. A longer shot prompt is refused, never cut.
+- **Frames, not references:** a start frame with an optional end frame, or text alone. No reference images, and no `negativePrompt` field.
+- Credits are per second at 720p or 1080p.
 
 ## Benchmark prompt structure
 
