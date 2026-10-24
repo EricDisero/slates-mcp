@@ -10,6 +10,8 @@
  *     panel     console log accumulating in a docked glass panel (fg alpha)
  *     poem      lines accumulate in open space, stanza by stanza (fg alpha)
  *     takeover  every beat owns the full frame as a hard-cut card (bg)
+ *     stack     two-tier spoken stacks beside the speaker + chapter card +
+ *               prompt lower thirds (fg alpha; the lesson identity)
  *
  *   HERO SETPIECES  the climax choreography
  *     detonation  sliced stencil stamp: shear-in, snap, squash, cool, furniture
@@ -36,7 +38,7 @@
  */
 const fs = require("fs");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const { execFileSync, spawnSync } = require("child_process");
 
 const PROJECT = path.resolve(process.argv[2] || ".");
 const SKILL = path.resolve(__dirname, "..");
@@ -258,7 +260,10 @@ if (!heroInline && !HEROLESS && !redactLinkage) {
 // resolve lines: every entry gets word objects with timings + role flags
 const minors = new Set((theme.minors || []).map(norm));
 const LINES = (theme.lines || []).map((arr, li) => {
-  const words = arr.map((a) => {
+  // a "|" token splits a line into setup | payoff (the stack paradigm); it is
+  // not a transcript word, and every other paradigm never sees one
+  const bar = arr.indexOf("|");
+  const words = arr.filter((a) => a !== "|").map((a) => {
     const tw = takeWord(a);
     return {
       display: a,
@@ -272,7 +277,7 @@ const LINES = (theme.lines || []).map((arr, li) => {
         tw.start <= hero.end + 0.01,
     };
   });
-  return { id: li, words };
+  return { id: li, words, split: bar < 0 ? null : bar };
 });
 // completeness gate
 const unused = tWords.filter((w) => !w.used);
@@ -4979,6 +4984,490 @@ ${
   return { css, html, js };
 }
 
+// ---- stack: the lesson identity. Three layers, each with one job: spoken
+// two-tier stacks in the clear space beside the speaker (fast, disposable), a
+// chapter card on the save ask, and prompt lower thirds whose prompt types on
+// (slow, quotable). Multi-shot by design: placement reads the matte and the
+// cuts at compile time, so every stack sits beside the face in ITS shot.
+
+// shot cuts: theme.cuts wins; else ffmpeg scdet over source.mp4 (threshold 12
+// matched a hand-logged 13-shot cut map exactly; the one extra hit is a whip pan)
+function stackCuts() {
+  if (Array.isArray(theme.cuts)) return theme.cuts.map(Number).sort((a, b) => a - b);
+  const src = path.join(PROJECT, "source.mp4");
+  if (!fs.existsSync(src)) return [];
+  const r = spawnSync(
+    "ffmpeg",
+    ["-hide_banner", "-nostats", "-i", src, "-vf", `scale=320:-2,scdet=threshold=${dna.body.cutThreshold ?? 12}`, "-an", "-f", "null", "-"],
+    { encoding: "utf8", maxBuffer: 64 << 20 },
+  );
+  return [...(r.stderr || "").matchAll(/lavfi\.scd\.time:\s*([\d.]+)/g)].map((m) => +m[1]);
+}
+
+// the matte as a coarse alpha grid per frame (one ffmpeg pass, no image deps)
+function stackMatte(GW, GH) {
+  const dir = path.join(PROJECT, "frames_fg");
+  if (!fs.existsSync(dir) || !fs.readdirSync(dir).some((f) => /^f_\d+\.png$/.test(f))) return null;
+  try {
+    const buf = execFileSync(
+      "ffmpeg",
+      ["-v", "error", "-framerate", String(FPS), "-i", path.join(dir, "f_%04d.png"),
+       "-vf", `alphaextract,scale=${GW}:${GH}:flags=area`, "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+      { maxBuffer: 1 << 30 },
+    );
+    return { n: Math.floor(buf.length / (GW * GH)), buf };
+  } catch {
+    console.error("[make-theme] WARN stack: matte unreadable — placing on the clearer side");
+    return null;
+  }
+}
+
+function paradigmStack() {
+  const b = dna.body,
+    pal = dna.palette;
+  const FR = 1 / FPS;
+  // a hair before the frame boundary, so a set lands ON the cut frame, never one late
+  const snap = (t) => Math.round(t * FPS) / FPS - 0.0005;
+  const r3 = (t) => +t.toFixed(4);
+  const CUTS = stackCuts();
+  const cutAfter = (t, lo = 0) => CUTS.find((c) => c > t + lo);
+  const cutNear = (t, win) => CUTS.find((c) => Math.abs(c - t) <= win);
+
+  // ---- geometry, all proportional to the frame (4:3, 16:9 and 9:16 alike)
+  const GW = 64,
+    GH = Math.max(24, Math.round((64 * H) / W));
+  const cw = W / GW,
+    chh = H / GH;
+  const M = stackMatte(GW, GH);
+  const BODY = dna.fonts.body,
+    TAG = dna.fonts.tag,
+    UI = dna.fonts.ui || "Inter";
+  const setupPx = Math.round(H * (b.setupPx ?? 0.043));
+  const payBase = Math.round(setupPx * (b.payoffScale ?? 2.5));
+  const maxW = W * (b.maxWidth ?? 0.56);
+  const LS = b.letterSpacing ?? -0.005;
+  const textW = (s, fam, px, ls = LS) => wordPx(s, fam, px, ls);
+
+  // union of matte alpha over [t0,t1] → occupancy + distance-to-subject grids
+  function occupancy(t0, t1) {
+    if (!M) return null;
+    const u = new Uint8Array(GW * GH);
+    const f0 = Math.max(0, Math.floor(t0 * FPS)),
+      f1 = Math.min(M.n - 1, Math.ceil(t1 * FPS));
+    for (let f = f0; f <= f1; f++) {
+      const o = f * GW * GH;
+      for (let i = 0; i < GW * GH; i++) if (M.buf[o + i] > u[i]) u[i] = M.buf[o + i];
+    }
+    const occ = new Uint8Array(GW * GH);
+    let any = false;
+    for (let i = 0; i < GW * GH; i++) if (u[i] > 48) (occ[i] = 1), (any = true);
+    // breathing room: dilate ~2% of the frame each way
+    const rx = Math.max(1, Math.round((0.022 * W) / cw)),
+      ry = Math.max(1, Math.round((0.022 * H) / chh));
+    const dil = new Uint8Array(GW * GH);
+    for (let y = 0; y < GH; y++)
+      for (let x = 0; x < GW; x++) {
+        if (!occ[y * GW + x]) continue;
+        for (let yy = Math.max(0, y - ry); yy <= Math.min(GH - 1, y + ry); yy++)
+          for (let xx = Math.max(0, x - rx); xx <= Math.min(GW - 1, x + rx); xx++) dil[yy * GW + xx] = 1;
+      }
+    // summed-area table over the dilated grid; chebyshev distance to the subject
+    const sat = new Float64Array((GW + 1) * (GH + 1));
+    for (let y = 0; y < GH; y++)
+      for (let x = 0; x < GW; x++)
+        sat[(y + 1) * (GW + 1) + x + 1] =
+          dil[y * GW + x] + sat[y * (GW + 1) + x + 1] + sat[(y + 1) * (GW + 1) + x] - sat[y * (GW + 1) + x];
+    const dist = new Float64Array(GW * GH).fill(1e9);
+    const q = [];
+    for (let i = 0; i < GW * GH; i++) if (occ[i]) (dist[i] = 0), q.push(i);
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h],
+        x = i % GW,
+        y = (i / GW) | 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx,
+            yy = y + dy;
+          if (xx < 0 || yy < 0 || xx >= GW || yy >= GH) continue;
+          const j = yy * GW + xx;
+          if (dist[j] > dist[i] + 1) (dist[j] = dist[i] + 1), q.push(j);
+        }
+    }
+    return { any, sat, dist };
+  }
+  const rectCells = (x, y, w, h) => [
+    Math.max(0, Math.floor(x / cw)),
+    Math.max(0, Math.floor(y / chh)),
+    Math.min(GW, Math.ceil((x + w) / cw)),
+    Math.min(GH, Math.ceil((y + h) / chh)),
+  ];
+  function overlap(O, x, y, w, h) {
+    if (!O) return 0;
+    const [x0, y0, x1, y1] = rectCells(x, y, w, h);
+    const S = (xx, yy) => O.sat[yy * (GW + 1) + xx];
+    const n = (x1 - x0) * (y1 - y0);
+    return n > 0 ? (S(x1, y1) - S(x0, y1) - S(x1, y0) + S(x0, y0)) / n : 0;
+  }
+  // best top-left for a w×h block over [t0,t1]: clear of the subject, close to
+  // it (beside the face, not in a far corner), near the preferred height
+  function place(t0, t1, w, h, prefY) {
+    const mx = W * 0.05,
+      mt = H * 0.06,
+      mb = H * 0.08;
+    const O = occupancy(t0, t1);
+    if (!O || !O.any) {
+      const x = CLEARER === "right" ? W - mx - w : mx;
+      return { x: Math.round(x), y: Math.round(Math.min(H - mb - h, Math.max(mt, prefY * H - h / 2))) };
+    }
+    let best = null;
+    for (let y = mt; y + h <= H - mb; y += chh)
+      for (let x = mx; x + w <= W - mx; x += cw) {
+        const ov = overlap(O, x, y, w, h);
+        const [x0, y0, x1, y1] = rectCells(x, y, w, h);
+        let near = 1e9;
+        for (let yy = y0; yy < y1; yy++)
+          for (let xx = x0; xx < x1; xx++) near = Math.min(near, O.dist[yy * GW + xx]);
+        const cost = ov * 100 + 0.35 * Math.max(0, near - 2) + 6 * Math.abs((y + h / 2) / H - prefY);
+        if (!best || cost < best.cost - 1e-9) best = { cost, x, y };
+      }
+    return { x: Math.round(best.x), y: Math.round(best.y) };
+  }
+
+  // ---- blocking windows: the chapter card and each lower third own the frame;
+  // spoken stacks whose first word falls inside one are not drawn (still verbatim-covered)
+  const blocks = [];
+  let chapter = null;
+  if (theme.chapter && theme.chapter.match) {
+    const c = theme.chapter;
+    const ph = findPhrase(c.match);
+    const saveWord = tWords.slice(ph.idx, ph.idx + ph.len).find((w) => norm(w.text) === norm(c.save || "save"));
+    const pre = CUTS.filter((t) => t <= ph.start && t >= ph.start - 0.45).pop();
+    const tin = pre != null ? snap(pre) : r3(ph.start - 0.12);
+    const ca = cutAfter(ph.end - 0.05);
+    const tout =
+      c.out ?? (ca != null && ca - ph.end <= 2 ? snap(Math.max(ca, ph.end + 0.4)) : r3(ph.end + 0.9));
+    const [t1, t2] = String(c.title || "").split("/").map((s) => s.trim().toUpperCase());
+    chapter = { tin, tout, save: r3((saveWord || tWords[ph.idx]).start), num: String(c.number ?? ""), t1: t1 || "", t2: t2 || "", cut: CUTS.some((x) => Math.abs(x - tout) < FR) };
+    blocks.push([tin, tout]);
+  }
+  const items = (theme.items || []).map((it, k) => {
+    const ph = findPhrase(it.match);
+    const pre = CUTS.filter((t) => t <= ph.start && t >= ph.start - 0.3).pop();
+    const tin = pre != null ? snap(pre) : r3(ph.start - 0.05);
+    const prompt = String(it.prompt || "");
+    const chars = [...prompt];
+    const typeStart = tin + 0.3;
+    // keystrokes: "cut" = the last key lands on the next cut; a number = ends
+    // there; default "speech" = each prompt word types while it is spoken
+    let keys = null,
+      typeEnd,
+      onCut = false;
+    const mode = it.typeEnd ?? "speech";
+    if (mode === "speech") {
+      const pw = prompt.split(/\s+/).filter(Boolean);
+      let hit = null;
+      for (let i = ph.idx; i <= tWords.length - pw.length && !hit; i++)
+        if (pw.every((p, j) => norm(tWords[i + j].text) === norm(p))) hit = i;
+      if (hit != null) {
+        keys = [];
+        let ci = 0;
+        pw.forEach((p, j) => {
+          const w = tWords[hit + j],
+            len = p.length + (j < pw.length - 1 ? 1 : 0);
+          const t0 = Math.max(w.start, typeStart),
+            span = Math.max(FR, 0.8 * (w.end - w.start));
+          for (let q = 0; q < len; q++) keys[ci++] = r3(t0 + (span * q) / len);
+        });
+        typeEnd = keys[keys.length - 1];
+      }
+    }
+    if (!keys) {
+      if (mode === "cut") {
+        const c = cutAfter(typeStart, 0.4);
+        if (c != null) (typeEnd = snap(c)), (onCut = true);
+      } else if (typeof mode === "number") typeEnd = mode;
+      if (typeEnd == null) typeEnd = typeStart + Math.min(2.2, 0.045 * chars.length);
+      // human rhythm: seeded ±35% jitter per interval, renormalized so the
+      // last keystroke lands exactly on typeEnd
+      let a = 0x9e3779b9 ^ (k + 1) * 2654435761;
+      const rnd = () => ((a = (a * 1664525 + 1013904223) >>> 0) / 4294967296);
+      const gaps = chars.map(() => 0.65 + 0.7 * rnd());
+      const tot = gaps.reduce((x, y) => x + y, 0) - gaps[0];
+      keys = [];
+      let acc = 0;
+      chars.forEach((_, q) => {
+        if (q) acc += gaps[q];
+        keys.push(r3(typeStart + ((typeEnd - typeStart) * acc) / (tot || 1)));
+      });
+      keys[keys.length - 1] = r3(typeEnd);
+    }
+    const next = theme.items[k + 1] ? findPhrase(theme.items[k + 1].match).start - 0.05 : DUR - 0.05;
+    const ca = cutAfter(Math.max(typeEnd, tin + 1.2), 0.3);
+    let tout = it.out ?? (ca != null && ca - typeEnd <= 6 ? snap(ca) : r3(typeEnd + 2.5));
+    tout = Math.min(tout, next, DUR - 0.05);
+    blocks.push([tin, tout]);
+    return {
+      tin, tout, keys, typeEnd: r3(typeEnd), onCut, n: String(it.number ?? k + 1),
+      name: String(it.name || "").toUpperCase(), prompt, before: it.before ? String(it.before).toUpperCase() : null,
+      beforeOut: onCut ? snap(typeEnd) : r3(Math.min(tout, typeEnd)), cut: CUTS.some((x) => Math.abs(x - tout) < FR),
+    };
+  });
+  const blocked = (t) => blocks.some(([a, z]) => t >= a - 0.01 && t <= z);
+
+  // ---- the lime lesson words: minors entries, a phrase matches as a run
+  const minorRuns = (theme.minors || []).map((m) => m.split(/\s+/).map(norm));
+  function limeMask(ws) {
+    const on = ws.map(() => false);
+    for (const run of minorRuns)
+      for (let i = 0; i + run.length <= ws.length; i++)
+        if (run.every((r, j) => norm(ws[i + j].display) === r)) for (let j = 0; j < run.length; j++) on[i + j] = true;
+    return on;
+  }
+
+  // ---- stacks: split, size (width-fit, then a balanced 2-row break), window
+  const stacks = [];
+  LINES.forEach((L, i) => {
+    const first = L.words[0],
+      last = L.words[L.words.length - 1];
+    if (blocked(first.start)) return;
+    const n = L.words.length;
+    const split = L.split != null ? L.split : n <= 2 ? 0 : Math.min(2, Math.max(1, Math.floor(n / 3)));
+    const su = L.words.slice(0, split),
+      po = L.words.slice(split);
+    const lime = limeMask(po);
+    // caps, and a sentence's closing period dropped (commas and ? stay, as spoken)
+    const up = (ws) => ws.map((w) => w.display.toUpperCase().replace(/\.+$/, ""));
+    let px = payBase,
+      rows = [up(po)];
+    const rowW = (r, p) => textW(r.join(" "), BODY, p);
+    if (rowW(rows[0], px) > maxW) px = Math.max(Math.round(payBase * 0.78), Math.floor((px * maxW) / rowW(rows[0], px)));
+    if (rowW(rows[0], px) > maxW && po.length > 1) {
+      let bestK = 1;
+      for (let k2 = 1; k2 < po.length; k2++) {
+        const m = (k) => Math.max(rowW(rows[0].slice(0, k), px), rowW(rows[0].slice(k), px));
+        if (m(k2) < m(bestK)) bestK = k2;
+      }
+      rows = [rows[0].slice(0, bestK), rows[0].slice(bestK)];
+      px = payBase;
+      const wid = Math.max(...rows.map((r) => rowW(r, px)));
+      if (wid > maxW) px = Math.floor((px * maxW) / wid);
+    }
+    const nextIn = i + 1 < LINES.length ? LINES[i + 1].words[0].start - 0.02 : DUR - 0.1;
+    const blockIn = blocks.map(([a]) => a).filter((a) => a > first.start).sort((a, z) => a - z)[0] ?? 1e9;
+    const ca = cutAfter(last.start - 0.001);
+    let tout = Math.min(nextIn, last.end + (b.maxHold ?? 1.1), blockIn - 0.01, DUR - 0.05);
+    let cut = false;
+    if (ca != null && ca <= tout + 0.001) (tout = snap(ca)), (cut = true);
+    stacks.push({
+      id: "s" + L.id, su: su.length ? up(su).join(" ") : "", rows, lime, px,
+      tin: r3(first.start - 0.02), tpo: r3(po[0].start - 0.02), tout: r3(tout), cut,
+      w: Math.max(su.length ? textW(up(su).join(" "), BODY, setupPx) : 0, ...rows.map((r) => rowW(r, px))),
+      ph: rows.length * px * 0.92,
+    });
+  });
+  // one anchor per run of stacks inside the same shot: consecutive stacks keep
+  // their column instead of hopping, and payoff-only lines land where the last payoff did
+  const groups = [];
+  stacks.forEach((S, i) => {
+    const prev = stacks[i - 1];
+    const sameShot = prev && !prev.cut && !CUTS.some((c) => c > prev.tin && c <= S.tin) && S.tin - prev.tout < 1.5;
+    if (sameShot) groups[groups.length - 1].push(S);
+    else groups.push([S]);
+  });
+  const suH = setupPx * 1.02,
+    gap = Math.round(payBase * 0.04);
+  for (const G of groups) {
+    const w = Math.max(...G.map((S) => S.w)) + payBase * 0.12; // italic overhang
+    const ph = Math.max(...G.map((S) => S.ph));
+    const h = suH + gap + ph;
+    const at = place(G[0].tin, G[G.length - 1].tout, w, h, b.prefY ?? 0.66);
+    for (const S of G) (S.x = at.x), (S.y = at.y), (S.poY = Math.round(suH + gap));
+  }
+
+  // ---- chapter card + lower-third corners: the corner with less subject in it
+  const chNumPx = Math.round(H * 0.25),
+    ch1Px = Math.round(H * 0.064),
+    ch2Px = Math.round(H * 0.036);
+  if (chapter) {
+    const w = textW(chapter.num, BODY, chNumPx) + Math.max(textW(chapter.t1, BODY, ch1Px) + ch1Px * 1.1, textW(chapter.t2, BODY, ch2Px)) + chNumPx * 0.1;
+    const h = chNumPx * 0.86;
+    const O = occupancy(chapter.tin, chapter.tout);
+    chapter.side = overlap(O, W - W * 0.05 - w, H * 0.06, w, h) < overlap(O, W * 0.05, H * 0.06, w, h) - 0.02 ? "right" : "left";
+  }
+  const namePx = Math.round(H * 0.1),
+    numPx = Math.round(namePx * 0.36),
+    pbPx = Math.round(H * 0.031),
+    boxMax = Math.round(W * 0.46);
+  for (const it of items) {
+    const nameW = textW(it.name, TAG, namePx, 0) + textW(it.n, TAG, numPx, 0) + namePx * 0.12;
+    const innerMax = boxMax - pbPx * 1.6 - pbPx * 4.6; // padding + the Generate keycap
+    const tw = textW(it.prompt, UI, pbPx, 0);
+    const rowsN = Math.max(1, Math.ceil(tw / innerMax));
+    const boxW = Math.min(boxMax, tw + pbPx * 1.6 + pbPx * 4.6);
+    const w = Math.max(nameW, boxW),
+      h = namePx * 0.95 + H * 0.018 + rowsN * pbPx * 1.32 + pbPx * 1.4;
+    const O = occupancy(it.tin, it.tout);
+    const y = H - H * 0.065 - h;
+    it.side = overlap(O, W - W * 0.05 - w, y, w, h) < overlap(O, W * 0.05, y, w, h) - 0.02 ? "right" : "left";
+  }
+
+  // ---- markup (baked at compile time; the page only schedules)
+  const shadowRest = `0 ${Math.round(setupPx * 0.08)}px ${Math.round(setupPx * 0.42)}px rgba(0,0,0,0.42), 0 ${Math.max(1, Math.round(setupPx * 0.03))}px ${Math.max(2, Math.round(setupPx * 0.08))}px rgba(0,0,0,0.38)`;
+  const stackHtml = stacks
+    .map((S) => {
+      let wi = 0;
+      const rows = S.rows
+        .map((r) => `<div class="pr">${r.map((t) => { const on = S.lime[wi++]; return on ? `<span class="lm">${esc(t)}</span>` : esc(t); }).join(" ")}</div>`)
+        .join("");
+      return `      <div class="st" id="${S.id}" style="left:${S.x}px;top:${S.y}px">${S.su ? `<div class="su">${esc(S.su)}</div>` : ""}<div class="po" style="top:${S.poY}px;font-size:${S.px}px">${rows}</div></div>`;
+    })
+    .join("\n");
+  const bookmark = (cls) =>
+    `<svg class="${cls}" viewBox="0 0 24 30" width="${Math.round(ch1Px * 0.72)}" height="${Math.round(ch1Px * 0.9)}"><path d="M3.5 2.5h17v25l-8.5-6.6-8.5 6.6z" fill="${cls === "bmf" ? pal.accent : "none"}" stroke="${cls === "bmf" ? pal.accent : pal.body}" stroke-width="2.6" stroke-linejoin="round"/></svg>`;
+  const chapterHtml = chapter
+    ? `      <div class="ch ${chapter.side}" id="ch"><div class="chn">${esc(chapter.num)}</div><div class="cht"><div class="ch1">${esc(chapter.t1)}<span class="bm">${bookmark("bmo")}<span class="bmfw">${bookmark("bmf")}</span></span></div>${chapter.t2 ? `<div class="ch2">${esc(chapter.t2)}</div>` : ""}</div></div>`
+    : "";
+  const itemHtml = items
+    .map((it, k) => {
+      const chars = [...it.prompt].map((c) => `<span class="c">${c === " " ? " " : esc(c)}<i class="cr"></i></span>`).join("");
+      return (
+        `      <div class="lt ${it.side}" id="lt${k}"><div class="ltn"><span class="ltk">${esc(it.n)}</span><span class="ltname">${esc(it.name)}</span></div>` +
+        `<div class="pb"><div class="pbt"><i class="cr cr0"></i>${chars}</div><div class="gen">Generate</div></div></div>` +
+        (it.before ? `\n      <div class="bf" id="bf${k}">${esc(it.before)}</div>` : "")
+      );
+    })
+    .join("\n");
+
+  const css = `
+  .st { position:absolute; opacity:0; white-space:nowrap; font-family:'${BODY}', sans-serif; font-style:italic;
+        font-weight:800; line-height:1; letter-spacing:${LS}em; color:${pal.body}; }
+  .st .su { position:absolute; left:0; top:0; font-size:${setupPx}px; opacity:0; text-shadow:${shadowRest}; }
+  .st .po { position:absolute; left:0; line-height:0.92; opacity:0; text-shadow:var(--sm, ${shadowRest}); }
+  .st .lm, .ch .lm { color:${pal.accent}; }
+  .ch { position:absolute; top:${Math.round(H * 0.06)}px; display:flex; align-items:flex-start; opacity:0;
+        font-family:'${BODY}', sans-serif; font-style:italic; font-weight:800; color:${pal.body};
+        letter-spacing:${LS}em; white-space:nowrap; text-shadow:${shadowRest}; }
+  .ch.left { left:${Math.round(W * 0.05)}px; } .ch.right { right:${Math.round(W * 0.05)}px; }
+  .ch .chn { font-size:${chNumPx}px; line-height:0.8; margin-right:${Math.round(chNumPx * 0.06)}px; text-shadow:var(--sm, ${shadowRest}); }
+  .ch .cht { padding-top:${Math.round(chNumPx * 0.06)}px; }
+  .ch .ch1 { font-size:${ch1Px}px; line-height:0.95; display:flex; align-items:center; gap:${Math.round(ch1Px * 0.24)}px; opacity:0; }
+  .ch .ch2 { font-size:${ch2Px}px; line-height:1.05; opacity:0; }
+  .ch .bm { position:relative; display:inline-block; width:${Math.round(ch1Px * 0.72)}px; height:${Math.round(ch1Px * 0.9)}px; opacity:0; }
+  .ch .bm svg { position:absolute; left:0; top:0; overflow:visible; }
+  .ch .bmfw { position:absolute; inset:0; clip-path:inset(100% 0 0 0); }
+  .lt { position:absolute; bottom:${Math.round(H * 0.065)}px; display:flex; flex-direction:column; opacity:0; }
+  .lt.left { left:${Math.round(W * 0.05)}px; align-items:flex-start; } .lt.right { right:${Math.round(W * 0.05)}px; align-items:flex-end; }
+  .lt .ltn { font-family:'${TAG}', sans-serif; font-weight:900; font-stretch:125%; color:${pal.body}; line-height:0.86;
+             white-space:nowrap; text-shadow:var(--sm, ${shadowRest}); opacity:0; }
+  .lt .ltk { font-size:${numPx}px; color:${pal.accent}; vertical-align:top; margin-right:${Math.round(namePx * 0.1)}px; display:inline-block; }
+  .lt .ltname { font-size:${namePx}px; }
+  .lt .pb { margin-top:${Math.round(H * 0.018)}px; max-width:${boxMax}px; display:flex; align-items:flex-end; gap:${Math.round(pbPx * 0.8)}px;
+            padding:${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.8)}px;
+            border-radius:${Math.round(pbPx * 0.75)}px; opacity:0;
+            background:linear-gradient(180deg, rgba(30,30,30,0.9) 0%, rgba(22,22,22,0.89) 48%, rgba(14,14,14,0.9) 100%);
+            box-shadow:0 ${Math.round(pbPx * 0.06)}px ${Math.round(pbPx * 0.1)}px rgba(0,0,0,0.55), 0 ${Math.round(pbPx * 0.3)}px ${Math.round(pbPx * 0.6)}px -${Math.round(pbPx * 0.26)}px rgba(0,0,0,0.5), 0 ${Math.round(pbPx * 0.85)}px ${Math.round(pbPx * 1.8)}px -${Math.round(pbPx * 0.65)}px rgba(0,0,0,0.68); }
+  .lt .pbt { position:relative; flex:1; font-family:'${UI}', sans-serif; font-weight:500; font-size:${pbPx}px; line-height:1.32;
+             color:#ECECEC; text-align:left; white-space:pre-wrap; padding:${Math.round(pbPx * 0.12)}px 0; }
+  .lt .c { visibility:hidden; position:relative; }
+  .lt .cr { position:absolute; right:-${Math.max(1, Math.round(pbPx * 0.06))}px; top:0.12em; width:${Math.max(2, Math.round(pbPx * 0.09))}px; height:1.1em;
+            background:${pal.accent}; border-radius:1px; opacity:0; visibility:visible; }
+  .lt .cr0 { left:0; right:auto; }
+  .lt .gen { flex:none; font-family:'${UI}', sans-serif; font-weight:600; font-size:${Math.round(pbPx * 0.62)}px; color:#000; white-space:nowrap;
+             padding:${Math.round(pbPx * 0.3)}px ${Math.round(pbPx * 0.62)}px; border-radius:${Math.round(pbPx * 0.38)}px;
+             background:linear-gradient(to bottom, #d7ff3d 0%, #c3f500 100%);
+             box-shadow:inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.45); }
+  .bf { position:absolute; left:${W / 2}px; top:${Math.round(H * 0.47)}px; transform:translateX(-50%); opacity:0; white-space:nowrap;
+        font-family:'${TAG}', sans-serif; font-weight:200; font-stretch:125%; font-size:${Math.round(H * 0.032)}px;
+        letter-spacing:0.32em; color:${pal.body}; text-shadow:${shadowRest}; }`;
+
+  const html = [stackHtml, chapterHtml, itemHtml].filter(Boolean).join("\n");
+
+  const js = `
+  // ---- body paradigm: STACK (lesson) — two-tier stacks, chapter card, prompt lower thirds ----
+  const FR = ${FR};
+  const REST = ${J(shadowRest)};
+  // directional motion blur without filter:blur — ghost copies of the glyphs in
+  // their own colour (currentColor), trailing the travel direction
+  const smear = (d, px) => {
+    if (!d) return REST;
+    const g = [];
+    for (let k = 1; k <= 6; k++) g.push((-k * 0.075 * px * d).toFixed(1) + "px 0 0 color-mix(in srgb, currentColor " + Math.round((0.52 - k * 0.07) * 100) + "%, transparent)");
+    return g.join(", ") + ", " + REST;
+  };
+  // the four-frame skew slide: lands on its word, settles on frame 4
+  const slideIn = (el, t0, px) => {
+    const K = [[-0.55, -16, 1], [-0.2, -8, 0.55], [-0.06, -3, 0.22], [0, 0, 0]];
+    K.forEach(([x, sk, d], f) => tl.set(el, { opacity: 1, x: x * px, skewX: sk, "--sm": smear(d, px) }, t0 + f * FR));
+  };
+  const outro = (el, t, cut) => {
+    if (cut) { tl.set(el, { opacity: 0 }, t); return; }
+    tl.set(el, { opacity: 0.55, x: -10 }, t); tl.set(el, { opacity: 0.2, x: -22 }, t + FR); tl.set(el, { opacity: 0 }, t + 2 * FR);
+  };
+  const STACKS = ${J(stacks.map((S) => ({ id: S.id, su: !!S.su, tin: S.tin, tpo: S.tpo, tout: S.tout, cut: S.cut, px: S.px })))};
+  STACKS.forEach((S) => {
+    const el = document.getElementById(S.id), su = el.querySelector(".su"), po = el.querySelector(".po");
+    tl.set(el, { opacity: 1 }, S.tin);
+    if (su) { tl.set(su, { opacity: 0.5, y: 5 }, S.tin); tl.set(su, { opacity: 1, y: 0 }, S.tin + FR); }
+    slideIn(po, Math.max(S.tpo, S.tin + (su ? 2 * FR : 0)), S.px);
+    outro(el, S.tout, S.cut);
+  });
+${
+  chapter
+    ? `  // ---- chapter card: numeral slides, title rows follow, the bookmark fills on "save"
+  {
+    const C = ${J(chapter)};
+    const ch = document.getElementById("ch");
+    tl.set(ch, { opacity: 1 }, C.tin);
+    slideIn(ch.querySelector(".chn"), C.tin, ${chNumPx});
+    slideIn(ch.querySelector(".ch1"), C.tin + 2 * FR, ${ch1Px});
+    const c2 = ch.querySelector(".ch2"); if (c2) slideIn(c2, C.tin + 3 * FR, ${ch2Px});
+    const bm = ch.querySelector(".bm"), fill = ch.querySelector(".bmfw");
+    tl.set(bm, { opacity: 1, scale: 0.6 }, C.tin + 5 * FR); tl.set(bm, { scale: 1.08 }, C.tin + 6 * FR); tl.set(bm, { scale: 1 }, C.tin + 7 * FR);
+    const S = Math.max(C.save, C.tin + 8 * FR);
+    ["inset(70% 0 0 0)", "inset(38% 0 0 0)", "inset(12% 0 0 0)", "inset(0% 0 0 0)"].forEach((v, f) => tl.set(fill, { clipPath: v }, S + f * FR));
+    [1.28, 1.14, 1.04, 1].forEach((s, f) => tl.set(bm, { scale: s }, S + f * FR));
+    tl.set(bm, { filter: "drop-shadow(0 0 ${Math.round(ch1Px * 0.22)}px ${pal.accent})" }, S);
+    tl.set(bm, { filter: "drop-shadow(0 0 ${Math.round(ch1Px * 0.08)}px rgba(200,255,0,0.45))" }, S + 6 * FR);
+    outro(ch, C.tout, C.cut);
+  }`
+    : ""
+}
+  // ---- prompt lower thirds: number pops, name slides, the box rises, the prompt types on
+  const ITEMS = ${J(items.map((it) => ({ tin: it.tin, tout: it.tout, keys: it.keys, typeEnd: it.typeEnd, onCut: it.onCut, cut: it.cut, side: it.side, before: !!it.before, beforeOut: it.beforeOut })))};
+  ITEMS.forEach((I, k) => {
+    const lt = document.getElementById("lt" + k);
+    const dir = I.side === "right" ? -1 : 1;
+    tl.set(lt, { opacity: 1 }, I.tin);
+    const ltn = lt.querySelector(".ltn"), pb = lt.querySelector(".pb");
+    slideIn(ltn, I.tin, ${namePx});
+    const kk = lt.querySelector(".ltk");
+    [1.5, 1.15, 1].forEach((s, f) => tl.set(kk, { scale: s }, I.tin + f * FR));
+    [[0.0, 14], [0.6, 5], [1, 0]].forEach(([o, y], f) => tl.set(pb, { opacity: o, y: y }, I.tin + (3 + f) * FR));
+    const cs = lt.querySelectorAll(".pbt .c"), cr0 = lt.querySelector(".cr0");
+    // idle caret blinks until the first key, keys type, the last caret blinks after
+    const blink = (el, a, z) => { for (let t = a, on = true; t < z - 0.01; t += 0.5, on = !on) tl.set(el, { opacity: on ? 1 : 0 }, t); };
+    blink(cr0, I.tin + 5 * FR, I.keys[0]);
+    tl.set(cr0, { opacity: 0 }, I.keys[0]);
+    I.keys.forEach((t, q) => {
+      tl.set(cs[q], { visibility: "visible" }, t);
+      const crq = cs[q].querySelector(".cr");
+      tl.set(crq, { opacity: 1 }, t);
+      if (q + 1 < cs.length) tl.set(crq, { opacity: 0 }, I.keys[q + 1]);
+    });
+    if (cs.length) blink(cs[cs.length - 1].querySelector(".cr"), I.typeEnd + 0.5, I.tout);
+    // Generate is pressed on the last keystroke
+    const gen = lt.querySelector(".gen");
+    [[0.92, 1.25], [0.96, 1.12], [1, 1]].forEach(([s, br], f) => tl.set(gen, { scale: s, filter: "brightness(" + br + ")" }, I.typeEnd + f * FR));
+    outro(lt, I.tout, I.cut);
+    if (I.before) {
+      const bf = document.getElementById("bf" + k);
+      [0.4, 0.8, 1].forEach((o, f) => tl.set(bf, { opacity: o }, I.tin + f * FR));
+      tl.set(bf, { opacity: 0 }, I.beforeOut);
+    }
+  });`;
+  return { css, html, js };
+}
+
 const PARADIGMS = {
   rail: paradigmRail,
   panel: paradigmPanel,
@@ -5003,6 +5492,7 @@ const PARADIGMS = {
   brushrail: paradigmBrushrail,
   inkrail: paradigmInkrail,
   ransomrail: paradigmRansomrail,
+  stack: paradigmStack,
 };
 
 function setpieceCpslam() {

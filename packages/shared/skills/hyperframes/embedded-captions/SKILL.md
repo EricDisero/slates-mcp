@@ -3,7 +3,7 @@ name: embedded-captions
 description: >
   Add captions or subtitles to an existing single-subject talking-head video without editing the
   footage. Use for plain verbatim captions, cinematic captions embedded behind the subject, VFX
-  captions, “炸/特效/酷炫字幕,” or a named identity from the 35-style catalog. Route by visual
+  captions, “炸/特效/酷炫字幕,” or a named identity from the 36-style catalog. Route by visual
   identity, not by backend engine. The quiet `anchor` rail is the default; embed every word only
   when the user explicitly wants a fully cinematic treatment. The workflow runs locally end to end,
   including transcription and subject matting; split multi-shot footage before applying it.
@@ -15,7 +15,7 @@ description: >
 
 # Embedded Captions
 
-**One catalog, picked up front** ([CATALOG.md](CATALOG.md) — 35 identities; the engines behind it are backend detail). **Standard** (default) builds a clean verbatim **rail** (lower-third subtitle carrying most text) + an **embed** climax composited _into_ the scene behind the subject at the peak. **Cinematic** is pure embed — no rail, every caption composited behind the subject (hero typography, accumulation, occlusion as the effect). **Theme** is a complete themed constitution — body paradigm × hero setpiece × front fx × plate reaction, composed from registries ([themes/README.md](themes/README.md)): `ordnance` `terminal` `neonsign` `stardust` `stomp`. Most explainer / voiceover is **Standard**; **embed is the scarce, earned peak** — embedding every word is the common mistake; Theme is for VFX-grade asks ("炸", "特效", "像 AE 做的").
+**One catalog, picked up front** ([CATALOG.md](CATALOG.md) — 36 identities; the engines behind it are backend detail). **Standard** (default) builds a clean verbatim **rail** (lower-third subtitle carrying most text) + an **embed** climax composited _into_ the scene behind the subject at the peak. **Cinematic** is pure embed — no rail, every caption composited behind the subject (hero typography, accumulation, occlusion as the effect). **Theme** is a complete themed constitution — body paradigm × hero setpiece × front fx × plate reaction, composed from registries ([themes/README.md](themes/README.md)): `ordnance` `terminal` `neonsign` `stardust` `stomp`. Most explainer / voiceover is **Standard**; **embed is the scarce, earned peak** — embedding every word is the common mistake; Theme is for VFX-grade asks ("炸", "特效", "像 AE 做的").
 
 ---
 
@@ -46,9 +46,9 @@ Routed through `/hyperframes`, the intent layer confirms only the input (which c
 
 The craft prose below is long; the **pipeline itself is short** — and everything deterministic is computed or compiled, never hand-written:
 
-1. **Decision gate** (refuse bad clips) → **pick ONE identity from [CATALOG.md](CATALOG.md)** (35 identities; engine/compiler derived by lookup — never surface a mode/category question)
+1. **Decision gate** (refuse bad clips) → **pick ONE identity from [CATALOG.md](CATALOG.md)** (36 identities; engine/compiler derived by lookup — never surface a mode/category question)
 2. `hyperframes init` (skip it if the project dir already exists with the video inside — `matte.cjs`/`transcribe.cjs` adopt any video in the dir as source.mp4) → **`bash scripts/prepare.sh <project>`** (matte ∥ transcribe ∥ audio-envelope in parallel, then safe-zones v2 with scene palette/optics/lighting — one command, nothing forgotten)
-3. **author a small JSON of creative choices** (read `safe-zones.json` first): Cinematic → `cinematic.json` → `make-cinematic.cjs` (derives `plan.json` and compiles it); Theme → `theme.json` → `make-theme.cjs` (rail/panel/poem/takeover paradigms; `anchor` is the quiet rail default)
+3. **author a small JSON of creative choices** (read `safe-zones.json` first): Cinematic → `cinematic.json` → `make-cinematic.cjs` (derives `plan.json` and compiles it); Theme → `theme.json` → `make-theme.cjs` (rail/panel/poem/takeover/stack paradigms; `anchor` is the quiet rail default, `lesson` the multi-shot stack)
 4. **Visual QA**: `node scripts/preview-frames.cjs <project>` → faithful composite previews in ~2s/frame (no render). Check § Visual QA before paying for a render.
 5. `render-and-composite.sh` → gates (timing / occlusion+hero / overflow / hand-off) → `final.mp4`
 
@@ -78,7 +78,7 @@ Rail-surface identities build exactly this (rail = `rail.html`, embed = the clim
 
 ## Step 0 — pick ONE identity from the CATALOG
 
-**One front-end, three engines behind.** The user picks an IDENTITY from [CATALOG.md](CATALOG.md) (35 entries: 10 classic + 25 themed); the engine, compiler and authoring file are derived by lookup from the catalog row. **Never surface "Standard vs Cinematic vs Theme" as a question** — those are backend names (a product has one UX even with several engines). The catalog encodes everything routing needs: reading surface, voice, recommend-for, scene needs, adjacency notes for the genuinely-close pairs (loud↔ordnance, neon↔neonsign, cream↔stardust).
+**One front-end, three engines behind.** The user picks an IDENTITY from [CATALOG.md](CATALOG.md) (36 entries: 10 classic + 26 themed); the engine, compiler and authoring file are derived by lookup from the catalog row. **Never surface "Standard vs Cinematic vs Theme" as a question** — those are backend names (a product has one UX even with several engines). The catalog encodes everything routing needs: reading surface, voice, recommend-for, scene needs, adjacency notes for the genuinely-close pairs (loud↔ordnance, neon↔neonsign, cream↔stardust).
 
 The identity pick is a **preference gate** (`../hyperframes/references/brief-contract.md` § 1): in autonomous mode ("surprise me" / "decide for me"), pick from your shortlist yourself and state the one-line why instead of asking.
 
@@ -108,7 +108,7 @@ ffmpeg -ss <t> -i <video.mp4> -vframes 1 sample.png   # at 20/50/80%
 
 Read the samples. Refuse if:
 
-- Multiple speakers / hard cuts (split & render each shot, or refuse)
+- Multiple speakers / hard cuts (split & render each shot, or refuse) — except the `lesson` identity, which is built for a cut-together edit: it detects the cuts and places every caption per shot
 - No human subject (this skill is for talking-head)
 - Under 3 seconds, **no speech**, or face never clearly visible — `transcribe.cjs` warns when audio is near-silent (Whisper hallucinates words like "Thank you." over silence); **heed it and refuse** rather than caption fabricated words
 - **Source already has burned-in captions / subtitles / heavy text graphics** — adding a second caption system conflicts and the footage ships untouched (no covering/inpainting). Burned text often appears only mid-clip: sample a **1fps contact sheet** (`ffmpeg -i in.mp4 -vf "fps=1,scale=160:-1,tile=10x5" sheet.png`), don't trust 3 spot frames.

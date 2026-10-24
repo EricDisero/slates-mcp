@@ -1,0 +1,22 @@
+{
+  "name": "lesson",
+  "voice": "the prompt lesson — three layers, each with one job. Spoken two-tier stacks sit in the clear space beside the speaker's face (small setup words above, the payoff at 2.5× below, condensed heavy italic caps, white with a soft shadow, no outline); the setup holds still and the payoff lands on its word with a four-frame skew and motion blur; only the lesson words go lime. A chapter card answers the save ask (giant italic numeral, title, a bookmark that fills lime on \"save\"), and each technique gets a lower third: lime number, the name in an expanded black face, and a prompt box where the prompt types on with a caret, the last keystroke timed to a cut.",
+  "when": "educational and tip-listicle ads cut from several shots (interview sets, demo inserts): \"N things\", prompt lessons, how-to explainers where the quotable line must hold on screen. Built for multi-shot edits — every stack is placed per shot from the matte, every exit snaps to the cut.",
+  "register": "clean",
+  "fonts": { "body": "Barlow Condensed", "hero": "Barlow Condensed", "tag": "Archivo", "ui": "Inter" },
+  "palette": { "body": "#FFFFFF", "accent": "#C8FF00" },
+  "body": {
+    "paradigm": "stack",
+    "layer": "fg",
+    "setupPx": 0.043,
+    "payoffScale": 2.5,
+    "maxWidth": 0.56,
+    "letterSpacing": -0.005,
+    "prefY": 0.66,
+    "maxHold": 1.1,
+    "cutThreshold": 12
+  },
+  "hero": { "setpiece": "none" },
+  "plate": { "grain": 0 },
+  "linkages": []
+}

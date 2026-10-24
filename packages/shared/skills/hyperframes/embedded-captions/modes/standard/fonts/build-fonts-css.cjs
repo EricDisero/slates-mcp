@@ -21,10 +21,12 @@ const OUT = path.join(__dirname, "fonts.css");
 // slug → exact CSS family name (must match what templates declare in font-family).
 const FAMILY = {
   anton: "Anton",
+  archivo: "Archivo",
   audiowide: "Audiowide",
   inter: "Inter",
   "baloo-2": "Baloo 2",
   bangers: "Bangers",
+  "barlow-condensed": "Barlow Condensed",
   "bodoni-moda": "Bodoni Moda",
   caveat: "Caveat",
   cinzel: "Cinzel",
@@ -46,6 +48,13 @@ const FAMILY = {
   vt323: "VT323",
 };
 
+// Variable faces (@fontsource-variable `<slug>-latin-wdth-<style>.woff2`, every axis in one
+// file): slug → the axis ranges the @font-face declares, so font-weight and font-stretch
+// reach the whole design space (the lesson identity runs Archivo at 900/125% and at 200/125%).
+const VARIABLE = {
+  archivo: { weight: "100 900", stretch: "62% 125%" },
+};
+
 const files = fs
   .readdirSync(FILES)
   .filter((f) => f.endsWith(".woff2"))
@@ -54,7 +63,9 @@ const faces = [];
 let raw = 0;
 const seenFamilies = new Set();
 for (const f of files) {
-  const m = f.match(/^(.*)-latin-(\d+)-(normal|italic)\.woff2$/);
+  const m =
+    f.match(/^(.*)-latin-(\d+)-(normal|italic)\.woff2$/) ||
+    f.match(/^(.*)-latin-(wdth)-(normal|italic)\.woff2$/);
   if (!m) {
     console.error(`[fonts] skip unrecognized filename: ${f}`);
     continue;
@@ -63,6 +74,11 @@ for (const f of files) {
     weight = m[2],
     style = m[3];
   const family = FAMILY[slug];
+  const axes = weight === "wdth" ? VARIABLE[slug] : null;
+  if (weight === "wdth" && !axes) {
+    console.error(`[fonts] no axis ranges for variable slug "${slug}" (${f}) — add it to VARIABLE`);
+    process.exit(1);
+  }
   if (!family) {
     console.error(`[fonts] no family mapping for slug "${slug}" (${f}) — add it to FAMILY`);
     process.exit(1);
@@ -74,7 +90,8 @@ for (const f of files) {
     `@font-face {\n` +
       `  font-family: '${family}';\n` +
       `  font-style: ${style};\n` +
-      `  font-weight: ${weight};\n` +
+      `  font-weight: ${axes ? axes.weight : weight};\n` +
+      (axes ? `  font-stretch: ${axes.stretch};\n` : "") +
       `  font-display: block;\n` + // block (not swap): render text only once the real face is ready — measure-layout + capture see the true glyphs, never a fallback flash
       `  src: url(data:font/woff2;base64,${buf.toString("base64")}) format('woff2');\n` +
       `}`,

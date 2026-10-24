@@ -35,6 +35,7 @@ const expectedThemes = [
   "inkwater",
   "laser",
   "lastpage",
+  "lesson",
   "neonsign",
   "ordnance",
   "papercut",

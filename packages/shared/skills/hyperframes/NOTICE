@@ -2,7 +2,7 @@ HyperFrames skills
 Copyright 2026 HeyGen, Inc.
 
 The 21 folders in this directory are the agent skills of HyperFrames, copied
-unmodified from the HyperFrames repository:
+from the HyperFrames repository:
 
   Repository: https://github.com/heygen-com/hyperframes
   Tag:        v0.8.140
@@ -13,8 +13,24 @@ They are licensed under the Apache License, Version 2.0. The full license text
 is in LICENSE-hyperframes beside this file, or at
 http://www.apache.org/licenses/LICENSE-2.0.
 
-Every file in those folders is byte for byte the file at that commit. Slates
-has not modified them. Slates' own additions sit beside them and are not part
+Every file in those folders is byte for byte the file at that commit, except
+the files listed below, which Slates changed or added (2026-10-24) to give the
+embedded-captions skill a `lesson` caption identity:
+
+  embedded-captions/SKILL.md, CATALOG.md, themes/README.md (changed: the
+    identity documented and routed)
+  embedded-captions/scripts/make-theme.cjs, scripts/make-theme.test.mjs
+    (changed: the `stack` body paradigm and its test entry)
+  embedded-captions/modes/standard/fonts/build-fonts-css.cjs (changed:
+    variable-font faces)
+  embedded-captions/assets/fonts/char-widths.json (changed: two families
+    measured)
+  embedded-captions/themes/lesson.json (added)
+  embedded-captions/modes/standard/fonts/files/barlow-condensed-latin-800-italic.woff2,
+    archivo-latin-wdth-normal.woff2 (added: SIL Open Font License fonts from
+    Fontsource)
+
+Slates' other additions sit beside them and are not part
 of HyperFrames: this NOTICE, LICENSE-hyperframes (the upstream LICENSE file,
 renamed) and SLATES-MAPPING.md (how the commands and surfaces these skills name
 map onto Slates).

@@ -1,6 +1,6 @@
 # HyperFrames in Slates: what each command and Studio surface is here
 
-The folders beside this file are HyperFrames' own skills, unmodified (see `NOTICE`). They were
+The folders beside this file are HyperFrames' own skills, unmodified apart from the files `NOTICE` lists. They were
 written for HyperFrames' CLI and its Studio, and they say `npx hyperframes <command>` and "the Studio
 timeline" throughout. Inside Slates there is no HyperFrames project folder and no CLI to run: an HTML
 clip is one HyperFrames composition (an HTML document with a GSAP timeline registered on
