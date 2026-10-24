@@ -994,6 +994,40 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 }
 
+// ── Retired seats ────────────────────────────────────────────────────────────
+
+/**
+ * Image seats that left the roster, each with the seat that replaced it. The
+ * desktop moves a stored or sent id onto its replacement (slate
+ * `migrateRetiredModel`, which reads this map and adds the retired video seats
+ * this repo does not name). The server keeps their cost keys so desktops
+ * released before a retirement still bill; the list and estimate ops hide those
+ * keys and name the replacement instead.
+ */
+export const RETIRED_MODELS: Readonly<Record<string, string>> = {
+  // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not downgrade.
+  'gpt-image-2': 'gpt-image-2-5-sunburst',
+  // 2026-10-23 (Eric): Nano Banana 2.1 replaced every Nano Banana row, FLUX 3 Image replaced FLUX.2 Max.
+  'nano-banana-2': 'nano-banana-2-1',
+  'nano-banana-2-lite': 'nano-banana-2-1',
+  'nano-banana-pro': 'nano-banana-2-1',
+  'flux-2-max': 'flux-3',
+}
+
+/**
+ * The retired seat a cost key bills, or null when the key belongs to a current
+ * row or to no row. A key is its row's id, alone or followed by `-` and its
+ * dimensions, and the longest such id wins: `nano-banana-2-1-1k` is Nano Banana
+ * 2.1 at 1K, and `nano-banana-2-1k` is the retired Nano Banana 2 at 1K.
+ */
+export function retiredModelOfKey(key: string): string | null {
+  let best = ''
+  for (const id of [...Object.keys(MODEL_CAPABILITIES), ...Object.keys(RETIRED_MODELS)]) {
+    if ((key === id || key.startsWith(`${id}-`)) && id.length > best.length) best = id
+  }
+  return best in RETIRED_MODELS ? best : null
+}
+
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 export function getModelCapability(model: string): ModelCapability | undefined {

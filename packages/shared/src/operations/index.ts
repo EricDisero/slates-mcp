@@ -2,7 +2,7 @@ import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
 import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, type GuideDepth } from '../prompts/guide-retrieval.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -1456,7 +1456,8 @@ export const listAvailableModels: Operation<{ filter?: string }> = {
   }),
   async run(input, ctx) {
     const r = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    let models = r.models
+    // The server keeps a retired seat's keys for older desktops; an agent is never offered them.
+    let models = r.models.filter((m) => !retiredModelOfKey(m.model))
     if (input.filter) {
       const q = input.filter.toLowerCase()
       models = models.filter((m) => m.model.toLowerCase().includes(q))
@@ -1736,8 +1737,14 @@ export const estimateGenerationCost: Operation<{
     ),
   }),
   async run(input, ctx) {
+    // A retired seat is never quoted: its keys still bill older desktops, and `nano-banana-2-1k` (the
+    // retired Nano Banana 2 at 1K) would otherwise answer an agent that meant Nano Banana 2.1.
+    const retired = retiredModelOfKey(input.model)
+    if (retired) {
+      throw new Error(`${retired} was retired and ${RETIRED_MODELS[retired]} replaced it. Quote ${RETIRED_MODELS[retired]} with the same parameters.`)
+    }
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
-    const byKey = new Map(registry.models.map((m) => [m.model, creditCost(m)]))
+    const byKey = new Map(registry.models.filter((m) => !retiredModelOfKey(m.model)).map((m) => [m.model, creditCost(m)]))
 
     // 1) exact registry cost key
     let key: string | null = byKey.has(input.model) ? input.model : null
@@ -3015,7 +3022,8 @@ async function previewAssets(
 
 // Nano Banana 2, NB2 Lite, Nano Banana Pro and FLUX.2 Max retired 2026-10-23
 // (Eric): Nano Banana 2.1 and FLUX 3 Image replace them. An older CLI that still
-// sends a retired id gets the desktop's answer (slate `migrateRetiredModel`).
+// sends a retired id lands on the replacement: the desktop's agent routes run it
+// through slate `migrateRetiredModel` before anything reads it.
 export type ImageModelId =
   | 'nano-banana-2-1'
   | 'gpt-image-2-5-flare'

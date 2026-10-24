@@ -5,8 +5,8 @@
 Nano Banana 2.1: The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, keeps what an edit leaves alone, and is the start-frame for legible in-scene text. It reasons before it draws, so dense compositions and hero frames land without a premium tier.
 GPT Image 2.5 Flare: THE FAST GPT IMAGE SEAT — OpenAI's small model, optimized for SPEED, quality COMPARABLE to GPT Image 2 (not better) at roughly half the latency. Route here when speed matters: drafts, exploration, volume. TEXT / DIAGRAM / PANEL work — character sheets, shot grids, text-bearing panels. When quality outranks speed, escalate to Sunburst. Own content filter, distinct from Gemini's. Killed by a head-to-head at the intended crop going the other way.
 GPT Image 2.5 Sunburst: THE QUALITY GPT IMAGE SEAT — OpenAI's most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Explore on Flare, finish on Sunburst.
-FLUX 3 Image: The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting. Auto-routes to its edit endpoint when references are present.
-Seedream 5 Lite: Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less censored. Routes to its edit endpoint when references are present.
+FLUX 3 Image: The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting, which can still reject a prompt. Auto-routes to its edit endpoint when references are present.
+Seedream 5 Lite: Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less filtered, though it can still reject a prompt. Routes to its edit endpoint when references are present.
 
 ### video generate
 

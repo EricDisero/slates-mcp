@@ -262,7 +262,7 @@ export const MODEL_FACTS: ModelFact[] = [
     label: 'FLUX 3 Image',
     kind: 'image',
     ...caps('flux-3'),
-    notes: 'The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting. Auto-routes to its edit endpoint when references are present.',
+    notes: 'The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting, which can still reject a prompt. Auto-routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedream-5-lite',
@@ -271,7 +271,7 @@ export const MODEL_FACTS: ModelFact[] = [
     label: 'Seedream 5 Lite',
     kind: 'image',
     ...caps('seedream-5-lite'),
-    notes: 'Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less censored. Routes to its edit endpoint when references are present.',
+    notes: 'Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less filtered, though it can still reject a prompt. Routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedance-2',
