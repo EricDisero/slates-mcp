@@ -48,7 +48,7 @@ await notGated(generateVideo.run({ ...video }, { desktop: () => desktop, cloud: 
 const id = '22222222-2222-4222-8222-222222222222'
 const seats = [
   [generateCharacterIdentity, { characterId: id, projectId: id, baseAssetId: id }, resolveGuideTopic(toolModelFor('character-sheet'))],
-  [generateCharacterIdentity, { characterId: id, projectId: id, baseAssetId: id, model: 'gpt-image-2-5-flare' }, resolveGuideTopic('gpt-image-2-5-flare')],
+  [generateCharacterIdentity, { characterId: id, projectId: id, baseAssetId: id, model: 'nano-banana-2-1' }, resolveGuideTopic('nano-banana-2-1')],
   [generateEnvironmentPlate, { environmentId: id, projectId: id }, resolveGuideTopic(toolModelFor('environment-plate'))],
   [extractGridCells, { projectId: id, assetId: id, cells: ['1A'] }, resolveGuideTopic(toolModelFor('grid-extract'))],
   [extractGridCells, { projectId: id, assetId: id, cells: ['1A'], model: 'flux-3' }, resolveGuideTopic('flux-3')],
