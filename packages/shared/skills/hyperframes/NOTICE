@@ -23,11 +23,11 @@ embedded-captions skill a `lesson` caption identity:
     (changed: the `stack` body paradigm and its test entry)
   embedded-captions/modes/standard/fonts/build-fonts-css.cjs (changed:
     variable-font faces)
-  embedded-captions/assets/fonts/char-widths.json (changed: two families
-    measured)
+  embedded-captions/assets/fonts/char-widths.json (changed: the Archivo
+    italic measured)
   embedded-captions/themes/lesson.json (added)
-  embedded-captions/modes/standard/fonts/files/barlow-condensed-latin-800-italic.woff2,
-    archivo-latin-wdth-normal.woff2 (added: SIL Open Font License fonts from
+  embedded-captions/modes/standard/fonts/files/archivo-latin-wdth-normal.woff2,
+    archivo-latin-wdth-italic.woff2 (added: SIL Open Font License fonts from
     Fontsource)
 
 Slates' other additions sit beside them and are not part

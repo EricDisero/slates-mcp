@@ -4993,7 +4993,7 @@ ${
 // ---- stack: the lesson identity, cloned from a proven prompt-lesson ad (fonts,
 // cap heights, gaps, colours and cuts measured from its frames). Three layers:
 // spoken two-tier stacks beside the speaker, a chapter card on the save ask, and
-// lower thirds whose prompt types on in a Slates prompt box. Every caption cuts in
+// lower thirds that name each technique and quote its prompt. Every caption cuts in
 // and out on a frame. Multi-shot by design: a line's `{x, y, s, p}` places it
 // (ink left, cap top, setup and payoff cap px); unplaced stacks read the matte and
 // the cuts at compile time, so each sits beside the face in ITS shot.
@@ -5048,8 +5048,7 @@ function paradigmStack() {
     CAPTOP = b.capTop ?? 0.145;
   const fsOf = (cap) => cap / CAP;
   const BODY = dna.fonts.body,
-    TAG = dna.fonts.tag,
-    UI = dna.fonts.ui || "Inter";
+    TAG = dna.fonts.tag;
   const BW = b.widthKey || BODY; // char-widths entry for the stack face (italic, condensed)
   const LS = b.letterSpacing ?? -0.055,
     WS = b.wordSpacing ?? 0.075;
@@ -5164,7 +5163,7 @@ function paradigmStack() {
     const pre = CUTS.filter((t) => t <= ph.start && t >= ph.start - 0.45).pop();
     const tin = pre != null ? snap(pre) : onFrame(ph.start);
     const ca = cutAfter(ph.end - 0.05);
-    const tout = c.out ?? (ca != null && ca - ph.end <= 2 ? snap(Math.max(ca, ph.end + 0.4)) : r3(ph.end + 0.9));
+    const tout = c.out ?? (ca != null && ca - ph.end <= 2 ? snap(ca) : r3(ph.end + 0.9));
     const [t1, t2] = String(c.title || "").split("/").map((s) => s.trim().toUpperCase());
     chapter = { tin, tout, num: String(c.number ?? ""), t1: t1 || "", t2: t2 || "" };
     blocks.push([tin, tout]);
@@ -5173,43 +5172,19 @@ function paradigmStack() {
     const ph = findPhrase(it.match);
     const pre = CUTS.filter((t) => t <= ph.start + 1e-6 && t >= ph.start - 0.3).pop();
     const tin = pre != null ? snap(pre) : onFrame(ph.start);
-    const prompt = String(it.prompt || "");
-    const chars = [...prompt];
-    const typeStart = tin + 0.3;
-    // keystrokes: "cut" = the last key and the Generate press land on the next cut (the
-    // result shot), a number = they land there, default = an even typing run at the cut
-    let typeEnd,
-      onCut = false;
-    if (it.typeEnd === "cut") {
-      const c = cutAfter(typeStart, 0.4);
-      if (c != null) (typeEnd = snap(c)), (onCut = true);
-    } else if (typeof it.typeEnd === "number") typeEnd = it.typeEnd;
-    if (typeEnd == null) typeEnd = typeStart + Math.min(2.2, 0.045 * chars.length);
-    // human rhythm: seeded ±35% jitter per interval, renormalized so the last
-    // keystroke lands exactly on typeEnd
-    let a = 0x9e3779b9 ^ ((k + 1) * 2654435761);
-    const rnd = () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296;
-    const gaps = chars.map(() => 0.65 + 0.7 * rnd());
-    const tot = gaps.reduce((x, y) => x + y, 0) - gaps[0];
-    const keys = [];
-    let acc = 0;
-    chars.forEach((_, q) => {
-      if (q) acc += gaps[q];
-      keys.push(r3(typeStart + ((typeEnd - typeStart) * acc) / (tot || 1)));
-    });
-    if (keys.length) keys[keys.length - 1] = r3(typeEnd);
-    // the number and name arrive with the shot they title: on the cut when the prompt
-    // is typed over a "before" shot, else with the box
-    const nameIn = onCut ? snap(typeEnd) : tin;
+    // a "before" item opens on the empty shot under a centred label; its lower third
+    // cuts in with the next shot, the result
+    const bc = it.before ? cutAfter(tin, 0.4) : null;
+    const nameIn = bc != null ? snap(bc) : tin;
     const next = theme.items[k + 1] ? findPhrase(theme.items[k + 1].match).start - 0.05 : DUR - 0.05;
-    const ca = cutAfter(Math.max(typeEnd, nameIn, tin + 1.2), 0.3);
-    let tout = it.out ?? (ca != null && ca - typeEnd <= 6 ? snap(ca) : r3(typeEnd + 2.5));
+    const ca = cutAfter(Math.max(nameIn, tin + 1.2), 0.3);
+    let tout = it.out ?? (ca != null && ca - nameIn <= 6 ? snap(ca) : r3(nameIn + 3));
     tout = Math.min(tout, next, DUR - 0.05);
     blocks.push([tin, tout]);
     return {
-      tin, tout, keys, typeEnd: r3(typeEnd), nameIn, n: String(it.number ?? k + 1),
-      name: String(it.name || "").toUpperCase(), prompt, layout: it.layout || "stack",
-      before: it.before ? String(it.before).toUpperCase() : null, beforeOut: onCut ? snap(typeEnd) : r3(Math.min(tout, typeEnd)),
+      tin, tout, nameIn, n: String(it.number ?? k + 1), name: String(it.name || "").toUpperCase(),
+      quote: String(it.prompt || "").toUpperCase(), layout: it.layout || "stack",
+      before: it.before ? String(it.before).toUpperCase() : null,
     };
   });
   const blocked = (t) => blocks.some(([a, z]) => t >= a - 0.01 && t <= z);
@@ -5281,7 +5256,7 @@ function paradigmStack() {
   // ---- chapter card, top-left (theme.chapter.side "right" mirrors it): numeral, title over subtitle,
   // an outline bookmark after the title
   const numCap = Math.round(H * 0.1037),
-    t1Cap = Math.round(H * 0.05),
+    t1Cap = Math.round(H * 0.0482),
     t2Cap = Math.round(H * 0.0231);
   if (chapter) {
     const x0 = W * 0.0278,
@@ -5289,8 +5264,8 @@ function paradigmStack() {
     const nW = wordPx(chapter.num, BW, fsOf(numCap), 0); // one glyph: no tracking to take off
     const t1x = nW + H * 0.0102,
       t1y = H * 0.012,
-      t2y = t1y + t1Cap + H * 0.0065;
-    const bmH = Math.round(t1Cap * 0.963),
+      t2y = t1y + t1Cap + H * 0.0083;
+    const bmH = t1Cap,
       bmW = Math.round(bmH * 0.81);
     const bmx = t1x + inkW(chapter.t1, t1Cap) + H * 0.0083;
     const w = bmx + bmW;
@@ -5299,40 +5274,52 @@ function paradigmStack() {
   }
 
   // ---- lower thirds: orange number over the name in an expanded black face, the
-  // prompt box where their quote sat
+  // prompt quoted under it in the same face (all cap px ∝ H, measured off the reference)
   const numPx = Math.round(H * 0.0324),
     nameCap = Math.round(H * 0.0759),
-    namePitch = Math.round(nameCap * 1.39),
-    pbPx = Math.round(H * 0.031),
-    boxMax = Math.round(W * 0.46);
-  const boxX = Math.round(W * 0.046),
-    boxY = Math.round(H * 0.8306);
+    qCap = Math.round(H * 0.0259),
+    namePitch = Math.round(fsOf(nameCap) * 0.96),
+    qPitch = Math.round(fsOf(qCap) * 0.96),
+    qMax = W * 0.46;
+  const qX = Math.round(W * 0.046),
+    qY = Math.round(H * 0.838);
   const NAME_FS = fsOf(nameCap),
-    NUM_FS = fsOf(numPx);
+    NUM_FS = fsOf(numPx),
+    Q_FS = fsOf(qCap);
   const tagW = (s, fs) => wordPx(s, TAG, fs, 0);
+  // two rows, broken where the longer row is shortest
+  const balance = (txt, fs) => {
+    const ws = txt.split(" ");
+    let bestK = 1;
+    const m = (k) => Math.max(tagW(ws.slice(0, k).join(" "), fs), tagW(ws.slice(k).join(" "), fs));
+    for (let k2 = 2; k2 < ws.length; k2++) if (m(k2) < m(bestK)) bestK = k2;
+    return [ws.slice(0, bestK).join(" "), ws.slice(bestK).join(" ")];
+  };
   for (const it of items) {
     // a name wider than the frame's left half breaks onto two rows
-    let rows = [it.name];
-    if (tagW(it.name, NAME_FS) > W * 0.55 && it.name.includes(" ")) {
-      const ws = it.name.split(" ");
-      let bestK = 1;
-      const m = (k) => Math.max(tagW(ws.slice(0, k).join(" "), NAME_FS), tagW(ws.slice(k).join(" "), NAME_FS));
-      for (let k2 = 2; k2 < ws.length; k2++) if (m(k2) < m(bestK)) bestK = k2;
-      rows = [ws.slice(0, bestK).join(" "), ws.slice(bestK).join(" ")];
-    }
-    const innerMax = boxMax - pbPx * 1.6 - pbPx * 4.6; // padding + the Generate keycap
-    const tw = wordPx(it.prompt, UI, pbPx, 0) * 1.08; // the table runs a little narrow for Inter 500
-    const boxW = Math.min(boxMax, tw + pbPx * 1.6 + pbPx * 4.6);
+    const rows = tagW(it.name, NAME_FS) > W * 0.55 && it.name.includes(" ") ? balance(it.name, NAME_FS) : [it.name];
+    // the quote: "/" in the prompt breaks it by hand, else a greedy wrap at qMax
+    let q = [];
+    if (it.quote.includes("/")) q = it.quote.split("/").map((r) => r.trim());
+    else
+      for (const w of it.quote.split(/\s+/).filter(Boolean)) {
+        const cand = q.length ? q[q.length - 1] + " " + w : w;
+        if (q.length && tagW('"' + cand + '"', Q_FS) <= qMax) q[q.length - 1] = cand;
+        else q.push(w);
+      }
+    q[0] = '"' + q[0];
+    q[q.length - 1] += '"';
+    const qW = Math.max(...q.map((r) => tagW(r, Q_FS)));
     const nameW = Math.max(...rows.map((r) => tagW(r, NAME_FS)));
     const nameH = nameCap + (rows.length - 1) * namePitch;
     let nx, nBottom;
     // nx is the name's box left: the expanded face's left bearing puts its ink ~0.006W in,
     // the numeral's ~0.002W, so the number sits 0.0035W right to land on the same ink edge
-    if (it.layout === "beside") (nx = boxX + boxW + W * 0.025), (nBottom = H - H * 0.0444);
-    else if (it.layout === "right") (nx = W - W * 0.0365 - nameW), (nBottom = boxY - H * 0.0444);
-    else (nx = boxX - W * 0.0042), (nBottom = boxY - H * 0.0111);
+    if (it.layout === "beside") (nx = qX + qW + W * 0.025), (nBottom = H - H * 0.0444);
+    else if (it.layout === "right") (nx = W - W * 0.0365 - nameW), (nBottom = qY - H * 0.05);
+    else (nx = qX - W * 0.0042), (nBottom = qY - H * 0.0204);
     const nTop = nBottom - nameH;
-    Object.assign(it, { rows, nx: Math.round(nx), kx: Math.round(nx + W * 0.0035), nTop: Math.round(nTop), kTop: Math.round(nTop - H * 0.0287 - numPx), boxW: Math.round(boxW) });
+    Object.assign(it, { rows, q, nx: Math.round(nx), kx: Math.round(nx + W * 0.0035), nTop: Math.round(nTop), kTop: Math.round(nTop - H * 0.0287 - numPx) });
   }
 
   // ---- markup (baked at compile time; the page only schedules)
@@ -5359,13 +5346,13 @@ function paradigmStack() {
     : "";
   const itemHtml = items
     .map((it, k) => {
-      const chars = [...it.prompt].map((c) => `<span class="c">${c === " " ? " " : esc(c)}<i class="cr"></i></span>`).join("");
-      const name = it.rows
-        .map((r, j) => `<div class="ltname" style="left:${it.nx}px;top:${Math.round(it.nTop + j * namePitch - CAPTOP * NAME_FS)}px">${esc(r)}</div>`)
-        .join("");
+      const at = (cls, text, x, capTop, fs) => `<div class="${cls}" style="left:${x}px;top:${Math.round(capTop - CAPTOP * fs)}px">${esc(text)}</div>`;
       return (
-        `      <div class="lt" id="lt${k}"><div class="ltk" style="left:${it.kx}px;top:${Math.round(it.kTop - CAPTOP * NUM_FS)}px">${esc(it.n)}</div>${name}` +
-        `<div class="pb" style="left:${boxX}px;top:${boxY}px"><div class="pbt"><i class="cr cr0"></i>${chars}</div><div class="gen">Generate</div></div></div>` +
+        `      <div class="lt" id="lt${k}">` +
+        at("ltk", it.n, it.kx, it.kTop, NUM_FS) +
+        it.rows.map((r, j) => at("ltname", r, it.nx, it.nTop + j * namePitch, NAME_FS)).join("") +
+        it.q.map((r, j) => at("ltq", r, qX - Math.round(W * 0.0028), qY + j * qPitch, Q_FS)).join("") +
+        `</div>` +
         (it.before ? `\n      <div class="bf" id="bf${k}">${esc(it.before)}</div>` : "")
       );
     })
@@ -5378,25 +5365,11 @@ function paradigmStack() {
   .ch .chl { opacity:1; }
   .ch .bm { position:absolute; overflow:visible; filter:drop-shadow(${shadow}); }
   .lt { position:absolute; inset:0; opacity:0; }
-  .lt .ltk, .lt .ltname { position:absolute; white-space:nowrap; font-family:'${TAG}', sans-serif; font-weight:900; font-stretch:125%;
-        line-height:1; opacity:0; text-shadow:${shadow}; }
-  .lt .ltk { font-size:${+NUM_FS.toFixed(2)}px; color:${pal.number || pal.accent}; }
-  .lt .ltname { font-size:${+NAME_FS.toFixed(2)}px; color:${pal.body}; }
-  .lt .pb { position:absolute; max-width:${boxMax}px; display:flex; align-items:flex-end; gap:${Math.round(pbPx * 0.8)}px;
-            padding:${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.8)}px;
-            border-radius:${Math.round(pbPx * 0.75)}px; opacity:0;
-            background:linear-gradient(180deg, rgba(30,30,30,0.9) 0%, rgba(22,22,22,0.89) 48%, rgba(14,14,14,0.9) 100%);
-            box-shadow:0 ${Math.round(pbPx * 0.06)}px ${Math.round(pbPx * 0.1)}px rgba(0,0,0,0.55), 0 ${Math.round(pbPx * 0.3)}px ${Math.round(pbPx * 0.6)}px -${Math.round(pbPx * 0.26)}px rgba(0,0,0,0.5), 0 ${Math.round(pbPx * 0.85)}px ${Math.round(pbPx * 1.8)}px -${Math.round(pbPx * 0.65)}px rgba(0,0,0,0.68); }
-  .lt .pbt { position:relative; flex:1; font-family:'${UI}', sans-serif; font-weight:500; font-size:${pbPx}px; line-height:1.32;
-             color:#ECECEC; text-align:left; white-space:pre-wrap; padding:${Math.round(pbPx * 0.12)}px 0; }
-  .lt .c { visibility:hidden; position:relative; }
-  .lt .cr { position:absolute; right:-${Math.max(1, Math.round(pbPx * 0.06))}px; top:0.12em; width:${Math.max(2, Math.round(pbPx * 0.09))}px; height:1.1em;
-            background:${pal.accent}; border-radius:1px; opacity:0; visibility:visible; }
-  .lt .cr0 { left:0; right:auto; }
-  .lt .gen { flex:none; font-family:'${UI}', sans-serif; font-weight:600; font-size:${Math.round(pbPx * 0.62)}px; color:#000; white-space:nowrap;
-             padding:${Math.round(pbPx * 0.3)}px ${Math.round(pbPx * 0.62)}px; border-radius:${Math.round(pbPx * 0.38)}px;
-             background:linear-gradient(to bottom, #d7ff3d 0%, #c3f500 100%);
-             box-shadow:inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.45); }
+  .lt > div { position:absolute; white-space:nowrap; font-family:'${TAG}', sans-serif; font-weight:900; font-stretch:125%;
+        line-height:1; color:${pal.body}; text-shadow:${shadow}; }
+  .lt .ltk { font-size:${+NUM_FS.toFixed(2)}px; color:${pal.accent}; }
+  .lt .ltname { font-size:${+NAME_FS.toFixed(2)}px; }
+  .lt .ltq { font-size:${+Q_FS.toFixed(2)}px; }
   .bf { position:absolute; left:${W / 2}px; top:${Math.round(H * 0.496 - fsOf(H * 0.0176) * (CAPTOP + CAP / 2))}px; transform:translateX(-50%);
         opacity:0; white-space:nowrap; font-family:'${TAG}', sans-serif; font-weight:400; font-stretch:125%; line-height:1;
         font-size:${+fsOf(H * 0.0176).toFixed(2)}px; color:${pal.body}; text-shadow:${shadow}; }`;
@@ -5404,7 +5377,7 @@ function paradigmStack() {
   const html = [stackHtml, chapterHtml, itemHtml].filter(Boolean).join("\n");
 
   const js = `
-  // ---- body paradigm: STACK (lesson) — two-tier stacks, chapter card, prompt lower thirds ----
+  // ---- body paradigm: STACK (lesson) — two-tier stacks, chapter card, lower thirds ----
   // every caption cuts in and out on a frame: no fades, no slides
   const FR = ${FR};
   const STACKS = ${J(stacks.map((S) => ({ id: S.id, su: !!S.su, tin: S.tin, tpo: S.tpo, tout: S.tout })))};
@@ -5424,36 +5397,16 @@ ${
   }`
     : ""
 }
-  // ---- prompt lower thirds: the box rises and the prompt types on; number and name cut in
-  const ITEMS = ${J(items.map((it) => ({ tin: it.tin, tout: it.tout, keys: it.keys, typeEnd: it.typeEnd, nameIn: it.nameIn, before: !!it.before, beforeOut: it.beforeOut })))};
+  // ---- lower thirds: number, name and quote cut in with the result shot, out on its cut
+  const ITEMS = ${J(items.map((it) => ({ tin: it.tin, tout: it.tout, nameIn: it.nameIn, before: !!it.before })))};
   ITEMS.forEach((I, k) => {
     const lt = document.getElementById("lt" + k);
-    tl.set(lt, { opacity: 1 }, I.tin);
-    tl.set(lt.querySelectorAll(".ltk, .ltname"), { opacity: 1 }, I.nameIn);
-    const pb = lt.querySelector(".pb");
-    [[0.0, 14], [0.6, 5], [1, 0]].forEach(([o, y], f) => tl.set(pb, { opacity: o, y: y }, I.tin + f * FR));
-    const cs = lt.querySelectorAll(".pbt .c"), cr0 = lt.querySelector(".cr0");
-    // idle caret blinks until the first key, keys type, the last caret blinks after
-    const blink = (el, a, z) => { for (let t = a, on = true; t < z - 0.01; t += 0.5, on = !on) tl.set(el, { opacity: on ? 1 : 0 }, t); };
-    if (I.keys.length) {
-      blink(cr0, I.tin + 2 * FR, I.keys[0]);
-      tl.set(cr0, { opacity: 0 }, I.keys[0]);
-    }
-    I.keys.forEach((t, q) => {
-      tl.set(cs[q], { visibility: "visible" }, t);
-      const crq = cs[q].querySelector(".cr");
-      tl.set(crq, { opacity: 1 }, t);
-      if (q + 1 < cs.length) tl.set(crq, { opacity: 0 }, I.keys[q + 1]);
-    });
-    if (cs.length) blink(cs[cs.length - 1].querySelector(".cr"), I.typeEnd + 0.5, I.tout);
-    // Generate is pressed on the last keystroke
-    const gen = lt.querySelector(".gen");
-    [[0.92, 1.25], [0.96, 1.12], [1, 1]].forEach(([s, br], f) => tl.set(gen, { scale: s, filter: "brightness(" + br + ")" }, I.typeEnd + f * FR));
+    tl.set(lt, { opacity: 1 }, I.nameIn);
     tl.set(lt, { opacity: 0 }, I.tout);
     if (I.before) {
       const bf = document.getElementById("bf" + k);
       tl.set(bf, { opacity: 1 }, I.tin);
-      tl.set(bf, { opacity: 0 }, I.beforeOut);
+      tl.set(bf, { opacity: 0 }, I.nameIn);
     }
   });`;
   return { css, html, js };
