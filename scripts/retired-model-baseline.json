@@ -29,6 +29,7 @@
     "scripts/audio-billing-gate-check.mjs": 2,
     "scripts/endpoint-key-binding-check.mjs": 49,
     "src/lib/activation-emails/store.ts": 1,
+    "src/lib/agent-models.ts": 1,
     "src/lib/fal-allowlist.ts": 5,
     "src/lib/key-family.ts": 4,
     "src/lib/providers/google.ts": 8,
