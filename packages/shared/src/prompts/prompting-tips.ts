@@ -257,6 +257,9 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
   ],
 }
 
+const KLING_DIALOGUE_FOOTER =
+  'Keep dialogue concise (under 10 seconds per line). Use the Language and Accent settings in Audio Controls to control speech characteristics.'
+
 const KLING: PromptingTipsEntry = {
   label: 'Kling 3.0',
   intro: [
@@ -299,7 +302,7 @@ const KLING: PromptingTipsEntry = {
     ],
   ],
   footer: [
-    'Keep dialogue concise (under 10 seconds per line). Use the Language and Accent settings in Audio Controls to control speech characteristics.',
+    KLING_DIALOGUE_FOOTER,
     'Kling 4.0 takes the same craft: single takes up to 30s, sound always on, and each multi-shot prompt at most 512 characters. In image-to-video the frame sets the aspect ratio.',
   ],
 }
@@ -307,6 +310,8 @@ const KLING: PromptingTipsEntry = {
 const KLING_EDIT: PromptingTipsEntry = {
   ...KLING,
   label: 'Kling O3 Edit',
+  // Kling's own footer carries a Kling 4.0 line that is not about this edit model.
+  footer: [KLING_DIALOGUE_FOOTER],
   columns: [
     KLING.columns[0],
     [
