@@ -116,6 +116,12 @@ const SEEDANCE: PromptingTipsEntry = {
         note: 'Replace abstract emotion words with the physical detail that shows them. This is the single highest-leverage habit in ByteDance\'s guide — the model renders bodies, not adjectives.',
       },
       {
+        heading: 'Nobody holds still',
+        example: '❌ she screams, mouth open\n✅ she yells at him with both hands up, grabs the dash as the car snaps sideways, then slaps his shoulder twice',
+        note: PARTIALS['living-performance-short'],
+        critical: true,
+      },
+      {
         heading: 'Separate camera from subject motion',
         example: 'The earbud rises smoothly. The camera tracks upward.',
         note: 'Two different sentences. Mixing them ("the camera speed ramps as the earbud rises") is a common cause of shaky, glitchy output.',

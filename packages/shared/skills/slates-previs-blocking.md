@@ -167,6 +167,8 @@ slates_generate_video {
 
 Choose a model that accepts video references using `slates-model-selection`, then read its current reference caps. Video duration limits apply to the combined reference clips, not to each clip independently; quote each actual input duration.
 
+**The figures are frozen, the people are not.** A blocking's stand-ins never act, and the model copies their stillness: the prompt says their stillness is not the acting and writes every person a performance that changes on every beat (`slates-blocking-to-prompt`, § Nobody holds still).
+
 ## Leaving holes on purpose
 
 Where the model outperforms any blockout you could build — liquid, smoke, fire, cloth — **block a black gap instead** and say so in the prompt: `CUT 7 (14.5-17.0, black gap in the reference)`. You are reserving a slot, not forgetting one. Keep these exact times in the blocking record, then translate model-facing time cues through `slates-blocking-to-prompt`; not every endpoint accepts fractional timestamps.

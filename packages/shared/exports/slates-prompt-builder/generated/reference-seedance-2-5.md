@@ -10,6 +10,7 @@
 - [🚨 Hazard 1 — the prompt-intent task classifier](#-hazard-1--the-prompt-intent-task-classifier)
 - [🚨 Hazard 2 — resolution is not the price dial here. LENGTH is.](#-hazard-2--resolution-is-not-the-price-dial-here-length-is)
 - [Timestamps — the one grammar change](#timestamps--the-one-grammar-change)
+- [Nobody holds still](#nobody-holds-still)
 - [What the extra reference budget is actually for](#what-the-extra-reference-budget-is-actually-for)
   - [Audio-only references — the genuinely new input](#audio-only-references--the-genuinely-new-input)
   - [Video references](#video-references)
@@ -26,7 +27,7 @@
 2. **Length is the reason to be here**: takes up to 30 seconds, where 2.0 stops at 15. Write the beats as `[0s-6s]`, `[6s-12s]`, `[12s-18s]`; do not hope for them.
 3. **Up to 30 image references**, and a multi-view image can serve as ONE subject reference (up to 5 subjects). 2.0 cannot do either.
 4. **Audio-only references are accepted** without an image or video alongside — the only Seedance seat that takes one.
-5. **Keep the 2.0 discipline**: one camera move per beat (`slow track right`, `handheld follow`), physical action instead of stated emotion, and quality asked for in the image-quality slot vocabulary — `rich details`, `natural colors`, `cinematic texture`, `soft lighting`.
+5. **Keep the 2.0 discipline**: one camera move per beat, physical action instead of stated emotion, and quality in the image-quality slot vocabulary (`rich details`, `cinematic texture`). **Every person acts in every interval**: a held face freezes for the whole take.
 
 **Examples**
 - `[0s-6s] Wide shot, <Subject_1>@<Image_1> crosses an empty car park toward a idling van, slow track right. [6s-12s] Medium, she stops as the driver's window comes down. [12s-18s] Close-up, she looks off past the lens and does not answer. Rich details, natural colors. Keep it subtitle-free.`
@@ -186,6 +187,33 @@ pacing you are happy to leave to the model, timestamps when a beat has to land a
 Do **not** carry this back to 2.0, and do not write `[00:00-00:02]` minute-second brackets (another
 vendor's syntax) into either — 2.0 ignores time entirely, and the cross-model syntax swap is its own known failure.
 <!-- @end:seedance-25-timestamps -->
+
+---
+
+## Nobody holds still
+
+<!-- @inject:living-performance -->
+**Nobody holds still. Write every person a performance that changes on every beat.** A video model
+animates what the prompt describes and nothing more. Describe one expression ("she screams, mouth
+open") and the person freezes in it for the whole take, which reads as dead and fake however good the
+camera is.
+
+- **Every person, every beat:** what their hands do, where their head and body go, what they say or
+  shout and to whom, and how the expression shifts, then shifts again. "Yelling at him with both hands
+  up, then grabs the dash as the car snaps sideways" moves; "terrified" is a still.
+- **Escalate and turn.** A scene's emotion travels: fear into fury into a stunned laugh. Each beat
+  gives the next state, never a repeat of the last.
+- **One calm character may stay still in the face, never in the body.** The stoic one still blinks,
+  breathes, glances, and works their hands, and reacts once the scene earns it (a smirk, a look across).
+- **Keep it physical.** Write the visible action, not the feeling: a jabbed finger, a slap on the
+  shoulder, a hand clawing hair out of a mouth. Name the lines or shouts when the audio matters.
+- **A blocking or previs reference makes stillness worse.** Its stand-in figures are frozen
+  mannequins, and the model copies their stillness unless the prompt says so. Say it in the prompt:
+  "its figures are frozen stand-ins and their stillness is not the acting; take only the camera and
+  the timing from video 1, and the people perform as written below, moving in every second."
+- **On a timestamped model, the acting is written inside every interval,** beside the camera and the
+  action, so no range leaves a person without something to do.
+<!-- @end:living-performance -->
 
 ---
 

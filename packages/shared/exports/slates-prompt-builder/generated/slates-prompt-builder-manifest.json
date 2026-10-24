@@ -20,7 +20,7 @@
     },
     {
       "path": "skills/slates-prompting-kling-v3.md",
-      "sha256": "6bfc552a3bd8c0da97b4d908af835c2a017cfe352df4579a75591d3128842da9"
+      "sha256": "5a6fdac8b511fa4b2e2931d2fef61c57f99967efdf24f258d51924b436e2839e"
     },
     {
       "path": "skills/slates-prompting-nano-banana-2.md",
@@ -32,11 +32,11 @@
     },
     {
       "path": "skills/slates-prompting-seedance-2-5.md",
-      "sha256": "3b5eeb2cd8183dcc37ff74d24395e090e500e1ef6eddfaf60cd073830341e2d9"
+      "sha256": "f4e3f3783f04b15447f3da5102ccbf4338ad9c02972fbffef331fea52f3e04b1"
     },
     {
       "path": "skills/slates-prompting-seedance.md",
-      "sha256": "ec7f26e178552403842091c019a041d8f6db4c62897f06e7c82ce48ea0cf0a0c"
+      "sha256": "0f43662485f2d9687fe1a4b58310a8ce80f27ad7407959f010129fc698b5ab29"
     },
     {
       "path": "src/prompts/character-sheet.ts",
@@ -56,7 +56,7 @@
     },
     {
       "path": "src/prompts/partials.generated.ts",
-      "sha256": "9f75ad1c625e6e3b71ece83cceaa9e60f0e36c669f06dd02dfcd2cdf83cbbf67"
+      "sha256": "67ff3c7cbedcfd76e067f58e7e8874310d393ee1a8cd493d57aa06739880b62a"
     },
     {
       "path": "src/prompts/reference-rules.ts",
@@ -80,13 +80,13 @@
     },
     {
       "path": "reference-seedance.md",
-      "bytes": 37480,
-      "sha256": "4e3f40fd831f9576aa51241f06da3166345f9835d67bafb6f4340bb2b8005960"
+      "bytes": 39318,
+      "sha256": "4127ad9b3c5023e03479dd6d53b0290edf0c680d18870e09b1efbda5da12b317"
     },
     {
       "path": "reference-kling.md",
-      "bytes": 17594,
-      "sha256": "8f9d0d4906a7af30536c88fedaaff6948437a353a862d96bb1072fd0ae86fe3a"
+      "bytes": 19429,
+      "sha256": "33a442b284d0824bd806aa8a74d9771e147fcc203e38fa326b1a995e0c879e01"
     },
     {
       "path": "reference-nano-banana.md",
@@ -95,8 +95,8 @@
     },
     {
       "path": "reference-seedance-2-5.md",
-      "bytes": 22971,
-      "sha256": "850dc598000e88cd8e4985be216c1c35242719d91f1d3dd78129b291c8b7fe0c"
+      "bytes": 24805,
+      "sha256": "07709b76369741f7852d8a5f465b102828efc893e823d75e833db3126d0572d8"
     },
     {
       "path": "reference-gpt-image-2-5.md",
@@ -116,8 +116,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 69690,
-    "sha256": "7e5d69121ff0f5288df44a9bfaf7e3f3f1209a3249b5f0c6352a166577929849",
+    "bytes": 72096,
+    "sha256": "8e5a9122e21327243714689f0ca31d40da22aca0fb16ad9e5bb298373336a867",
     "entries": [
       "SKILL.md",
       "reference-character.md",

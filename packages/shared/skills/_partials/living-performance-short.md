@@ -1,0 +1,2 @@
+<!-- consumer:ts -->
+A video model animates only what you describe: one held expression ("she screams") freezes the person in it for the whole take. Give every person a changing performance on every beat: hands, head, body, what they shout and to whom, and the expression shifting again. One calm character may keep a still face, but still blinks, breathes and works their hands. A blocking clip's stand-in figures are frozen, so say in the prompt that their stillness is not the acting.
