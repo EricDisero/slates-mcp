@@ -345,7 +345,7 @@ export const MODEL_FACTS: ModelFact[] = [
     tier: 'specialist',
     label: 'Gemini Omni Flash 1.1',
     kind: 'video',
-    // 10 ref2v image_urls + 3 reference videos of <=3s (fal 1.1 schema, 2026-10-17).
+    // 10 ref2v image_urls + 3 reference videos of <=10s (fal 1.1 schema, 2026-10-23).
     ...caps('omni-flash'),
     notes: 'Google\'s video model, version 1.1 since 2026-10-17, with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
   },

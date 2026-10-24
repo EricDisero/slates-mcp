@@ -562,12 +562,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // fal's reference-to-video `image_urls`: maxItems 10 on 1.1 (and on 1.0,
     // where we capped at 7 off a July reading of Google's limit).
     maxIngredientImages: 10,
-    // `reference_video_urls`: maxItems 3, "Each video must be at most three
-    // seconds long". Google: "Video references work best with likenesses; any
-    // audio in a video reference is ignored." No minimum is published.
+    // `reference_video_urls`: maxItems 3, "Each video must be at most ten
+    // seconds long" (fal's live OpenAPI, re-read 2026-10-23; it said three on
+    // 2026-10-17). Google: "Video references work best with likenesses; any
+    // audio in a video reference is ignored." No minimum and no combined
+    // limit are published, so the total is three clips at the per-clip max.
     maxReferenceVideos: 3,
-    referenceVideoDuration: { min: 1, max: 3 },
-    maxReferenceVideoSeconds: 9,
+    referenceVideoDuration: { min: 1, max: 10 },
+    maxReferenceVideoSeconds: 30,
     // Neither fal nor Google publishes a combined ceiling, so the total is the
     // two arms summed; it never binds below them. No audio references.
     maxReferenceFilesTotal: 13,

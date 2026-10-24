@@ -1556,6 +1556,8 @@ const VIDEO_RESOLUTIONS = videoResolutionUnion(VIDEO_MODELS)
 const VIDEO_DURATION_BOUNDS = durationBounds(VIDEO_MODELS)
 /** Omni Flash's combined reference-image cap, read from the SSOT (10 on 1.1). */
 const omniFlashRefCap = getModelCapability('omni-flash')?.maxIngredientImages ?? 0
+/** Omni Flash's per-clip reference-video ceiling in seconds, read from the SSOT. */
+const omniFlashRefClipMax = getModelCapability('omni-flash')?.referenceVideoDuration?.max ?? 0
 
 /** Every resolution token any video model speaks, for the forgiving cost-key
  *  parser. Derived, so 768p and 2k arrived with the models rather than with a
@@ -4552,7 +4554,7 @@ export const generateVideo: Operation<{
     // multimodalRefSummary) rather than hand-typed, so a cap change in one
     // place cannot leave a stale number in a description an LLM reads.
     videoReferenceAssetIds: z.array(z.string()).optional().describe(
-      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. On Seedance and Wan 3.0, billing switches to the vref key (input+output seconds); Omni Flash caps each clip at 3s. Pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
+      `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. On Seedance and Wan 3.0, billing switches to the vref key (input+output seconds); Omni Flash caps each clip at ${omniFlashRefClipMax}s. Pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
     ),
     videoReferenceSecondsEach: z.array(z.number()).optional().describe(
       'REQUIRED with videoReferenceAssetIds, same order and length: each clip\'s duration in seconds. Feeds the vref cost key; the server re-probes and corrects an understated value upward.'
@@ -4647,7 +4649,7 @@ export const generateVideo: Operation<{
 
     // Omni Flash 1.1's SHAPE constraints. Frames ride image-to-video (a start
     // frame and an optional end frame); references ride reference-to-video (up
-    // to 10 images and 3 videos of 3s or less). With references, the desktop
+    // to 10 images and 3 videos, each within the per-clip cap). With references, the desktop
     // sends a start frame as reference image 1 (as it did on 1.0), so it counts
     // toward the image cap; a last frame has no slot there and is refused. There
     // is no audio reference at all (Google: "Uploading audio references is
@@ -4656,7 +4658,6 @@ export const generateVideo: Operation<{
     if (input.model === 'omni-flash') {
       const cap = getModelCapability('omni-flash')
       const maxVideos = cap?.maxReferenceVideos ?? 0
-      const maxClip = cap?.referenceVideoDuration?.max ?? 3
       const videoRefs = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
       const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
       const imageRefs =
@@ -4677,8 +4678,8 @@ export const generateVideo: Operation<{
                 ? `Omni Flash takes at most ${omniFlashRefCap} reference images combined, a start frame included (you passed ${refCount}). Trim the list.`
                 : videoRefs > maxVideos
                   ? `Omni Flash takes at most ${maxVideos} reference videos (you passed ${videoRefs}).`
-                  : [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].some((d) => d > maxClip + 0.05)
-                    ? `Each Omni Flash reference video must be ${maxClip}s or shorter. Trim it first with slates_trim_video.`
+                  : [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].some((d) => d > omniFlashRefClipMax + 0.05)
+                    ? `Each Omni Flash reference video must be ${omniFlashRefClipMax}s or shorter. Trim it first with slates_trim_video.`
                     : null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
@@ -4935,7 +4936,7 @@ export const generateVideo: Operation<{
     // missing one doesn't fail the generation (the server probes and corrects
     // upward) — it silently under-quotes, which is worse than asking.
     // Wan 3.0 bills reference video seconds on top of output seconds too, and
-    // Omni Flash's 3s clip cap needs every length to check.
+    // Omni Flash's per-clip cap needs every length to check.
     const isSeedance = input.model.startsWith('seedance')
     const needsRefSeconds = isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash'
     if (input.videoReferenceAssetId && needsRefSeconds && !input.videoReferenceSeconds) {
@@ -4943,7 +4944,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSeconds'],
         message:
-          'A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at 3s. Pass videoReferenceSeconds (the reference clip\'s duration, shown in slates_list_assets) so the pre-flight quote matches the bill.',
+          `A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at ${omniFlashRefClipMax}s. Pass videoReferenceSeconds (the reference clip's duration, shown in slates_list_assets) so the pre-flight quote matches the bill.`,
       })
     }
     const pluralRefCount = input.videoReferenceAssetIds?.length ?? 0
@@ -4955,7 +4956,7 @@ export const generateVideo: Operation<{
         requires_clarification: true,
         missing: ['videoReferenceSecondsEach'],
         message:
-          `A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at 3s. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
+          `A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at ${omniFlashRefClipMax}s. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
     const cloud = ctx.cloud()

@@ -28,7 +28,7 @@
     },
     {
       "path": "skills/slates-prompting-omni-flash.md",
-      "sha256": "1a8975e4f4184def87e6725ef29fad886cf9e3d56620c4cb780dc1196d4cf96f"
+      "sha256": "cb435fb250b32ebead94d084d7b62d88adc19331b7423b09829eeedbb9ca0ed8"
     },
     {
       "path": "skills/slates-prompting-seedance-2-5.md",
@@ -48,11 +48,11 @@
     },
     {
       "path": "src/prompts/model-capabilities.ts",
-      "sha256": "297d5f60fa644dd74f28c75f94fd039ce142652ae01b0512a5fc26bcb8c027ad"
+      "sha256": "76961be76b1d5201f64adb901920d23e1db6a0c7214e6824182066637fb848e0"
     },
     {
       "path": "src/prompts/model-facts.ts",
-      "sha256": "cb1340207819b0216069d1aca025dd39b15a45820bebd3950dafb339f9a7153f"
+      "sha256": "28761af2c7a65fdbaf203962bdf28dc22e77f3ff1e34381c9ba5f9fad221e0f6"
     },
     {
       "path": "src/prompts/partials.generated.ts",
@@ -105,8 +105,8 @@
     },
     {
       "path": "reference-omni-flash.md",
-      "bytes": 10357,
-      "sha256": "83fbee2aa38333eb44cc3d3f453af631f7c0eefaaace62e3cefcc88359e48e92"
+      "bytes": 10358,
+      "sha256": "5fb761b26621c7a6da038daa2bf89fd965d6882f1b6a17a16aa67528a5e3b602"
     },
     {
       "path": "reference-content-policy.md",
@@ -116,8 +116,8 @@
   ],
   "archive": {
     "path": "slates-prompt-builder.skill",
-    "bytes": 70589,
-    "sha256": "4d1d179cffc36cbedca354b5bb9ce4b9ade0b0592921e06d8013a2520e0c84ba",
+    "bytes": 70587,
+    "sha256": "afa25192f2c87230b912dcdf918b003294cccc6260616fdf62e0b4ca1cdec893",
     "entries": [
       "SKILL.md",
       "reference-character.md",

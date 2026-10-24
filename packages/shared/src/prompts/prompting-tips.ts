@@ -324,7 +324,7 @@ const KLING_EDIT: PromptingTipsEntry = {
 const OMNI_FLASH: PromptingTipsEntry = {
   label: 'Gemini Omni Flash 1.1',
   intro: [
-    'Gemini Omni Flash 1.1 renders 720p natively, with 1080p and 4K as upscales, and native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, a start frame with an optional last frame, or references: up to 10 images and 3 videos of 3s or less. A last frame never mixes with references, and there are no audio references.',
+    'Gemini Omni Flash 1.1 renders 720p natively, with 1080p and 4K as upscales, and native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, a start frame with an optional last frame, or references: up to 10 images and 3 videos of 10s or less. A last frame never mixes with references, and there are no audio references.',
   ],
   columns: [
     [
