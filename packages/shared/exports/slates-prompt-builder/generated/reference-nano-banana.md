@@ -2,32 +2,34 @@
 
 > Generated from the production Slates guide. Model-specific syntax and measured examples apply to the endpoints named below. For another generation tool, check its current schema and reference handling; its limits, billing and defaults may differ.
 
-# Nano Banana 2 — cinematic & photorealistic prompting
+# Nano Banana 2.1 — cinematic & photorealistic prompting
 
 ## Contents
 
-- [Google's 4 official rules (verbatim)](#googles-4-official-rules-verbatim)
-- [Official prompt formula](#official-prompt-formula)
-- [Photorealism positives — what consistently works](#photorealism-positives--what-consistently-works)
-- [The anti-list — phrases that DEGRADE realism](#the-anti-list--phrases-that-degrade-realism)
+- [Google's guidance](#googles-guidance)
+- [Prompt formula](#prompt-formula)
+- [Photorealism positives](#photorealism-positives)
+- [The anti-list — phrases that degrade realism](#the-anti-list--phrases-that-degrade-realism)
 - [Negative prompting — there is no field](#negative-prompting--there-is-no-field)
 - [Reference images](#reference-images)
   - [Reference rules (the verified ones)](#reference-rules-the-verified-ones)
-  - [For Nano Banana 2 specifically](#for-nano-banana-2-specifically)
+  - [For Nano Banana 2.1 specifically](#for-nano-banana-21-specifically)
+- [Edits](#edits)
 - [Common failure modes + fixes](#common-failure-modes--fixes)
 - [Resolution tactics](#resolution-tactics)
 - [Boring vs cinema — examples](#boring-vs-cinema--examples)
 - [Diagnose repeated failures](#diagnose-repeated-failures)
-- [Family variants — Lite and Pro](#family-variants--lite-and-pro)
+- [Sources](#sources)
 
-**Card — Nano Banana 2 (Gemini 3.1 Flash Image).** Brief it like a creative director, not a tag list. Structure: `Film still from [director] [genre]. Shot on [camera] with [lens]. [Subject and action]. [3-5 specific visual details]. [Lighting — direction + quality]. [Color palette]. [Film stock]. [1-2 word tone].`
+**Card — Nano Banana 2.1.** Brief it in sentences like a creative director, never a tag list; it reasons before it draws. Structure: `[Subject and action]. [Setting and composition]. [Lighting — direction + quality]. [Lens, stock or medium]. [Color palette].` With references, say what each image supplies, then the scene.
 
-**The five levers**
-1. **Named lens + aperture** beats "shallow depth of field" — `85mm f/1.4`, `135mm f/2.8`, `Panavision anamorphic`, `400mm telephoto`.
-2. **Light by direction and quality**, never "good lighting" — `hard sidelight from a single window, deep falloff`, `overcast north light`, `practical tungsten spill`.
-3. **A named film stock or sensor** carries a whole palette — `Kodak Portra 400`, `Cinestill 800T`, `ARRI Alexa 65`.
-4. **Composition as a shot** — `low angle`, `aerial view`, `rule of thirds with the subject camera-left`, `foreground occlusion`.
-5. **Positive framing only.** Describe what is there. "Empty street", never "no cars"; "unstaged documentary photography", never "not anime".
+**The six levers**
+1. **Sentences, not keywords.** Describe the scene the way a photographer would describe the shot they took.
+2. **Light by direction and quality**, never "good lighting" — `hard sidelight from a single window, deep falloff`, `overcast north light`.
+3. **Control the camera** — `85mm f/1.4`, `low angle`, `aerial view`, `rule of thirds with the subject camera-left`.
+4. **Say what each reference supplies** — `the jacket from image 2`, `lit and graded like image 3`. In an edit, say what must stay the same.
+5. **Quote text that must render** and describe its type — `the word "OPEN" in thin red neon script above the door`.
+6. **Positive framing only.** "Empty street", never "no cars"; "unstaged documentary photography", never "not anime".
 
 <!-- @inject:cinematic-card -->
 **For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
@@ -39,34 +41,39 @@
 Bind references inline. A scene reference owns the grade; for a look-only reference, write the new scene's light. References are optional. For owned-frame edits, describe only the change and what stays.
 <!-- @end:cinematic-card -->
 
-**Hard constraint:** there is no `negativePrompt` field. Suppress by reframing positively, or inline `without` / `free of`. Knowledge cutoff January 2025 — anything later needs reference images.
+**Hard constraint:** there is no `negativePrompt` field, and Slates sends no exclusion list on this model. Suppress by reframing positively, or inline `without` / `free of`.
 
-Nano Banana 2 is **Gemini 3.1 Flash Image**. It is **not** Gemini 3 Pro Image; that is Nano Banana **Pro** (`nano-banana-pro`), a separate model with its own seat. NB2 is a language model that outputs pixels — brief it like a creative director, not like a Stable-Diffusion tag-soup tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
+Nano Banana 2.1 is Google's **Gemini Nano Banana 2.1**, generally available since 2026-10-06 and described by Google as an update to Nano Banana 2 with improved visual quality, character consistency and text rendering. It is a language model that outputs pixels and reasons before it draws, so brief it like a creative director, not like a Stable-Diffusion tag tool. The single biggest lever for realism: **specificity that mimics how real photographers and cinematographers describe their work**.
 
-Knowledge cutoff: January 2025. Anything after needs explicit reference images.
+## Google's guidance
 
-## Google's 4 official rules (verbatim)
+No guide is written for 2.1 itself; Google's Nano Banana guidance is what applies:
 
-1. **Be specific.** Provide concrete details on subject, lighting, and composition.
-2. **Use positive framing.** Describe what you want, not what you don't want.
-3. **Control the camera.** Use photographic and cinematic terms like "low angle" and "aerial view."
-4. **Iterate.** Refine images with follow-up prompts in a conversational manner.
+1. **Describe the scene in sentences, not keywords.** Concrete subject, lighting and composition.
+2. **Use positive framing.** Describe what you want, not what you don't: "empty street", never "no cars".
+3. **Control the camera** with photographic and cinematic terms like "low angle" and "aerial view".
+4. **In an edit, say what must stay the same** as well as what changes.
+5. **Quote text that must render**, and describe its type.
 
-## Official prompt formula
+Documented limits (Google's model card): small text, imperfect character consistency, and left/right confusion. Each has a fix below.
+
+## Prompt formula
 
 ```
 [Subject] + [Action] + [Location/context] + [Composition] + [Style]
 ```
 
-For the cinematic / photoreal use case, expand to:
+For the cinematic / photoreal use case, expand to sentences:
 
 ```
 Film still from [DIRECTOR] [GENRE]. Shot on [CAMERA] with [LENS]. [SUBJECT and action]. [3-5 specific visual details]. [LIGHTING — direction + quality]. [COLOR PALETTE]. [FILM STOCK or sensor language]. [1-2 word emotional tone].
 ```
 
-## Photorealism positives — what consistently works
+With references, Google's Cloud guide orders it: the references, then how they relate, then the scene. `The woman in image 1 wears the jacket from image 2. She waits at a rain-slick bus stop at night...`
 
-⚠️ **This vocabulary is correct here and does not carry into a video prompt.** The leak happens one way: you write an NB2 start frame, then carry its look description straight into the prompt that animates it.
+## Photorealism positives
+
+⚠️ **This vocabulary is correct here and does not carry into a video prompt.** The leak happens one way: you write a start frame here, then carry its look description straight into the prompt that animates it.
 
 <!-- @inject:lens-video-split -->
 Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Portra 400`, `ARRI Alexa 65`) are an image-model lever. On a video model, translate the look instead of pasting the gear list: `85mm f/1.4, Portra 400` becomes `close-up, shallow depth of field, warm natural colors, cinematic texture, film-grain texture`. ByteDance's Seedance 2.0 guide never mentions fps, shutter angle, f-stop or lens millimetres. Its Seedance 2.5 guide does, once: the visual-style line of its own storyboard example names one camera body and one 35 mm cinema lens. On 2.5 a single line like that is vendor-sanctioned; a stacked gear list still is not.
@@ -113,9 +120,9 @@ Named lenses, apertures, film stocks and camera bodies (`85mm f/1.4`, `Kodak Por
 - `fashion magazine editorial, shot on medium-format analog film, pronounced grain`
 - `Film still from [Director] [genre]`
 
-## The anti-list — phrases that DEGRADE realism
+## The anti-list — phrases that degrade realism
 
-These are Stable-Diffusion-era tag soup. The model treats them as low-signal noise. Measured success rate: ~60-70% with these vs ~95%+ with positive description.
+These are Stable-Diffusion-era tag soup. They name no observable result, so the model reads them as low-signal noise; positive description of the medium, light and texture does the work instead.
 
 **Never use:**
 - `8k`, `4k` (as a quality token)
@@ -127,11 +134,11 @@ These are Stable-Diffusion-era tag soup. The model treats them as low-signal noi
 - `not anime, not cartoon, not 3D` — negation tag soup, replace with a positive style cue
 
 **Examples**
-- `Film still from a Denis Villeneuve thriller. Shot on ARRI Alexa 65, 85mm f/1.4. A woman in a charcoal wool coat stands at a rain-slick bus stop, breath visible. Hard sodium light from a single overhead lamp, deep falloff into blue night. Kodak Vision3 500T. Isolated.`
+- `Film still from a Denis Villeneuve thriller. Shot on ARRI Alexa 65, 85mm f/1.4. A woman in a charcoal wool coat stands at a rain-slick bus stop, her breath visible. Hard sodium light falls from a single overhead lamp, with deep falloff into blue night. Kodak Vision3 500T. Isolated.`
 
 ## Negative prompting — there is no field
 
-Nano Banana 2 has **no `negativePrompt` parameter**. Three patterns to suppress unwanted content:
+Nano Banana 2.1 has **no `negativePrompt` parameter**,. Three patterns to suppress unwanted content:
 
 1. **Positive reframing (preferred):** "empty street" not "no cars". "Unstaged documentary photography" not "not anime."
 2. **Inline `without` / `free of`:** "without any people, vehicles, or man-made structures", "free of text overlays, logos, or watermarks."
@@ -141,8 +148,9 @@ Default to #1. Reach for #2 only when positive framing can't suppress the unwant
 
 ## Reference images
 
-- **Hard limit: 14 images** (10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
-- **Name each reference inline — Slates does this for you.** When you `@mention` a subject/environment or `#mention` a style, Slates composes the prompt so each reference is named inline as "image N" — e.g. `Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3)`, or `lit and graded like image 4` where you placed the style mention. An unmentioned style attachment gets a short fallback clause The model does NOT infer a reference's role from its position; the NAME carries it. NB2's own consistency lever is literally **"assign a distinct name to each character/object"**. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
+- **Up to 14 images** (Google: 10 object-fidelity + 4 character-consistency). Categories don't trade — you can't use 14 object slots even if no characters are referenced.
+- **Google sets no reference notation.** Its pages say "the first image", "Image A" or name the subject; none is normative. What binds a reference is a sentence saying what it supplies.
+- **Slates names each reference inline for you.** When you `@mention` a subject/environment or `#mention` a style, Slates composes the prompt so each reference is named as "image N" — e.g. `Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3)`, or `lit and graded like image 4` where you placed the style mention. An unmentioned style attachment gets a short fallback clause. The model does NOT infer a reference's role from its position; the name and the sentence carry it. Google's own consistency lever is **"assign a distinct name to each character/object"**. **Do NOT hand-write a "Reference Image Instructions" block or role essays** ("use for identity, ignore the outfit, render the scene's expression") — that drags the sheet's wardrobe + studio lighting into the scene. The prompt leads; the user's words own wardrobe, expression, lighting, and action.
 
 ### Reference rules (the verified ones)
 
@@ -175,18 +183,21 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 10. **Style transforms happen in natural language.** By default the source's artistic medium and visual style are inherited. To change it, add a plain-text instruction ("anime → real person"). There are no preset pickers, and there is no style slider.
 <!-- @end:reference-rules-core -->
 
-### For Nano Banana 2 specifically
+### For Nano Banana 2.1 specifically
 
-- **NB2's own consistency lever is "assign a distinct name to each character/object."** That is Google's phrasing for rule 3 — cite each canonical identity inline by name.
-- **Rule 8 is a job you do, not one you delegate.** NB2 *is* the start-frame model — when a downstream video shot needs legible text, render it here and animate from this frame.
-- **Character consistency is officially "not 100% perfect"** per Google. Test before bulk generations. High-resolution, front-facing reference images help most.
-- **Injection is stochastic — budget 3-5 re-rolls per shot; re-roll, don't re-engineer.** First rolls miss faces/hands; the same prompt lands a clean one within a few tries.
+- **Name what each image supplies** — that is Google's binding mechanism, and rule 2 above in its words.
+- **Rule 8 is a job you do, not one you delegate.** This *is* the start-frame model: when a downstream video shot needs legible text, render it here and animate from this frame.
+- **Character consistency is imperfect** per Google's model card. Test before bulk generations; high-resolution, front-facing references help most.
+
+## Edits
+
+Describe the change, then say what must stay the same: `Change her coat to deep green wool. Keep her face, pose, the bus stop and the night lighting exactly as they are.` The source already carries composition and light; re-describing them invites the model to redraw them.
 
 ## Common failure modes + fixes
 
 **Hands:** Append `accurate anatomy with five fingers per hand, symmetrical features, natural proportions, relaxed open palm`. Avoid heavy jewelry, props intersecting fingers, motion blur in references.
 
-**Text in images:** Quote-wrap target text. Specify font (`Century Gothic, 12pt`). Long phrases work; small text degrades. Two-step works best — generate text concepts conversationally first, then ask for the image.
+**Text in images:** Quote the exact text and describe its type: weight, style, size and placement (`the headline "LAST CALL" in heavy condensed capitals across the top third`). Small text is a documented limit: keep type large, and short.
 
 **Left/right confusion:** Default is **viewer's perspective**, not subject's. Append `left and right are from the character's perspective, NOT the camera's` when scene-blocking matters.
 
@@ -194,24 +205,25 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 
 **Soft faces / dead eyes:** Add `crisp catchlights in the eyes`, `skin micro-detail`, `peach fuzz visible`. Don't stack quality enhancers — single clean prompt beats multiple re-interpretations.
 
-**Post-cutoff content (anything after Jan 2025):** Use reference images. The model has no knowledge of recent franchises, products, events.
+**Recent products, people and events:** give it reference images rather than relying on what it knows.
+
+**Written light overridden (Slates receipt, 2026-10-23, N=1 per scene):** in a three-scene test against GPT Image 2.5 Sunburst, the night-bar scene asked for one-sided blue TV light and Nano Banana 2.1 lit the face warm and from the front, brighter than asked; Sunburst kept the dark side dark. State the one light system plainly and early, say which side stays dark, and describe the exposure as it should look: `the left half of her face falls to near black`.
 
 ## Resolution tactics
 
-- Resolution is priced: NB2 4k costs roughly 2x 1k. Prices change — check current numbers. Pick the cheapest resolution that serves the use case.
-- **At 2K and above, the model allocates more tokens to surface detail** — explicit texture vocabulary (pores, fabric weave, grain) compounds at higher resolution.
+- Resolution is priced, and 4k costs the most. Check current numbers. Pick the cheapest resolution that serves the use case.
+- **At 2K and above, the model has more pixels for surface detail** — explicit texture vocabulary (pores, fabric weave, grain) pays off more at higher resolution.
 - 1k for fast iteration / drafts; 2k for hero shots; 4k only when you need print-grade detail.
-- 2K generations vary 20-60s+. Don't time-budget tightly.
 
 ## Boring vs cinema — examples
 
 ❌ **Boring:** "Wide shot of a man on a dock looking at the forest."
 
-✅ **Cinema:** "Direct overhead drone shot on weathered dock surface. Single figure standing center frame, climbing up from frame bottom. Boot prints leading away from him toward shore. Pale winter light. Anamorphic lens flare from low sun. Desaturated blue and slate grey palette. Kodak Portra 400 grain. The path already walked by someone else. Map of threat."
+✅ **Cinema:** "Direct overhead drone shot of a weathered dock. A single figure stands center frame, climbing up from the bottom of the frame, with boot prints leading away from him toward shore. Pale winter light, an anamorphic flare from the low sun, a desaturated blue and slate grey palette and Kodak Portra 400 grain. The path was already walked by someone else."
 
 ❌ **Boring:** "Close up of a woman looking scared."
 
-✅ **Cinema:** "Extreme close on subject's mouth and nose, 135mm f/2.8, shallow depth of field. Breath pluming out, catching cold light from upper-left key. Lips slightly parted, peach fuzz visible. The breath holds. CineStill 800T halation around catchlights. Waiting."
+✅ **Cinema:** "Extreme close-up on her mouth and nose, 135mm f/2.8, shallow depth of field. Her breath plumes out and catches cold light from an upper-left key. Her lips are slightly parted, peach fuzz visible, and the breath holds. CineStill 800T halation around the catchlights. Waiting."
 
 <!-- @inject:iteration-diagnosis -->
 ## Diagnose repeated failures
@@ -221,9 +233,8 @@ After three failed attempts at the same requirement, pause unchanged re-rolls an
 Continue autonomously when the brief is clear, a specific correction is supported and the next request is already authorized. Hand control back when taste or intent cannot be inferred, the next request needs fresh consent, or the available tool cannot meet the requirement. A failed roll never authorizes an additional charge. Follow the existing batch and per-request cost policy.
 <!-- @end:iteration-diagnosis -->
 
-## Family variants — Lite and Pro
+## Sources
 
-Everything in this skill applies to the whole Nano Banana family; two variants trade speed/ceiling around NB2 full:
-
-- **nano-banana-2-lite** — ~half the price, ~2.7× faster, **1K output only**, max 4 refs. The draft/iteration seat: explore compositions here, then re-run the winner on NB2 full at 2K/4K. Same Gemini filter.
-- **nano-banana-pro**: the hero-frame/typography ceiling (2× NB2 at 1K, 1.33× at 2K, about 1.9× at 4K; 4K native). NB2 ≈ 95% of Pro; escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene, or deep multi-element frames must be perfect. Up to 14 refs; it takes a full subject library in one call.
+- Google, Gemini API image generation guide and model card (Nano Banana family guidance; no 2.1-specific guide exists as of 2026-10-23).
+- Google Cloud, image generation prompt guide (reference ordering).
+- Slates receipt: Nano Banana 2.1 against Sunburst, three cinematic scenes, 2026-10-23 (the overridden one-sided light).

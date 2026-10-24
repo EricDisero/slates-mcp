@@ -64,7 +64,6 @@ export type PromptingTipsKey =
   | 'ltx-2-5'
   | 'wan-3'
   | 'nano-banana'
-  | 'nano-banana-lite'
   | 'gpt-image-2-5'
   | 'seed-audio'
   | 'eleven-sfx'
@@ -456,9 +455,9 @@ const GPT_IMAGE_25: PromptingTipsEntry = {
 }
 
 const NANO_BANANA: PromptingTipsEntry = {
-  label: 'Nano Banana 2',
+  label: 'Nano Banana 2.1',
   intro: [
-    'Nano Banana 2 is a language model that outputs pixels. Brief it like a creative director, not like a Stable-Diffusion tag tool. The biggest realism lever: specificity that mimics how real photographers describe their work.',
+    'Nano Banana 2.1 is a language model that outputs pixels, and it reasons before it draws. Brief it in sentences like a creative director, not like a Stable-Diffusion tag tool. The biggest realism lever: specificity that mimics how real photographers describe their work.',
     "Google's 4 official rules: Be specific. Use positive framing (describe what you want, not what you don't). Control the camera with cinematic terms. Iterate conversationally.",
   ],
   columns: [
@@ -509,16 +508,16 @@ const NANO_BANANA: PromptingTipsEntry = {
       {
         heading: 'No negative-prompt field',
         example: '✅ "empty street" not "no cars"\n✅ "without people, vehicles, or signage"\n❌ "not anime, not cartoon, not 3D"',
-        note: 'Reframe positively first. Use inline "without" / "free of" only when positive framing can\'t suppress the unwanted element.',
+        note: 'Reframe positively first; Slates sends no exclusion list to this model. Use inline "without" / "free of" only when positive framing can\'t suppress the unwanted element.',
       },
       {
-        heading: 'Reference images — name them, never label roles',
+        heading: 'Reference images — say what each one supplies',
         example: 'Marcus (image 1) sits across from the woman (image 2) in the cafe (image 3).',
         note: `Up to 14 refs (10 object + 4 character — caps don't trade). ${PARTIALS['reference-tips-short']}`,
       },
       {
         heading: 'Common fixes',
-        example: 'Hands → "five fingers, natural proportions"\nText → quote-wrap "HEADLINE" + specify font\nLeft/right → "from the character\'s perspective"',
+        example: 'Hands → "five fingers, natural proportions"\nText → quote-wrap "HEADLINE" + describe the type\nLeft/right → "from the character\'s perspective"',
         note: "Default left/right is the viewer's perspective. Surreal prompts trip uncanny valley — the model drags toward realism. For surrealism, lean hard into \"painted\" / \"illustrated\".",
       },
       {
@@ -531,25 +530,6 @@ const NANO_BANANA: PromptingTipsEntry = {
   footer: [
     'Boring vs Cinema. Boring: "Wide shot of man on dock looking at forest." Cinema: "Direct overhead drone shot on weathered dock. Single figure climbing up frame bottom. Boot prints leading toward shore. Pale winter light. Anamorphic flare. Desaturated blue/slate palette. Kodak Portra 400 grain. Map of threat."',
     "Three-attempt checkpoint. If three iterations on the same prompt haven't landed, stop re-rolling and diagnose the reference, prompt structure and model fit before the next spend. Usually the structure is wrong, not the seed.",
-  ],
-}
-
-const NANO_BANANA_LITE: PromptingTipsEntry = {
-  ...NANO_BANANA,
-  label: 'Nano Banana 2 Lite',
-  columns: [
-    NANO_BANANA.columns[0],
-    NANO_BANANA.columns[1].map((card) =>
-      card.heading === 'Reference images — name them, never label roles'
-        ? { ...card, note: `Up to 4 refs on Lite (the edit endpoint caps input images at 4). ${PARTIALS['reference-tips-short']}` }
-        : card.heading === 'Resolution tactics'
-        ? {
-            heading: 'Resolution tactics',
-            example: '1k only on Lite',
-            note: 'Lite outputs 1K only — use it for iteration volume and drafts, then switch to Nano Banana 2 for 2K/4K finals.',
-          }
-        : card
-    ),
   ],
 }
 
@@ -899,7 +879,6 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'ltx-2-5': LTX_2_5,
   'wan-3': WAN_3,
   'nano-banana': NANO_BANANA,
-  'nano-banana-lite': NANO_BANANA_LITE,
   'gpt-image-2-5': GPT_IMAGE_25,
 
   'seed-audio': SEED_AUDIO,

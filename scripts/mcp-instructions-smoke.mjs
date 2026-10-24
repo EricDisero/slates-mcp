@@ -199,7 +199,7 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   )
   check(
     'the warning points at the skill that owns the rule',
-    warning.includes('slates-prompting-nano-banana-2')
+    warning.includes('slates-prompting-nano-banana-2-1')
   )
   check(
     'and it did NOT block the call (clarification, not an error)',

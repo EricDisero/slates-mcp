@@ -321,6 +321,23 @@ export function falImageSize(
   return computeFalDimensions(ar, 4)
 }
 
+/**
+ * FLUX 3 Image's `resolution` tier for each Slates rung. FLUX 3 does NOT take
+ * `image_size`: its schema carries an `aspect_ratio` enum and a `resolution`
+ * enum `768sq | 1k | 1.5k | 2k | 4k` (fal OpenAPI, read 2026-10-23, ripped to
+ * second-brain/business/projects/slates/provider-docs/fal-flux-3-image-openapi-schemas.md).
+ *
+ * 🚨 A BILLING INPUT, like `falImageSize` above: the proxy recovers the rung of
+ * a FLUX 3 cost key by inverting this table over the body's `resolution`, so
+ * the desktop and the server read the same map. `768sq` (square only) and `4k`
+ * ("can take several minutes") are not offered (Eric, 2026-10-23).
+ */
+export const FLUX_3_RESOLUTIONS: Record<'1k' | '2k' | '4k', '1k' | '1.5k' | '2k'> = {
+  '1k': '1k',
+  '2k': '1.5k',
+  '4k': '2k',
+}
+
 export interface ModelCapability {
   imageResolutions?: ImageResolution[]
   /** Product default shared by estimates and generation. */
@@ -395,26 +412,28 @@ export const AGENT_ROUTE_PROVIDER = 'fal'
 export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // ── Image models ───────────────────────────────────────────────────────────
 
-  'nano-banana-2': {
-    defaultImageResolution: '2k',
-    imageResolutions: ['1k', '2k', '4k'],
-    // fal's nano-banana-2 schema caps `num_images` at 4 (read 2026-09-09). This
-    // is the ONLY model that batches: the MCP's headless path (no projectId) asks
-    // fal for one batch, and every other route — desktop and agent alike — fires
-    // N separate single-image generations. The proxy bills the batch size.
-    maxBatchImages: 4,
-    aspectRatios: FULL_ASPECT_RATIOS,
-    maxRefImages: 14,
-  },
-
-  'nano-banana-2-lite': {
-    defaultImageResolution: '1k',
-    imageResolutions: ['1k'],
-    aspectRatios: FULL_ASPECT_RATIOS,
-    maxRefImages: 4, // fal edit endpoint caps input images at 4
-  },
-
-  'nano-banana-pro': {
+  // Nano Banana 2.1 (fal `google/nano-banana-2.1` and `/edit`), the one Nano
+  // Banana row since 2026-10-23 (Eric: it replaces Nano Banana 2; Pro and NB2
+  // Lite retire with it). Read off fal's OpenAPI rip 2026-10-23
+  // (second-brain/business/projects/slates/provider-docs/fal-nano-banana-2-1-openapi-schemas.md):
+  // `resolution` is `1K | 2K | 4K` (no 0.5K); `aspect_ratio` takes all ten of
+  // ours plus 4:1/1:4/8:1/1:8, which stay out until the picker offers them on
+  // any model. 14 references is Google's documented total (10 object + 4
+  // character); fal's edit schema states no `maxItems`.
+  //
+  // NO `maxBatchImages`, so ONE image per request everywhere, the MCP's headless
+  // path included. fal's schema allows `num_images` 1-4, but 2.1 bills tokens and
+  // the thinking share of a batched request is not stated, so a per-image key
+  // cannot be shown to price a batch. ASSUMED safe at one; settled by a metered
+  // 4-image read of `x-fal-billable-units`.
+  //
+  // The retired rows (`nano-banana-2`, `nano-banana-2-lite`, `nano-banana-pro`)
+  // are gone from here for the reason `gpt-image-2` is (comment below): stored
+  // ids migrate to this row in slate's `migrateRetiredModel`. The server keeps
+  // their keys for desktops released before the swap, with a frozen copy of their
+  // rows in slates-api/src/lib/fal-image-keys.ts.
+  'nano-banana-2-1': {
+    // 2k, as Nano Banana 2 defaulted: a product choice, not fal's default (1K).
     defaultImageResolution: '2k',
     imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
@@ -471,11 +490,18 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxRefImages: 16,
   },
 
-  'flux-2-max': {
+  // FLUX 3 Image (fal `blackforestlabs/flux-3/text-to-image` and `/edit-image`),
+  // replacing FLUX.2 Max 2026-10-23 (Eric). Read off fal's OpenAPI rip
+  // 2026-10-23 (provider-docs/fal-flux-3-image-openapi-schemas.md): an
+  // `aspect_ratio` enum holding all ten of ours, a `resolution` tier
+  // (`FLUX_3_RESOLUTIONS` above maps our rungs onto it) and edit `image_urls`
+  // `maxItems: 10`. Default 1k, as FLUX.2 Max defaulted (a product choice).
+  // `flux-2-max` left this table the same day; its stored ids migrate here.
+  'flux-3': {
     defaultImageResolution: '1k',
     imageResolutions: ['1k', '2k', '4k'],
     aspectRatios: FULL_ASPECT_RATIOS,
-    maxRefImages: 4,
+    maxRefImages: 10,
   },
 
   'seedream-5-lite': {

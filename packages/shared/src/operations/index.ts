@@ -1699,7 +1699,7 @@ export const estimateGenerationCost: Operation<{
   description:
     'Quote credits before any generate_* op. For saved Shots, a board or a scene, quote with slates_get_board_quote instead. Accepts the generation model ids and parameters (edit seats other than Kling, lip-sync and motion-transfer engines need an exact registry cost key), or an exact registry cost key. Show the user the total and wait for their OK before the generate call; the result flags requires_confirm above the threshold and carries the model\'s prompting card.',
   input: z.object({
-    model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2") or an exact registry cost key ("nano-banana-2-2k", "seedance-2-1080p-8s")'),
+    model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2-1") or an exact registry cost key ("nano-banana-2-1-2k", "seedance-2-1080p-8s")'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
     // Video windows and resolutions GENERATED from MODEL_CAPABILITIES. The
     // hand-typed "Video 3-15" here was wrong the day seedance-2.5 (4-30s)
@@ -2700,7 +2700,7 @@ export const generateCharacterIdentity: Operation<{
   projectId: string
   baseAssetId: string
   userNotes?: string
-  model?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst'
+  model?: 'nano-banana-2-1' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst'
 }> = {
   id: 'slates_generate_character_identity',
   billable: true,
@@ -2712,7 +2712,7 @@ export const generateCharacterIdentity: Operation<{
     baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from. ' + ASSET_UUID_ONLY),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
-      .enum(['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
+      .enum(['nano-banana-2-1', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
       .optional()
       .describe(`Image model for the sheet. Omit for the sheet tool's seat (${toolModelFor('character-sheet')}), which is what the app's own button uses. Pass another only to compare seats side by side.`),
   }),
@@ -2725,11 +2725,11 @@ export const generateCharacterIdentity: Operation<{
     // introduced, and the 2.5 swap is what makes it reachable in practice.
     if (isGptImageModel(input.model)) {
       await ctx.desktop().requireCapability('image-models-v3', `${input.model} character identity`)
-    } else if (input.model === 'nano-banana-pro' || input.model === 'nano-banana-2-lite') {
-      await ctx.desktop().requireCapability('image-models-v2', `${input.model} character identity`)
+    } else if (isImageModelV4(input.model)) {
+      await ctx.desktop().requireCapability('image-models-v4', `${input.model} character identity`)
     }
     // 1.5.8 renders an unnamed model as Nano Banana 2 and every model at 2k, so
-    // only an explicit Nano Banana model runs there as quoted.
+    // an unnamed or GPT Image seat needs a desktop that renders the seat quoted.
     if (!input.model || isGptImageModel(input.model)) {
       await ctx.desktop().requireCapability('sheet-tool-seats', 'sheet tools on the default image seat')
     }
@@ -3009,13 +3009,14 @@ async function previewAssets(
 
 // ── Generation (cloud-routed, credits-default) ──────────────────
 
+// Nano Banana 2, NB2 Lite, Nano Banana Pro and FLUX.2 Max retired 2026-10-23
+// (Eric): Nano Banana 2.1 and FLUX 3 Image replace them. An older CLI that still
+// sends a retired id gets the desktop's answer (slate `migrateRetiredModel`).
 export type ImageModelId =
-  | 'nano-banana-2'
-  | 'nano-banana-2-lite'
-  | 'nano-banana-pro'
+  | 'nano-banana-2-1'
   | 'gpt-image-2-5-flare'
   | 'gpt-image-2-5-sunburst'
-  | 'flux-2-max'
+  | 'flux-3'
   | 'seedream-5-lite'
 
 /** The exact `model` ids `slates_generate_image` accepts. */
@@ -3025,12 +3026,10 @@ export const THREE_K_IMAGE_MODELS = Object.keys(MODEL_CAPABILITIES).filter(
 )
 
 export const IMAGE_MODELS = [
-  'nano-banana-2',
-  'nano-banana-2-lite',
-  'nano-banana-pro',
+  'nano-banana-2-1',
   'gpt-image-2-5-flare',
   'gpt-image-2-5-sunburst',
-  'flux-2-max',
+  'flux-3',
   'seedream-5-lite',
 ] as const satisfies readonly ImageModelId[]
 
@@ -3039,6 +3038,19 @@ export const IMAGE_MODELS = [
 export function isGptImageModel(model: string | undefined): boolean {
   return model === 'gpt-image-2-5-flare' || model === 'gpt-image-2-5-sunburst'
 }
+
+/**
+ * The seats that arrived 2026-10-23, which only a desktop advertising
+ * `image-models-v4` knows. 🚨 A NEW TOKEN, as v3 was for GPT Image 2.5: an older
+ * desktop has neither id in its registry and would fall back to its Nano Banana
+ * path while this op quotes the new seat's price.
+ */
+export function isImageModelV4(model: string | undefined): boolean {
+  return model === 'nano-banana-2-1' || model === 'flux-3'
+}
+
+/** The one image seat with a headless path (no projectId): the MCP asks the proxy for it directly. */
+const HEADLESS_IMAGE_MODEL = 'nano-banana-2-1' satisfies ImageModelId
 
 /**
  * GPT Image 2.5's quality ladder — the full enum fal accepts, all five rungs
@@ -3084,9 +3096,8 @@ const IMAGE_ASPECT_RATIOS = aspectRatioUnion(IMAGE_MODELS)
 
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
 // in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
-// videoCostKey): NB2/NB Pro price per resolution, FLUX.2 Max prices per
-// resolution (1k is the bare key), NB2 Lite/Seedream are flat, GPT Image 2.5 is
-// quality × resolution-class over ALL FIVE exposed tiers.
+// videoCostKey): Nano Banana 2.1 and FLUX 3 price per resolution, Seedream is
+// flat, GPT Image 2.5 is quality × resolution-class over ALL FIVE exposed tiers.
 //
 // 🚨 THE KEY SUFFIX IS `med` WHILE THE WIRE VALUE IS `medium` — the one
 // tier name that differs between fal's enum and our cost keys, inherited from
@@ -3119,12 +3130,10 @@ export function imageCostKey(
   quality: GptQualityId = DEFAULT_GPT_QUALITY,
   aspectRatio?: string
 ): string {
-  if (model === 'flux-2-max') return resolution === '1k' ? 'flux-2-max' : `flux-2-max-${resolution}`
+  if (model === 'flux-3') return `flux-3-${resolution}`
   if (model === 'seedream-5-lite') return 'seedream-5-lite'
-  if (model === 'nano-banana-2-lite') return 'nano-banana-2-lite'
-  if (model === 'nano-banana-pro') return `nano-banana-pro-${resolution}`
   if (isGptImageModel(model)) return `${model}-${gptKeyTier(quality)}-${resolution}${gptKeyAspect(aspectRatio)}`
-  return `nano-banana-2-${resolution}`
+  return `nano-banana-2-1-${resolution}`
 }
 
 type CheaperImageOption = { model: ImageModelId; credits: number; resolution: '1k' | '2k' | '3k' | '4k'; quality?: GptQualityId }
@@ -3183,8 +3192,8 @@ if (!(IMAGE_MODELS as readonly string[]).includes(DEFAULT_IMAGE_MODEL)) {
   throw new Error(`slates_generate_image: default image seat ${DEFAULT_IMAGE_MODEL} is not in IMAGE_MODELS`)
 }
 
-/** The headless path's one fal batch: `maxBatchImages` owns it (nano-banana-2 is the only batching model). */
-const HEADLESS_BATCH_CAP = MODEL_CAPABILITIES['nano-banana-2']?.maxBatchImages ?? 1
+/** The headless path's one provider request: `maxBatchImages` owns it. Nano Banana 2.1 declares none, so one image. */
+const HEADLESS_BATCH_CAP = MODEL_CAPABILITIES[HEADLESS_IMAGE_MODEL]?.maxBatchImages ?? 1
 /** A 1.5.8 desktop's own clamp on a project batch, frozen with that build. */
 const LEGACY_DESKTOP_IMAGE_BATCH = 4
 
@@ -3209,7 +3218,7 @@ export const generateImage: Operation<{
     // Rules only: Claude Code keeps the first 2,048 characters of a tool
     // description, so the generated roster lives on the model param, as on the
     // video and audio ops (it pushed the default seat's line past the cut).
-    'Generate an image via Slates credits. Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except nano-banana-2 require projectId (no headless path). Pass aspectRatio (the server returns requires_clarification when missing); resolution defaults to the model\'s own. ' +
+    `Generate an image via Slates credits. Pass projectId to save into a Slates project (asset appears live in the desktop UI). All models except ${HEADLESS_IMAGE_MODEL} require projectId (no headless path). ` + 'Pass aspectRatio (the server returns requires_clarification when missing); resolution defaults to the model\'s own. ' +
     confirmGateSentence('any referenceAssetIds') +
     ' MCP/CLI generation always charges credits. The estimate returns the model\'s prompting card; load its slates-prompting-* guide with slates_get_prompting_guide for anything the card leaves out. ' +
     // GENERATED from the skill file's own never-use list -- the one piece of
@@ -3220,11 +3229,11 @@ export const generateImage: Operation<{
     prompt: z.string().min(1).max(4000),
     // Routing GENERATED from MODEL_FACTS.
     model: zEnum(IMAGE_MODELS).optional().describe(
-      `Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, nano-banana-2 (the only headless seat) without.\n` +
+      `Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, ${HEADLESS_IMAGE_MODEL} (the only headless seat) without.\n` +
         `${describeRouting('image')}\n` +
         'Full table: the slates-model-selection skill.'
     ),
-    projectId: z.string().uuid().optional().describe('Save into this Slates project. Renderer refreshes live. Required for every model except nano-banana-2.'),
+    projectId: z.string().uuid().optional().describe(`Save into this Slates project. Renderer refreshes live. Required for every model except ${HEADLESS_IMAGE_MODEL}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Omit for the selected model default. Override for a specific delivery size; use the same setting when estimating.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image only. Default ${DEFAULT_GPT_QUALITY}; estimate the chosen tier before generation.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
@@ -3232,8 +3241,8 @@ export const generateImage: Operation<{
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
     count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Variations of this one prompt: every image gets the same prompt, so different subjects are separate calls. Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}. A 2x2 or 3x3 grid in one picture is a Shot's or the prompt box's Grid (params.gridMode), not count.`),
-    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe('Headless (no projectId) nano-banana-2 only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.'),
-    referenceAssetIds: z.array(z.string()).max(16).optional().describe("Project assets as references — UUIDs or badge codes (\"IMG-A8\"), resolved at call time. Requires projectId. Caps: GPT Image 16, nano-banana-2 14, FLUX/Seedream lower. Label every reference role in the prompt."),
+    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe(`Headless (no projectId) ${HEADLESS_IMAGE_MODEL} only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.`),
+    referenceAssetIds: z.array(z.string()).max(16).optional().describe(`Project assets as references — UUIDs or badge codes ("IMG-A8"), resolved at call time. Requires projectId. Caps: ${describeReferenceImageCaps(IMAGE_MODELS)}. Label every reference role in the prompt.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
@@ -3249,10 +3258,10 @@ export const generateImage: Operation<{
     // that echoes a prompt -- the clarification and confirm gates are PRE-spend,
     // which is where a rewrite is still free.
     // Omitted model: the default seat when there is a project to route through,
-    // nano-banana-2 without one, because it is the only headless seat. The
+    // HEADLESS_IMAGE_MODEL without one, because it is the only headless seat. The
     // desktop resolves the same seat for its cost and plan-model guards
     // (`imageModelFor`, slate src/main/studio-agent/guards.ts): change both together.
-    const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : 'nano-banana-2')
+    const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : HEADLESS_IMAGE_MODEL)
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
     if (!input.aspectRatio || !input.resolution) {
@@ -3278,9 +3287,9 @@ export const generateImage: Operation<{
       return ok({ requires_clarification: true, missing: ['resolution'],
         message: `${imageModel} accepts ${resolutions.join(', ')}.` })
     }
-    // Only nano-banana-2 has a headless path — everything else routes through
-    // the desktop generation pipeline, which needs a project.
-    if (imageModel !== 'nano-banana-2' && !input.projectId) {
+    // Only HEADLESS_IMAGE_MODEL has a headless path — everything else routes
+    // through the desktop generation pipeline, which needs a project.
+    if (imageModel !== HEADLESS_IMAGE_MODEL && !input.projectId) {
       return ok({
         requires_clarification: true,
         missing: ['projectId'],
@@ -3308,17 +3317,17 @@ export const generateImage: Operation<{
           'background=true routes through the desktop generation pipeline (so slates_get_generation_status can poll it) — pass a projectId, or drop background for a blocking headless run.',
       })
     }
-    // 🚨 THE HEADLESS PATH ASKS FAL FOR A BATCH, so a provider ceiling binds
-    // here and nowhere else. It is nano-banana-2 only, and Nano Banana's
-    // `num_images` maximum is 4 (fal schema, 2026-09-09). Refused rather than
-    // clamped: a silent clamp would make four images against a request for ten
-    // and read to the caller as a partial failure it should retry.
+    // 🚨 THE HEADLESS PATH IS ONE PROVIDER REQUEST, so its batch bound binds
+    // here and nowhere else: `maxBatchImages` on HEADLESS_IMAGE_MODEL, which
+    // Nano Banana 2.1 leaves unset (one image; model-capabilities.ts says why).
+    // Refused rather than clamped: a silent clamp would make one image against a
+    // request for ten and read to the caller as a partial failure to retry.
     if (!input.projectId && (input.count ?? 1) > HEADLESS_BATCH_CAP) {
       return ok({
         requires_clarification: true,
         missing: ['projectId'],
         message:
-          `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path asks for one batch and nano-banana-2 caps a batch at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
+          `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path is one request and ${HEADLESS_IMAGE_MODEL} caps it at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
       })
     }
     let refEcho = ''
@@ -3335,19 +3344,16 @@ export const generateImage: Operation<{
       await ctx.desktop().requireCapability('background-generation', 'background generation')
     }
     // New-roster models need a desktop that knows them — an older desktop's
-    // allowlist would silently fall back to nano-banana-2 while we quote the
-    // new model's price.
+    // allowlist would silently fall back to its Nano Banana path while we quote
+    // the new model's price.
     if (input.projectId && isGptImageModel(imageModel)) {
       // 🚨 v3, NOT v2. GPT Image 2.5 landed 2026-09-09 with new ids and a
       // five-rung ladder; a desktop that only knows v2 has neither, so it would
-      // fall back to nano-banana-2 while this op quotes a 2.5 price — precisely
+      // fall back to its Nano Banana path while this op quotes a 2.5 price — precisely
       // the failure the gate was built to stop. Reusing v2 reintroduces it.
       await ctx.desktop().requireCapability('image-models-v3', `${imageModel} generation`)
-    } else if (
-      input.projectId &&
-      (imageModel === 'nano-banana-pro' || imageModel === 'nano-banana-2-lite')
-    ) {
-      await ctx.desktop().requireCapability('image-models-v2', `${imageModel} generation`)
+    } else if (input.projectId && isImageModelV4(imageModel)) {
+      await ctx.desktop().requireCapability('image-models-v4', `${imageModel} generation`)
     }
     // 1.5.8 clamps a project batch to its own 4 and bills 4 against this op's quote for all of them.
     if (input.projectId && (input.count ?? 1) > LEGACY_DESKTOP_IMAGE_BATCH) {
@@ -3530,8 +3536,8 @@ export const generateImage: Operation<{
     const hasReferenceImages =
       !!input.referenceImageUrls && input.referenceImageUrls.length > 0
     const endpoint = hasReferenceImages
-      ? 'fal-ai/nano-banana-2/edit'
-      : 'fal-ai/nano-banana-2'
+      ? 'google/nano-banana-2.1/edit'
+      : 'google/nano-banana-2.1'
     const proxyResult = await cloud.post<{
       success: boolean
       data?: { images?: Array<{ url?: string }> }
@@ -3542,31 +3548,30 @@ export const generateImage: Operation<{
       type: 'image',
       model: costKey,
       endpoint,
+      // The body the desktop's `buildFalNanoBananaRequest` (slate src/main/api/fal.ts)
+      // sends, field for field; the proxy derives the cost key from it
+      // (slates-api src/lib/fal-image-keys.ts).
       params: {
         prompt: input.prompt,
         aspect_ratio: input.aspectRatio ?? '1:1',
         // 🚨 THE RESOLUTION HAS TO BE ON THE WIRE, BECAUSE IT IS IN THE KEY.
-        // `imageCostKey` above bills `nano-banana-2-{resolution}`, and until
-        // 2026-09-10 this body omitted the field entirely — so fal rendered at
-        // its own default while we charged for whatever rung the caller asked
-        // for. The enum is fal's (`1K`/`2K`/`4K`), the same one the desktop's
-        // `buildFalNB2Request` sends, and the proxy now recovers the rung from it
-        // rather than trusting the key (`lib/fal-image-keys.ts`).
-        // `3k` cannot reach here — the capability guard above refuses a rung
-        // nano-banana-2 does not declare — so the map is deliberately partial
-        // rather than carrying a rung this model has no key for.
+        // `imageCostKey` above bills `nano-banana-2-1-{resolution}`; until
+        // 2026-09-10 this body omitted the field and fal rendered at its own
+        // default while we charged for the rung asked. The enum is fal's
+        // (`1K`/`2K`/`4K`), and the proxy recovers the rung from it rather than
+        // trusting the key. `3k` cannot reach here: the capability guard above
+        // refuses a rung the model does not declare.
         resolution: ({ '1k': '1K', '2k': '2K', '4k': '4K' } as Record<string, string>)[resolution] ?? '2K',
-        // 🚨 THE HEADLESS PATH IS THE ONE PLACE WE ASK FAL FOR A BATCH, so it
-        // is the one place a provider's own `num_images` ceiling binds — and
-        // Nano Banana's is 4 (fal schema, read 2026-09-09), against the op's
-        // limit of 10. Everything else fans out through the desktop as N
-        // separate single-image generations, where no batch ceiling exists.
-        // Guarded above rather than clamped here: silently making 4 when 10
-        // were asked for would bill 4 and look like a partial failure.
-        //
-        // The proxy bills this COUNT (it multiplies the single-image key by it),
-        // which is what the confirm gate above has always quoted.
+        // Sent, never left to fal's default: a default is a bill nobody chose.
+        // `medium` is what the key's thinking allowance prices; the proxy
+        // refuses `high`, which no key prices.
+        thinking_level: 'medium',
+        // One image per request (HEADLESS_BATCH_CAP, guarded above). The proxy
+        // bills this count against the single-image key.
         num_images: input.count ?? 1,
+        // Nano Banana 2's posture, kept: fal's string enum "1"-"6", default "4".
+        safety_tolerance: '5',
+        output_format: 'png',
         ...(hasReferenceImages
           ? { image_urls: input.referenceImageUrls }
           : {}),
@@ -3651,13 +3656,13 @@ async function pollProxyJob(
 /** References an edit carries beside the source, which is image 1 of the same request. */
 const editReferenceCap = (model: string): number => Math.max(0, (MODEL_CAPABILITIES[model]?.maxRefImages ?? 1) - 1)
 /** The models a 1.5.8 desktop sends edit references on, frozen with that build: on every other model it drops them and bills the edit in full. */
-const LEGACY_EDIT_REFERENCE_MODELS: readonly string[] = ['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro']
+const LEGACY_EDIT_REFERENCE_MODELS: readonly string[] = ['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro'] // 1.5.8's ids, retired since
 
 export const editImage: Operation<{
   projectId: string
   sourceAssetId: string
   prompt: string
-  editModel?: 'nano-banana-2' | 'nano-banana-2-lite' | 'nano-banana-pro' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst' | 'flux-2-max' | 'seedream-5-lite'
+  editModel?: ImageModelId
   referenceAssetIds?: string[]
   resolution?: '1k' | '2k' | '3k' | '4k'
   quality?: GptQualityId
@@ -3677,7 +3682,7 @@ export const editImage: Operation<{
     prompt: z.string().min(1).max(4000).describe('The change, not the whole image. @name and #look words attach nothing here: pass those pictures in referenceAssetIds.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
     referenceAssetIds: z.array(z.string().uuid().describe(ASSET_UUID_ONLY)).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite; nano-banana-2-lite is 1k only.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite only.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
     aspectRatio: z.string().optional(),
@@ -3700,8 +3705,8 @@ export const editImage: Operation<{
       // handleEditImage falls through to the nano-banana path — NB2 output billed
       // at a quoted 2.5 price. Exactly the bug the gate exists to stop.
       await desktop.requireCapability('image-models-v3', `${editModel} editing`)
-    } else if (editModel === 'nano-banana-pro' || editModel === 'nano-banana-2-lite') {
-      await desktop.requireCapability('image-models-v2', `${editModel} editing`)
+    } else if (isImageModelV4(editModel)) {
+      await desktop.requireCapability('image-models-v4', `${editModel} editing`)
     }
     if (input.referenceAssetIds?.length && !LEGACY_EDIT_REFERENCE_MODELS.includes(editModel)) {
       await desktop.requireCapability('edit-references-all-models', `references on a ${editModel} edit`)
@@ -3713,7 +3718,7 @@ export const editImage: Operation<{
     // Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts, which
     // this package cannot import: change both together.
     const costKey =
-      editModel === 'flux-2-max' || editModel === 'seedream-5-lite'
+      editModel === 'flux-3' || editModel === 'seedream-5-lite'
         ? `${imageCostKey(editModel, resolution)}-edit`
         : imageCostKey(editModel, resolution, input.quality, input.aspectRatio)
     const cloud = ctx.cloud()
@@ -3820,7 +3825,7 @@ export const editImage: Operation<{
  */
 
 /** The seats the viewer's Cells box offers. Mirrors slate's `GRID_EXTRACT_MODELS` (`shared/prompts/storyboard-grids.ts`), which this package cannot import. */
-const GRID_EXTRACT_SEATS = ['nano-banana-2', 'flux-2-max', 'seedream-5-lite'] as const
+const GRID_EXTRACT_SEATS = ['nano-banana-2-1', 'flux-3', 'seedream-5-lite'] as const
 
 interface ExtractQuote {
   gridCode: string | null
@@ -9557,9 +9562,9 @@ export function resolveGuideTopic(topic: string): string | null {
   ) {
     return 'slates-model-selection'
   }
-  if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2'
+  if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2-1'
   if (t === 'sunburst' || t === 'flare' || t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-5'
-  if (t.startsWith('flux')) return 'slates-prompting-flux-2-max'
+  if (t.startsWith('flux')) return 'slates-prompting-flux-3'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
   if (t.startsWith('wan') || t === 'alibaba-wan-3.0') return 'slates-prompting-wan-3'
@@ -9630,7 +9635,7 @@ export function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('seedance')) return 'slates-prompting-seedance'
   if (t.startsWith('avatar-') || t.includes('lip-sync')) return 'slates-prompting-lip-sync'
   // Style names → the per-style prompting guide (photoreal/anime/painterly/
-  // 3d-render across Seedance/Kling/NB2). Matches the style-library ids plus
+  // 3d-render across Seedance/Kling/Nano Banana). Matches the style-library ids plus
   // the obvious spellings users type.
   if (
     t === 'style' ||

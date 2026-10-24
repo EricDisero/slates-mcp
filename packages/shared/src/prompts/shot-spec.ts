@@ -90,7 +90,7 @@ export const ORDERED_ATTACHMENT_ROLES: readonly OrderedAttachmentRole[] = (
  */
 export interface ShotParams {
   aspectRatio?: string
-  /** Image models (Nano Banana 2 &co) — `1k` / `2k` / `4k`. */
+  /** Image models (Nano Banana 2.1 &co) — `1k` / `2k` / `4k`. */
   imageResolution?: string
   videoResolution?: string
   quality?: string

@@ -51,7 +51,6 @@
     "src/content/pseo/explain/ai-transition.ts": 4,
     "src/content/pseo/explain/image-to-video-ai.ts": 4,
     "src/content/pseo/index.ts": 3,
-    "src/content/pseo/models/nano-banana-2.ts": 2,
     "src/content/pseo/models/sora-2.ts": 2,
     "src/content/pseo/models/veo-3-1.ts": 61,
     "src/content/pseo/tools/ai-video-editor.ts": 2,

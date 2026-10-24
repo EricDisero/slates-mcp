@@ -22,12 +22,10 @@ The catalogue below is generated from the same model facts used by the tools. Cu
 
 ### image generate
 
-Nano Banana 2 (Gemini 3.1 Flash Image): The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, and the start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images.
-Nano Banana 2 Lite: FAST/DRAFT image tier — markedly cheaper and faster than NB2 full, at draft quality. Route here for iteration volume, then re-run the winner on NB2 full. Same Gemini content filter as NB2.
-Nano Banana Pro: HERO-FRAME / typography PREMIUM image tier. NB2 is about 95% of Pro — escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene or deep multi-element reasoning must be perfect, and say why.
+Nano Banana 2.1: The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, keeps what an edit leaves alone, and is the start-frame for legible in-scene text. It reasons before it draws, so dense compositions and hero frames land without a premium tier.
 GPT Image 2.5 Flare: THE FAST GPT IMAGE SEAT — OpenAI's small model, optimized for SPEED, quality COMPARABLE to GPT Image 2 (not better) at roughly half the latency. Route here when speed matters: drafts, exploration, volume. TEXT / DIAGRAM / PANEL work — character sheets, shot grids, text-bearing panels. When quality outranks speed, escalate to Sunburst. Own content filter, distinct from Gemini's. Killed by a head-to-head at the intended crop going the other way.
 GPT Image 2.5 Sunburst: THE QUALITY GPT IMAGE SEAT — OpenAI's most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Explore on Flare, finish on Sunburst.
-FLUX.2 Max: Photoreal image seat, less censored than the Gemini rails. Auto-routes to its edit endpoint when references are present.
+FLUX 3 Image: The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting. Auto-routes to its edit endpoint when references are present.
 Seedream 5 Lite: Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less censored. Routes to its edit endpoint when references are present.
 
 ### video generate
@@ -99,16 +97,14 @@ Video-reference calls bill from both input and output duration. Pass the actual 
 Image, video and audio are separate output lanes. A hero reference still is an image request, even when its final destination is video. Use the current image default for ordinary work and choose another seat when speed, supported shape, reference fidelity or an observed shortfall supplies a reason.
 
 <!-- @inject:image-defaults -->
-**Image default:** gpt-image-2-5-sunburst, quality `high`, 3k. User overrides take priority. Without a project, generation uses the headless Nano Banana 2 seat.
+**Image default:** gpt-image-2-5-sunburst, quality `high`, 3k. User overrides take priority. Without a project, generation uses the headless Nano Banana 2.1 seat. When to reroll a frame on Nano Banana 2.1 instead: `slates-cinematic-look` § Model notes.
 
 | Model | Default resolution |
 |---|---|
-| nano-banana-2 | 2k |
-| nano-banana-2-lite | 1k |
-| nano-banana-pro | 2k |
+| nano-banana-2-1 | 2k |
 | gpt-image-2-5-flare | 2k |
 | gpt-image-2-5-sunburst | 3k |
-| flux-2-max | 1k |
+| flux-3 | 1k |
 | seedream-5-lite | 2k |
 <!-- @end:image-defaults -->
 

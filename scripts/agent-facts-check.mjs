@@ -8,12 +8,12 @@ import { ALL_OPERATIONS, bannedTokensForSkill, findBannedTokens, refusableBanned
 const op = (id) => ALL_OPERATIONS.find((o) => o.id === `slates_${id}`)
 const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)
 
-// The eval's registry prices for the image roster (credits per image).
+// Registry prices for the image roster (credits per image), as slates-api prices
+// them from 2026-10-23 (Nano Banana 2.1 and FLUX 3 replaced NB2, NB2 Lite, Pro and FLUX.2 Max).
 const prices = new Map([
-  ['seedream-5-lite', 2], ['nano-banana-2-lite', 2],
-  ['nano-banana-2-1k', 4], ['nano-banana-2-2k', 6], ['nano-banana-2-4k', 8],
-  ['nano-banana-pro-1k', 8], ['nano-banana-pro-2k', 8], ['nano-banana-pro-4k', 15],
-  ['flux-2-max', 4], ['flux-2-max-2k', 5], ['flux-2-max-4k', 8],
+  ['seedream-5-lite', 2],
+  ['nano-banana-2-1-1k', 3], ['nano-banana-2-1-2k', 4], ['nano-banana-2-1-4k', 8],
+  ['flux-3-1k', 3], ['flux-3-2k', 4], ['flux-3-4k', 5],
   ['seedance-2-1080p-8s', 148],
 ])
 for (const seat of ['gpt-image-2-5-flare', 'gpt-image-2-5-sunburst']) {
@@ -31,20 +31,20 @@ const quoteCtx = { cloud: () => cloud, desktop: () => { throw new Error('an esti
 // ── 1. The estimate names cheaper image seats (cheap-image.0) ───────
 // Asked for "the cheapest and best version", the agent priced Nano Banana 2
 // alone (6 credits) and called it the cheapest; 1- and 2-credit seats existed.
-const nb2 = await call('estimate_generation_cost', { model: 'nano-banana-2' }, quoteCtx)
-// The quoted seat's own cheaper setting first (Nano Banana 2 at 1k), then the cheapest others.
+const nb2 = await call('estimate_generation_cost', { model: 'nano-banana-2-1' }, quoteCtx)
+// The quoted seat's own cheaper setting first (Nano Banana 2.1 at 1k), then the cheapest others.
 assert.deepEqual(nb2.data.cheaper_options.map((o) => [o.model, o.credits]), [
-  ['nano-banana-2', 4], ['gpt-image-2-5-flare', 1], ['gpt-image-2-5-sunburst', 1], ['nano-banana-2-lite', 2],
+  ['nano-banana-2-1', 3], ['gpt-image-2-5-flare', 1], ['gpt-image-2-5-sunburst', 1], ['seedream-5-lite', 2],
 ])
 // Ties go to the seat's default resolution, then the higher tier: medium costs what low does.
 assert.deepEqual(nb2.data.cheaper_options[2], { model: 'gpt-image-2-5-sunburst', credits: 1, resolution: '3k', quality: 'medium' })
-assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 6): nano-banana-2 4 credits (1k); gpt-image-2-5-flare 1 credits (quality medium); gpt-image-2-5-sunburst 1 credits (quality medium); nano-banana-2-lite 2 credits.')
+assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 5): nano-banana-2-1 3 credits (1k); gpt-image-2-5-flare 1 credits (quality medium); gpt-image-2-5-sunburst 1 credits (quality medium); seedream-5-lite 2 credits.')
 // It survives the desktop's repeated-card strip (loop.ts cuts at the card header).
 assert.match(nb2.text.split('\n\n--- HOW TO PROMPT')[0], /Cheaper per image/)
 // Priced at the asked framing: GPT Image prices a square frame higher, and a key the list
 // lacks is named as unpriced, never quoted at the 16:9 rate.
-const square = await call('estimate_generation_cost', { model: 'nano-banana-2', aspectRatio: '1:1' }, quoteCtx)
-assert.deepEqual(square.data.cheaper_options.map((o) => o.model), ['nano-banana-2', 'nano-banana-2-lite', 'seedream-5-lite', 'flux-2-max'])
+const square = await call('estimate_generation_cost', { model: 'nano-banana-2-1', aspectRatio: '1:1' }, quoteCtx)
+assert.deepEqual(square.data.cheaper_options.map((o) => o.model), ['nano-banana-2-1', 'seedream-5-lite', 'flux-3'])
 assert.match(square.text.split('\n')[1], /^Cheaper per image on the price list at 1:1: .*\. Not on the price list at 1:1: gpt-image-2-5-flare, gpt-image-2-5-sunburst; estimate one directly to price it\.$/)
 // Nothing cheaper, nothing said; and video estimates never carry the line.
 const cheapest = await call('estimate_generation_cost', { model: 'gpt-image-2-5-flare', quality: 'low' }, quoteCtx)
@@ -52,7 +52,7 @@ assert.equal(cheapest.data.cheaper_options, undefined)
 assert.doesNotMatch(cheapest.text, /Cheaper per image|Not on the price list/)
 const video = await call('estimate_generation_cost', { model: 'seedance-2', duration: 8, videoResolution: '1080p' }, quoteCtx)
 assert.doesNotMatch(video.text, /Cheaper per image/)
-console.log(`agent-facts: an image estimate lists ${nb2.data.cheaper_options.length} of the 6 cheaper settings under Nano Banana 2's 6 credits, its own 1k first, priced at the asked framing; none under the cheapest, none on video`)
+console.log(`agent-facts: an image estimate lists ${nb2.data.cheaper_options.length} of the 5 cheaper settings under Nano Banana 2.1's 4 credits, its own 1k first, priced at the asked framing; none under the cheapest, none on video`)
 
 // ── 2. The shot list carries its rows (batch-over-budget.0 and .2) ──
 // The desktop agent reads only `text`, which was the totals alone: it listed the
@@ -107,7 +107,7 @@ const imageDesktop = {
   post: async (route) => { assert.equal(route, '/agent/generation/image'); return { success: true, asset: { id: 'a1', code: 'IMG-A21' } } },
   get: async (route) => { assert.equal(route, '/agent/assets/image'); return { data: 'AAAA', mimeType: 'image/jpeg', bytes: 3 } },
 }
-const made = await call('generate_image', { prompt: 'A lighthouse at dusk', model: 'nano-banana-2', projectId, aspectRatio: '16:9', confirm: true },
+const made = await call('generate_image', { prompt: 'A lighthouse at dusk', model: 'nano-banana-2-1', projectId, aspectRatio: '16:9', confirm: true },
   { desktop: () => imageDesktop, cloud: () => cloud })
 assert.equal(made.images.length, 1)
 assert.match(made.text, /first the frame edges \(is every subject whole, or is one cut off where the brief did not ask for a crop\?\), then each thing the brief named/)
@@ -117,8 +117,8 @@ console.log('agent-facts: an inline image result names the frame-edge check befo
 // Every backticked string in a @banned block used to be a token, so FLUX's positive forms and
 // Omni Flash's recommended closing line were "banned", and the desktop loop refused them.
 const tokens = (skill) => bannedTokensForSkill(skill).map((t) => t.token)
-assert.ok(!tokens('slates-prompting-flux-2-max').some((t) => ['sharp focus throughout', 'empty scene', 'soft, diffused lighting'].includes(t)))
-assert.ok(tokens('slates-prompting-flux-2-max').includes('no blur'))
+assert.ok(!tokens('slates-prompting-flux-3').some((t) => ['sharp focus throughout', 'empty scene', 'soft, diffused lighting'].includes(t)))
+assert.ok(tokens('slates-prompting-flux-3').includes('no blur'))
 assert.ok(!tokens('slates-prompting-omni-flash').some((t) => ['Keep everything else the same.', 'when he snaps his fingers'].includes(t)))
 // Seedance 2.5 reclassifies on "edit" only with a reference video: refused then, never without.
 const s25 = 'One continuous drone climb, no cuts, no edit.'
@@ -129,7 +129,7 @@ assert.equal(findBannedTokens(s25, 'video', 'slates-prompting-seedance-2-5').len
 assert.deepEqual(refusableBannedTokens('He walks to the door.', 'video', 'slates-prompting-kling-v3'), [])
 assert.equal(findBannedTokens('He walks to the door.', 'video', 'slates-prompting-kling-v3').length, 1)
 // The plain ones refuse, and carry the skill's own line for the refusal to quote.
-const [cin] = refusableBannedTokens('quiet cinematic mood', 'image', 'slates-prompting-nano-banana-2')
+const [cin] = refusableBannedTokens('quiet cinematic mood', 'image', 'slates-prompting-nano-banana-2-1')
 assert.equal(cin.token, 'cinematic')
 assert.match(cin.note, /standing alone — always specify \*which cinema\*/)
 console.log('agent-facts: never-use lists drop the skills\' positive forms; "edit" refuses only with a reference video; context-only rules stay warnings')

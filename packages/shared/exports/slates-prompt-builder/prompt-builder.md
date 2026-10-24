@@ -27,7 +27,7 @@ This export includes the current Slates image, video and video-edit defaults plu
    - `reference-seedance.md` for Seedance 2.0 and shared Seedance grammar.
    - `reference-kling.md` for Kling generation or reference-driven editing.
    - `reference-gpt-image-2-5.md` for GPT Image 2.5.
-   - `reference-nano-banana.md` for Nano Banana 2.
+   - `reference-nano-banana.md` for Nano Banana 2.1.
    - `reference-omni-flash.md` for Omni Flash generation or prompt-only editing.
    Load only the model and mode being used; the contents list identifies the relevant sections.
 4. For recurring characters, identity consistency, or character-sheet preparation, also load `reference-character.md`. It owns the exact sheet architecture, background plate, lighting, and evaluation gate.

@@ -1,9 +1,9 @@
 ---
-name: slates-prompting-flux-2-max
-description: "Prompt or edit images with FLUX.2 Max (flux-2-max). Use with slates_generate_image or slates_edit_image on this model; covers word order, camera vocabulary, materials, colours and positive phrasing."
+name: slates-prompting-flux-3
+description: "Prompt or edit images with FLUX 3 Image (flux-3). Use with slates_generate_image or slates_edit_image on this model; covers plain-sentence prompts, numbered references, edits, quoted text and positive phrasing."
 ---
 
-# FLUX.2 Max — prompting
+# FLUX 3 Image — prompting
 
 <!-- @card:start -->
 <!-- slates-only -->
@@ -15,14 +15,14 @@ description: "Prompt or edit images with FLUX.2 Max (flux-2-max). Use with slate
      Keep it under 2,400 characters (the build fails above that) and keep the
      rationale, the receipts and the worked examples in the body below. -->
 <!-- /slates-only -->
-**Card — FLUX.2 Max.** Word order is weight: it attends hardest to the start. Structure: `Subject + Action + Style + Context`, then secondary detail. Length 10-30 words for a concept test, 30-80 for most work, 80+ only for a genuinely complex scene.
+**Card — FLUX 3 Image.** Short prompts work; add detail only where you want control. Write sentences that name visible things — the subject, what it does, where, the light, the medium — not a tag list.
 
 **The five levers**
-1. **Front-load the subject and the one action.** Anything after the first clause is a modifier, and it is read as one.
-2. **Name real gear** — `Shot on Hasselblad X2D, 80mm, f/2.8, natural light`, `Kodak Portra 400, natural grain`. This is the single biggest realism lever.
-3. **Era cues as a package** — `early digital camera, slight noise, flash photography, candid` reads 2000s; `film grain, warm cast, soft focus` reads 80s.
-4. **Bind every hex colour to an object.** `a #1B4D3E enamel mug` lands; an unbound colour does not.
-5. **For portraits add texture words** — `natural skin texture, realistic pores, subtle imperfections, soft diffused lighting`.
+1. **Name visible things in plain sentences.** `A chef plates a dish at a steel kitchen pass under overhead fluorescents.` beats a list of adjectives.
+2. **Name the style concretely** — a medium, an era, a camera or a film stock (`35mm documentary photograph, Kodak Portra 400`), never "nice style".
+3. **One or two strong effects, not five.** A single lighting idea and a single lens idea read cleaner than a stack.
+4. **Number references as the images arrive: "image 1" is the first.** Say what each one supplies; in an edit the base image is image 1 and comes first.
+5. **Quote text that must render**, with its case, placement and type: `the word "OPEN" in thin uppercase red neon above the door`.
 
 <!-- @inject:cinematic-card -->
 **For a photographic look, use only what this frame needs.** Image models default to clean, evenly lit and fully exposed. Describe what the camera sees, not just gear or mood:
@@ -35,7 +35,7 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 <!-- slates-only -->Use `slates-cinematic-look` with a technique ID or section query for more.<!-- /slates-only -->
 <!-- @end:cinematic-card -->
 
-**Hard constraint:** no negative prompting. Every "no X" must be rewritten as the positive state — `no blur` becomes `sharp focus throughout`, `no people` becomes `empty scene`, `no harsh shadows` becomes `soft, diffused lighting`.
+**Hard constraint:** no negative prompting. Rewrite every "no X" as what is there — `no blur` becomes `sharp focus throughout`, `no people` becomes `empty scene`, `no harsh shadows` becomes `soft, diffused lighting`.
 <!-- @card:end -->
 
 <!-- @banned:start -->
@@ -47,90 +47,55 @@ Bind references inline. A scene reference owns the grade; for a look-only refere
 <!-- /slates-only -->
 **Never use** — there is no negative prompting, so each of these has a positive form:
 - `no blur` (say `sharp focus throughout`), `no people` (say `empty scene`), `no harsh shadows` (say `soft, diffused lighting`)
-- an unbound hex colour — bind it to an object or it lands inconsistently
-- `masterpiece`, `best quality`, `trending on artstation`, `8k`
+- `masterpiece`, `best quality`, `trending on artstation`, `8k` — quality tags name nothing visible
 <!-- @banned:end -->
 
 **Examples**
-- `A chef plating in a steel kitchen pass. Shot on Hasselblad X2D, 80mm, f/2.8. Overhead fluorescents plus warm spill from the line. Natural skin texture, subtle imperfections. Muted steel and #7A3B2E copper.`
-- `An empty municipal pool at dusk, 35mm, deep focus, early digital camera with slight noise and flash falloff. Cracked #4A7C8C tiles. Candid, unstaged.`
+- `A chef plates a dish at a steel kitchen pass. Overhead fluorescents with warm spill from the line. 35mm documentary photograph, natural skin texture.`
+- `An empty municipal pool at dusk, cracked teal tiles, early digital camera with slight noise and flash falloff. Candid, unstaged.`
 
-Black Forest Labs' top image model. In Slates: `slates_generate_image` with `model: flux-2-max` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). Strengths vs Nano Banana 2: photoreal texture, less censored, precise hex-color control, strong typography. Reference images route through FLUX's edit endpoint and carry a lower per-model cap than NB2's 14.
+Black Forest Labs' FLUX 3 Image, released 2026-10-01.<!-- slates-only --> In Slates: `slates_generate_image` with `model: flux-3` (REQUIRES projectId — no headless path), priced per resolution (1k/2k/4k — call `slates_estimate_generation_cost` for current numbers, never quote from memory). It replaced FLUX.2 Max on 2026-10-23; takes made on FLUX.2 Max keep their label. It is the less-filtered premium image seat, sent at the loosest safety setting the model offers. With references it routes to its edit endpoint, which takes up to 10 images.<!-- /slates-only -->
 
-## Core structure — front-load what matters
+## Core approach — plain sentences, short first
 
-```
-Subject + Action + Style + Context
-```
-
-Word order is weight. FLUX.2 attends hardest to the start of the prompt: main subject → key action → critical style → essential context → secondary details.
-
-**Length:** 10-30 words for concept tests, 30-80 words for most work, 80+ only for genuinely complex scenes.
-
-## Photorealism: name real gear, not "professional photo"
-
-The single biggest realism lever is concrete camera vocabulary:
+BFL's FLUX 3 guide: short prompts work, and detail goes where you want control. Write sentences that name visible things. Quality tags ("masterpiece", "8k") add nothing visible and are left out.
 
 ```
-Shot on Hasselblad X2D, 80mm lens, f/2.8, natural lighting
-Shot on Sony A7IV, 35mm, golden hour, shallow depth of field
-Kodak Portra 400, natural grain, organic colors
+[Subject and action]. [Setting]. [Light]. [Medium or style, named concretely].
 ```
 
-Era cues work the same way: "early digital camera, slight noise, flash photography, candid" reads 2000s digicam; "film grain, warm color cast, soft focus" reads 80s.
+Start short. If the frame misses something, add the sentence that names it, rather than more adjectives on the sentences you have.
 
-For portraits add: natural skin texture, realistic pores, subtle imperfections, soft diffused lighting.
+## Style — name it concretely
 
-## No negative prompts — reframe positively
+Name the medium, era, camera or film stock you want: `35mm documentary photograph`, `early digital camera, slight noise, flash photography, candid`, `film grain, warm color cast, soft focus`, `flat vector illustration with two spot colors`. "Cinematic" or "nice style" alone names nothing.
 
-FLUX.2 has no negative prompt support. Describe the presence you want, not the absence:
+Keep effects to one or two. One lighting idea (`low sun behind her, face in shadow`) and one lens idea (`telephoto compression`) beat a stack of five.
+
+## No negative prompts — say what is there
+
+FLUX 3 has no negative prompt. Describe the presence you want, not the absence:
 
 - ❌ "no blur" → ✅ "sharp focus throughout"
 - ❌ "no people" → ✅ "empty scene"
 - ❌ "no harsh shadows" → ✅ "soft, diffused lighting"
 
-## Hex colors — bind them to objects
-
-FLUX.2 matches hex codes, but only when each code is attached to a specific object:
-
-```
-walls in hex #C4725A, sofa in #1B6B6F, accent pillows #E8A847
-gradient starting with color #02eb3c and finishing with color #edfa3c
-```
-
-❌ "use #FF0000 somewhere" — unbound colors land inconsistently.
-
 ## Text rendering
 
-Quote the exact text, then place and style it:
+Put the exact text in quotation marks, then give its case, placement and type:
 
 ```
-The text 'OPEN' appears in red neon letters above the door
-Logo text 'ACME' in color #FF5733, ultra-bold decorative serif, centered
+The word "OPEN" in thin uppercase red neon letters above the door
+A poster headline "LAST CALL" in heavy condensed capitals across the top third
 ```
 
-Specify placement relative to other elements, font family feel (serif / sans / script), and relative size ("large headline," "small body copy").
+## Reference images and edits
 
-## JSON prompting for production work
+**BFL's numbering: "Image 1" is the first image sent, "image 2" the second, counting from one.** Name what each image supplies — `the jacket from image 2`, `lit and graded like image 3`. In an edit the base image is image 1 and is named first: describe the change, then what stays.<!-- slates-only --> Slates sends references in the order it cites them, so the numbers in the prompt match.<!-- /slates-only -->
 
-For multi-element scenes that must come out exactly right (product shots, infographics, brand work), FLUX.2 parses structured JSON prompts:
-
-```json
-{
-  "scene": "Professional studio product photography on polished concrete",
-  "subjects": [{ "description": "matte black ceramic mug with steam", "position": "center foreground" }],
-  "style": "commercial product photography",
-  "color_palette": ["#1B1B1B", "#E8A847"],
-  "lighting": "three-point softbox, soft diffused highlights",
-  "camera": { "lens-mm": 85, "f-number": "f/5.6" }
-}
-```
-
-Use natural language for exploration, JSON when the layout is locked and you're matching a spec.
-
-## Reference images (edit path)
-
-In Slates, pass `referenceAssetIds` on `slates_generate_image` — FLUX routes them through its edit endpoint. Slates names each reference inline in the prompt ("the subject (image 1), the style (image 2)") in the order it sends them, so you don't hand-write role labels; the name carries the role and unnamed-by-position blending is avoided. For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-2-max`. Extra `referenceAssetIds` are supported within the current edit-reference cap, with the source occupying one slot; read the tool schema for that cap. An older desktop without this capability refuses the request rather than silently omitting references.
+- **Up to 10 images per request**, each at least 256 px on its shortest side; larger images are scaled down to about 4 MP.
+- Pass `referenceAssetIds` on `slates_generate_image` and FLUX 3 routes them through its edit endpoint.<!-- slates-only --> For surgical changes to one existing image use `slates_edit_image` with `editModel: flux-3`; the source takes one of the 10 slots.<!-- /slates-only -->
+- <!-- slates-only -->The edit is priced per image whatever the number of references, so a reference costs nothing extra.<!-- /slates-only -->
 
 ### Reference rules (the verified ones)
 
@@ -163,29 +128,30 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 10. **Style transforms happen in natural language.** By default the source's artistic medium and visual style are inherited. To change it, add a plain-text instruction ("anime → real person"). There are no preset pickers, and there is no style slider.
 <!-- @end:reference-rules-core -->
 
-### For FLUX.2 Max specifically
+### For FLUX 3 specifically
 
-- **FLUX caps references well below NB2's 14, so rule 1's "2-4" is a ceiling here, not a starting point.** Be deliberate about which roles earn a slot.
-- **FLUX has no memory between generations, so rule 7 is enforced by repetition.** Define the character exhaustively once and repeat those exact descriptors verbatim in every subsequent prompt — see Character consistency across a series below.
-
-## Character consistency across a series
-
-Define the character exhaustively once, then repeat those exact descriptors verbatim in every subsequent prompt. FLUX has no memory between generations — the repeated description IS the consistency mechanism.
+- **The number is the binding.** "Image 1" is the first image sent; a sentence saying what it supplies ties it to the scene.
+- **No memory between generations, so rule 7 is enforced by repetition.** Define a character exhaustively once and repeat those exact descriptors in every later prompt, alongside the same references.
 
 ## Common failure modes + fixes
 
 | Failure | Fix |
 |---|---|
-| Generic "AI look" on photoreal | Name a camera body + lens + f-stop instead of "professional photo" |
-| Colors drift from brand spec | Bind each hex code to a named object |
-| Text garbled | Quote the exact string, specify font feel + placement + size |
-| Multi-reference blend chaos | Name each reference inline (Slates does this from your @mentions/referenceAssetIds) — the same name for one entity, distinct names per role |
-| Wanted element missing | Move it earlier in the prompt — order is weight |
+| Generic "AI look" on photoreal | Name the medium concretely (a camera, a stock, an era) instead of "professional photo" |
+| Text garbled | Quote the exact string; give case, placement and type |
+| Multi-reference blend | Say what each numbered image supplies; one image per role |
+| Wanted element missing | Add a sentence that names it |
+| Overworked, muddy frame | Cut to one or two effects |
 
 ## Pre-flight: references arrive inline, refer by code
 
 When you pass `referenceAssetIds`, the first call returns the references **inline as image content blocks** with a cost estimate and `requires_confirm: true`. Look at them — revise the prompt if they suggest a different composition or style — then re-call with `confirm=true`. Refer to each asset by its short code (`IMG-A12 — Beach Sunset`) when talking to the user; it matches the badge on their gallery thumbnail.
 
+<!-- slates-only -->
+Routing against Nano Banana 2.1, GPT Image 2.5 and Seedream: `slates-model-selection`.
+<!-- /slates-only -->
+
 ## Sources
 
-- [Black Forest Labs — FLUX.2 Prompting Guide](https://docs.bfl.ml/guides/prompting_guide_flux2)
+- Black Forest Labs, FLUX 3 prompting guide (read 2026-10-23).
+- The FLUX 3 Image API schemas for text-to-image and edit-image (read 2026-10-23).

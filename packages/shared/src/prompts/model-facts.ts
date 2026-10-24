@@ -86,7 +86,7 @@ export interface ModelFact {
    *
    * IMAGE (Eric, 2026-09-15): GPT IMAGE 2.5 SUNBURST IS THE DEFAULT IMAGE MODEL, at
    * `high` and 3k, in agent routing as it has been in the app picker since
-   * 2026-09-09. Nano Banana 2 keeps the only headless path, so an image call
+   * 2026-09-09. Nano Banana 2.1 keeps the only headless path, so an image call
    * with no project still runs there. Changing the
    * default lives in this tier field; quality/resolution live in model-capabilities.ts.
    * Consumers and generated skill partials derive them. slates-web reads this to order its model lineup
@@ -222,35 +222,19 @@ export function multimodalRefModels(): string[] {
 
 export const MODEL_FACTS: ModelFact[] = [
   {
-    id: 'nano-banana-2',
+    id: 'nano-banana-2-1',
     route: 'generate',
     tier: 'specialist',
-    // Gemini 3.1 FLASH Image — verified against the runtime slug map in
-    // slate/src/main/api/google.ts. Nano Banana PRO is a different model
-    // (gemini-3-pro-image-preview); do not conflate them.
-    label: 'Nano Banana 2 (Gemini 3.1 Flash Image)',
+    // Google's `gemini-nano-banana-2.1` (GA 2026-10-06), on fal as
+    // `google/nano-banana-2.1`. The one Nano Banana seat since 2026-10-23: it
+    // replaced Nano Banana 2, and Pro and NB2 Lite retired with it (Eric). Their
+    // stored ids migrate here (slate `RETIRED_MODEL_REPLACEMENTS`).
+    label: 'Nano Banana 2.1',
     kind: 'image',
-    // 14 = 10 object-fidelity + 4 character-consistency; the categories don't trade.
-    ...caps('nano-banana-2'),
-    notes: 'The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, and the start-frame for legible in-scene text. Knowledge cutoff Jan 2025: anything later needs reference images.',
-  },
-  {
-    id: 'nano-banana-2-lite',
-    route: 'generate',
-    tier: 'specialist',
-    label: 'Nano Banana 2 Lite',
-    kind: 'image',
-    ...caps('nano-banana-2-lite'),
-    notes: 'FAST/DRAFT image tier — markedly cheaper and faster than NB2 full, at draft quality. Route here for iteration volume, then re-run the winner on NB2 full. Same Gemini content filter as NB2.',
-  },
-  {
-    id: 'nano-banana-pro',
-    route: 'generate',
-    tier: 'specialist',
-    label: 'Nano Banana Pro',
-    kind: 'image',
-    ...caps('nano-banana-pro'),
-    notes: 'HERO-FRAME / typography PREMIUM image tier. NB2 is about 95% of Pro — escalate only when spatial composition, cinematic lighting/skin, fine typography-in-scene or deep multi-element reasoning must be perfect, and say why.',
+    // 10 object-fidelity + 4 character-consistency references (Google); the
+    // categories don't trade.
+    ...caps('nano-banana-2-1'),
+    notes: 'The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, keeps what an edit leaves alone, and is the start-frame for legible in-scene text. It reasons before it draws, so dense compositions and hero frames land without a premium tier.',
   },
   {
     id: 'gpt-image-2-5-flare',
@@ -271,13 +255,14 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Explore on Flare, finish on Sunburst.',
   },
   {
-    id: 'flux-2-max',
+    id: 'flux-3',
     route: 'generate',
     tier: 'specialist',
-    label: 'FLUX.2 Max',
+    // Black Forest Labs' FLUX 3 Image, replacing FLUX.2 Max 2026-10-23 (Eric).
+    label: 'FLUX 3 Image',
     kind: 'image',
-    ...caps('flux-2-max'),
-    notes: 'Photoreal image seat, less censored than the Gemini rails. Auto-routes to its edit endpoint when references are present.',
+    ...caps('flux-3'),
+    notes: 'The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting. Auto-routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedream-5-lite',

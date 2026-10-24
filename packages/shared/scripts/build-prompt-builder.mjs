@@ -92,7 +92,7 @@ const specs = [
   },
   {
     output: 'reference-nano-banana.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-nano-banana-2.md'),
+    source: join(pkgRoot, 'skills', 'slates-prompting-nano-banana-2-1.md'),
     kind: 'production-skill',
   },
   {
@@ -120,7 +120,7 @@ const specs = [
 const portableModels = [
   { id: 'gpt-image-2-5-sunburst', guide: 'reference-gpt-image-2-5.md' },
   { id: 'gpt-image-2-5-flare', guide: 'reference-gpt-image-2-5.md' },
-  { id: 'nano-banana-2', guide: 'reference-nano-banana.md' },
+  { id: 'nano-banana-2-1', guide: 'reference-nano-banana.md' },
   { id: 'seedance-2.5', guide: 'reference-seedance-2-5.md' },
   { id: 'seedance-2', guide: 'reference-seedance.md' },
   { id: 'kling-v3', guide: 'reference-kling.md' },
@@ -151,7 +151,7 @@ const crossRefs = [
   ['slates-prompting-gpt-image-2-5', 'reference-gpt-image-2-5.md'],
   ['slates-prompting-omni-flash', 'reference-omni-flash.md'],
   ['slates-model-selection', 'SKILL.md'],
-  ['slates-prompting-nano-banana-2', 'reference-nano-banana.md'],
+  ['slates-prompting-nano-banana-2-1', 'reference-nano-banana.md'],
   ['slates-prompting-kling-v3', 'reference-kling.md'],
   ['slates-character-identity', 'reference-character.md'],
   ['slates-prompting-seedance', 'reference-seedance.md'],

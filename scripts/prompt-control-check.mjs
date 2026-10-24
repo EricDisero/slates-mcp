@@ -141,7 +141,7 @@ assert.deepEqual(posts[0].body, {
 })
 await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: 'photorealistic cinematic room', aspectRatio: '16:9', resolution: '2k', background: true }, ctx)
 assert.equal(posts[1].body.resolution, '2k')
-const warning = await call('generate_image', { model: 'nano-banana-2', prompt: 'photorealistic cinematic' })
+const warning = await call('generate_image', { model: 'nano-banana-2-1', prompt: 'photorealistic cinematic' })
 assert.match(warning.data.prompt_warning, /nano-banana/)
 const allowed = await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: 'photorealistic cinematic' })
 assert.equal(allowed.data.prompt_warning, undefined)
@@ -160,8 +160,8 @@ console.log(`prompt-control: inline bindings, ${catalogue.length} selective tech
 // line, and FLUX's list writes the positive form beside each negative (2026-10-07 review, #5).
 assert.equal(findBannedTokens('Keep everything else the same.', 'video', 'slates-prompting-omni-flash').length, 0)
 assert.equal(findBannedTokens('a candle-like glow', 'video', 'slates-prompting-omni-flash').length, 1)
-assert.equal(findBannedTokens('sharp focus throughout, empty scene, soft, diffused lighting', 'image', 'slates-prompting-flux-2-max').length, 0)
-assert.equal(findBannedTokens('no blur, no people', 'image', 'slates-prompting-flux-2-max').length, 2)
+assert.equal(findBannedTokens('sharp focus throughout, empty scene, soft, diffused lighting', 'image', 'slates-prompting-flux-3').length, 0)
+assert.equal(findBannedTokens('no blur, no people', 'image', 'slates-prompting-flux-3').length, 2)
 for (const [id, capability] of Object.entries(MODEL_CAPABILITIES)) {
   if (!capability.imageResolutions) continue
   const result = await call('get_prompting_guide', {topic: id})

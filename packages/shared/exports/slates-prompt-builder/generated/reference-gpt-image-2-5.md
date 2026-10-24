@@ -76,7 +76,7 @@ All five rungs are exposed, and they span ~36× end to end at every resolution c
 | Tier | Use it for |
 |---|---|
 | `low` | Roughest pass — layout and composition checks, throwaway comps. |
-| `medium` | The draft tier. Cheaper than NB2 Lite and available up to 4K, which is why the draft lane moved here. |
+| `medium` | The draft tier: cheap and available up to 4K, which is why the draft lane moved here. |
 | `high` | General-purpose quality tier. Blind benchmarks on GPT Image 2 put this rung — which it called `medium` — within a hair of `max` (which it called `high`) at a quarter of the cost. Inherited from the old ladder, never re-run on 2.5, and it says nothing about `xhigh`. |
 | `xhigh` | One rung short of the top at about half its price (2k: 4 cr against `max`'s 8). Worth trying before `max`. |
 | `max` | Top of the ladder. Tiny type, dense diagrams, many labelled elements. |
@@ -156,7 +156,7 @@ Name materials, lighting, colour and medium. Mood words are cues only — "cinem
 
 - State the grid explicitly and number the cells: "a 2×3 grid of panels, numbered 1–6, reading left-to-right, top-to-bottom".
 - Give each cell ONE content clause: "Panel 3: the character mid-jump, side view".
-- Character identity sheets: GPT Image holds both the structured panel layout AND photoreal skin, which is why the influencer-ad lane builds its sheets here. Reach for NB2/NB Pro when it is an edit of an existing sheet, or when many subjects have to stay recognisable at once — not for the reference count, which GPT Image now leads at 16.
+- Character identity sheets: GPT Image holds both the structured panel layout AND photoreal skin, which is why the influencer-ad lane builds its sheets here. Reach for Nano Banana 2.1 when it is an edit of an existing sheet, or when many subjects have to stay recognisable at once — not for the reference count, which GPT Image now leads at 16.
 
 ## 🚨 WHAT GETS YOU BLOCKED — read before writing a prompt with a person in it
 

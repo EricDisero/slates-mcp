@@ -335,7 +335,7 @@ Identity = a few flat-lit neutral angles; one reference per role, named inline; 
 - **Describe the ACTION, never the reference's content.** With refs attached, prompt only what is *happening* — motion, change, camera. Never re-describe what's in the reference, and never say "still / scene / from a movie / from the image." The model already sees the refs; narrating them wastes tokens and induces drift. Injection is stochastic — if a roll misses, **re-roll, don't re-engineer** (and a slow gen is not a failed one).
 - **Seedance's own idiom for rule 2 is `Reference <Subject_N> in <Image_N>`** `[official :1389]` — `Image_N` indexes the order the refs are attached, so the name plus the index carries the role. The full binding grammar is in Part 1 (Subject binding).
 - **Rule 3 has an official ceiling here.** The trend is MORE references (video and audio into Seedance), all addressed by name — but for **multi-character frames** see the twin-problem section above: bind every character to its image, append the anti-twin constraint, and prefer single-person references. Past 4 reference people, stability drops `[official :2048-2052]`.
-- **Rule 8 holds even though Seedance can render common text natively** `[official :1758]`. A baked NB2 start frame is still the reliable route for text that must be legible.
+- **Rule 8 holds even though Seedance can render common text natively** `[official :1758]`. A baked image-model start frame is still the reliable route for text that must be legible.
 - **Rule 5 pairs with the first/last-frame exclusion** — frames and reference images are mutually exclusive on this model (see Reference media above), so an environment you must match exactly costs you the frame lane.
 
 ---

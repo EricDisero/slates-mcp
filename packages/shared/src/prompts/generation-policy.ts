@@ -36,7 +36,7 @@ export const TOOL_SEAT: Record<BuiltInTool, typeof DEFAULT_IMAGE_SEAT | string> 
   // Pinned: the image viewer offers grid extraction a fixed short list of seats,
   // and the cell-extraction prompt has a variant per seat family. Moving it is a
   // picker and a prompt change first.
-  'grid-extract': 'nano-banana-2',
+  'grid-extract': 'nano-banana-2-1',
   // Follows the default image model (2026-09-29). The viewer's Edit box lists
   // every image model from the registry, and the edit handler sends references
   // to each one up to its own cap, so nothing ties this tool to one family. Until
