@@ -1,10 +1,10 @@
 {
-  "version": "1.1.3",
-  "filename": "agentic-skills-pack-v1.1.3-d87eee435b957b6d.zip",
-  "sha256": "d87eee435b957b6d4ed99223b344800e16f83cc053c333c10c5018c2fa7a1d0b",
-  "bytes": 228258,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.3-d87eee435b957b6d.zip",
-  "skillCount": 45,
+  "version": "1.1.4",
+  "filename": "agentic-skills-pack-v1.1.4-b2fb9d58f47f3e7e.zip",
+  "sha256": "b2fb9d58f47f3e7e68ec7f34dd5498e118e3ae0d605cdcab9e613e15e70c4a79",
+  "bytes": 240603,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.4-b2fb9d58f47f3e7e.zip",
+  "skillCount": 46,
   "freeSkills": [
     "slates-blocking-to-prompt",
     "slates-camera-language",
@@ -27,7 +27,7 @@
     "slates-previs-blocking",
     "slates-project-organization",
     "slates-prompting-elevenlabs",
-    "slates-prompting-flux-2-max",
+    "slates-prompting-flux-3",
     "slates-prompting-gpt-image-2-5",
     "slates-prompting-inworld-tts",
     "slates-prompting-kling-v3",
@@ -35,12 +35,13 @@
     "slates-prompting-ltx-2-5",
     "slates-prompting-minimax-h3",
     "slates-prompting-motion-transfer",
-    "slates-prompting-nano-banana-2",
+    "slates-prompting-nano-banana-2-1",
     "slates-prompting-omni-flash",
     "slates-prompting-seed-audio",
     "slates-prompting-seedance-2-5",
     "slates-prompting-seedance",
     "slates-prompting-seedream-5-lite",
+    "slates-prompting-wan-3",
     "slates-restyle-from-blocking",
     "slates-script-craft",
     "slates-shot-variety",
@@ -171,9 +172,9 @@
       "summary": "Prompt ElevenLabs Sound Effects v2 (eleven-sfx) for a single effect or loop."
     },
     {
-      "key": "slates-prompting-flux-2-max",
+      "key": "slates-prompting-flux-3",
       "tier": "free",
-      "summary": "Prompt or edit images with FLUX.2 Max (flux-2-max)."
+      "summary": "Prompt or edit images with FLUX 3 Image (flux-3)."
     },
     {
       "key": "slates-prompting-gpt-image-2-5",
@@ -188,7 +189,7 @@
     {
       "key": "slates-prompting-kling-v3",
       "tier": "free",
-      "summary": "Prompt Kling V3.0 video generation and Kling O3 video edits."
+      "summary": "Prompt Kling 3.0 and 4.0 video generation and Kling O3 video edits."
     },
     {
       "key": "slates-prompting-lip-sync",
@@ -211,14 +212,14 @@
       "summary": "Prepare Kling Motion Control with slates_generate_motion_transfer: a character image plus a driving clip."
     },
     {
-      "key": "slates-prompting-nano-banana-2",
+      "key": "slates-prompting-nano-banana-2-1",
       "tier": "free",
-      "summary": "Prompt Nano Banana 2, Lite or Pro image generation and edits."
+      "summary": "Prompt Nano Banana 2.1 image generation and edits."
     },
     {
       "key": "slates-prompting-omni-flash",
       "tier": "free",
-      "summary": "Prompt Gemini Omni Flash video generation or Omni Flash edits (omni-flash, omni-flash-edit)."
+      "summary": "Prompt Gemini Omni Flash 1.1 video generation or edits (omni-flash, omni-flash-edit)."
     },
     {
       "key": "slates-prompting-seed-audio",
@@ -239,6 +240,11 @@
       "key": "slates-prompting-seedream-5-lite",
       "tier": "free",
       "summary": "Prompt or edit images with Seedream 5 Lite (seedream-5-lite)."
+    },
+    {
+      "key": "slates-prompting-wan-3",
+      "tier": "free",
+      "summary": "Prompt Wan 3.0 video (wan-3.0)."
     },
     {
       "key": "slates-restyle-from-blocking",

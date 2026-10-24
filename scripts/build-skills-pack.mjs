@@ -64,7 +64,10 @@ const root = resolve(here, '..');
 // disagree with and no reason to burn a version number.
 // 1.1.3, 2026-10-23: adds the seven skills written since 1.1.2 (captions, cuts,
 // the three layers, motion, transitions). Uploaded, then both URLs moved.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.3';
+// 1.1.4, 2026-10-23 (release 1.6.3): the roster cleanup's skills (Nano Banana 2.1
+// for 2, 2 Lite and Pro; FLUX 3 for FLUX.2 Max; Kling 4.0, Omni 1.1, Wan 3.0) and
+// the in-app agent named Slates Director. Uploaded, then both URLs moved.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.4';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');
