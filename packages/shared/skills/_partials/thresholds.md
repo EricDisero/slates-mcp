@@ -8,7 +8,7 @@
 
 - **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
   proceed until you re-call with `confirm: true`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
-- **Deviation pause:** the desktop Studio Agent stops and re-asks when projected generation spend
+- **Deviation pause:** the desktop Slates Director stops and re-asks when projected generation spend
   exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
 - **Seed Audio duration:** **3–120 seconds.** There is no duration
   parameter on the model — the number you pass is written into the prompt AND is what the user is

@@ -89,7 +89,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['reorder', 'reordering folders and pins'],
   ['usage', 'usage'],
   ['app-settings', 'app settings'],
-  ['agent-host', "choosing who does the Studio Agent's thinking"],
+  ['agent-host', "choosing who does Slates Director's thinking"],
   ['asset-detail', 'reading one asset in full'],
   ['asset-link', 'linking a clip to its picture'],
   ['frame-extract', 'extracting a frame from a clip'],

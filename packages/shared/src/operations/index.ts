@@ -807,9 +807,9 @@ const describeView = (v: ViewShape): string => {
     : []
   const agent = v.studioAgent.enabled
     ? v.studioAgent.open
-      ? `the Studio Agent panel is open (${v.studioAgent.width}px)`
-      : 'the Studio Agent panel is closed'
-    : 'the Studio Agent is switched off in Settings'
+      ? `the Slates Director panel is open (${v.studioAgent.width}px)`
+      : 'the Slates Director panel is closed'
+    : 'Slates Director is switched off in Settings'
   return (
     `The ${v.lens} tab is ${v.window && !v.window.lens ? 'hidden' : 'showing'}. The timeline is ${where}. ` +
     `The project navigator is ${v.leftDock.open ? `open (${v.leftDock.width}px)` : 'closed'}, and ${agent}.` +
@@ -878,7 +878,7 @@ export const setView: Operation<{
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Studio Agent panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Slates Director panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -918,7 +918,7 @@ export const setView: Operation<{
         })
         .strict()
         .optional()
-        .describe('The Studio Agent panel on the right. It cannot be opened while the agent is off in Settings.'),
+        .describe('The Slates Director panel on the right. It cannot be opened while the agent is off in Settings.'),
       script: z
         .object({
           details: z.boolean().optional().describe("Words + shots (true): each shot's picture beside its words on the Script page. Words (false): the words alone."),
@@ -1296,7 +1296,7 @@ export const getUsage: Operation<{ period?: 'week' | 'month' | 'all' }> = {
 export const getAppSettings: Operation<Record<string, never>> = {
   id: 'slates_get_app_settings',
   description:
-    "The app's own settings an agent may read: the app version, the projects folder, which tab a never-opened project lands on (newProjectLens), whether ChatGPT images is on, and (from Slates 1.6.1) who does the Studio Agent's thinking (studioAgentHost: slates, codex or claude) with each host's model and thinking level ('' is its default). Never keys or sign-in.",
+    "The app's own settings an agent may read: the app version, the projects folder, which tab a never-opened project lands on (newProjectLens), whether ChatGPT images is on, and (from Slates 1.6.1) who does Slates Director's thinking (studioAgentHost: slates, codex or claude) with each host's model and thinking level ('' is its default). Never keys or sign-in.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('app-settings', 'app settings')
@@ -1319,7 +1319,7 @@ const HOST_KEYS = ['studioAgentHost', 'studioAgentCodexModel', 'studioAgentCodex
 export const setAppSettings: Operation<AppSettingsPatch> = {
   id: 'slates_set_app_settings',
   description:
-    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does the Studio Agent's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
+    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does Slates Director's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
   input: z
     .object({
       newProjectLens: z.enum(['media', 'script', 'board']).optional(),
@@ -1335,7 +1335,7 @@ export const setAppSettings: Operation<AppSettingsPatch> = {
     await ctx.desktop().requireCapability('app-settings', 'app settings')
     // An older desktop has the route but not these keys: ask it by capability, so it says "update Slates".
     if (HOST_KEYS.some((key) => input[key] !== undefined)) {
-      await ctx.desktop().requireCapability('agent-host', "choosing who does the Studio Agent's thinking")
+      await ctx.desktop().requireCapability('agent-host', "choosing who does Slates Director's thinking")
     }
     return ok(await ctx.desktop().post('/agent/app-settings', input))
   },
@@ -9798,7 +9798,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
   description: 'Find production craft from the user vision: pass query alone with the brief (for example "two friends talking in a rainy diner") for keyword-ranked guides with matching sections, followed by every other guide\'s description so you choose by judgment. Omit topic and query, or use topic "catalog", for the whole catalog. Then request a guide name, model id or style name with card/index/section/full depth. Cards are short; query with a topic selects one section or cinematic technique; full returns worked examples, failure modes and sources. Reuse current guidance already in context. Entitled member playbooks are fetched privately through the connected Slates account. The motion engine\'s own skills (motion-*) are in the catalog too, for HTML motion layers and editing craft; a topic can name one of their files by path. For exact buttons and UI paths use topic "app-manual" with relevant question keywords; no query returns its surface map. Users supply the vision; you find the guides.',
   input: z.object({
     query: z.string().min(1).max(1000).optional().describe('Without topic: creative brief or craft need to discover guides. With topic: section keywords, heading or technique ID.'),
-    topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules for an MCP client; the app's Studio Agent has its own). Omit to search by intent or browse.`),
+    topic: z.string().min(1).optional().describe(`Optional guide name, model id, style name, catalog, app-manual, or ${WORKING_METHOD_TOPIC} (the full working method and hard rules for an MCP client; the app's Slates Director has its own). Omit to search by intent or browse.`),
     depth: z.enum(['card', 'index', 'section', 'full']).optional().describe('Default card is a short overview; index lists sections; query selects a section; full returns the complete guide.'),
     limit: z.number().int().min(1).max(20).optional().describe('Page size for a search (default 8) or a catalog listing (default: the whole catalog); continue with offset from nextOffset. Does not change guide bodies.'),
     offset: z.number().int().min(0).optional().describe('Catalog/search offset from nextOffset in the preceding result.'),
