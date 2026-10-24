@@ -167,9 +167,13 @@ export function multimodalRefSummary(id: string): string {
   if (v > 0) parts.push(`${v} video${v === 1 ? '' : 's'} (${f.maxReferenceVideoSeconds}s total)`)
   if (a > 0) parts.push(`${a} audio clip${a === 1 ? '' : 's'} (${f.maxReferenceAudioSeconds}s total)`)
   const total = f.maxReferenceFilesTotal ? `, ${f.maxReferenceFilesTotal} files max` : ''
-  const companion = f.audioRefNeedsCompanion
-    ? '; audio needs an image or video alongside.'
-    : '; audio-only is allowed.'
+  // A model with no audio slot says nothing about audio (Omni Flash 1.1 reads
+  // reference videos but no audio).
+  const companion = a === 0
+    ? '; no audio references.'
+    : f.audioRefNeedsCompanion
+      ? '; audio needs an image or video alongside.'
+      : '; audio-only is allowed.'
   return `${f.label}: up to ${parts.join(' + ')}${total}${companion}`
 }
 
@@ -339,21 +343,21 @@ export const MODEL_FACTS: ModelFact[] = [
     id: 'omni-flash',
     route: 'generate',
     tier: 'specialist',
-    label: 'Gemini Omni Flash',
+    label: 'Gemini Omni Flash 1.1',
     kind: 'video',
-    // 7 ref2v image_urls — mirrors Google's own reference limit.
+    // 10 ref2v image_urls + 3 reference videos of <=3s (fal 1.1 schema, 2026-10-17).
     ...caps('omni-flash'),
-    notes: '720p seat with native synced audio included. Route here for drafts with sound in one pass and reference-to-video character-consistency trials; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Quality against Kling/Seedance is unproven — do not route hero shots here.',
+    notes: 'Google\'s video model, version 1.1 since 2026-10-17, with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
   },
   {
     id: 'omni-flash-edit',
     route: 'edit',
     tier: 'default',
-    label: 'Omni Flash Edit',
+    label: 'Omni Flash 1.1 Edit',
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
     ...caps('omni-flash-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only — THE EDIT-FIDELITY WINNER (head-to-head vs Kling edit on real talking footage: lips held, audio near-identical, both action beats landed), priced level with Kling O3 Edit Standard. Footage-synced prop, effect, environment and lighting swaps. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
+    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only, on Omni Flash 1.1 since 2026-10-17. The 1.0 edit won the head-to-head against Kling edit on real talking footage (lips held, audio near-identical, both action beats landed); 1.1 has not been re-measured against it yet. Footage-synced prop, effect, environment and lighting swaps; 1080p and 4K output are upscales. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
   },
   {
     id: 'minimax-h3',
@@ -396,6 +400,16 @@ export const MODEL_FACTS: ModelFact[] = [
     // `caps()` returns nulls and the composer refuses references.
     ...caps('minimax-h3-max-turbo'),
     notes: 'THE BUDGET SEAT of the MiniMax family: a second post-train of the H3 weights, billed at half H3 Max\'s rate at every tier. Its 1080p is a refinement of the native 768p render, not a native 1080p generation. INPUTS ARE FRAMES, NOT REFERENCES: text-to-video and start/end frames only, with no reference endpoint, so reference-driven consistency goes to H3 Max or base H3. Route here for drafts, volume and cheap coverage, then re-run the keeper on H3 Max or a hero seat.',
+  },
+  {
+    id: 'wan-3.0',
+    route: 'generate',
+    tier: 'specialist',
+    label: 'Wan 3.0',
+    kind: 'video',
+    // 10 images + 5 videos (15s total) + 5 audio (15s total), 20 files max.
+    ...caps('wan-3.0'),
+    notes: 'Alibaba\'s video model, added 2026-10-17: first on Artificial Analysis text-to-video that day, at about a third of Seedance 2.5\'s price per second at 1080p. Long single takes, multi-shot sequences with timestamps, sound on or off. Start frame with an optional last frame, or references across images, videos and audio cited as Image N / Video N / Audio N (audio-only allowed); frames and references never mix. Reference video seconds bill on top of the output. Route here for long takes, timed multi-shot scenes and reference-driven shots on a budget; Seedance 2.5 stays the default. VIDEO-ONLY.',
   },
   {
     id: 'ltx-2-5',

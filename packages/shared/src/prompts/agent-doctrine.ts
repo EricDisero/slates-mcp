@@ -269,7 +269,7 @@ export const HARD_RULES: ReadonlyArray<Record<AgentSurface, string>> = [
 // record, so this paragraph would be dead weight in its cached prefix.
 const MCP_FOOTER = `## Working without skill files
 
-If slates-* skill files are not installed in this client, every one of them is still reachable as data: call slates_get_prompting_guide with the skill name (or a model id — it resolves aliases). Query the brief or browse topic "catalog" for generated discovery and entitled member playbooks. "No skill installed" is never a reason to prompt a model blind.
+If slates-* skill files are not installed in this client, every one of them is still reachable as data: call slates_get_prompting_guide with the skill name. Query the brief or browse topic "catalog" for generated discovery and entitled member playbooks. "No skill installed" is never a reason to prompt a model blind.
 `
 
 // ── The MCP instructions: what every request needs ────────────────
