@@ -155,10 +155,9 @@ export class GuideNotReadError extends Error {
   }
 }
 
-/** Refuse the generation when the session keeps a ledger and `model`'s guide is not in it. */
-function requireGuideRead(ctx: OperationContext, model: string | null | undefined): void {
+/** Refuse the generation when the session keeps a ledger and `model`'s guide is not in it. A seat with no model id names its guide. */
+function requireGuideRead(ctx: OperationContext, model: string | null | undefined, guide = model ? resolveGuideTopic(model) : null): void {
   if (!ctx?.guidesRead || !model) return
-  const guide = resolveGuideTopic(model)
   if (guide && !ctx.guidesRead.has(guide)) throw new GuideNotReadError(model, guide)
 }
 
@@ -2310,6 +2309,7 @@ export const generateChatGptImage: Operation<{
     aspectRatio: z.enum(CHATGPT_FRAMING_RATIOS as [string, ...string[]]).optional().describe('Optional framing request appended verbally to the prompt, not an exact output-size guarantee.'),
     referenceAssetIds: z.array(z.string().min(1)).optional(), background: z.boolean().optional(), folderId: folderIdField }),
   async run(input, ctx) {
+    requireGuideRead(ctx, 'ChatGPT images', 'slates-chatgpt-images')
     const desktop = ctx.desktop()
     await desktop.requireCapability('chatgpt-image-generation', 'ChatGPT image generation')
     // A desktop before the folder rule ignores folderId and files at the root.
@@ -2767,6 +2767,7 @@ export const generateCharacterIdentity: Operation<{
     // model's price and generate another, silently. Same failure `generateImage`
     // and `editImage` gate against; this op was simply missed when the gate was
     // introduced, and the 2.5 swap is what makes it reachable in practice.
+    requireGuideRead(ctx, input.model ?? toolModelFor('character-sheet'))
     if (isGptImageModel(input.model)) {
       await ctx.desktop().requireCapability('image-models-v3', `${input.model} character identity`)
     } else if (isImageModelV4(input.model)) {
@@ -2810,6 +2811,7 @@ export const generateEnvironmentPlate: Operation<{
     userNotes: z.string().optional(),
   }),
   async run(input, ctx) {
+    requireGuideRead(ctx, toolModelFor('environment-plate'))
     // 1.5.8 always renders the plate on Nano Banana 2 at 2k, never the seat quoted.
     await ctx.desktop().requireCapability('sheet-tool-seats', 'sheet tools on the default image seat')
     return ok(
@@ -3921,6 +3923,7 @@ export const extractGridCells: Operation<{
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
   async run(input, ctx) {
+    requireGuideRead(ctx, input.model ?? toolModelFor('grid-extract'))
     const desktop = ctx.desktop()
     await desktop.requireCapability('grid-extract', 'extracting grid cells')
     if (input.background) await desktop.requireCapability('background-generation', 'background generation')

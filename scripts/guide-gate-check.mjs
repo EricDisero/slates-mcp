@@ -1,7 +1,8 @@
 // The guide gate (operations/index.ts `requireGuideRead`): a session that keeps a
 // ledger cannot generate on a model until it has fetched that model's guide.
 import assert from 'node:assert/strict'
-import { generateVideo, generateImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
+import { generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
+import { toolModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 
 // A desktop that fails loudly if a refused call ever reaches it.
 const reached = []
@@ -43,4 +44,22 @@ await assert.rejects(generateImage.run({ prompt: 'A garage.', aspectRatio: '9:16
 // 4. No ledger (the CLI): no gate.
 await notGated(generateVideo.run({ ...video }, { desktop: () => desktop, cloud: ctx.cloud }))
 
-console.log('guide-gate: refused with the card before any spend; the guide fetch opens it per model; a new model is refused again; no ledger, no gate')
+// 5. The tool seats gate on the guide of the seat they render on; ChatGPT images on its own guide.
+const id = '22222222-2222-4222-8222-222222222222'
+const seats = [
+  [generateCharacterIdentity, { characterId: id, projectId: id, baseAssetId: id }, resolveGuideTopic(toolModelFor('character-sheet'))],
+  [generateCharacterIdentity, { characterId: id, projectId: id, baseAssetId: id, model: 'gpt-image-2-5-flare' }, resolveGuideTopic('gpt-image-2-5-flare')],
+  [generateEnvironmentPlate, { environmentId: id, projectId: id }, resolveGuideTopic(toolModelFor('environment-plate'))],
+  [extractGridCells, { projectId: id, assetId: id, cells: ['1A'] }, resolveGuideTopic(toolModelFor('grid-extract'))],
+  [extractGridCells, { projectId: id, assetId: id, cells: ['1A'], model: 'flux-3' }, resolveGuideTopic('flux-3')],
+  [generateChatGptImage, { projectId: id, requestId: id, prompt: 'A garage.' }, 'slates-chatgpt-images'],
+]
+for (const [op, input, guide] of seats) {
+  assert.ok(guide, `${op.id} resolves a guide`)
+  const fresh = session()
+  await assert.rejects(op.run({ ...input }, fresh), (err) => err instanceof GuideNotReadError && err.guide === guide, `${op.id} is refused until ${guide} is read`)
+  await getPromptingGuide.run({ topic: guide }, fresh)
+  await notGated(op.run({ ...input }, fresh))
+}
+
+console.log('guide-gate: refused with the card before any spend; the guide fetch opens it per model; a new model is refused again; the tool seats and ChatGPT images gate the same way; no ledger, no gate')
