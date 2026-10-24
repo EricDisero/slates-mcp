@@ -88,6 +88,7 @@ Each row: the technique, its evidence, what it does to the frame, when to reach 
 | Technique | Evidence | What it does | Reach for · skip | Say |
 |---|---|---|---|---|
 | `haze-in-front` | receipt | Haze, dust or smoke between camera and subject softens the subject's edges | Exteriors, sunbeams, dusty sets · skip crisp product or text shots | "Thin haze crosses the frame in front of her, so her edges are no sharper than the rock beside her." |
+| `backlit-particles` | practitioner | Dust, sparks, rain or snow catch a light behind the subject and glow; lit from the front they nearly vanish | Window interiors, fires, night rain, headlights · skip crisp product or text shots | "Sparks drift up past his face from the fire behind him, each one glowing against the dark sky." |
 | `source-flare` | vendor | Flare from a bright source in the frame | Facing the sun, headlights, stage lights · skip jargon stacks and scenes with no hard source | "The low sun at the edge of the frame throws a flare that crosses in front of her." |
 | `halation-on-highlights` | canon | A soft reddish glow bleeds past bright edges | Night practicals, candles, neon, film looks · skip clean digital register | "Bright lights have a soft reddish glow bleeding past their edges." |
 | `defocus-as-outcome` | receipt | Planes separate: only the subject is sharp | Close and medium shots · skip wides where the place must read | "On a 200mm telephoto lens only she and the pan are sharp; the background melts into soft shapes and the foreground rock edge falls out of focus." |
@@ -174,7 +175,7 @@ Each row: the technique, its evidence, what it does to the frame, when to reach 
 - **`lifted-matte-blacks` against `dense-shadows-with-ramp`.** Pick one.
 - **One colour-temperature story.** `warm-muddy` does not go with `tungsten-in-daylight` or a cool `uncorrected-white-balance`.
 - **Presets exclude each other.** Golden hour has no noon shadows; overcast has no rim light or flare; `practicals-only` has no even room light.
-- **Haze or flare against readable text or product.** Keep the atmosphere away from the text, or drop it.
+- **Haze, flare or backlit particles against readable text or product.** Keep the atmosphere away from the text, or drop it.
 - **`defocus-as-outcome` against a place that must read.** Keep it for close and medium shots.
 - **Motion blur, handheld sway or missed focus against text, lip-sync or identity.** Keep them off the face and off the text.
 - **`closed-prop-list` against `lived-in-wear-on-named-things`.** Wear goes on the named objects, never as new ones.
