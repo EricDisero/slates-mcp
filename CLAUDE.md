@@ -47,6 +47,7 @@ slates-mcp/
   restate model routing in an op description or a skill.** Each lock, why it exists and the
   publish-before-you-build obligation it creates: `.claude/rules/ssot.md`, which loads on any file
   under `packages/shared/src/prompts/` or in the ops registry.
+- **No generation before its model's guide is read (Eric, 2026-10-23: *"That needs to be a hard blocker"*).** A context carrying `guidesRead` (the MCP server keeps one per connection) refuses every generate and edit op whose model's guide `slates_get_prompting_guide` has not returned in that session, with the guide's card in the refusal; estimates and reads stay open, and a context without one (the CLI) is not gated. A new generate op calls `requireGuideRead` once its model is resolved. `scripts/guide-gate-check.mjs`.
 - **Asset params take UUIDs OR badge codes.** Generation ops resolve refs ("IMG-A8", bare "a8") against the project AT CALL TIME via `resolveAssetRefs()` and echo the resolved code+label in every result. New ops with asset-id params must use the same helper — stale-code guessing burned a real $4.44 render on the wrong start frame (2026-07-03).
 - **Version handshake (added 2026-09-13).** `packages/shared/src/update-check.ts` is the one place either
   published entry point learns it is behind: one registry GET an hour, cached in `~/.slates/update-check.json`,

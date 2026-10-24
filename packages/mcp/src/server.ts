@@ -288,6 +288,10 @@ async function elicitConfirm(message: string): Promise<boolean | null> {
   }
 }
 
+// The guides this connection has read. One server process is one client session
+// (stdio), so a generation is refused until its model's guide was fetched here.
+const guidesRead = new Set<string>()
+
 server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const op = opsById.get(request.params.name)
   if (!op) {
@@ -339,7 +343,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
 
     let result
     try {
-      result = await op.run(args as never, { ...defaultContext(), signal: extra?.signal })
+      result = await op.run(args as never, { ...defaultContext(), signal: extra?.signal, guidesRead })
     } finally {
       if (ticker) clearInterval(ticker)
     }
@@ -366,6 +370,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         result = await op.run({ ...(args as object), ...fingerprint, confirm: true } as never, {
           ...defaultContext(),
           signal: extra?.signal,
+          guidesRead,
         })
         data = result.data as Record<string, unknown> | undefined
       } else if (answer === false) {

@@ -158,6 +158,16 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   check('exact tool discovery leaves the full MCP list fixed', JSON.stringify((await client.listTools()).tools) === JSON.stringify(tools))
 }
 
+// ── the guide gate over the wire: no guide read on this connection, no generation ──
+{
+  const refused = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'a quiet room' } })
+  const text = (refused.content ?? []).map((c) => c.text ?? '').join('\n')
+  const guide = /topic "([^"]+)"/.exec(text)?.[1]
+  check('a generation before its guide is read is refused, with the guide named', refused.isError === true && /^Error: Refused: this session has not read/.test(text) && !!guide, text.slice(0, 200))
+  // Read it, as an agent must, so the checks below reach the op itself.
+  await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: guide } })
+}
+
 // ── the enforcement, end to end, through the real MCP call path ────────────
 //
 // `slates_generate_image` computes the prompt warning and then hits its

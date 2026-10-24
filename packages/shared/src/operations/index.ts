@@ -109,6 +109,14 @@ export interface OperationContext {
    * Optional so an older caller that does not pass one still type-checks.
    */
   signal?: AbortSignal
+  /**
+   * The guides this session has read through `slates_get_prompting_guide`, by
+   * guide name. Present, it gates every generation: a model whose guide is not
+   * in it is refused, with the guide's card, before anything is spent
+   * (`requireGuideRead`). The MCP server keeps one per connection and the
+   * desktop one per chat. Absent (the CLI, one call per process), no gate.
+   */
+  guidesRead?: Set<string>
 }
 
 // One factory for every default context, so per-connection caches can key on it.
@@ -127,6 +135,31 @@ export class OperationCancelledError extends Error {
   constructor(detail?: string) {
     super(`Cancelled by the user${detail ? ` — ${detail}` : ''}.`)
   }
+}
+
+/**
+ * A generation refused because this session has not read its model's guide.
+ * Eric, 2026-10-23, after a Seedance test was prompted before its guide was
+ * read: *"That needs to be a hard blocker."* Nothing was generated or charged.
+ */
+export class GuideNotReadError extends Error {
+  code = 'GUIDE_NOT_READ'
+  constructor(readonly model: string, readonly guide: string) {
+    super(
+      `Refused: this session has not read ${guide}, the guide for ${model}. Nothing was generated or charged. ` +
+        `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:
+
+` +
+        describeCraftCard(guide)
+    )
+  }
+}
+
+/** Refuse the generation when the session keeps a ledger and `model`'s guide is not in it. */
+function requireGuideRead(ctx: OperationContext, model: string | null | undefined): void {
+  if (!ctx?.guidesRead || !model) return
+  const guide = resolveGuideTopic(model)
+  if (guide && !ctx.guidesRead.has(guide)) throw new GuideNotReadError(model, guide)
 }
 
 /** Throw if the caller has cancelled. Call between billable items, never inside one. */
@@ -3274,6 +3307,7 @@ export const generateImage: Operation<{
     // desktop resolves the same seat for its cost and plan-model guards
     // (`imageModelFor`, slate src/main/studio-agent/guards.ts): change both together.
     const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : HEADLESS_IMAGE_MODEL)
+    requireGuideRead(ctx, imageModel)
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
     if (!input.aspectRatio || !input.resolution) {
@@ -3709,6 +3743,7 @@ export const editImage: Operation<{
     }
     // The image-edit tool's seat (TOOL_SEAT), the model the app's own Edit uses.
     const editModel = input.editModel ?? (toolModelFor('image-edit') as NonNullable<typeof input.editModel>)
+    requireGuideRead(ctx, editModel)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
     if (isGptImageModel(editModel)) {
       // 🚨 v3, LIKE generateImage — this site was missed once already.
@@ -4625,6 +4660,7 @@ export const generateVideo: Operation<{
       )
     }
     input.model = resolved.model
+    requireGuideRead(ctx, input.model)
     if (input.duration == null && resolved.duration != null) input.duration = resolved.duration
     if (input.videoResolution == null && resolved.videoResolution != null)
       input.videoResolution = resolved.videoResolution
@@ -5397,6 +5433,7 @@ export const generateAudio: Operation<{
     folderId: folderIdField,
   }),
   run: async (input, ctx) => {
+    requireGuideRead(ctx, input.model)
     // A desktop before the folder rule ignores folderId and files at the root.
     if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // ── Per-surface clarification + constraint gates ──
@@ -5683,6 +5720,7 @@ export const generateLipSync: Operation<{
     const stem = input.sourceType === 'video'
       ? 'kling-lip-sync-video'
       : input.avatarModel === 'avatar-pro' ? 'kling-lip-sync-avatar-pro' : 'kling-lip-sync-avatar'
+    requireGuideRead(ctx, stem)
     // Billed per 5s block of the output: the clip's length on a video source;
     // on a still, the voice track's — typed words at the desktop's reading pace
     // (`lipSyncEstimate`, 13 characters a second, so this quote is the Generate
@@ -5808,6 +5846,7 @@ export const generateMotionTransfer: Operation<{
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
+    requireGuideRead(ctx, motionModel)
     // Billed per 5s block of the driving clip, which the output follows, up to
     // the orientation's maximum (the desktop's `motionTransferEstimate`).
     const clipSeconds = await recordedSeconds(ctx.desktop(), input.projectId, input.sourceVideoAssetId)
@@ -5971,6 +6010,7 @@ export const editVideo: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     const model = input.model ?? EDIT_VIDEO_DEFAULT
+    requireGuideRead(ctx, model)
     const isOmniFlashEdit = model === 'omni-flash-edit'
     const isSeedanceEdit = model === 'seedance-2.5-edit'
     // Source-clip window, read from the capability SSOT per engine — never a
@@ -9424,6 +9464,7 @@ export const generateFromShots: Operation<{
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
       input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft: input.draft }),
     })
+    for (const model of new Set(quote.items.map((i) => i.model))) requireGuideRead(ctx, model)
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
     const largest = Math.max(0, ...quote.items.map((i) => i.credits ?? 0))
     // ONE approval for the set, on the STATED total; a stale fingerprint is a
@@ -9785,6 +9826,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     if (resolved) {
       const depth = input.depth ?? 'card'
       const guide = retrieveGuide(resolved, SKILLS[resolved], depth, input.query)
+      ctx?.guidesRead?.add(resolved)
       return { text: guide, data: { topic: resolved, tier: 'free', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     const member = await memberGuideCatalog(ctx)
@@ -9799,6 +9841,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       if (typeof result?.markdown !== 'string') throw new Error('Invalid member guide body')
       const depth = input.depth ?? 'card'
       const guide = retrieveGuide(privateEntry.name, result.markdown, depth, input.query)
+      ctx?.guidesRead?.add(privateEntry.name)
       return { text: guide, data: { topic: privateEntry.name, tier: 'paid', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).

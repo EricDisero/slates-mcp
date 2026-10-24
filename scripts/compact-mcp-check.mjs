@@ -39,7 +39,8 @@ for (const flags of [[], ['--tools=compact'], ['--tools=flat']]) {
     const invalid = await client.callTool({ name: 'slates_load_tools', arguments: { names: ['slates_missing'] } })
     assert.equal(invalid.isError, true)
     assert.deepEqual((await client.listTools()).tools, initial, 'an invalid load preserves the list')
-    // Missing required settings returns before any transport or generation.
+    // Missing required settings returns before any transport or generation, once the model's guide is read.
+    await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: 'gpt-image-2-5-sunburst' } })
     const call = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'photorealistic cinematic room', model: 'gpt-image-2-5-sunburst' } })
     assert.equal(call.structuredContent.requires_clarification, true)
     assert.equal(call.structuredContent.prompt_warning, undefined)
