@@ -289,7 +289,8 @@ async function elicitConfirm(message: string): Promise<boolean | null> {
 }
 
 // The guides this connection has read. One server process is one client session
-// (stdio), so a generation is refused until its model's guide was fetched here.
+// (stdio), so a generation is refused until its model's guide was served here:
+// as a guide tool result, a prompt or a skill resource.
 const guidesRead = new Set<string>()
 
 server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
@@ -439,6 +440,7 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   if (content === undefined) {
     throw new Error(`Unknown prompt: ${name}. Available: ${SKILL_NAMES.join(', ')}`)
   }
+  guidesRead.add(name)
   return {
     description: skillSummary(name),
     messages: [{ role: 'user' as const, content: { type: 'text' as const, text: content } }],
@@ -544,6 +546,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     if (skill) {
       const content = SKILLS[decodeURIComponent(skill[1])]
       if (content === undefined) throw new Error(`Unknown skill: ${skill[1]}`)
+      guidesRead.add(decodeURIComponent(skill[1]))
       return content
     }
     const shots = /^slates:\/\/project\/([^/]+)\/shots$/.exec(uri)

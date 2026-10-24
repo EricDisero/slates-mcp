@@ -166,6 +166,17 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   check('a generation before its guide is read is refused, with the guide named', refused.isError === true && /^Error: Refused: this session has not read/.test(text) && !!guide, text.slice(0, 200))
   // Read it, as an agent must, so the checks below reach the op itself.
   await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: guide } })
+  // A guide served as a prompt or a resource is read too.
+  const gated = async (model) => (((await client.callTool({ name: 'slates_generate_video', arguments: { prompt: 'a quiet room', model } })).content ?? [])[0]?.text ?? '')
+  const viaPrompt = 'slates-prompting-kling-v3'
+  const viaResource = 'slates-prompting-seedance-2-5'
+  const before = [await gated('kling-v3-pro'), await gated('seedance-2.5')]
+  await client.getPrompt({ name: viaPrompt })
+  await client.readResource({ uri: `slates://skill/${viaResource}` })
+  const after = [await gated('kling-v3-pro'), await gated('seedance-2.5')]
+  check('a guide served as a prompt or a resource opens the gate for its model',
+    before.every((t) => /^Error: Refused: this session has not read/.test(t)) && after.every((t) => !/this session has not read/.test(t)),
+    JSON.stringify([...before, ...after].map((t) => t.slice(0, 120))))
 }
 
 // ── the enforcement, end to end, through the real MCP call path ────────────
