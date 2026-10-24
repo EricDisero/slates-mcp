@@ -260,13 +260,19 @@ if (!heroInline && !HEROLESS && !redactLinkage) {
 // resolve lines: every entry gets word objects with timings + role flags
 const minors = new Set((theme.minors || []).map(norm));
 const LINES = (theme.lines || []).map((arr, li) => {
-  // a "|" token splits a line into setup | payoff (the stack paradigm); it is
-  // not a transcript word, and every other paradigm never sees one
-  const bar = arr.indexOf("|");
-  const words = arr.filter((a) => a !== "|").map((a) => {
+  // stack paradigm only: a "|" token splits a line into setup | payoff, a trailing
+  // object places it, and a "~" prefix covers a stutter without drawing it. None
+  // is a transcript word, and every other paradigm never sees one
+  const at = arr.find((a) => a && typeof a === "object") || null;
+  const toks = arr.filter((a) => typeof a === "string");
+  const bar = toks.indexOf("|");
+  const words = toks.filter((a) => a !== "|").map((raw) => {
+    const drop = raw.startsWith("~");
+    const a = drop ? raw.slice(1) : raw;
     const tw = takeWord(a);
     return {
       display: a,
+      drop,
       start: tw.start,
       end: tw.end,
       minor: minors.has(norm(a)),
@@ -277,7 +283,7 @@ const LINES = (theme.lines || []).map((arr, li) => {
         tw.start <= hero.end + 0.01,
     };
   });
-  return { id: li, words, split: bar < 0 ? null : bar };
+  return { id: li, words, split: bar < 0 ? null : bar, at };
 });
 // completeness gate
 const unused = tWords.filter((w) => !w.used);
@@ -4984,11 +4990,13 @@ ${
   return { css, html, js };
 }
 
-// ---- stack: the lesson identity. Three layers, each with one job: spoken
-// two-tier stacks in the clear space beside the speaker (fast, disposable), a
-// chapter card on the save ask, and prompt lower thirds whose prompt types on
-// (slow, quotable). Multi-shot by design: placement reads the matte and the
-// cuts at compile time, so every stack sits beside the face in ITS shot.
+// ---- stack: the lesson identity, cloned from a proven prompt-lesson ad (fonts,
+// cap heights, gaps, colours and cuts measured from its frames). Three layers:
+// spoken two-tier stacks beside the speaker, a chapter card on the save ask, and
+// lower thirds whose prompt types on in a Slates prompt box. Every caption cuts in
+// and out on a frame. Multi-shot by design: a line's `{x, y, s, p}` places it
+// (ink left, cap top, setup and payoff cap px); unplaced stacks read the matte and
+// the cuts at compile time, so each sits beside the face in ITS shot.
 
 // shot cuts: theme.cuts wins; else ffmpeg scdet over source.mp4 (threshold 12
 // matched a hand-logged 13-shot cut map exactly; the one extra hit is a whip pan)
@@ -5026,28 +5034,41 @@ function paradigmStack() {
   const b = dna.body,
     pal = dna.palette;
   const FR = 1 / FPS;
-  // a hair before the frame boundary, so a set lands ON the cut frame, never one late
+  // a hair before the frame boundary: a set at a cut lands ON the cut frame, and a
+  // word's set lands on the frame that contains the word's start
   const snap = (t) => Math.round(t * FPS) / FPS - 0.0005;
+  const onFrame = (t) => Math.floor(t * FPS + 1e-6) / FPS - 0.0005;
   const r3 = (t) => +t.toFixed(4);
   const CUTS = stackCuts();
   const cutAfter = (t, lo = 0) => CUTS.find((c) => c > t + lo);
-  const cutNear = (t, win) => CUTS.find((c) => Math.abs(c - t) <= win);
 
-  // ---- geometry, all proportional to the frame (4:3, 16:9 and 9:16 alike)
+  // ---- type: every size is a CAP HEIGHT in px (what the frame shows), turned into a
+  // font-size through the face's measured cap ratio; cap tops and ink lefts place lines
+  const CAP = b.capRatio ?? 0.69,
+    CAPTOP = b.capTop ?? 0.145;
+  const fsOf = (cap) => cap / CAP;
+  const BODY = dna.fonts.body,
+    TAG = dna.fonts.tag,
+    UI = dna.fonts.ui || "Inter";
+  const BW = b.widthKey || BODY; // char-widths entry for the stack face (italic, condensed)
+  const LS = b.letterSpacing ?? -0.055,
+    WS = b.wordSpacing ?? 0.075;
+  // lines align on the INK: a first glyph's left bearing (relative to a stem) is undone
+  const LSB = (famMetrics(BW) || {}).lsb || {};
+  const inset = (s) => (LSB[s[0]] ?? 0) - (LSB.H ?? 0);
+  const inkW = (s, cap) => wordPx(s, BW, fsOf(cap), LS) + (s.split(" ").length - 1) * WS * fsOf(cap);
+  const setupCap = Math.round(H * (b.setupCap ?? 0.0352));
+  const payCap = Math.round(setupCap * (b.payoffScale ?? 1.89));
+  const singleCap = Math.round(setupCap * (b.singleScale ?? 1.1));
+  const gapOf = (s) => Math.round(s * (b.gap ?? 0.21));
+  const maxW = W * (b.maxWidth ?? 0.56);
+
+  // ---- matte occupancy, for stacks the theme does not place itself
   const GW = 64,
     GH = Math.max(24, Math.round((64 * H) / W));
   const cw = W / GW,
     chh = H / GH;
   const M = stackMatte(GW, GH);
-  const BODY = dna.fonts.body,
-    TAG = dna.fonts.tag,
-    UI = dna.fonts.ui || "Inter";
-  const setupPx = Math.round(H * (b.setupPx ?? 0.043));
-  const payBase = Math.round(setupPx * (b.payoffScale ?? 2.5));
-  const maxW = W * (b.maxWidth ?? 0.56);
-  const LS = b.letterSpacing ?? -0.005;
-  const textW = (s, fam, px, ls = LS) => wordPx(s, fam, px, ls);
-
   // union of matte alpha over [t0,t1] → occupancy + distance-to-subject grids
   function occupancy(t0, t1) {
     if (!M) return null;
@@ -5111,7 +5132,7 @@ function paradigmStack() {
   // best top-left for a w×h block over [t0,t1]: clear of the subject, close to
   // it (beside the face, not in a far corner), near the preferred height
   function place(t0, t1, w, h, prefY) {
-    const mx = W * 0.05,
+    const mx = W * 0.04,
       mt = H * 0.06,
       mb = H * 0.08;
     const O = occupancy(t0, t1);
@@ -5140,228 +5161,228 @@ function paradigmStack() {
   if (theme.chapter && theme.chapter.match) {
     const c = theme.chapter;
     const ph = findPhrase(c.match);
-    const saveWord = tWords.slice(ph.idx, ph.idx + ph.len).find((w) => norm(w.text) === norm(c.save || "save"));
     const pre = CUTS.filter((t) => t <= ph.start && t >= ph.start - 0.45).pop();
-    const tin = pre != null ? snap(pre) : r3(ph.start - 0.12);
+    const tin = pre != null ? snap(pre) : onFrame(ph.start);
     const ca = cutAfter(ph.end - 0.05);
-    const tout =
-      c.out ?? (ca != null && ca - ph.end <= 2 ? snap(Math.max(ca, ph.end + 0.4)) : r3(ph.end + 0.9));
+    const tout = c.out ?? (ca != null && ca - ph.end <= 2 ? snap(Math.max(ca, ph.end + 0.4)) : r3(ph.end + 0.9));
     const [t1, t2] = String(c.title || "").split("/").map((s) => s.trim().toUpperCase());
-    chapter = { tin, tout, save: r3((saveWord || tWords[ph.idx]).start), num: String(c.number ?? ""), t1: t1 || "", t2: t2 || "", cut: CUTS.some((x) => Math.abs(x - tout) < FR) };
+    chapter = { tin, tout, num: String(c.number ?? ""), t1: t1 || "", t2: t2 || "" };
     blocks.push([tin, tout]);
   }
   const items = (theme.items || []).map((it, k) => {
     const ph = findPhrase(it.match);
-    const pre = CUTS.filter((t) => t <= ph.start && t >= ph.start - 0.3).pop();
-    const tin = pre != null ? snap(pre) : r3(ph.start - 0.05);
+    const pre = CUTS.filter((t) => t <= ph.start + 1e-6 && t >= ph.start - 0.3).pop();
+    const tin = pre != null ? snap(pre) : onFrame(ph.start);
     const prompt = String(it.prompt || "");
     const chars = [...prompt];
     const typeStart = tin + 0.3;
-    // keystrokes: "cut" = the last key lands on the next cut; a number = ends
-    // there; default "speech" = each prompt word types while it is spoken
-    let keys = null,
-      typeEnd,
+    // keystrokes: "cut" = the last key and the Generate press land on the next cut (the
+    // result shot), a number = they land there, default = an even typing run at the cut
+    let typeEnd,
       onCut = false;
-    const mode = it.typeEnd ?? "speech";
-    if (mode === "speech") {
-      const pw = prompt.split(/\s+/).filter(Boolean);
-      let hit = null;
-      for (let i = ph.idx; i <= tWords.length - pw.length && !hit; i++)
-        if (pw.every((p, j) => norm(tWords[i + j].text) === norm(p))) hit = i;
-      if (hit != null) {
-        keys = [];
-        let ci = 0;
-        pw.forEach((p, j) => {
-          const w = tWords[hit + j],
-            len = p.length + (j < pw.length - 1 ? 1 : 0);
-          const t0 = Math.max(w.start, typeStart),
-            span = Math.max(FR, 0.8 * (w.end - w.start));
-          for (let q = 0; q < len; q++) keys[ci++] = r3(t0 + (span * q) / len);
-        });
-        typeEnd = keys[keys.length - 1];
-      }
-    }
-    if (!keys) {
-      if (mode === "cut") {
-        const c = cutAfter(typeStart, 0.4);
-        if (c != null) (typeEnd = snap(c)), (onCut = true);
-      } else if (typeof mode === "number") typeEnd = mode;
-      if (typeEnd == null) typeEnd = typeStart + Math.min(2.2, 0.045 * chars.length);
-      // human rhythm: seeded ±35% jitter per interval, renormalized so the
-      // last keystroke lands exactly on typeEnd
-      let a = 0x9e3779b9 ^ (k + 1) * 2654435761;
-      const rnd = () => ((a = (a * 1664525 + 1013904223) >>> 0) / 4294967296);
-      const gaps = chars.map(() => 0.65 + 0.7 * rnd());
-      const tot = gaps.reduce((x, y) => x + y, 0) - gaps[0];
-      keys = [];
-      let acc = 0;
-      chars.forEach((_, q) => {
-        if (q) acc += gaps[q];
-        keys.push(r3(typeStart + ((typeEnd - typeStart) * acc) / (tot || 1)));
-      });
-      keys[keys.length - 1] = r3(typeEnd);
-    }
+    if (it.typeEnd === "cut") {
+      const c = cutAfter(typeStart, 0.4);
+      if (c != null) (typeEnd = snap(c)), (onCut = true);
+    } else if (typeof it.typeEnd === "number") typeEnd = it.typeEnd;
+    if (typeEnd == null) typeEnd = typeStart + Math.min(2.2, 0.045 * chars.length);
+    // human rhythm: seeded ±35% jitter per interval, renormalized so the last
+    // keystroke lands exactly on typeEnd
+    let a = 0x9e3779b9 ^ ((k + 1) * 2654435761);
+    const rnd = () => (a = (a * 1664525 + 1013904223) >>> 0) / 4294967296;
+    const gaps = chars.map(() => 0.65 + 0.7 * rnd());
+    const tot = gaps.reduce((x, y) => x + y, 0) - gaps[0];
+    const keys = [];
+    let acc = 0;
+    chars.forEach((_, q) => {
+      if (q) acc += gaps[q];
+      keys.push(r3(typeStart + ((typeEnd - typeStart) * acc) / (tot || 1)));
+    });
+    if (keys.length) keys[keys.length - 1] = r3(typeEnd);
+    // the number and name arrive with the shot they title: on the cut when the prompt
+    // is typed over a "before" shot, else with the box
+    const nameIn = onCut ? snap(typeEnd) : tin;
     const next = theme.items[k + 1] ? findPhrase(theme.items[k + 1].match).start - 0.05 : DUR - 0.05;
-    const ca = cutAfter(Math.max(typeEnd, tin + 1.2), 0.3);
+    const ca = cutAfter(Math.max(typeEnd, nameIn, tin + 1.2), 0.3);
     let tout = it.out ?? (ca != null && ca - typeEnd <= 6 ? snap(ca) : r3(typeEnd + 2.5));
     tout = Math.min(tout, next, DUR - 0.05);
     blocks.push([tin, tout]);
     return {
-      tin, tout, keys, typeEnd: r3(typeEnd), onCut, n: String(it.number ?? k + 1),
-      name: String(it.name || "").toUpperCase(), prompt, before: it.before ? String(it.before).toUpperCase() : null,
-      beforeOut: onCut ? snap(typeEnd) : r3(Math.min(tout, typeEnd)), cut: CUTS.some((x) => Math.abs(x - tout) < FR),
+      tin, tout, keys, typeEnd: r3(typeEnd), nameIn, n: String(it.number ?? k + 1),
+      name: String(it.name || "").toUpperCase(), prompt, layout: it.layout || "stack",
+      before: it.before ? String(it.before).toUpperCase() : null, beforeOut: onCut ? snap(typeEnd) : r3(Math.min(tout, typeEnd)),
     };
   });
   const blocked = (t) => blocks.some(([a, z]) => t >= a - 0.01 && t <= z);
 
-  // ---- the lime lesson words: minors entries, a phrase matches as a run
-  const minorRuns = (theme.minors || []).map((m) => m.split(/\s+/).map(norm));
-  function limeMask(ws) {
-    const on = ws.map(() => false);
-    for (const run of minorRuns)
-      for (let i = 0; i + run.length <= ws.length; i++)
-        if (run.every((r, j) => norm(ws[i + j].display) === r)) for (let j = 0; j < run.length; j++) on[i + j] = true;
-    return on;
-  }
-
-  // ---- stacks: split, size (width-fit, then a balanced 2-row break), window
+  // ---- stacks: a small setup line over the payoff, white caps, hard cut on each word
+  const up = (ws) => ws.map((w) => w.display.toUpperCase().replace(/\.+$/, "")).join(" ");
   const stacks = [];
-  LINES.forEach((L, i) => {
-    const first = L.words[0],
-      last = L.words[L.words.length - 1];
-    if (blocked(first.start)) return;
-    const n = L.words.length;
-    const split = L.split != null ? L.split : n <= 2 ? 0 : Math.min(2, Math.max(1, Math.floor(n / 3)));
-    const su = L.words.slice(0, split),
-      po = L.words.slice(split);
-    const lime = limeMask(po);
-    // caps, and a sentence's closing period dropped (commas and ? stay, as spoken)
-    const up = (ws) => ws.map((w) => w.display.toUpperCase().replace(/\.+$/, ""));
-    let px = payBase,
+  LINES.forEach((L) => {
+    const vis = L.words.filter((w) => !w.drop);
+    if (!vis.length || blocked(vis[0].start)) return;
+    const n = vis.length;
+    const split = L.split != null ? L.split : n <= 3 ? 0 : Math.min(2, Math.max(1, Math.floor(n / 3)));
+    const su = L.words.slice(0, split).filter((w) => !w.drop),
+      po = L.words.slice(split).filter((w) => !w.drop);
+    const at = L.at || {};
+    const s = at.s ?? setupCap;
+    let p = at.p ?? (su.length ? payCap : singleCap),
       rows = [up(po)];
-    const rowW = (r, p) => textW(r.join(" "), BODY, p);
-    if (rowW(rows[0], px) > maxW) px = Math.max(Math.round(payBase * 0.78), Math.floor((px * maxW) / rowW(rows[0], px)));
-    if (rowW(rows[0], px) > maxW && po.length > 1) {
-      let bestK = 1;
-      for (let k2 = 1; k2 < po.length; k2++) {
-        const m = (k) => Math.max(rowW(rows[0].slice(0, k), px), rowW(rows[0].slice(k), px));
-        if (m(k2) < m(bestK)) bestK = k2;
+    if (at.p == null && inkW(rows[0], p) > maxW) {
+      p = Math.max(Math.round(p * 0.78), Math.floor((p * maxW) / inkW(rows[0], p)));
+      if (inkW(rows[0], p) > maxW && po.length > 1) {
+        const ws = rows[0].split(" ");
+        let bestK = 1;
+        const m = (k) => Math.max(inkW(ws.slice(0, k).join(" "), p), inkW(ws.slice(k).join(" "), p));
+        for (let k2 = 2; k2 < ws.length; k2++) if (m(k2) < m(bestK)) bestK = k2;
+        rows = [ws.slice(0, bestK).join(" "), ws.slice(bestK).join(" ")];
       }
-      rows = [rows[0].slice(0, bestK), rows[0].slice(bestK)];
-      px = payBase;
-      const wid = Math.max(...rows.map((r) => rowW(r, px)));
-      if (wid > maxW) px = Math.floor((px * maxW) / wid);
     }
-    const nextIn = i + 1 < LINES.length ? LINES[i + 1].words[0].start - 0.02 : DUR - 0.1;
-    const blockIn = blocks.map(([a]) => a).filter((a) => a > first.start).sort((a, z) => a - z)[0] ?? 1e9;
-    const ca = cutAfter(last.start - 0.001);
-    let tout = Math.min(nextIn, last.end + (b.maxHold ?? 1.1), blockIn - 0.01, DUR - 0.05);
-    let cut = false;
-    if (ca != null && ca <= tout + 0.001) (tout = snap(ca)), (cut = true);
     stacks.push({
-      id: "s" + L.id, su: su.length ? up(su).join(" ") : "", rows, lime, px,
-      tin: r3(first.start - 0.02), tpo: r3(po[0].start - 0.02), tout: r3(tout), cut,
-      w: Math.max(su.length ? textW(up(su).join(" "), BODY, setupPx) : 0, ...rows.map((r) => rowW(r, px))),
-      ph: rows.length * px * 0.92,
+      id: "s" + L.id, su: su.length ? up(su) : "", rows, s, p, at,
+      first: vis[0], last: vis[vis.length - 1], poStart: po[0].start,
+      w: Math.max(su.length ? inkW(up(su), s) : 0, ...rows.map((r) => inkW(r, p))),
+      h: (su.length ? s + gapOf(s) : 0) + rows.length * p + (rows.length - 1) * gapOf(p),
     });
   });
-  // one anchor per run of stacks inside the same shot: consecutive stacks keep
-  // their column instead of hopping, and payoff-only lines land where the last payoff did
+  // windows: in on the first word (on the cut when one falls just before it), out when
+  // the next stack takes over, the hold after the last word runs out, or the shot cuts
+  stacks.forEach((S, i) => {
+    const cutIn = CUTS.find((c) => c <= S.first.start + 1e-6 && c > S.first.start - (b.cutLead ?? 0.12));
+    S.tin = cutIn != null ? snap(cutIn) : onFrame(S.first.start);
+    S.tpo = S.su ? Math.max(S.tin, onFrame(S.poStart)) : S.tin;
+  });
+  stacks.forEach((S, i) => {
+    const nextIn = i + 1 < stacks.length ? stacks[i + 1].tin : DUR - 0.05;
+    const blockIn = blocks.map(([a]) => a).filter((a) => a > S.first.start).sort((a, z) => a - z)[0] ?? 1e9;
+    const ca = cutAfter(S.last.start - 0.001);
+    let tout = Math.min(nextIn, onFrame(S.last.end + (b.hold ?? 0.12)), blockIn, DUR - 0.05);
+    if (ca != null && snap(ca) < tout) tout = snap(ca);
+    S.tout = r3(tout);
+  });
+  // stacks the theme does not place: one anchor per run inside the same shot, so
+  // consecutive stacks keep their column instead of hopping
   const groups = [];
   stacks.forEach((S, i) => {
-    const prev = stacks[i - 1];
-    const sameShot = prev && !prev.cut && !CUTS.some((c) => c > prev.tin && c <= S.tin) && S.tin - prev.tout < 1.5;
-    if (sameShot) groups[groups.length - 1].push(S);
+    if (S.at.x != null && S.at.y != null) return;
+    const prev = groups.length ? groups[groups.length - 1] : null;
+    const P = prev && prev[prev.length - 1];
+    const sameShot = P && stacks.indexOf(P) === i - 1 && !CUTS.some((c) => c > P.tin && c <= S.tin) && S.tin - P.tout < 1.5;
+    if (sameShot) prev.push(S);
     else groups.push([S]);
   });
-  const suH = setupPx * 1.02,
-    gap = Math.round(payBase * 0.04);
   for (const G of groups) {
-    const w = Math.max(...G.map((S) => S.w)) + payBase * 0.12; // italic overhang
-    const ph = Math.max(...G.map((S) => S.ph));
-    const h = suH + gap + ph;
-    const at = place(G[0].tin, G[G.length - 1].tout, w, h, b.prefY ?? 0.66);
-    for (const S of G) (S.x = at.x), (S.y = at.y), (S.poY = Math.round(suH + gap));
+    const w = Math.max(...G.map((S) => S.w)) + payCap * 0.12; // italic overhang
+    const h = Math.max(...G.map((S) => S.h));
+    const at = place(G[0].tin, G[G.length - 1].tout, w, h, b.prefY ?? 0.7);
+    for (const S of G) S.at = { ...S.at, x: at.x, y: at.y };
   }
 
-  // ---- chapter card + lower-third corners: the corner with less subject in it
-  const chNumPx = Math.round(H * 0.25),
-    ch1Px = Math.round(H * 0.064),
-    ch2Px = Math.round(H * 0.036);
+  // ---- chapter card, top-left (theme.chapter.side "right" mirrors it): numeral, title over subtitle,
+  // an outline bookmark after the title
+  const numCap = Math.round(H * 0.1037),
+    t1Cap = Math.round(H * 0.05),
+    t2Cap = Math.round(H * 0.0231);
   if (chapter) {
-    const w = textW(chapter.num, BODY, chNumPx) + Math.max(textW(chapter.t1, BODY, ch1Px) + ch1Px * 1.1, textW(chapter.t2, BODY, ch2Px)) + chNumPx * 0.1;
-    const h = chNumPx * 0.86;
-    const O = occupancy(chapter.tin, chapter.tout);
-    chapter.side = overlap(O, W - W * 0.05 - w, H * 0.06, w, h) < overlap(O, W * 0.05, H * 0.06, w, h) - 0.02 ? "right" : "left";
+    const x0 = W * 0.0278,
+      y0 = H * 0.037;
+    const nW = wordPx(chapter.num, BW, fsOf(numCap), 0); // one glyph: no tracking to take off
+    const t1x = nW + H * 0.0102,
+      t1y = H * 0.012,
+      t2y = t1y + t1Cap + H * 0.0065;
+    const bmH = Math.round(t1Cap * 0.963),
+      bmW = Math.round(bmH * 0.81);
+    const bmx = t1x + inkW(chapter.t1, t1Cap) + H * 0.0083;
+    const w = bmx + bmW;
+    const side = theme.chapter.side || "left";
+    Object.assign(chapter, { x: Math.round(side === "right" ? W - x0 - w : x0), y: Math.round(y0), t1x, t1y, t2y, bmx, bmH, bmW });
   }
-  const namePx = Math.round(H * 0.1),
-    numPx = Math.round(namePx * 0.36),
+
+  // ---- lower thirds: orange number over the name in an expanded black face, the
+  // prompt box where their quote sat
+  const numPx = Math.round(H * 0.0324),
+    nameCap = Math.round(H * 0.0759),
+    namePitch = Math.round(nameCap * 1.39),
     pbPx = Math.round(H * 0.031),
     boxMax = Math.round(W * 0.46);
+  const boxX = Math.round(W * 0.046),
+    boxY = Math.round(H * 0.8306);
+  const NAME_FS = fsOf(nameCap),
+    NUM_FS = fsOf(numPx);
+  const tagW = (s, fs) => wordPx(s, TAG, fs, 0);
   for (const it of items) {
-    const nameW = textW(it.name, TAG, namePx, 0) + textW(it.n, TAG, numPx, 0) + namePx * 0.12;
+    // a name wider than the frame's left half breaks onto two rows
+    let rows = [it.name];
+    if (tagW(it.name, NAME_FS) > W * 0.55 && it.name.includes(" ")) {
+      const ws = it.name.split(" ");
+      let bestK = 1;
+      const m = (k) => Math.max(tagW(ws.slice(0, k).join(" "), NAME_FS), tagW(ws.slice(k).join(" "), NAME_FS));
+      for (let k2 = 2; k2 < ws.length; k2++) if (m(k2) < m(bestK)) bestK = k2;
+      rows = [ws.slice(0, bestK).join(" "), ws.slice(bestK).join(" ")];
+    }
     const innerMax = boxMax - pbPx * 1.6 - pbPx * 4.6; // padding + the Generate keycap
-    const tw = textW(it.prompt, UI, pbPx, 0);
-    const rowsN = Math.max(1, Math.ceil(tw / innerMax));
+    const tw = wordPx(it.prompt, UI, pbPx, 0) * 1.08; // the table runs a little narrow for Inter 500
     const boxW = Math.min(boxMax, tw + pbPx * 1.6 + pbPx * 4.6);
-    const w = Math.max(nameW, boxW),
-      h = namePx * 0.95 + H * 0.018 + rowsN * pbPx * 1.32 + pbPx * 1.4;
-    const O = occupancy(it.tin, it.tout);
-    const y = H - H * 0.065 - h;
-    it.side = overlap(O, W - W * 0.05 - w, y, w, h) < overlap(O, W * 0.05, y, w, h) - 0.02 ? "right" : "left";
+    const nameW = Math.max(...rows.map((r) => tagW(r, NAME_FS)));
+    const nameH = nameCap + (rows.length - 1) * namePitch;
+    let nx, nBottom;
+    // nx is the name's box left: the expanded face's left bearing puts its ink ~0.006W in,
+    // the numeral's ~0.002W, so the number sits 0.0035W right to land on the same ink edge
+    if (it.layout === "beside") (nx = boxX + boxW + W * 0.025), (nBottom = H - H * 0.0444);
+    else if (it.layout === "right") (nx = W - W * 0.0365 - nameW), (nBottom = boxY - H * 0.0444);
+    else (nx = boxX - W * 0.0042), (nBottom = boxY - H * 0.0111);
+    const nTop = nBottom - nameH;
+    Object.assign(it, { rows, nx: Math.round(nx), kx: Math.round(nx + W * 0.0035), nTop: Math.round(nTop), kTop: Math.round(nTop - H * 0.0287 - numPx), boxW: Math.round(boxW) });
   }
 
   // ---- markup (baked at compile time; the page only schedules)
-  const shadowRest = `0 ${Math.round(setupPx * 0.08)}px ${Math.round(setupPx * 0.42)}px rgba(0,0,0,0.42), 0 ${Math.max(1, Math.round(setupPx * 0.03))}px ${Math.max(2, Math.round(setupPx * 0.08))}px rgba(0,0,0,0.38)`;
+  const shadow = b.shadow || "0 2px 6px rgba(0,0,0,0.32)";
+  const line = (cls, text, cap, x, capTop, extra = "") => {
+    const fs = fsOf(cap);
+    return `<div class="${cls}" style="left:${Math.round(x - inset(text) * fs)}px;top:${Math.round(capTop - CAPTOP * fs)}px;font-size:${+fs.toFixed(2)}px${extra}">${esc(text)}</div>`;
+  };
   const stackHtml = stacks
     .map((S) => {
-      let wi = 0;
-      const rows = S.rows
-        .map((r) => `<div class="pr">${r.map((t) => { const on = S.lime[wi++]; return on ? `<span class="lm">${esc(t)}</span>` : esc(t); }).join(" ")}</div>`)
-        .join("");
-      return `      <div class="st" id="${S.id}" style="left:${S.x}px;top:${S.y}px">${S.su ? `<div class="su">${esc(S.su)}</div>` : ""}<div class="po" style="top:${S.poY}px;font-size:${S.px}px">${rows}</div></div>`;
+      const { x, y } = S.at;
+      const poTop = S.su ? y + S.s + gapOf(S.s) : y;
+      const rows = S.rows.map((r, k) => line("po", r, S.p, x, poTop + k * (S.p + gapOf(S.p)))).join("");
+      return `      <div class="st" id="${S.id}">${S.su ? line("su", S.su, S.s, x, y) : ""}${rows}</div>`;
     })
     .join("\n");
-  const bookmark = (cls) =>
-    `<svg class="${cls}" viewBox="0 0 24 30" width="${Math.round(ch1Px * 0.72)}" height="${Math.round(ch1Px * 0.9)}"><path d="M3.5 2.5h17v25l-8.5-6.6-8.5 6.6z" fill="${cls === "bmf" ? pal.accent : "none"}" stroke="${cls === "bmf" ? pal.accent : pal.body}" stroke-width="2.6" stroke-linejoin="round"/></svg>`;
   const chapterHtml = chapter
-    ? `      <div class="ch ${chapter.side}" id="ch"><div class="chn">${esc(chapter.num)}</div><div class="cht"><div class="ch1">${esc(chapter.t1)}<span class="bm">${bookmark("bmo")}<span class="bmfw">${bookmark("bmf")}</span></span></div>${chapter.t2 ? `<div class="ch2">${esc(chapter.t2)}</div>` : ""}</div></div>`
+    ? `      <div class="ch" id="ch" style="left:${chapter.x}px;top:${chapter.y}px">` +
+      line("chl", chapter.num, numCap, 0, 0) +
+      line("chl", chapter.t1, t1Cap, chapter.t1x, chapter.t1y) +
+      (chapter.t2 ? line("chl", chapter.t2, t2Cap, chapter.t1x, chapter.t2y) : "") +
+      `<svg class="bm" viewBox="0 0 42 52" width="${chapter.bmW}" height="${chapter.bmH}" style="left:${Math.round(chapter.bmx)}px;top:${Math.round(chapter.t1y - 1)}px">` +
+      `<path d="M2 2H40V50L21 33.5L2 50Z" fill="none" stroke="${pal.body}" stroke-width="4" stroke-linejoin="miter"/></svg></div>`
     : "";
   const itemHtml = items
     .map((it, k) => {
       const chars = [...it.prompt].map((c) => `<span class="c">${c === " " ? " " : esc(c)}<i class="cr"></i></span>`).join("");
+      const name = it.rows
+        .map((r, j) => `<div class="ltname" style="left:${it.nx}px;top:${Math.round(it.nTop + j * namePitch - CAPTOP * NAME_FS)}px">${esc(r)}</div>`)
+        .join("");
       return (
-        `      <div class="lt ${it.side}" id="lt${k}"><div class="ltn"><span class="ltk">${esc(it.n)}</span><span class="ltname">${esc(it.name)}</span></div>` +
-        `<div class="pb"><div class="pbt"><i class="cr cr0"></i>${chars}</div><div class="gen">Generate</div></div></div>` +
+        `      <div class="lt" id="lt${k}"><div class="ltk" style="left:${it.kx}px;top:${Math.round(it.kTop - CAPTOP * NUM_FS)}px">${esc(it.n)}</div>${name}` +
+        `<div class="pb" style="left:${boxX}px;top:${boxY}px"><div class="pbt"><i class="cr cr0"></i>${chars}</div><div class="gen">Generate</div></div></div>` +
         (it.before ? `\n      <div class="bf" id="bf${k}">${esc(it.before)}</div>` : "")
       );
     })
     .join("\n");
 
   const css = `
-  .st { position:absolute; opacity:0; white-space:nowrap; font-family:'${BODY}', sans-serif; font-style:italic;
-        font-weight:800; line-height:1; letter-spacing:${LS}em; color:${pal.body}; }
-  .st .su { position:absolute; left:0; top:0; font-size:${setupPx}px; opacity:0; text-shadow:${shadowRest}; }
-  .st .po { position:absolute; left:0; line-height:0.92; opacity:0; text-shadow:var(--sm, ${shadowRest}); }
-  .st .lm, .ch .lm { color:${pal.accent}; }
-  .ch { position:absolute; top:${Math.round(H * 0.06)}px; display:flex; align-items:flex-start; opacity:0;
-        font-family:'${BODY}', sans-serif; font-style:italic; font-weight:800; color:${pal.body};
-        letter-spacing:${LS}em; white-space:nowrap; text-shadow:${shadowRest}; }
-  .ch.left { left:${Math.round(W * 0.05)}px; } .ch.right { right:${Math.round(W * 0.05)}px; }
-  .ch .chn { font-size:${chNumPx}px; line-height:0.8; margin-right:${Math.round(chNumPx * 0.06)}px; text-shadow:var(--sm, ${shadowRest}); }
-  .ch .cht { padding-top:${Math.round(chNumPx * 0.06)}px; }
-  .ch .ch1 { font-size:${ch1Px}px; line-height:0.95; display:flex; align-items:center; gap:${Math.round(ch1Px * 0.24)}px; opacity:0; }
-  .ch .ch2 { font-size:${ch2Px}px; line-height:1.05; opacity:0; }
-  .ch .bm { position:relative; display:inline-block; width:${Math.round(ch1Px * 0.72)}px; height:${Math.round(ch1Px * 0.9)}px; opacity:0; }
-  .ch .bm svg { position:absolute; left:0; top:0; overflow:visible; }
-  .ch .bmfw { position:absolute; inset:0; clip-path:inset(100% 0 0 0); }
-  .lt { position:absolute; bottom:${Math.round(H * 0.065)}px; display:flex; flex-direction:column; opacity:0; }
-  .lt.left { left:${Math.round(W * 0.05)}px; align-items:flex-start; } .lt.right { right:${Math.round(W * 0.05)}px; align-items:flex-end; }
-  .lt .ltn { font-family:'${TAG}', sans-serif; font-weight:900; font-stretch:125%; color:${pal.body}; line-height:0.86;
-             white-space:nowrap; text-shadow:var(--sm, ${shadowRest}); opacity:0; }
-  .lt .ltk { font-size:${numPx}px; color:${pal.accent}; vertical-align:top; margin-right:${Math.round(namePx * 0.1)}px; display:inline-block; }
-  .lt .ltname { font-size:${namePx}px; }
-  .lt .pb { margin-top:${Math.round(H * 0.018)}px; max-width:${boxMax}px; display:flex; align-items:flex-end; gap:${Math.round(pbPx * 0.8)}px;
+  .st > div, .ch .chl { position:absolute; opacity:0; white-space:nowrap; font-family:'${BODY}', sans-serif; font-style:italic;
+        font-weight:900; font-stretch:${b.stretch ?? "62.5%"}; line-height:1; letter-spacing:${LS}em; word-spacing:${WS}em; color:${pal.body}; text-shadow:${shadow}; }
+  .ch { position:absolute; opacity:0; }
+  .ch .chl { opacity:1; }
+  .ch .bm { position:absolute; overflow:visible; filter:drop-shadow(${shadow}); }
+  .lt { position:absolute; inset:0; opacity:0; }
+  .lt .ltk, .lt .ltname { position:absolute; white-space:nowrap; font-family:'${TAG}', sans-serif; font-weight:900; font-stretch:125%;
+        line-height:1; opacity:0; text-shadow:${shadow}; }
+  .lt .ltk { font-size:${+NUM_FS.toFixed(2)}px; color:${pal.number || pal.accent}; }
+  .lt .ltname { font-size:${+NAME_FS.toFixed(2)}px; color:${pal.body}; }
+  .lt .pb { position:absolute; max-width:${boxMax}px; display:flex; align-items:flex-end; gap:${Math.round(pbPx * 0.8)}px;
             padding:${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.62)}px ${Math.round(pbPx * 0.8)}px;
             border-radius:${Math.round(pbPx * 0.75)}px; opacity:0;
             background:linear-gradient(180deg, rgba(30,30,30,0.9) 0%, rgba(22,22,22,0.89) 48%, rgba(14,14,14,0.9) 100%);
@@ -5376,78 +5397,48 @@ function paradigmStack() {
              padding:${Math.round(pbPx * 0.3)}px ${Math.round(pbPx * 0.62)}px; border-radius:${Math.round(pbPx * 0.38)}px;
              background:linear-gradient(to bottom, #d7ff3d 0%, #c3f500 100%);
              box-shadow:inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -1px 0 rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.45); }
-  .bf { position:absolute; left:${W / 2}px; top:${Math.round(H * 0.47)}px; transform:translateX(-50%); opacity:0; white-space:nowrap;
-        font-family:'${TAG}', sans-serif; font-weight:200; font-stretch:125%; font-size:${Math.round(H * 0.032)}px;
-        letter-spacing:0.32em; color:${pal.body}; text-shadow:${shadowRest}; }`;
+  .bf { position:absolute; left:${W / 2}px; top:${Math.round(H * 0.496 - fsOf(H * 0.0176) * (CAPTOP + CAP / 2))}px; transform:translateX(-50%);
+        opacity:0; white-space:nowrap; font-family:'${TAG}', sans-serif; font-weight:400; font-stretch:125%; line-height:1;
+        font-size:${+fsOf(H * 0.0176).toFixed(2)}px; color:${pal.body}; text-shadow:${shadow}; }`;
 
   const html = [stackHtml, chapterHtml, itemHtml].filter(Boolean).join("\n");
 
   const js = `
   // ---- body paradigm: STACK (lesson) — two-tier stacks, chapter card, prompt lower thirds ----
+  // every caption cuts in and out on a frame: no fades, no slides
   const FR = ${FR};
-  const REST = ${J(shadowRest)};
-  // directional motion blur without filter:blur — ghost copies of the glyphs in
-  // their own colour (currentColor), trailing the travel direction
-  const smear = (d, px) => {
-    if (!d) return REST;
-    const g = [];
-    for (let k = 1; k <= 6; k++) g.push((-k * 0.075 * px * d).toFixed(1) + "px 0 0 color-mix(in srgb, currentColor " + Math.round((0.52 - k * 0.07) * 100) + "%, transparent)");
-    return g.join(", ") + ", " + REST;
-  };
-  // the four-frame skew slide: lands on its word, settles on frame 4
-  const slideIn = (el, t0, px) => {
-    const K = [[-0.55, -16, 1], [-0.2, -8, 0.55], [-0.06, -3, 0.22], [0, 0, 0]];
-    K.forEach(([x, sk, d], f) => tl.set(el, { opacity: 1, x: x * px, skewX: sk, "--sm": smear(d, px) }, t0 + f * FR));
-  };
-  const outro = (el, t, cut) => {
-    if (cut) { tl.set(el, { opacity: 0 }, t); return; }
-    tl.set(el, { opacity: 0.55, x: -10 }, t); tl.set(el, { opacity: 0.2, x: -22 }, t + FR); tl.set(el, { opacity: 0 }, t + 2 * FR);
-  };
-  const STACKS = ${J(stacks.map((S) => ({ id: S.id, su: !!S.su, tin: S.tin, tpo: S.tpo, tout: S.tout, cut: S.cut, px: S.px })))};
+  const STACKS = ${J(stacks.map((S) => ({ id: S.id, su: !!S.su, tin: S.tin, tpo: S.tpo, tout: S.tout })))};
   STACKS.forEach((S) => {
-    const el = document.getElementById(S.id), su = el.querySelector(".su"), po = el.querySelector(".po");
-    tl.set(el, { opacity: 1 }, S.tin);
-    if (su) { tl.set(su, { opacity: 0.5, y: 5 }, S.tin); tl.set(su, { opacity: 1, y: 0 }, S.tin + FR); }
-    slideIn(po, Math.max(S.tpo, S.tin + (su ? 2 * FR : 0)), S.px);
-    outro(el, S.tout, S.cut);
+    const el = document.getElementById(S.id), lines = el.querySelectorAll(":scope > div");
+    const po = [...lines].slice(S.su ? 1 : 0);
+    if (S.su) tl.set(lines[0], { opacity: 1 }, S.tin);
+    tl.set(po, { opacity: 1 }, S.tpo);
+    tl.set(lines, { opacity: 0 }, S.tout);
   });
 ${
   chapter
-    ? `  // ---- chapter card: numeral slides, title rows follow, the bookmark fills on "save"
-  {
-    const C = ${J(chapter)};
+    ? `  {
     const ch = document.getElementById("ch");
-    tl.set(ch, { opacity: 1 }, C.tin);
-    slideIn(ch.querySelector(".chn"), C.tin, ${chNumPx});
-    slideIn(ch.querySelector(".ch1"), C.tin + 2 * FR, ${ch1Px});
-    const c2 = ch.querySelector(".ch2"); if (c2) slideIn(c2, C.tin + 3 * FR, ${ch2Px});
-    const bm = ch.querySelector(".bm"), fill = ch.querySelector(".bmfw");
-    tl.set(bm, { opacity: 1, scale: 0.6 }, C.tin + 5 * FR); tl.set(bm, { scale: 1.08 }, C.tin + 6 * FR); tl.set(bm, { scale: 1 }, C.tin + 7 * FR);
-    const S = Math.max(C.save, C.tin + 8 * FR);
-    ["inset(70% 0 0 0)", "inset(38% 0 0 0)", "inset(12% 0 0 0)", "inset(0% 0 0 0)"].forEach((v, f) => tl.set(fill, { clipPath: v }, S + f * FR));
-    [1.28, 1.14, 1.04, 1].forEach((s, f) => tl.set(bm, { scale: s }, S + f * FR));
-    tl.set(bm, { filter: "drop-shadow(0 0 ${Math.round(ch1Px * 0.22)}px ${pal.accent})" }, S);
-    tl.set(bm, { filter: "drop-shadow(0 0 ${Math.round(ch1Px * 0.08)}px rgba(200,255,0,0.45))" }, S + 6 * FR);
-    outro(ch, C.tout, C.cut);
+    tl.set(ch, { opacity: 1 }, ${chapter.tin});
+    tl.set(ch, { opacity: 0 }, ${chapter.tout});
   }`
     : ""
 }
-  // ---- prompt lower thirds: number pops, name slides, the box rises, the prompt types on
-  const ITEMS = ${J(items.map((it) => ({ tin: it.tin, tout: it.tout, keys: it.keys, typeEnd: it.typeEnd, onCut: it.onCut, cut: it.cut, side: it.side, before: !!it.before, beforeOut: it.beforeOut })))};
+  // ---- prompt lower thirds: the box rises and the prompt types on; number and name cut in
+  const ITEMS = ${J(items.map((it) => ({ tin: it.tin, tout: it.tout, keys: it.keys, typeEnd: it.typeEnd, nameIn: it.nameIn, before: !!it.before, beforeOut: it.beforeOut })))};
   ITEMS.forEach((I, k) => {
     const lt = document.getElementById("lt" + k);
-    const dir = I.side === "right" ? -1 : 1;
     tl.set(lt, { opacity: 1 }, I.tin);
-    const ltn = lt.querySelector(".ltn"), pb = lt.querySelector(".pb");
-    slideIn(ltn, I.tin, ${namePx});
-    const kk = lt.querySelector(".ltk");
-    [1.5, 1.15, 1].forEach((s, f) => tl.set(kk, { scale: s }, I.tin + f * FR));
-    [[0.0, 14], [0.6, 5], [1, 0]].forEach(([o, y], f) => tl.set(pb, { opacity: o, y: y }, I.tin + (3 + f) * FR));
+    tl.set(lt.querySelectorAll(".ltk, .ltname"), { opacity: 1 }, I.nameIn);
+    const pb = lt.querySelector(".pb");
+    [[0.0, 14], [0.6, 5], [1, 0]].forEach(([o, y], f) => tl.set(pb, { opacity: o, y: y }, I.tin + f * FR));
     const cs = lt.querySelectorAll(".pbt .c"), cr0 = lt.querySelector(".cr0");
     // idle caret blinks until the first key, keys type, the last caret blinks after
     const blink = (el, a, z) => { for (let t = a, on = true; t < z - 0.01; t += 0.5, on = !on) tl.set(el, { opacity: on ? 1 : 0 }, t); };
-    blink(cr0, I.tin + 5 * FR, I.keys[0]);
-    tl.set(cr0, { opacity: 0 }, I.keys[0]);
+    if (I.keys.length) {
+      blink(cr0, I.tin + 2 * FR, I.keys[0]);
+      tl.set(cr0, { opacity: 0 }, I.keys[0]);
+    }
     I.keys.forEach((t, q) => {
       tl.set(cs[q], { visibility: "visible" }, t);
       const crq = cs[q].querySelector(".cr");
@@ -5458,10 +5449,10 @@ ${
     // Generate is pressed on the last keystroke
     const gen = lt.querySelector(".gen");
     [[0.92, 1.25], [0.96, 1.12], [1, 1]].forEach(([s, br], f) => tl.set(gen, { scale: s, filter: "brightness(" + br + ")" }, I.typeEnd + f * FR));
-    outro(lt, I.tout, I.cut);
+    tl.set(lt, { opacity: 0 }, I.tout);
     if (I.before) {
       const bf = document.getElementById("bf" + k);
-      [0.4, 0.8, 1].forEach((o, f) => tl.set(bf, { opacity: o }, I.tin + f * FR));
+      tl.set(bf, { opacity: 1 }, I.tin);
       tl.set(bf, { opacity: 0 }, I.beforeOut);
     }
   });`;

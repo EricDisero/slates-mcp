@@ -26,7 +26,6 @@ const FAMILY = {
   inter: "Inter",
   "baloo-2": "Baloo 2",
   bangers: "Bangers",
-  "barlow-condensed": "Barlow Condensed",
   "bodoni-moda": "Bodoni Moda",
   caveat: "Caveat",
   cinzel: "Cinzel",
@@ -50,7 +49,8 @@ const FAMILY = {
 
 // Variable faces (@fontsource-variable `<slug>-latin-wdth-<style>.woff2`, every axis in one
 // file): slug → the axis ranges the @font-face declares, so font-weight and font-stretch
-// reach the whole design space (the lesson identity runs Archivo at 900/125% and at 200/125%).
+// reach the whole design space (the lesson identity runs Archivo italic at 900/62.5% and
+// upright at 900/125% and 400/125%).
 const VARIABLE = {
   archivo: { weight: "100 900", stretch: "62% 125%" },
 };
