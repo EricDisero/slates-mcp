@@ -5215,13 +5215,14 @@ function paradigmStack() {
     }
     stacks.push({
       id: "s" + L.id, su: su.length ? up(su) : "", rows, s, p, at,
-      first: vis[0], last: vis[vis.length - 1], poStart: po[0].start,
+      first: vis[0], last: L.words[L.words.length - 1], poStart: po[0].start,
       w: Math.max(su.length ? inkW(up(su), s) : 0, ...rows.map((r) => inkW(r, p))),
       h: (su.length ? s + gapOf(s) : 0) + rows.length * p + (rows.length - 1) * gapOf(p),
     });
   });
   // windows: in on the first word (on the cut when one falls just before it), out when
-  // the next stack takes over, the hold after the last word runs out, or the shot cuts
+  // the next stack takes over, the hold after the last word (a dropped stutter counts)
+  // runs out, or the shot cuts
   stacks.forEach((S, i) => {
     const cutIn = CUTS.find((c) => c <= S.first.start + 1e-6 && c > S.first.start - (b.cutLead ?? 0.12));
     S.tin = cutIn != null ? snap(cutIn) : onFrame(S.first.start);
