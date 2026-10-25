@@ -912,13 +912,14 @@ function zodDescriptions(op) {
       }
       return out
     }
-    const used = new Set()
+    // Every token the file checks, in an op or in a helper an op calls (textSetItems, requireSoundPrecision):
+    // doctor must list each one, or it reads green on a desktop that refuses the op.
+    const used = new Set([...opsSrc.matchAll(/requireCapability\(\s*'([^']+)'/g)].map((x) => x[1]))
     const ungated = []
     for (const b of blocks) {
       const id = /\bid:\s*'(slates_[a-z0-9_]+)'/.exec(b.body)?.[1]
       if (!id) continue
       const tokens = [...b.body.matchAll(/requireCapability\(\s*'([^']+)'/g)].map((x) => x[1])
-      tokens.forEach((t) => used.add(t))
       const fresh = [...routesOf(b)].filter((p) => !oldRoutes.has(p))
       if (fresh.length && !tokens.some((t) => nowCaps.has(t) && !oldCaps.has(t))) {
         ungated.push(`${id} calls ${fresh.join(', ')}${tokens.length ? ` but checks only ${tokens.join(', ')}, which ${released} already advertises` : ' and checks no capability'}`)
