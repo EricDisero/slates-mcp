@@ -691,6 +691,8 @@ const VIEW_CUT_SIDES = ['bottom', 'left', 'right'] as const
 const VIEW_DOCK_SECTIONS = ['storyboards', 'library', 'folders', 'pinned'] as const
 // W3: the one window's two layouts (`WINDOW_LAYOUTS`).
 const VIEW_WINDOW_LAYOUTS = ['plan', 'edit'] as const
+// What the timeline's Viewer shows (`VIEWER_MODES`).
+const VIEW_VIEWER_MODES = ['source', 'timeline'] as const
 // 1.6.1: what the user is looking at. Mirrors slate's `@shared/types/view` (lockstep check 12).
 const VIEW_BOARD_LEVELS = ['film', 'scenes', 'shot'] as const
 const VIEW_BOARD_FILTERS = ['all', 'with-clip', 'without-clip'] as const
@@ -869,7 +871,7 @@ export const setView: Operation<{
   board?: { id?: string; sceneId?: string; level?: (typeof VIEW_BOARD_LEVELS)[number]; cardWidth?: number; filter?: (typeof VIEW_BOARD_FILTERS)[number]; linkedClips?: boolean; scriptFollowsDrag?: boolean; collapsedSceneIds?: string[] }
   media?: { tab?: (typeof VIEW_MEDIA_TABS)[number]; folderId?: string | null; unfiledOnly?: boolean; search?: string; favoritesOnly?: boolean; linkedOnly?: boolean; rounds?: boolean; cardSize?: number; revealAssetId?: string }
   library?: { categoryId: string | null }
-  viewer?: { assetId: string | null }
+  viewer?: { assetId?: string | null; mode?: (typeof VIEW_VIEWER_MODES)[number] }
   compare?: { open?: boolean; assetIds?: string[] }
   animatic?: { open: boolean; fromShotId?: string }
   settings?: { open: boolean; pane?: (typeof VIEW_SETTINGS_PANES)[number] }
@@ -956,7 +958,14 @@ export const setView: Operation<{
         .strict()
         .optional(),
       library: z.object({ categoryId: z.string().nullable() }).strict().optional().describe("Open a Library category's page in Media's place; null goes back to the grid."),
-      viewer: z.object({ assetId: z.string().nullable() }).strict().optional().describe("A picture opens in the picture viewer; a clip plays in the timeline's Viewer (Source), on desktops after 1.6.2. null closes the picture viewer."),
+      viewer: z
+        .object({
+          assetId: z.string().nullable().optional().describe("A picture opens in the picture viewer; a clip plays in the timeline's Viewer (Source), on desktops after 1.6.2. null closes the picture viewer."),
+          mode: z.enum(VIEW_VIEWER_MODES).optional().describe("What the timeline's Viewer shows: source (a clip opened to watch) or timeline (the timeline). Compare opens through compare.open. Desktops from 1.6.3."),
+        })
+        .strict()
+        .refine((v) => v.assetId !== undefined || v.mode !== undefined, { message: 'viewer: name assetId or mode' })
+        .optional(),
       compare: z
         .object({ open: z.boolean().optional(), assetIds: z.array(z.string()).max(4).optional().describe('The compare set, two to four items.') })
         .strict()
