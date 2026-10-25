@@ -6,6 +6,12 @@ description: "Make a product-led direct-response ad: demonstration, proof, argum
 
 # Product-led direct response
 
+**Operative summary.**
+- Find what demonstrates the claim for this audience, and the real next action; never invent finishes, guarantees or benefits from a picture. (§ Choose the product's job in the picture)
+- Keep the product one Library item, the script as document text, and alternative openings as versions beside one shared body. (§ Keep the work editable)
+- Generate in the primary placement's aspect, read the composed requests first, and quote the set before any spend. (§ Keep the work editable; § Production when requested)
+- Tighten the hook so something happens in its first frame, then export the selected cuts and their variants. (§ Production when requested)
+
 Use `slates-script-craft` for the words, evidence and hook/bridge variations. This guide supplies an optional product-led approach. A person can appear; a presenter, fixed duration, fixed frame count or hyper-motion treatment is not required.
 
 ## Choose the product's job in the picture

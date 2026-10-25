@@ -5,6 +5,17 @@ description: "Translate a rendered blocking clip into a video prompt that preser
 
 # Blocking → prompt
 
+<!-- @operative:start -->
+**Operative summary.**
+- Let the blocking clip own the camera, cuts and timing; the prompt only says what everything looks like, and it must state that the reference video wins any disagreement. (§ The one idea)
+- Read `cutSeconds` from `slates_blender_scene` before writing and translate it into the selected model's timing grammar. (§ Get the real numbers first)
+- Give every reference a claim plus a "NOT inherited" exclusion, include the placement-only clause, and declare style references as never a shot. (§ ACTIVE REFERENCES — every entry has an exclusion)
+- Reinterpret every blocking artifact in words, or it renders literally. (§ Translate the blocking's artifacts)
+- Write numbered invariants with counts, a ledger for repeated actions, and a named misread for anything that failed before. (§ RULES — the invariants)
+- Pin every beat to a moment, give each person a changing performance, and keep dialogue a closed list with a forbidden list. (§ ACTION TIMING — the beats; § Nobody holds still; § AUDIO)
+- Close with an ending lock and a hold block, then run the checklist. (§ ENDING LOCK; § HOLD FOR THE FULL TIMELINE; § Checklist before you generate)
+<!-- @operative:end -->
+
 You have a blocking clip. This is how you write the prompt that goes with it.
 
 ## The one idea

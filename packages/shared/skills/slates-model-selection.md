@@ -5,6 +5,16 @@ description: "Choose image, video, edit and audio models for the brief, includin
 
 # Model selection for the intended piece
 
+<!-- @operative:start -->
+**Operative summary.**
+- Name the must-preserve requirement and every hard constraint before choosing a model, and honour a model the user names unless it cannot do the job. (§ Decide from constraints and evidence)
+- Read the generated catalogue and the tool schemas, take prices only from `slates_estimate_generation_cost`, and treat dated receipts as history, not quotes. (§ Current catalogue; § Dated production comparisons)
+- When a clip is mostly right, compare an edit with a new generation, and keep the original audio when the words must be exact. (§ Existing footage and edit fidelity)
+- Treat a hero reference still as an image request and use the current image default unless speed, shape or an observed shortfall gives a reason. (§ Image and style production)
+- Decide whether sound generates with the picture or becomes a separate asset, then route to the matching voice, effect or scene seat. (§ Sound as a production choice)
+- Route by requirements first, then compare quotes, and follow `slates-cost-discipline` instead of launching paid comparisons to refresh a table. (§ Spend and delivery)
+<!-- @operative:end -->
+
 Choose from the current catalogue using the brief, existing media and delivery requirements. The agent makes this production choice; the user supplies the vision, explicit preferences and approval. A named model takes priority when it can do the requested job. If it cannot, explain the specific conflict and choose a supported route within the brief.
 
 ## Decide from constraints and evidence

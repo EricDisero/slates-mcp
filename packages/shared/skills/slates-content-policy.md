@@ -5,6 +5,16 @@ description: "Check provider-sensitive content before prompting a brief with con
 
 # Content-policy-safe construction — read before any risk-surface prompt
 
+<!-- @operative:start -->
+**Operative summary.**
+- Build every risk-surface scene safe from the first word: depict the energy, aftermath, threat or scale, never the harm. (§ Substitution table)
+- Swap each tripwire for its substitution before prompting: no panicking crowds, gore, firing weapons or real named public figures. (§ Substitution table)
+- When a scene drifts risky, pull it back to one original creature in a generalized location, in daylight, with no weapons. (§ The safe benchmark)
+- Give every creature or combat scene a containment rule. (§ Containment rule — it doubles as a physics win)
+- Never write romantic, sexual or suggestive content involving minors; keep scenes with children wholesome. (§ Minors — hard rule)
+- Run the pre-flight checklist before delivering any risk-surface prompt, and apply the substitution table for every box that fails. (§ Pre-flight (run before delivering any risk-surface prompt))
+<!-- @operative:end -->
+
 <!-- @banned:start -->
 <!-- slates-only -->
 <!-- Content-policy guidance. Read this list alongside the selected model's

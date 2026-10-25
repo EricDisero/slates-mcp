@@ -5,6 +5,15 @@ description: "Layer preset: a lower third naming who is speaking, a name over a 
 
 # Lower third (a layer preset)
 
+<!-- @operative:start -->
+**Operative summary.**
+- Use this preset when someone asks for a lower third, a name tag, a speaker label or a credit. (§ Use it)
+- Ask for the name and role when you do not know them; never invent one. (§ Use it)
+- Add it with `slates_add_html_clip`, `html` set to the composition and `variables` for `name`, `role` and anything else you change, shortly after the person first speaks. (§ Use it; § The composition)
+- Change values with `slates_update_html_clip`: set `side` away from the face and `height` above captions or the platform's buttons. (§ Values it declares)
+- Look at a frame with `slates-vision-feedback-loop` to confirm it sits inside the safe area and above captions. (§ Use it)
+<!-- @operative:end -->
+
 Who is on screen: a name over their role, beside an accent bar, sliding in from the side and out before the layer ends. In Slates every caption, title and graphic is one kind of layer: a composition with declared values (`docs/layer-contract.md` in the desktop repo). This preset is that composition. The app's **Add a layer** gallery applies it in one click with the defaults below; you adapt it to the footage.
 
 ## Use it

@@ -1,4 +1,5 @@
 import { craftCard } from './craft-cards.js'
+import { BRAIN_ROUTER, operativeSummary } from './brain.js'
 
 export type GuideDepth = 'card' | 'index' | 'section' | 'full'
 
@@ -21,9 +22,12 @@ export function guideSections(content: string): Array<{ title: string; body: str
 
 /** Bounded retrieval. A missing card never silently expands to the full guide. */
 export function retrieveGuide(skill: string, content: string, depth: GuideDepth, query?: string): string {
+  // The router is the index of the brain, short enough to read whole: its card is all of it.
+  if (skill === BRAIN_ROUTER && depth === 'card' && !query?.trim()) depth = 'full'
   const sections = guideSections(content)
   const index = sections.map((s) => `- ${s.title}`).join('\n')
-  if (depth === 'full') return sections.map((s) => s.body.trim()).join('\n\n')
+  // Stripped maintainer comments leave runs of blank lines behind.
+  if (depth === 'full') return sections.map((s) => s.body.trim()).join('\n\n').replace(/\n{3,}/g, '\n\n')
   if (depth === 'index') return index
   if (query?.trim()) {
     const q = query.trim().toLowerCase()
@@ -41,6 +45,7 @@ export function retrieveGuide(skill: string, content: string, depth: GuideDepth,
     // Never cut a table row or a worked prompt mid-sentence.
     return `Section "${ranked[0].s.title}" is too large for a selective response. Use a technique ID or depth "full".\n${index}`
   }
-  const card = craftCard(skill)
+  // A model guide's summary is its craft card; every other file leads with an operative summary.
+  const card = craftCard(skill) ?? operativeSummary(content)
   return `${card ?? sections[0]?.body.trim().slice(0, 1600) ?? 'No overview available.'}\n\nSections (request with query, or depth "full"):\n${index}`
 }

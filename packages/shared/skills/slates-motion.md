@@ -5,6 +5,16 @@ description: "Put HTML motion layers on a cut (lower thirds, end cards, animated
 
 # Motion layers on a cut
 
+<!-- @operative:start -->
+**Operative summary.**
+- Add a layer only to show what the voiceover cannot say, keep layers few, and build them last. (§ Show what the words cannot)
+- Search `slates_list_motion_blocks` first and place a match with `slates_add_html_clip` using `block` and `variables`; write your own composition only when no block fits. (§ Start from the registry)
+- Put a transparent foreground and an opaque plate on separate overlay tracks, the plate below. (§ Foreground and plate on separate tracks)
+- Run `slates_check_composition` while drafting, fix every error with `slates_update_html_clip`, and read every warning; redesign a layer when the same finding survives two fixes. (§ Check before a layer lands)
+- Make every layer start and end fully transparent, animate every element in and out, fit all text, and avoid `backdrop-filter`. (§ What holds in every layer)
+- Retrieve the motion engine's writing guides with `slates_get_prompting_guide`. (§ The motion engine's guides)
+<!-- @operative:end -->
+
 An HTML clip is a composition, an HTML document with a GSAP timeline registered on `window.__timelines`, drawn on an overlay track in preview and export. Slates places, checks and draws it, and the motion engine's own guides teach how to write one (the last section names them). Layers are free: nothing here spends credits.
 
 ## Show what the words cannot

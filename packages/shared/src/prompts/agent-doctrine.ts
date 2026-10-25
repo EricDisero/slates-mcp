@@ -57,6 +57,7 @@
 
 import { SKILLS } from '../skills/content.js'
 import { guideCatalog } from './guide-discovery.js'
+import { BRAIN_ROUTER, DIRECTOR_CARD, ROUTER_BODY } from './brain.js'
 import { VIDEO_MODELS, AUDIO_MODELS, WORKING_METHOD_TOPIC } from '../operations/index.js'
 
 /**
@@ -105,7 +106,7 @@ export function buildSkillIndex(): SkillIndexEntry[] {
 // doctrine paragraph.
 const PREAMBLE: Record<AgentSurface, string> = fork(
   `You are Slates Director — a production assistant living inside Slates, the AI video creation studio. Turn the user's vision into finished work using the optional Slates tools and relevant production craft. Choose the workflow for the brief; start from the user's existing material and bring results into their project or timeline when asked.`,
-  `Turn the user's vision into finished work in Slates. Find craft with slates_get_prompting_guide(query: the brief). Tools generate real media and spend credits. Before generation, estimate every step, show the itemized total and wait for approval. Choose tools to fit the brief.
+  `Turn the user's vision into finished work in Slates. Start every job at slates_get_prompting_guide(topic: "${BRAIN_ROUTER}"). Tools generate real media and spend credits. Before generation, estimate every step, show the itemized total and wait for approval.
 
 ## Essentials
 
@@ -318,6 +319,10 @@ export function buildMcpInstructions(): string {
 
 ${lines.join('\n')}
 
+## Start here
+
+${DIRECTOR_CARD}
+
 ${MCP_FOOTER}`
 }
 
@@ -334,29 +339,22 @@ ${MCP_FOOTER}`
  * SLATES-AGENT-DOCTRINE-SSOT
  */
 export function buildAgentDoctrine({ surface }: { surface: AgentSurface }): string {
-  // COMPRESSED on purpose (2026-08-30). The full frontmatter descriptions were
-  // 14,556 characters — 38% of the doctrine — and they are DISCOVERY blurbs,
-  // written in Claude Code's "Use when X, or when Y" style for a fuzzy matcher
-  // choosing among skills. Here the mapping is close to deterministic:
-  // `resolveGuideTopic()` turns a model id into the right guide in code.
-  //
-  // So the per-model guides are listed as bare names (the name IS the
-  // description) and everything else keeps its FIRST SENTENCE, which is the
-  // part that says when to reach for it. The complete list with full
-  // descriptions is one `slates_get_prompting_guide` call away.
-  const entries = buildSkillIndex()
-  const firstSentence = (d: string): string => {
-    const m = /^(.*?[.!?])(\s|$)/.exec(d.trim())
-    return (m ? m[1] : d.trim()).slice(0, 180)
-  }
-  const perModel = entries.filter((s) => s.name.startsWith('slates-prompting-'))
-  const rest = entries.filter((s) => !s.name.startsWith('slates-prompting-'))
-  const skillIndex =
-    rest.map((s) => `- ${s.name}: ${firstSentence(s.description)}`).join('\n') +
-    `\n- PER-MODEL PROMPTING GUIDES — pass the model id, or the name: ` +
-    perModel.map((s) => s.name).join(', ')
+  // THE GUIDE INDEX IS THE BRAIN'S ROUTER (2026-10-25). It used to be every
+  // skill's first sentence, a flat list the agent picked from by description
+  // and nothing linked. The router (slates-start-here) names one playbook per
+  // job, the question to ask first, and the rules the playbooks link; the brain
+  // lint proves every skill is reachable from it. The Director card (L0) opens
+  // the doctrine. Per-model guides stay bare names: `resolveGuideTopic()` maps
+  // a model id to its guide in code, and the guide gate makes the agent read
+  // one before that model's first generation.
+  const perModel = buildSkillIndex().filter((s) => s.name.startsWith('slates-prompting-'))
+  const perModelIndex = `PER-MODEL PROMPTING GUIDES — pass the model id, or the name: ${perModel.map((s) => s.name).join(', ')}`
 
   return `${PREAMBLE[surface]}
+
+## Start here
+
+${DIRECTOR_CARD}
 
 ## How you work
 
@@ -366,8 +364,10 @@ ${WORKING_METHOD.map((s) => s[surface]).join('\n')}
 
 ${HARD_RULES.map((r) => r[surface]).join('\n')}
 
-## Guide index (load via slates_get_prompting_guide)
+## Guide index: the router (${BRAIN_ROUTER}; load each guide via slates_get_prompting_guide)
 
-${skillIndex}
+${ROUTER_BODY}
+
+${perModelIndex}
 ${surface === 'mcp' ? `\n${MCP_FOOTER}` : ''}`
 }

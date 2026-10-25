@@ -5,6 +5,16 @@ description: "Generate and save images through a connected ChatGPT account or th
 
 # ChatGPT images in Slates
 
+<!-- @operative:start -->
+**Operative summary.**
+- Saving into a project needs the Slates desktop app open and a connected server or CLI; if tools are missing, report it and keep the prompt and references. (§ Prerequisites)
+- Call `slates_get_chatgpt_status` first, and when connected generate with `slates_generate_chatgpt_image` using a fresh requestId, the prompt and ordered `referenceAssetIds`. (§ Connected desktop path)
+- On a timeout or uncertain response, reuse the same requestId, never install software or enable the add-on silently, and start sign-in with `slates_connect_chatgpt` only when the user asks. (§ Connected desktop path)
+- In the host-tool path, save each returned image through `slates_save_external_image` with its exact prompt and the references actually sent, and never import the same file twice. (§ Host-tool path)
+- State the aspect ratio and orientation once, through the `aspectRatio` field, and report requested versus actual framing without cropping. (§ Framing and quality requests)
+- Read back the saved assets, inspect them, and report project, badge code, generator, references and measured dimensions. (§ Verify the saved result)
+<!-- @operative:end -->
+
 ## Prerequisites
 
 Saving into a Slates project requires the Slates desktop app open and a connected Slates MCP server or CLI. Follow the [connection guide](https://slates.video/docs/connect-claude); CLI onboarding is `npx -y @slatesvideo/cli setup`. The host image tool alone does not expose Slates project tools. If the required tools or desktop connection are unavailable, report the missing connection and retain the prompt and references; do not invent operations.

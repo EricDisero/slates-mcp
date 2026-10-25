@@ -5,6 +5,17 @@ description: "Generate different visual treatments from one blocking pass while 
 
 # Restyle — one edit, many worlds
 
+<!-- @operative:start -->
+**Operative summary.**
+- Start only from an approved blocking clip and a finished prompt for one style, written per `slates-blocking-to-prompt`. (§ Before you restyle)
+- Hold the structure and swap only the style: copy the blocking contract, cut boundaries, camera, screen direction, hold block and video reference settings verbatim into every style. (§ What stays fixed)
+- Lead each style prompt with the video lock so the look cannot leak into the motion. (§ What stays fixed)
+- Write a dummy mapping from each grey proxy to a real object for each style's cast. (§ Dummy mapping — the mechanism that makes it work)
+- Declare a style reference as style-only and never a keyframe, and pin every beat to a reused location label. (§ Style references; § Location continuity)
+- Keep acting inside the existing shots and add a text-free clause for stylised worlds. (§ Keep performance inside the existing shots; § Text-free worlds)
+- Generate each style as its own `slates_generate_video` call against the same video reference assets, and show the prompts and the quoted total before firing the batch. (§ Running it)
+<!-- @operative:end -->
+
 The commercial payoff of the whole previs workflow, and the reason a blocking file is an asset rather than a step.
 
 ## The idea

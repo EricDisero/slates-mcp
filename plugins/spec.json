@@ -53,6 +53,7 @@
       "slates-connect"
     ],
     "shared": [
+      "slates-start-here",
       "slates-project-organization",
       "slates-script-craft",
       "slates-storyboard-from-script",

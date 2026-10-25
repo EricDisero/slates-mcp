@@ -5,6 +5,17 @@ description: "Block a multi-character conversation (at a table, in a car, walkin
 
 # Dialogue blocking — six people who stay where you put them
 
+<!-- @operative:start -->
+**Operative summary.**
+- Block in 3D only when seating, eyelines or screen direction must hold across cuts. (§ Why this is hard)
+- Give each character a distinct proxy colour, do not animate the heads, and paste the colour mapping verbatim into the generation prompt. (§ Seated proxies, colour-coded)
+- Place people once, state who sits where in words, restate it in the prompt as a geography rule, and name the near-foreground owner of each cut. (§ Fix the geography, then never move it; § Geography — restate it as a rule)
+- State that a backward-facing camera mirrors screen sides and is not a seat swap, and that every occupied seat visibly holds its person. (§ Screen direction, and the mirror that is not a swap; § Presence)
+- Give every character ongoing business, background life, a shared scene event and an acting task that includes the gaze safety line. (§ Keep everyone alive; § Acting, per character)
+- Split any strong emotion into phases with a hinge timestamp. (§ Split any strong emotion into phases)
+- Include the dialogue-never-creates-shots and off-screen-voices rules whenever the blocking owns the cut list. (§ Dialogue must not restructure the edit)
+<!-- @operative:end -->
+
 Use this when fixed seating, eyelines or screen direction across cuts are part of the brief, or when generated shots have lost that continuity. A simple conversation can use ordinary shot and reference direction; 3D blocking is a tool for deterministic geography, not a prerequisite for dialogue.
 
 ## Why this is hard

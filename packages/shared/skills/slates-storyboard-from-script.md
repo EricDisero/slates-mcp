@@ -5,6 +5,16 @@ description: "Save a supplied script or treatment as an editable Slates document
 
 # Script into editable production
 
+<!-- @operative:start -->
+**Operative summary.**
+- Read the document and its revision first, and keep supplied words, speakers, headings and explicit shot lists. (§ Save the words once)
+- Write words and structure through `slates_update_script_document`; create a board or scene only when the destination needs one. (§ Save the words once)
+- Bind passages with `slates_make_shot_from_script` and never write the dialogue a second time in a custom prompt. (§ Bind production where wanted)
+- For a reference ad, read `slates_get_reference_breakdown`, then look at every keyframe with `slates_get_asset_image` before writing. (§ Start from a reference ad)
+- Keep the reference's pacing and beats, never its brand, logo or people. (§ Start from a reference ad)
+- Follow `slates-cost-discipline` for any generation, and inspect existing generation IDs before retrying a timeout. (§ Review without imposing a format)
+<!-- @operative:end -->
+
 Read the existing document and its revision before writing. Preserve supplied words, speaker context, headings, non-spoken direction and any explicit shot list. A heading formats a document; creating a production scene is a separate choice. Paragraph count does not determine shot count.
 
 ## Save the words once

@@ -5,6 +5,16 @@ description: "Estimate and announce generation spend, aggregate batches, follow 
 
 # Slates cost discipline — read before every generation
 
+<!-- @operative:start -->
+**Operative summary.**
+- Run `slates_estimate_generation_cost` before every `slates_generate_*` call, with model, resolution, aspect ratio and count fixed. (§ 1. Pre-flight estimate — never call generate without one)
+- Announce the credit total, never dollars, and follow the approval policy before spending. (§ 2. Announce in credits, plainly, before spending)
+- Announce a multi-call plan as one total up front; the approval covers only the enumerated calls. (§ 3b. Batch authorization — one approval covers the enumerated batch)
+- When a gate returns `requires_clarification` or `requires_confirm`, ask the user and re-call with their answer. (§ When the gate fires)
+- Never resubmit a video generation after a timeout; poll `slates_get_generation_status`. (§ Video is slow + async — a timeout is NOT a failure)
+- Inspect the start frame before animating it. (§ 🔴 The still-gate — the most expensive mistake in the pipeline)
+<!-- @operative:end -->
+
 Generation costs real money. Every call is on the user's credits. The user can't see what you're about to spend until you tell them. **Tell them first, generate second.**
 
 ## The 4 rules

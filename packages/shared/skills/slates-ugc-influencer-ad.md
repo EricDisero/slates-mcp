@@ -5,6 +5,14 @@ description: "Make a UGC or influencer-style ad with a camera-facing creator. On
 
 # Creator-style performance
 
+<!-- @operative:start -->
+**Operative summary.**
+- Direct an observable activity and a speaking intention in a concrete place; match the requested register instead of forcing phone shake. (§ Direct a person in a place)
+- Decide how the words are voiced before generating (native speech, a separate voice take, or lip sync) and read that guide. (§ Speech, interaction and sound)
+- Keep the creator one Library character with their voice attached, and give the exact words beside any recording. (§ References and production choices)
+- Quote before spending, never reroll a failed job unchanged, and review lip sync and sound by playback or report them unreviewed. (§ References and production choices)
+<!-- @operative:end -->
+
 Read `slates-script-craft` for the script and opening/bridge versions. Match the requested creator, audience and reference register. Phone footage, quiet polish and cinematic treatment are choices; follow the requested register.
 
 ## Direct a person in a place

@@ -5,6 +5,14 @@ description: "Shape visual rhythm across a shot sequence or diagnose unintended 
 
 # Visual rhythm across a sequence
 
+<!-- @operative:start -->
+**Operative summary.**
+- Read the distributions from `slates_list_shots` across the sequence, and treat a dominant bucket as a question, not a defect. (§ Compare neighboring cuts)
+- Change the dimension that carries the meaning of the next beat; never add camera motion just because another shot is static. (§ Compare neighboring cuts)
+- Keep deliberate repetition and continuing performance, and state the purpose briefly when a count flags it. (§ Compare neighboring cuts)
+- Check both recipes before `slates_merge_shots`, which has no undo tool, and price the requests after any split. (§ Re-cut only for a reason)
+<!-- @operative:end -->
+
 `slates_list_shots` and `slates_get_storyboard_with_frames` supply shot-size and camera-move distributions and repeated runs from authored shot fields. Read across the sequence, then decide whether repetition serves the intended effect. A dominant bucket is a question, not a defect or generation barrier.
 
 ## Compare neighboring cuts

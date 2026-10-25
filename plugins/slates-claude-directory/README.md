@@ -18,6 +18,7 @@ If you connected Slates from the app's Settings before, remove that older `slate
 ## Bundled skills
 
 - **slates-connect**: Install, open, connect, or repair Slates when its slates_* tools are missing or fail to reach the desktop app. Do not use when Slates tools already work; continue with the user's request instead.
+- **slates-start-here**: Start any Slates job here: the Director card (how every job begins) and the router that names the playbook for each job, the rules it links and the question to ask first. Read it before planning an ad, a film, a cut or any other piece.
 - **slates-project-organization**: Organize a Slates project: asset codes (IMG-A12, VID-V3), folders, favorites, pins, Library references and templates. Use when locating media, moving or copying it between projects, reusing a production or keeping a project legible.
 - **slates-script-craft**: Write or revise script passages, openings, bridges and saved variations while preserving voice, format and fixed material. Use for writing within a production brief or a writing-only request.
 - **slates-storyboard-from-script**: Save a supplied script or treatment as an editable Slates document and bind production passages to shots. Use to prepare a storyboard that keeps the words, structure and scope, or to remake a reference ad.

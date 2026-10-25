@@ -2,6 +2,7 @@ import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
 import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, type GuideDepth } from '../prompts/guide-retrieval.js'
+import { BRAIN_ROUTER } from '../prompts/brain.js'
 import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
@@ -10119,6 +10120,8 @@ export const editCut: Operation<{
 export function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (Object.hasOwn(SKILLS, t)) return t
+  // The brain's front door: the Director card and the router (prompts/brain.ts).
+  if (['start-here', 'start here', 'start', 'router', 'brain', 'director-card', 'playbooks'].includes(t)) return BRAIN_ROUTER
   if (t === 'slates-character-turnaround' || t === 'character-turnaround') {
     return 'slates-character-identity'
   }

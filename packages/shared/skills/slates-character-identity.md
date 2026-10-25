@@ -5,6 +5,18 @@ description: "Prepare and bind a reusable character identity sheet from an image
 
 # Character identity sheet — Slates workflow
 
+<!-- @operative:start -->
+<!-- slates-only -->
+**Operative summary.**
+- Make one identity sheet per character: a large off-frontal chest-up portrait, a full-body front with the face cropped out, and a full-body back, on a flat deep neutral grey plate. (§ The shape: ONE sheet, three panels)
+- Upload the source image, create the record with `slates_create_character`, then call `slates_generate_character_identity`; never hand-write the sheet prompt, and put extras in `userNotes`. (§ Get the reference; § Create the character record; § Generate the sheet)
+- Estimate with `slates_estimate_generation_cost` and announce the cost in credits before generating. (§ Generate the sheet)
+- Check the result against the panel list before it binds; if it is off, make one focused refinement and regenerate. (§ Generate the sheet)
+- Describe the front-panel crop as framing, never as a missing head, and keep the skin and body in view. (§ Anti-patterns)
+- Fix the sheet, not the prompt, when a flaw repeats in every shot, and mention the character with `@name`. (§ How the reference gets used at scene time; § Anti-patterns)
+<!-- /slates-only -->
+<!-- @operative:end -->
+
 A character's identity sheet is attached to **every** downstream generation that mentions it, so a flaw in the sheet becomes a flaw in every shot made from it. Building it well is the highest-leverage thing you can do for a project.
 
 <!-- @inject:references-read-literally -->

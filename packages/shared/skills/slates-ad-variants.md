@@ -5,6 +5,14 @@ description: "One ad into many: hook, body and end-card slots, the grid of combi
 
 # Ad variants: one body, many hooks, every format
 
+<!-- @operative:start -->
+**Operative summary.**
+- Build the slots from clips already on the cut with `slates_edit_variant_slots`: the body once, then each hook and the end card; check the order with `slates_get_variants`. (§ Set up the slots)
+- Read the grid before exporting and tell the user the count, variants times formats; quote any missing takes and never fill one from the grid. (§ Read the grid)
+- Export every file in one `slates_export_cuts` request (`version: 2`, a new `batchId`, the same pick the grid read) and poll `slates_get_export_batch`. (§ Export every file in one request)
+- Every variant is an ordinary cut afterwards; a hand edit holds until a rebuild, and seams are set per variant. (§ After the export)
+<!-- @operative:end -->
+
 An ad variant is one alternative per slot laid end to end over the cut's bed (its own music and sound). The body exists once, so a fix to it shows in every variant. Nothing here generates or spends: a take the grid says is missing is shown with its price, and made only on its Shot, with the user's yes, like any other generation.
 
 ## Set up the slots

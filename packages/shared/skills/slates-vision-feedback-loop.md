@@ -5,6 +5,17 @@ description: "Inspect generated media against the brief, diagnose defects and ch
 
 # Vision feedback loop — Slates utility skill
 
+<!-- @operative:start -->
+**Operative summary.**
+- Refer to every asset in chat by its code and label, never by a UUID or a loose description. (§ Asset codes are your shared vocabulary with the user)
+- Look at the pixels with `slates_get_asset_image`, `slates_get_assets_batch` and `slates_get_asset_video_frames`; sampled frames do not verify motion, lip sync or sound. (§ Vision tools at your disposal)
+- Inspect a start frame before animating it, and repair a visible defect first. (§ 🔴 The still-gate — never animate a bad frame)
+- Judge every generated image on brief-conformance and on the slop rubric, then keep it, refine it once, or diagnose a wrong direction. (§ The pattern; § The defect rubric — five slop tells)
+- Find where the fault lives before changing anything, and correct the earliest broken handoff. (§ Where the fault lives — triage before you change anything)
+- Change one specific delta per regeneration, and use `slates_edit_image` for a surgical tweak when most of the image is right. (§ Refinement rules)
+- After three failed attempts at the same requirement, stop unchanged re-rolls and diagnose; a failed roll never authorizes another charge. (§ Diagnose repeated failures; § Cost discipline)
+<!-- @operative:end -->
+
 Slates returns generated images inline as base64. You see the actual pixels. Use that — don't trust prompt-following blindly.
 
 ## Asset codes are your shared vocabulary with the user

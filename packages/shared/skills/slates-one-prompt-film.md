@@ -5,6 +5,15 @@ description: "Turn a video brief into a finished, editable Slates production and
 
 # Idea to finished video
 
+<!-- @operative:start -->
+**Operative summary.**
+- Carry the piece through to an exported file, using existing work and entering wherever the creator is. (§ Make the intended piece visible)
+- Inspect composed requests with `slates_get_shot` and follow `slates-cost-discipline` before any spend. (§ Inspect the actual requests and estimate)
+- Quote saved shots with `slates_generate_from_shots`, and other generations with `slates_estimate_generation_cost`. (§ Inspect the actual requests and estimate)
+- On an uncertain timeout, read the shot's generation IDs and job status before any retry. (§ Generate only the authorized material)
+- Verify the returned files and playback before reporting success; a submitted render is not a complete one. (§ Arrange and deliver)
+<!-- @operative:end -->
+
 Carry the requested piece through to an exported file. Use existing work whenever it serves the brief. The creator can enter at any point: writing, importing footage, comparing takes or changing an edit. No mandatory stage sequence, shot count or number of approval checkpoints follows from this guide.
 
 ## Make the intended piece visible

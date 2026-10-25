@@ -38,7 +38,15 @@ README and the chart so the inventory is never hand-typed. After a rebuild, run
 hand-mirrored in **two** repos and gated by `slates-web/scripts/check-skills-pack-lockstep.mjs` —
 **never move that URL before the object is uploaded**, or every paying customer gets a 404.
 
-1. Drop a markdown file with frontmatter into `packages/shared/skills/`.
+**The skills are one layered brain (2026-10-25; second-brain `plans/2026-10-25-slates-brain.md`).**
+`slates-start-here` holds the Director card (between `@director` markers, extracted by
+`src/prompts/brain.ts` into both surfaces' doctrine) and the router: one playbook per job and the rules
+they link, which replaced the doctrine's flat guide index. Every other file leads with an operative
+summary (`@operative` markers, two to seven bullets each ending on `(§ heading)`), or its craft card on a
+model guide; `retrieveGuide`'s default card depth returns it. `npm run check:brain` (in the build) holds
+the caps, the summaries and that every skill is reachable from the router.
+
+1. Drop a markdown file with frontmatter into `packages/shared/skills/`, with an operative summary under its title, and name it in the router (`slates-start-here`) or in a playbook the router names.
 2. Use portable `name:` and `description:` frontmatter. The shared `src/skills/metadata.ts` parser validates it before embedding or installation. Descriptions distinguish when to use the skill; detailed craft belongs in the body.
 3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
 4. **🚨 A first-party prompt guide is authority on the MODEL; the ENDPOINT SCHEMA is authority on the

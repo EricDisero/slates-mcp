@@ -5,6 +5,16 @@ description: "Caption speech in a cut: free local transcription, correcting a tr
 
 # Captions from speech
 
+<!-- @operative:start -->
+**Operative summary.**
+- Transcribing and captioning are free, so there is nothing to estimate; say so before the first transcription on a machine, because the speech models download once. (§ Transcribe)
+- Caption real speech with `slates_add_captions` from the transcript source; use the script source only when recognition fails, and tell the user the words may drift. (§ Add captions)
+- Correct misheard words once in the transcript with `slates_edit_asset_transcript`, never caption by caption. (§ Correct a transcript)
+- Phrase by what each line is doing, and never split a name, a number from what it counts, or a prepositional phrase. (§ Phrases)
+- Ration emphasis tiers: emphasis is rare, italic and slam rarer, and only caption components draw the tiers. (§ Emphasis; § Caption components)
+- Read `mismatches` and `skipped` in the result, tell the user whether the recognizer or the performer was wrong, then look at the frames. (§ Read the result)
+<!-- @operative:end -->
+
 Captions are text clips on an overlay track, one per phrase, each carrying its words so the spoken word lights up on the frame it is said; or one HTML clip drawn by a caption component. Transcribing and captioning are both free: they run on the user's machine and spend no credits, so there is nothing to estimate.
 
 ## Transcribe

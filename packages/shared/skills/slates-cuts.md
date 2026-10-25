@@ -5,6 +5,17 @@ description: "Cut a Slates timeline: trim, roll, ripple, slip, split, speed, J/L
 
 # Cutting — Slates craft
 
+<!-- @operative:start -->
+**Operative summary.**
+- Read the cut with `slates_get_timeline`, then edit with `slates_edit_timeline_clips`: ripple-trim to tighten, roll to land a cut on an action or a word, slip to change the moment, split to drop a stumble. (§ Which edit)
+- Cut on action, trim the air before and after it, and make the opening of an ad carry the hook. (§ Pacing)
+- Make J-cuts and L-cuts with `audioOffsetFrames` in `slates_update_clip`, and set speed, volume and fades there too. (§ J-cuts and L-cuts; § Speed and level)
+- When the picture slows down, slow the sound with it by keying a speed ramp and filters on one clock, not with `speed`. (§ Audio follows the slow motion)
+- Cut music downbeat to downbeat with source edges in seconds, joined by a short `slates_add_transition` crossfade. (§ Music cut downbeat to downbeat)
+- Stack two clips in a split screen with one clip per lane, then size and place each with `slates_set_clip_keyframes`. (§ Two clips stacked in a split screen)
+- After a pass, read the timeline back and look at the frames, and measure the mix with `slates_get_timeline_loudness` before exporting. (§ Check the cut; § Check the mix)
+<!-- @operative:end -->
+
 This is the editing pass after clips are on the timeline: making the cut play. Every tool here changes the timeline only; source files are untouched, nothing is generated and nothing is spent. Read the cut first with `slates_get_timeline` (clip ids, `startFrame`, `endFrame`, `sourceInFrame`, `sourceOutFrame`, frame rate).
 
 ## Which edit

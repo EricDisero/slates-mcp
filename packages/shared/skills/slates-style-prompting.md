@@ -5,6 +5,16 @@ description: "Translate a visual-style brief into model-specific image or video 
 
 # Per-style prompting (photoreal · anime · painterly · 3d-render)
 
+<!-- @operative:start -->
+**Operative summary.**
+- Bind references inline where they contribute, and describe light and exposure when a reference carries look only. (§ The four ground rules (all styles))
+- Write in each model's own language, with the style as one framing clause, and never stack style buzzwords; use one or two register tokens at most. (§ The four ground rules (all styles))
+- Keep the look consistent across shots by reusing references and stable descriptions, and treat a styled start frame as one video control. (§ The four ground rules (all styles))
+- For photoreal, describe a real photograph with natural texture and motivated light, and keep motion slow and coherent. (§ Photoreal)
+- For anime, painterly and 3D styles, open with the medium; for video in the weaker lanes, make a styled start frame and prompt motion only. (§ Anime; § Painterly; § 3D render)
+- Route by the brief: inspect any style reference, use the current image default, and let `slates-model-selection` own model choice. (§ Routing recipe (what to actually do))
+<!-- @operative:end -->
+
 The style library (`slates_create_style` / the app's style ids) defines what each style IS. This guide is how to PROMPT each style per model. Derived from `research/style-prompting-research.md` (second-brain) — claims marked *(hypothesis)* are untested; don't present them to users as fact.
 
 ## The four ground rules (all styles)

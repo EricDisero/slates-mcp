@@ -5,6 +5,17 @@ description: "Build and render a Blender blocking pass for precise camera paths,
 
 # Previs blocking — design the shot, then generate it
 
+<!-- @operative:start -->
+**Operative summary.**
+- Call `slates_blender_status` first, and if it reports `connected: false`, relay its hint and stop. (§ Before you start)
+- Settle fps, aspect and duration before building, because the blocking render is the film's format; keep the duration inside the chosen model's reference-video ceiling. (§ Before you start)
+- Build in order: format, neutral grey set with colour-coded named figures, camera, handheld last, then verify the cuts and save a backup after each stage. (§ Build order)
+- Read the scene back with `slates_blender_scene` and write every timing from its `cutSeconds`, never from what you intended. (§ 3. Camera)
+- Make camera position, target and lens change exactly on the cut frame, with no interpolated frame between setups. (§ 5. Verify the cuts)
+- Render with `slates_blender_render_blocking`, pass the asset to `slates_generate_video` as a video reference, and never texture or light the blocking. (§ Render and generate; § What not to do)
+- Block a black gap where the model beats any blockout (liquid, smoke, fire, cloth) and say so in the prompt. (§ Leaving holes on purpose)
+<!-- @operative:end -->
+
 The spine of the whole workflow. Read this first; the other four previs skills are branches off it.
 
 ## The mechanism (why this works at all)

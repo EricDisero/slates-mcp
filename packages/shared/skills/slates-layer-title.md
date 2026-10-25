@@ -5,6 +5,15 @@ description: "Layer preset: a bold title with an optional line under it, rising 
 
 # Title (a layer preset)
 
+<!-- @operative:start -->
+**Operative summary.**
+- Use this preset when someone asks for a title, a hook card, a chapter card or big words on screen. (§ Use it)
+- Write a few words that carry the point, add a line under it only if it helps, and put no em dashes on screen. (§ Use it)
+- Add it with `slates_add_html_clip`, `html` set to the composition and `variables` for what you change, at least `title`. (§ Use it; § The composition)
+- Change values with `slates_update_html_clip`: slam for a hook, fade for a quiet card, and `position` to keep it off the face. (§ Values it declares)
+- Look at a frame with `slates-vision-feedback-loop` to confirm it sits clear of faces and inside the safe area. (§ Use it)
+<!-- @operative:end -->
+
 A title over the picture: one bold line, an optional smaller line under it, in on a rise, a slam or a fade, and out before the layer ends. In Slates every caption, title and graphic is one kind of layer: a composition with declared values (`docs/layer-contract.md` in the desktop repo). This preset is that composition. The app's **Add a layer** gallery applies it in one click with the defaults below; you adapt it to the footage.
 
 ## Use it

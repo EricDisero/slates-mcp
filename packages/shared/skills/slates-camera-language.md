@@ -5,6 +5,17 @@ description: "Build or refine Blender camera rigs for a previs pass: orbits, flo
 
 # Camera language — from a shot list to a rig
 
+<!-- @operative:start -->
+**Operative summary.**
+- Brief the camera like an operator, with rails, target, height, lens and start and end frames; convert "cinematic" into that and state what you assumed. (§ The first rule)
+- Look up any constraint or operator you are unsure of with `slates_blender_docs` or `slates_blender_search_docs`; never invent enum values. (§ Look it up, don't recall it)
+- Build every move as a path plus a separate offset aiming target, and give speed through f-curve handles, with a true hold at each stop. (§ The two primitives everything is built from; § Speed — the part that reads as production value)
+- Add handheld last, as slow sway on a finished move. (§ The moves)
+- Use one camera with `CONSTANT` jump cuts for a handful of cuts, and a camera per setup bound to timeline markers for more. (§ Multiple cameras and cuts)
+- Never let camera, target or lens interpolate across a cut frame. (§ Multiple cameras and cuts)
+- Before rendering, read `cutSeconds` from `slates_blender_scene` and check it against the shot list. (§ Verify before you render)
+<!-- @operative:end -->
+
 Companion to `slates-previs-blocking`. That skill owns the workflow; this one owns the camera.
 
 ## The first rule

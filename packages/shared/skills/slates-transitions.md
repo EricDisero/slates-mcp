@@ -5,6 +5,16 @@ description: "Choose and place transitions between clips on a Slates timeline, o
 
 # Transitions — Slates craft
 
+<!-- @operative:start -->
+**Operative summary.**
+- Keep the plain cut by default and add a transition only where it carries meaning: time passed, a place changed, a mood turned or a beat hit. (§ Choosing one)
+- Choose the kind from `transitionKinds` in `slates_get_timeline`, match its energy to the moment, and never invent a kind. (§ Choosing one)
+- Read the cut with `slates_get_timeline`, place the transition with `slates_add_transition`, and change or remove it with `slates_update_transition` or `slates_remove_transition`. (§ Doing it)
+- Pick `alignment` and a length the clips can hold; a length that does not fit is refused with the longest that does. (§ Length and placement)
+- When `shortHandles` reports missing frames, choose `fix: "freeze"` for a still moment or `fix: "shorten"` for a moving clip with `slates_update_transition`, and tell the user which. (§ Short media)
+- Join two music or voice clips with a crossfade on the audio lane, and set a fade to or from silence on one clip with `slates_update_clip`. (§ Sound)
+<!-- @operative:end -->
+
 A transition sits on a cut: two clips that meet on one lane. Most cuts in a good edit are plain cuts. A transition says something the cut cannot: time passed, a place changed, a mood turned, or a beat hit. Put one only where it carries that meaning.
 
 ## Choosing one

@@ -110,7 +110,10 @@ const MCP_INSTRUCTIONS_CEILING = 8_000
 // 15,000 → 15,350 (2026-10-25): slates-ad-variants (the variant grid and its export) joined the index, its
 // line cut to 86 characters, and the working method measured 15,054 characters; the ceiling sits a little
 // above that. Check 2 prints the size on every build: raise the ceiling only from a fresh measurement.
-const MCP_WORKING_METHOD_CEILING = 15_350
+// 15,350 → 15,600 (2026-10-25, the Slates brain step 1): the Director card (181 words) opens the method, and
+// the router (slates-start-here) replaced the flat index of first sentences, 446 characters net; the method
+// measured 15,500. It is fetched once a production workflow starts, never sent per request.
+const MCP_WORKING_METHOD_CEILING = 15_600
 
 const failures = []
 const warnings = []

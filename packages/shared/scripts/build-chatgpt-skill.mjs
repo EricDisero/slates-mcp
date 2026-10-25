@@ -10,10 +10,15 @@ const source = new URL('../skills/slates-chatgpt-images.md', import.meta.url)
 const output = new URL('../exports/slates-chatgpt-images/generated/', import.meta.url)
 const markdown = readFileSync(source, 'utf8')
 parseSkillMetadata(markdown, 'slates-chatgpt-images')
-const prerequisite = markdown.indexOf('## Prerequisites')
-const firstTool = markdown.indexOf('`slates_')
+// The operative summary leads the file (the brain lint); its first bullet must be the prerequisite.
+const summary = /<!--\s*@operative:start\s*-->([\s\S]*?)<!--\s*@operative:end\s*-->/.exec(markdown)
+const firstBullet = summary?.[1].split(/\r?\n/).find((line) => line.startsWith('- ')) ?? ''
+assert.ok(!summary || /\(§ Prerequisites\)\s*$/.test(firstBullet), 'The operative summary must open on the Connected Slates prerequisites')
+const body = summary ? markdown.replace(summary[0], '') : markdown
+const prerequisite = body.indexOf('## Prerequisites')
+const firstTool = body.indexOf('`slates_')
 assert.ok(prerequisite >= 0 && prerequisite < firstTool, 'Connected Slates prerequisites must precede tool calls')
-assert.match(markdown.slice(prerequisite, firstTool), /https:\/\/slates\.video\/docs\//, 'Prerequisites need a setup pointer')
+assert.match(body.slice(prerequisite, firstTool), /https:\/\/slates\.video\/docs\//, 'Prerequisites need a setup pointer')
 const archive = zipSync({ 'slates-chatgpt-images/SKILL.md': [strToU8(markdown), { mtime: new Date(2026, 8, 15, 12, 0, 0) }] })
 const files = { 'SKILL.md': Buffer.from(markdown), 'slates-chatgpt-images.skill': Buffer.from(archive) }
 assert.equal(strFromU8(unzipSync(archive)['slates-chatgpt-images/SKILL.md']), markdown)

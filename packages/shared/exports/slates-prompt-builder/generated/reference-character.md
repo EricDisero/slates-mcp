@@ -4,6 +4,9 @@
 
 # Character identity sheet — Slates workflow
 
+<!-- @operative:start -->
+<!-- @operative:end -->
+
 A character's identity sheet is attached to **every** downstream generation that mentions it, so a flaw in the sheet becomes a flaw in every shot made from it. Building it well is the highest-leverage thing you can do for a project.
 
 <!-- @inject:references-read-literally -->
