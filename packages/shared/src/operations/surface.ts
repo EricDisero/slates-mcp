@@ -107,14 +107,16 @@ const startsWithAny = (id: string, prefixes: readonly string[]): boolean =>
 
 /** Ops that can fetch from the HyperFrames registry on GitHub: a listing, a block, a caption component. */
 const REGISTRY_IDS: ReadonlySet<string> = new Set(['slates_list_motion_blocks', 'slates_add_html_clip', 'slates_add_captions'])
+/** Ops that fetch a web page the user names (product intake): the desktop reads a store's page and its pictures. */
+const WEB_PAGE_IDS: ReadonlySet<string> = new Set(['slates_get_product_page', 'slates_import_product'])
 
 /**
  * Derive an op's four hints.
  *
  * `openWorldHint` means "reaches something outside this system": every billable
  * op hits a provider, every Blender op hits a separate process over a socket,
- * and the registry ops may fetch from GitHub. Everything else touches only the
- * user's own workspace.
+ * the registry ops may fetch from GitHub, and the product intake ops fetch a
+ * web page. Everything else touches only the user's own workspace.
  */
 export function annotate(id: string, billable: boolean | undefined): OperationAnnotations {
   const readOnlyHint = startsWithAny(id, READ_ONLY_PREFIXES)
@@ -123,7 +125,7 @@ export function annotate(id: string, billable: boolean | undefined): OperationAn
     // A read is never destructive, whatever the id looks like.
     destructiveHint: !readOnlyHint && DESTRUCTIVE_IDS.has(id),
     idempotentHint: readOnlyHint || startsWithAny(id, IDEMPOTENT_PREFIXES),
-    openWorldHint: !!billable || id.startsWith('slates_blender_') || REGISTRY_IDS.has(id),
+    openWorldHint: !!billable || id.startsWith('slates_blender_') || REGISTRY_IDS.has(id) || WEB_PAGE_IDS.has(id),
   }
 }
 
@@ -359,6 +361,8 @@ const TASK_ALIASES: Readonly<Record<string, string>> = {
   slates_use_pictures_as_first_frames: 'photo animate',
   slates_generate_audio: 'voiceover narration speech ambience sound effect',
   slates_break_down_reference: 'remake recreate winning ad advert advertisement storyboard scene shot list link url meta facebook ad library',
+  slates_get_product_page: 'product page link url shop store shopify brand logo colours price',
+  slates_import_product: 'product page link url shop store shopify brand logo colours palette add library item',
 }
 
 /** Rank exact task words by rarity across the current registry, returning at most ten. */

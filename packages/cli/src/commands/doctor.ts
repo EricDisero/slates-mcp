@@ -104,6 +104,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['shot-from-asset', 'saving a result as a Shot'],
   ['media-folder', 'choosing the folder a generation or upload lands in'],
   ['reference-breakdown', 'breaking a reference ad into shots'],
+  ['product-intake', 'adding products from their pages'],
 ]
 
 export async function runDoctor(): Promise<void> {

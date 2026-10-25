@@ -7746,10 +7746,12 @@ export const updateLibraryItem: Operation<{
   retagShots?: boolean
   imageAssetId?: string | null
   voiceAssetId?: string | null
+  extraAssetIds?: string[]
+  palette?: string[]
 }> = {
   id: 'slates_update_library_item',
   description:
-    "Update a Library item: rename it, move it to another category (categoryId), bind its picture (imageAssetId) or its voice (voiceAssetId, an audio asset; a thing in a location category composes as an environment and carries none). null clears an asset; the asset itself stays. Moving between a 'thing' and a 'look' category flips the sigil (@ ↔ #), and moving a thing into or out of a 'location'-template category changes what it composes as. A rename changes its handle. In every case each saved Shot that mentions the item is rewritten to match (the mention in its prompt, and its mention id), and the result's `move` reports `shotsMentioning`, `shotsRetagged` and the old and new `mention`: tell the user what changed. Pass retagShots:false to leave Shots alone; they then show the item as missing until it is mentioned again. Moving it back, or renaming it back, undoes the rewrite.",
+    "Update a Library item: rename it, move it to another category (categoryId), bind its picture (imageAssetId) or its voice (voiceAssetId, an audio asset; a thing in a location category composes as an environment and carries none). null clears an asset; the asset itself stays. Moving between a 'thing' and a 'look' category flips the sigil (@ ↔ #), and moving a thing into or out of a 'location'-template category changes what it composes as. A rename changes its handle. In every case each saved Shot that mentions the item is rewritten to match (the mention in its prompt, and its mention id), and the result's `move` reports `shotsMentioning`, `shotsRetagged` and the old and new `mention`: tell the user what changed. Pass retagShots:false to leave Shots alone; they then show the item as missing until it is mentioned again. Moving it back, or renaming it back, undoes the rewrite. extraAssetIds sets the item's extra pictures (the whole ordered list; [] clears; a mention still sends only its picture) and palette its colours (up to six; [] clears; shown and read, never sent to a model).",
   input: z.object({
     projectId: z.string().uuid().describe('The project the item is in — asset codes resolve against it.'),
     itemId: z.string().uuid(),
@@ -7760,10 +7762,15 @@ export const updateLibraryItem: Operation<{
     retagShots: z.boolean().optional().describe('Only with categoryId or name. Default true: Shots that mention the item follow a move or a rename that changes how it is mentioned.'),
     imageAssetId: z.string().min(1).nullable().optional().describe('UUID or badge code; null clears.'),
     voiceAssetId: z.string().min(1).nullable().optional().describe('An AUDIO asset, UUID or badge code; null detaches.'),
+    extraAssetIds: z.array(z.string().min(1)).max(24).optional().describe('More pictures of it, in order: UUIDs or badge codes of pictures in this project. [] clears.'),
+    palette: z.array(z.string().min(1)).max(6).optional().describe('Its colours: #rrggbb, #rgb or rgb(r, g, b). [] clears.'),
   }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('library', 'the Library')
-    const refs = [input.imageAssetId, input.voiceAssetId].filter((r): r is string => typeof r === 'string')
+    if (input.extraAssetIds !== undefined || input.palette !== undefined) {
+      await ctx.desktop().requireCapability('product-intake', "a Library item's extra pictures and colours")
+    }
+    const refs = [input.imageAssetId, input.voiceAssetId, ...(input.extraAssetIds ?? [])].filter((r): r is string => typeof r === 'string')
     const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
     const asset = (ref: string | null | undefined): string | null | undefined =>
       typeof ref === 'string' ? resolved.get(ref)!.id : ref
@@ -7780,6 +7787,8 @@ export const updateLibraryItem: Operation<{
           // explicit null is the clear.
           ...(input.imageAssetId !== undefined ? { imageAssetId: asset(input.imageAssetId) } : {}),
           ...(input.voiceAssetId !== undefined ? { voiceAssetId: asset(input.voiceAssetId) } : {}),
+          ...(input.extraAssetIds !== undefined ? { extraAssetIds: input.extraAssetIds.map((ref) => resolved.get(ref)!.id) } : {}),
+          ...(input.palette !== undefined ? { palette: input.palette } : {}),
         },
       })
     )
@@ -8031,6 +8040,71 @@ export const breakDownReference: Operation<{
       ? `Board ${r.board.storyboardId} built: ${r.board.shotCodes.length} Shot${r.board.shotCodes.length === 1 ? '' : 's'} (${r.board.shotCodes.join(', ')}), nothing generated.${r.board.timing.length ? ` Timing: ${r.board.timing.join(' ')}` : ''}`
       : `${cuts} cut${cuts === 1 ? '' : 's'} found in ${r.breakdown.sourceCode ?? 'the reference'}; frames saved, no board yet.`
     return ok(r, `${fetched}${head} ${JSON.stringify(r)}`)
+  },
+}
+
+// ── Product intake ──────────────────────────────────────────────────────
+// A product page becomes Library items a remade ad's roles can use: the product
+// (a thing, with its pictures) and its brand (a look, with its logo and colours).
+// Read and write are two tools so a host can auto-approve the read.
+
+export const getProductPage: Operation<{ url: string }> = {
+  id: 'slates_get_product_page',
+  description:
+    "Read a product page without changing anything: the product's name, description, brand, slogan, price, pictures, logo candidates, the brand's declared colours and the page's bullet points, each with where it came from (json-ld product data, a Shopify store's product data, open-graph sharing tags, other meta tags, or the page's own pictures by size), plus notes on what the page lacks. The desktop fetches the page itself (public addresses only, no browser, nothing signed in). A page that builds itself with JavaScript, an ad library link, a post, or a link to a picture or video file is refused with the reason. Free; writes nothing. Read here first when the user names a product page, then make the product with slates_import_product.",
+  input: z
+    .object({
+      url: z.string().url().describe("The product page, such as a shop's /products/... page."),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('product-intake', 'reading product pages')
+    return ok(await ctx.desktop().get('/agent/library/intake', { url: input.url }))
+  },
+}
+
+export const importProduct: Operation<{
+  projectId: string
+  url?: string
+  html?: string
+  filePaths?: string[]
+  name?: string
+  categoryId?: string
+  brand?: boolean
+  maxPictures?: number
+}> = {
+  id: 'slates_import_product',
+  billable: false,
+  description:
+    "Add a product to the Library from its page, as the app's Add as product does: the product becomes a thing (in Products, or the things categoryId given) with the page's first picture as its picture, the next ones as its extra pictures and the page's bullet points, price and link as its notes; its brand becomes a look with the brand's logo as its picture and the page's and logo's colours as its palette. A look of the same name already in the Library is filled in where empty, never overwritten. Pictures land in a Media folder named after the product. Give url, filePaths (absolute paths to pictures on this computer, the product's first), or both. html is the page's HTML when you already have it (a page that builds itself with JavaScript, read in your own browser); url still names the page and its pictures are still fetched. Free; nothing is generated. The result gives the product and the brand with their mention (@name, #name) for prompts and for slates_break_down_reference roles (itemId), each picture and where it came from, each picture left out with its reason, and notes on what the page lacked.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      url: z.string().url().optional().describe('The product page.'),
+      html: z.string().min(1).optional().describe("The page's HTML, read instead of fetching the page. Needs url."),
+      filePaths: z.array(z.string().min(1)).optional().describe('Absolute paths to pictures of the product on this computer, first in the order given.'),
+      name: z.string().min(1).max(120).optional().describe("The product's name. Defaults to the page's, else the first file's."),
+      categoryId: z.string().uuid().optional().describe('A things category (slates_list_library) to file the product in. Defaults to Products.'),
+      brand: z.boolean().optional().describe('false: make no look for the brand. Default true.'),
+      maxPictures: z.number().int().min(1).optional().describe('How many pictures to fetch from the page. Default 6; the desktop takes at most 12.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('product-intake', 'adding products from their pages')
+    if (!input.url && !input.filePaths?.length) throw new Error('Give url (the product page), filePaths (pictures on this computer), or both.')
+    if (input.html && !input.url) throw new Error('html needs url: the address the page came from.')
+    const r = await ctx.desktop().post<{
+      product: { name: string; mention: string }
+      brand: { name: string; mention: string } | null
+      brandReused: boolean
+      pictures: unknown[]
+      skipped: unknown[]
+      notes: string[]
+    }>('/agent/library/intake', input)
+    const brand = r.brand ? ` Its brand ${r.brand.mention} ${r.brandReused ? 'was already in the Library and was filled in' : 'is a new look'}.` : ''
+    const left = r.skipped.length ? ` ${r.skipped.length} picture${r.skipped.length === 1 ? '' : 's'} left out (see skipped).` : ''
+    const head = `Added ${r.product.mention} with ${r.pictures.length} picture${r.pictures.length === 1 ? '' : 's'}.${brand}${left}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}`
+    return ok(r, `${head} ${JSON.stringify(r)}`)
   },
 }
 
@@ -10363,6 +10437,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   importTemplate as unknown as Operation<unknown>,
   getReferenceBreakdown as unknown as Operation<unknown>,
   breakDownReference as unknown as Operation<unknown>,
+  getProductPage as unknown as Operation<unknown>,
+  importProduct as unknown as Operation<unknown>,
   updateStoryboard as unknown as Operation<unknown>,
   deleteStoryboard as unknown as Operation<unknown>,
   updateScene as unknown as Operation<unknown>,
