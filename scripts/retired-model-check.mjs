@@ -32,10 +32,10 @@ const BASELINE = resolve(root, 'scripts', 'retired-model-baseline.json')
 // would let lowercase `veo` inside `curveOut` match.
 const START = /(?<![A-Za-z])veo/gi
 const CAMEL = /(?<=[a-z])Veo/g
-// The behaviour A/B's results are recorded sessions: their random tool-call ids spell `4veo7` now and then, and
+// The behaviour A/B's and the brain eval's results are recorded sessions: their random tool-call ids spell `4veo7` now and then, and
 // what they quote from the guides is checked at its source. HyperFrames' generated fonts.css is the same: base64
 // font files, which spell `Veo` by chance.
-const SKIP = /(^|\/)(package-lock\.json|.*\.(png|jpe?g|webp|gif|ico|mp4|mov|webm|woff2?|ttf|zip|tgz|mcpb|pdf))$|^scripts\/behaviour-ab\/results\/|^packages\/shared\/skills\/hyperframes\/.*\/fonts\.css$/i
+const SKIP = /(^|\/)(package-lock\.json|.*\.(png|jpe?g|webp|gif|ico|mp4|mov|webm|woff2?|ttf|zip|tgz|mcpb|pdf))$|^scripts\/(behaviour-ab|brain-eval)\/results\/|^packages\/shared\/skills\/hyperframes\/.*\/fonts\.css$/i
 const MAX_BYTES = 2_000_000
 // This file and its baseline have to name Veo.
 const SELF = new Set(['scripts/retired-model-check.mjs', 'scripts/retired-model-baseline.json'])

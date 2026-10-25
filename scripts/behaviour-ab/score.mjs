@@ -40,7 +40,8 @@ const COST_TOOLS = new Set([
   'slates_get_shot', 'slates_get_storyboard_with_frames', 'slates_get_board_progress', 'slates_list_generations',
 ])
 /** The few whose figures a reply may add up: the quotes and the balance. */
-const SUM_TOOLS = new Set(['slates_estimate_generation_cost', 'slates_get_board_quote', 'slates_get_credit_balance', 'slates_get_me'])
+// A Shot's `credits` is its quote (what one take fires for), so a reply may add it up like an estimate.
+const SUM_TOOLS = new Set(['slates_estimate_generation_cost', 'slates_get_board_quote', 'slates_get_credit_balance', 'slates_get_me', 'slates_get_shot', 'slates_list_shots'])
 /** Whose every priced figure is a balance. */
 const BALANCE_TOOLS = new Set(['slates_get_credit_balance', 'slates_get_me'])
 /** A JSON key that holds a price or a balance ("credits", "total_credits", "credit_balance"), not a count of unpriced items. */
@@ -129,7 +130,7 @@ export function balancesIn(text) {
  * - 0, or a price or balance a tool returned;
  * - up to MAX_TAKES takes of one quote;
  * - a sum of any two quotes of MIN_SUMMED or more ("the board is 80", from 32 and 48, items not named);
- * - a sum of up to MAX_TERMS quotes the reply itself names, repeats allowed: the itemized total;
+ * - a sum of up to MAX_TERMS quotes, or takes of one, that the reply itself names, repeats allowed: the itemized total;
  * - a balance minus either kind of sum;
  * - the difference of two quotes the reply names, the saving between two options shown side by side.
  * Free sums stop at two quotes, because sums of many reach almost any small number; an itemized sum can be longer,
@@ -143,7 +144,9 @@ export function isSourced(n, pool, sums, { stated = [], balances = [] } = {}) {
   const big = quotes.filter((v) => v >= MIN_SUMMED)
   const reach = new Set(big)
   for (const a of big) for (const b of big) reach.add(a + b)
-  const listed = quotes.filter((v) => stated.some((s) => near(s, v)))
+  // An itemized line is a quote, or a quote times its takes ("2 × 4s: 228" from 114), shown in the reply.
+  const takes = quotes.flatMap((v) => [...Array(MAX_TAKES)].map((_, i) => v * (i + 1)))
+  const listed = [...new Set(takes.filter((v) => stated.some((s) => near(s, v))))]
   // A named quote of any size is its own one-term sum, so "a 3-credit image leaves you 1,237" holds.
   for (const v of listed) reach.add(v)
   let frontier = new Set(listed)
