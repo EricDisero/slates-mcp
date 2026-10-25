@@ -37,8 +37,8 @@ If you connected Slates from the app's Settings before, remove that older `slate
 - **slates-shot-variety**: Shape visual rhythm across a shot sequence or diagnose unintended sameness. Use while planning or reviewing cuts; preserve deliberate repetition, continuing performance and the chosen format.
 - **slates-one-prompt-film**: Turn a video brief into a finished, editable Slates production and verified export. Use for a film, short, trailer, music video or other complete video, from brief to verified export, entering through writing, imported footage or an existing edit. For an ad's argument and structure, combine with slates-direct-response-ad.
 - **slates-edit-and-iterate**: Refine an existing Slates image or clip with a targeted edit or revised generation. Use for warmer light, removing a figure, reframing, a different look, or fixing a clip that is nearly right; preserve the original and its lineage.
-- **slates-direct-response-ad**: Make a product-led direct-response ad: demonstration, proof, argument and the next action. From an offer and references, in each placement's aspect; not a camera-facing creator ad (slates-ugc-influencer-ad).
-- **slates-ugc-influencer-ad**: Make a UGC or influencer-style ad with a camera-facing creator. One person and voice across clips: performance, phone-camera handling, speech, lip sync and sound; not a product-led ad (slates-direct-response-ad).
+- **slates-direct-response-ad**: Make a product ad that sells: clone an ad winning now (hook, beats, pacing) for the user's product, then quote, generate, cut and export the variants. Not a camera-facing creator ad (slates-ugc-influencer-ad).
+- **slates-ugc-influencer-ad**: Make a UGC or influencer ad with a camera-facing creator: clone a creator ad winning now, one person and voice across clips (performance, phone camera, speech, lip sync, sound). Not a product-led ad (slates-direct-response-ad).
 
 ## Links
 

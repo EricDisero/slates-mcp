@@ -7,6 +7,7 @@ description: "One ad into many: hook, body and end-card slots, the grid of combi
 
 <!-- @operative:start -->
 **Operative summary.**
+- Vary the hook on one proven body: each hook a whole opening of its own (picture, words, idea), cloned from a winning hook, never a word-swap; a test across ideas needs different references, not more hooks. (§ Which variants to make)
 - Build the slots from clips already on the cut with `slates_edit_variant_slots`: the body once, then each hook and the end card; check the order with `slates_get_variants`. (§ Set up the slots)
 - Read the grid before exporting and tell the user the count, variants times formats; quote any missing takes and never fill one from the grid. (§ Read the grid)
 - Export every file in one `slates_export_cuts` request (`version: 2`, a new `batchId`, the same pick the grid read) and poll `slates_get_export_batch`. (§ Export every file in one request)
@@ -14,6 +15,14 @@ description: "One ad into many: hook, body and end-card slots, the grid of combi
 <!-- @operative:end -->
 
 An ad variant is one alternative per slot laid end to end over the cut's bed (its own music and sound). The body exists once, so a fix to it shows in every variant. Nothing here generates or spends: a take the grid says is missing is shown with its price, and made only on its Shot, with the user's yes, like any other generation.
+
+## Which variants to make
+
+- **Hooks on one body.** Most viewers see only the opening, so the hook is what a variant tests. Keep the body that works and vary the opening.
+- **Each hook is a whole composition.** Its own picture, words, angle and idea, never the same opening shot with new text, which tests nothing. Clone each one from a hook that is winning now, the way the body was cloned (`slates-direct-response-ad` § 1. Find the winner).
+- **Each hook works alone and flows into the body.** Read every join aloud.
+- **Different ideas need different ads.** Hooks on one body test openings within one idea; testing ideas against each other takes different reference ads, each its own cut.
+- **Formats cost nothing to add.** Every aspect comes from the same takes at export.
 
 ## Set up the slots
 
