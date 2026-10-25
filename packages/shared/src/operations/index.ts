@@ -7898,6 +7898,101 @@ export const importTemplate: Operation<{
   },
 }
 
+// ── Start from a reference ad ───────────────────────────────────────────
+// A finished ad becomes an ordinary board: one Shot per cut, each postered with
+// its keyframe, the heard words on the Script page. Local and free, and the
+// board generates nothing. Read and write are two tools so a host can
+// auto-approve the read (mcp-server-design § Annotations).
+
+export const getReferenceBreakdown: Operation<{ projectId: string; assetId: string }> = {
+  id: 'slates_get_reference_breakdown',
+  description:
+    "Read a reference ad's cuts and words without changing anything: each cut's start, end and seconds, the words heard in it, and the reference's size, frame rate and form (a still, no voice, soft cuts). When slates_break_down_reference already saved this asset's frames, they come back too (framesSaved: true, each cut's keyframeCode and compositeCode, the first and last frame side by side); otherwise there are no pictures and the words are the stored transcript only. Free; writes nothing. To start from a reference, read it here, then break it down.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).describe('The reference video or picture in the project: its code (VID-V3) or id.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('reference-breakdown', 'breaking a reference ad into shots')
+    const assetId = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    return ok(await ctx.desktop().get('/agent/reference/breakdown', { projectId: input.projectId, assetId }))
+  },
+}
+
+export const breakDownReference: Operation<{
+  projectId: string
+  assetId?: string
+  filePath?: string
+  build?: boolean
+  transcribe?: boolean
+  name?: string
+  model?: string
+  cuts?: Array<{ index: number; description?: string; onScreenText?: string }>
+  sections?: Array<{ label: string; fromCut: number }>
+  roles?: Array<{ name: string; kind?: 'person' | 'location' | 'product'; itemId?: string; cuts: number[] }>
+}> = {
+  id: 'slates_break_down_reference',
+  billable: false,
+  description:
+    "Start from a reference ad: break a finished video into a new board with one Shot per cut, as the clip's Break down into shots command does, so the user can remake it with their own product. Each Shot is postered with its cut's keyframe (a poster only, never a reference or first frame), named by its seconds in the reference, and holds the words heard in that cut on the Script page. Nothing is generated and nothing spends: the result carries the board's quote, the Shot codes and each timing gap in words (a cut shorter than the model's shortest length). Local and free; the first transcription can take minutes. build false saves each cut's keyframe and first-and-last composite to a frames folder and returns the cuts, without a board: look at them with slates_get_asset_image, then call again with build (the frames are reused) and `cuts` (each cut's description, written for the user's product, becomes its Shot's prompt; onScreenText becomes a direction line), `sections` (headings) and `roles` (who or what recurs; itemId points the role at the user's own Library item). A still becomes one Shot. Generate only after the user approves the quote (slates_generate_from_shots).",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1).optional().describe('A video or picture already in the project: its code (VID-V3) or id. Give this or filePath.'),
+      filePath: z.string().min(1).optional().describe('An absolute path to a video or picture on this computer; it is imported first.'),
+      build: z.boolean().optional().describe('false: save the frames and return the cuts, with no board. Default true.'),
+      transcribe: z.boolean().optional().describe('Hear the words when no transcript is stored. Default true.'),
+      name: z.string().min(1).max(80).optional().describe("The board's name. Defaults to the reference's."),
+      model: z.string().min(1).optional().describe("A video model id for every Shot; defaults to the app's default video model."),
+      cuts: z
+        .array(
+          z
+            .object({
+              index: z.number().int().min(0).describe("The cut's index from the breakdown's segments."),
+              description: z.string().max(4000).optional().describe("What this Shot shows, for the user's product: its prompt."),
+              onScreenText: z.string().max(500).optional().describe('Words on screen in this cut, kept as a direction line, never sent as action.'),
+            })
+            .strict()
+        )
+        .optional(),
+      sections: z
+        .array(z.object({ label: z.string().min(1).max(120), fromCut: z.number().int().min(0) }).strict())
+        .optional()
+        .describe('Headings on the Script page, each before the cut it starts at (hook, problem, offer...).'),
+      roles: z
+        .array(
+          z
+            .object({
+              name: z.string().min(1).max(80),
+              kind: z.enum(['person', 'location', 'product']).optional(),
+              itemId: z.string().min(1).optional().describe('A Library item of this project (slates_list_library) to use for the role.'),
+              cuts: z.array(z.number().int().min(0)).describe('The cut indices the role appears in.'),
+            })
+            .strict()
+        )
+        .optional()
+        .describe('Who or what recurs. Without itemId a role becomes a new Library item to fill in.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('reference-breakdown', 'breaking a reference ad into shots')
+    if (!input.assetId === !input.filePath) throw new Error('Give exactly one of assetId (a video or picture in the project) or filePath.')
+    const assetId = input.assetId ? (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id : input.assetId
+    const r = await ctx.desktop().post<{
+      breakdown: { segments: unknown[]; sourceCode?: string | null }
+      board: { storyboardId: string; shotCodes: string[]; timing: string[]; warnings: string[] } | null
+      reused: boolean
+    }>('/agent/reference/breakdown', { ...input, assetId })
+    const cuts = r.breakdown.segments.length
+    const head = r.board
+      ? `Board ${r.board.storyboardId} built: ${r.board.shotCodes.length} Shot${r.board.shotCodes.length === 1 ? '' : 's'} (${r.board.shotCodes.join(', ')}), nothing generated.${r.board.timing.length ? ` Timing: ${r.board.timing.join(' ')}` : ''}`
+      : `${cuts} cut${cuts === 1 ? '' : 's'} found in ${r.breakdown.sourceCode ?? 'the reference'}; frames saved, no board yet.`
+    return ok(r, `${head} ${JSON.stringify(r)}`)
+  },
+}
+
 export const updateStoryboard: Operation<{
   storyboardId: string
   name?: string
@@ -9620,6 +9715,8 @@ export function resolveGuideTopic(topic: string): string | null {
   }
   // Timeline craft: placing transitions, and the cutting pass (trim, roll, slip, J- and L-cuts).
   if (t === 'transition' || t === 'transitions' || t === 'dissolve' || t === 'crossfade' || t === 'wipe') return 'slates-transitions'
+  // Starting from a finished ad: the breakdown and the remake.
+  if (t === 'remake' || t === 'reference ad' || t === 'reference-ad' || t === 'breakdown' || t === 'break down') return 'slates-storyboard-from-script'
   if (t === 'cut' || t === 'cuts' || t === 'cutting' || t === 'editing' || t === 'pacing' || t === 'trim' || t === 'j-cut' || t === 'l-cut' || t === 'split-edit' || t === 'split edit') return 'slates-cuts'
   if (['captions', 'caption', 'subtitles', 'subtitle', 'transcribe', 'transcript', 'transcription'].includes(t)) return 'slates-captions'
   // `motion-graphics` is HyperFrames' own guide, matched by name before these aliases.
@@ -10223,6 +10320,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getTemplate as unknown as Operation<unknown>,
   exportTemplate as unknown as Operation<unknown>,
   importTemplate as unknown as Operation<unknown>,
+  getReferenceBreakdown as unknown as Operation<unknown>,
+  breakDownReference as unknown as Operation<unknown>,
   updateStoryboard as unknown as Operation<unknown>,
   deleteStoryboard as unknown as Operation<unknown>,
   updateScene as unknown as Operation<unknown>,

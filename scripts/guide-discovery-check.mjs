@@ -46,6 +46,7 @@ for (const [query, expected] of [
   ['cinematic lighting lens color grade for a perfume ad', 'slates-cinematic-look'],
   ['transcribe the founder video and caption it with word highlights', 'slates-captions'],
   ['a lower third and an end card as motion layers on the cut', 'slates-motion'],
+  ['remake this winning ad with my product', 'slates-storyboard-from-script'],
 ]) {
   const result = await run({ query })
   assert(names(result).includes(expected), `${query}: expected ${expected}, got ${names(result)}`)
@@ -63,6 +64,7 @@ assert.equal(resolveGuideTopic('seedance-2.5'), 'slates-prompting-seedance-2-5')
 assert.equal(resolveGuideTopic('video-edit'), 'slates-prompting-omni-flash')
 assert.equal(resolveGuideTopic('subtitles'), 'slates-captions')
 assert.equal(resolveGuideTopic('lower third'), 'slates-motion')
+assert.equal(resolveGuideTopic('remake'), 'slates-storyboard-from-script')
 assert(!('guides' in (await run({ topic: 'camera', query: 'dolly' })).data))
 assert((await run({ topic: 'app-manual', query: 'export mp4' })).text.length > 0)
 

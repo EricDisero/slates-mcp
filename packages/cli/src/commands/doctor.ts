@@ -102,6 +102,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['trim-pieces', 'cutting a clip into pieces'],
   ['shot-from-asset', 'saving a result as a Shot'],
   ['media-folder', 'choosing the folder a generation or upload lands in'],
+  ['reference-breakdown', 'breaking a reference ad into shots'],
 ]
 
 export async function runDoctor(): Promise<void> {

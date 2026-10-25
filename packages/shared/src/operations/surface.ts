@@ -358,6 +358,7 @@ const TASK_ALIASES: Readonly<Record<string, string>> = {
   slates_edit_image: 'photo picture',
   slates_use_pictures_as_first_frames: 'photo animate',
   slates_generate_audio: 'voiceover narration speech ambience sound effect',
+  slates_break_down_reference: 'remake recreate winning ad advert advertisement storyboard scene shot list',
 }
 
 /** Rank exact task words by rarity across the current registry, returning at most ten. */
