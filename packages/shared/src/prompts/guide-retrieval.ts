@@ -1,5 +1,5 @@
-import { craftCard } from './craft-cards.js'
-import { BRAIN_ROUTER, operativeSummary } from './brain.js'
+import { craftCardOf } from './craft-cards.js'
+import { BRAIN_ROUTER, OVERLAY_LEAD, OVERLAY_SHARED_LEAD, PLAYBOOKS, operativeSummary, splitOverlay } from './brain.js'
 
 export type GuideDepth = 'card' | 'index' | 'section' | 'full'
 
@@ -20,10 +20,35 @@ export function guideSections(content: string): Array<{ title: string; body: str
   return sections
 }
 
+/** What a file leads with: a model guide's craft card, else its operative summary, else the top of its first section. */
+function leadOf(skill: string, content: string): string {
+  return craftCardOf(skill, content) ?? operativeSummary(content) ?? guideSections(content)[0]?.body.trim().slice(0, 1600) ?? 'No overview available.'
+}
+
+/**
+ * The depth a request is served at. The router, the index of the brain, and every playbook, whose steps the
+ * Director card says to follow (a summary of steps is not the steps), are served whole at the default depth;
+ * rules and model guides stay at their card.
+ */
+export function servedDepth(skill: string, depth: GuideDepth, query?: string): GuideDepth {
+  return (skill === BRAIN_ROUTER || PLAYBOOKS.has(skill)) && depth === 'card' && !query?.trim() ? 'full' : depth
+}
+
 /** Bounded retrieval. A missing card never silently expands to the full guide. */
-export function retrieveGuide(skill: string, content: string, depth: GuideDepth, query?: string): string {
-  // The router is the index of the brain, short enough to read whole: its card is all of it.
-  if (skill === BRAIN_ROUTER && depth === 'card' && !query?.trim()) depth = 'full'
+export function retrieveGuide(skill: string, content: string, requested: GuideDepth, query?: string): string {
+  const depth = servedDepth(skill, requested, query)
+  const overlay = splitOverlay(content)
+  if (overlay) {
+    // Their file over a shared guide: their summary or card, then the shared one; a deeper read takes both bodies.
+    if (depth === 'full') return retrieveOne(skill, content, depth)
+    if (depth === 'index' || query?.trim()) return `${OVERLAY_LEAD}\n\n${retrieveOne(skill, content, depth, query)}`
+    const index = guideSections(content).map((s) => `- ${s.title}`).join('\n')
+    return `${OVERLAY_LEAD}\n\n${leadOf(skill, overlay.theirs)}\n\n${OVERLAY_SHARED_LEAD}\n\n${leadOf(skill, overlay.shared)}\n\nSections (request with query, or depth "full"):\n${index}`
+  }
+  return retrieveOne(skill, content, depth, query)
+}
+
+function retrieveOne(skill: string, content: string, depth: GuideDepth, query?: string): string {
   const sections = guideSections(content)
   const index = sections.map((s) => `- ${s.title}`).join('\n')
   // Stripped maintainer comments leave runs of blank lines behind.
@@ -46,6 +71,5 @@ export function retrieveGuide(skill: string, content: string, depth: GuideDepth,
     return `Section "${ranked[0].s.title}" is too large for a selective response. Use a technique ID or depth "full".\n${index}`
   }
   // A model guide's summary is its craft card; every other file leads with an operative summary.
-  const card = craftCard(skill) ?? operativeSummary(content)
-  return `${card ?? sections[0]?.body.trim().slice(0, 1600) ?? 'No overview available.'}\n\nSections (request with query, or depth "full"):\n${index}`
+  return `${leadOf(skill, content)}\n\nSections (request with query, or depth "full"):\n${index}`
 }

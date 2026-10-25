@@ -6,8 +6,8 @@ export interface GuideCatalogEntry {
   name: string
   description: string
   tier: 'free' | 'paid'
-  /** The motion engine's own skills (`skills/hyperframes.ts`): they carry the craft, Slates' guides direct. */
-  source?: 'motion'
+  /** The motion engine's own skills (`skills/hyperframes.ts`), or the user's own My brain (`skills/my-brain.ts`). */
+  source?: 'motion' | 'my-brain'
   /** What ranking reads when `description` is a listing summary. */
   searchText?: string
 }

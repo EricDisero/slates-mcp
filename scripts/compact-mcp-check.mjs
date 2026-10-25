@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { ALL_OPERATIONS, toolDefinitions } from '../packages/shared/dist/index.js'
+import { ALL_OPERATIONS, ROUTER_NOTICE, toolDefinitions } from '../packages/shared/dist/index.js'
 import { mcpFixture } from './ad-variant-export-check.mjs'
 
 const serverPath = fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))
@@ -76,10 +76,25 @@ try {
   await approvalClient.connect(approvalTransport)
   const result = await approvalClient.callTool({name: 'slates_generate_image', arguments: {prompt: 'fixture'}})
   assert.equal(approvalRequests, 1)
+  // A billable op's result never carries the router, first result of the connection or not: it reports a spend,
+  // and the router read there comes after the money is gone.
   assert.equal(result.content[0].text, 'Completed fixture generation')
+  assert.equal(result.content.length, 1, 'the router does not ride a billable result')
   assert.deepEqual(result.structuredContent, {status: 'completed', assetId: 'fixture-only'})
+  // The first result of an op that spends nothing carries it, once: a guide for a topic other than the router
+  // counts, as its own text block (the op's text stays as it was) and in the structured content.
+  const playbook = await approvalClient.callTool({name: 'slates_get_prompting_guide', arguments: {topic: 'slates-cuts'}})
+  assert.notEqual(playbook.content[0].text, ROUTER_NOTICE)
+  assert.equal(playbook.structuredContent.guide, playbook.content[0].text, "the guide's own text is unchanged")
+  assert.equal(playbook.content[1]?.text, ROUTER_NOTICE, 'the router rides the first non-billable result')
+  assert.equal(playbook.structuredContent.brain_router, ROUTER_NOTICE)
   const batch = await approvalClient.callTool({name: 'slates_generate_from_shots', arguments: {shotIds: ['SHOT-A1']}})
   assert.equal(approvalRequests, 2)
   assert.equal(batch.content[0].text, 'Completed fixture batch', 'an approved batch fires with the fingerprint of the quote shown')
-  console.log('MCP approval: text and structured content both describe the final operation result; an approved batch carries the fingerprint of its quote')
+  assert.equal(batch.content.length, 1)
+  assert.deepEqual(batch.structuredContent, {results: [], total: 0})
+  const again = await approvalClient.callTool({name: 'slates_load_tools', arguments: {query: 'animate these photos'}})
+  assert.equal(again.content.length, 1, 'the router is not sent twice')
+  assert.equal(again.structuredContent.brain_router, undefined)
+  console.log('MCP approval: text and structured content both describe the final operation result; an approved batch carries the fingerprint of its quote; the router skips billable results and rides the first non-billable one, once')
 } finally { await approvalClient.close(); await approvalTransport.close(); await isolatedApproval.close(); rmSync(fixtureDir, { recursive: true, force: true }) }

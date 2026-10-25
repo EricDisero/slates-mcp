@@ -16,6 +16,10 @@ interface SkillEnvironment {
   skills: Record<string, string>
   log: (message: string) => void
 }
+/** The brain's source comments say where a lesson came from; that is for the repo and its review, not an installed copy. */
+const SOURCE_COMMENT_RE = /[\t ]*<!--\s*src:[^]*?-->/g
+const installedCopy = (content: string) => content.replace(SOURCE_COMMENT_RE, '')
+
 export function skillInstallTargets(client: SkillClient, base: string): Array<{ client: Exclude<SkillClient, 'both'>; path: string }> {
   if (client !== 'both' && !Object.hasOwn(CLIENT_DIRECTORIES, client)) throw new Error(`Unknown skill client: ${client}`)
   return Object.entries(CLIENT_DIRECTORIES)
@@ -32,7 +36,7 @@ export function inspectSkillInstallation(roots: string[], skills: Record<string,
     const { name } = parseSkillMetadata(content, key)
     const files = [...new Set(roots)].map(root => join(root, name, 'SKILL.md')).filter(path => existsSync(path))
     if (!files.length) missing.push(name)
-    else if (files.some(file => readFileSync(file, 'utf8') !== content)) stale.push(name)
+    else if (files.some(file => readFileSync(file, 'utf8') !== installedCopy(content))) stale.push(name)
     if (files.length > 1) duplicates.push(name)
   }
   return { installed: Object.keys(skills).length - missing.length, missing, stale, duplicates }
@@ -56,7 +60,7 @@ export function runInstallSkills(opts: InstallSkillsOptions, environment: SkillE
       if (existsSync(file)) updated++
       else fresh++
       mkdirSync(directory, { recursive: true })
-      writeFileSync(file, content)
+      writeFileSync(file, installedCopy(content))
     }
     environment.log(`Installed ${entries.length} ${target.client} skills (${fresh} new, ${updated} updated) into ${target.path}`)
   }

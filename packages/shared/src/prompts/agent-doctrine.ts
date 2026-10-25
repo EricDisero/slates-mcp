@@ -299,9 +299,28 @@ const MCP_EVERY_REQUEST = [
 
 /**
  * The MCP server's `instructions`: the Essentials, ending on the pointer to the
- * full working method, then the every-request rules. The server adds only its version line
- * and the update notice (lockstep check 2).
+ * full working method, then the Director card, then the every-request rules. The server adds
+ * only its version line and the update notice (lockstep check 2).
  */
+/**
+ * The router, sent once on an MCP connection that has not opened it: the server attaches this to the first
+ * result of a tool that spends nothing (never a billable op's, which reports a spend), another guide's answer
+ * included. The instructions say to start every job at the router, and the brain's craft eval
+ * (2026-10-25, 20 jobs on Opus) still saw 3 runs go straight to the tools and skip the job's playbook, the one
+ * that turned a script into shots with no shot sizes and no prices. A pointer to a guide is skipped; the fact
+ * in a result is read (the banned-token measurement, 13% against 94%). The desktop's Director needs none:
+ * its doctrine carries the router whole.
+ */
+export const ROUTER_NOTICE = `This session has not opened the router (${BRAIN_ROUTER}), so here it is, once. Find this job's row and read its playbook with slates_get_prompting_guide before you plan or build.
+
+${ROUTER_BODY}`
+
+/**
+ * Where the MCP working method points instead of carrying the router: ROUTER_NOTICE already sends the router once
+ * per connection, so a copy here was the same 4,000 characters twice for an agent that read both.
+ */
+const MCP_ROUTER_POINTER = `The router names the playbook for each job, the question to ask first, the method to offer for each result and the rules every playbook links. It comes with your first result from a tool that spends nothing if you have not opened it; open it with slates_get_prompting_guide (topic: ${BRAIN_ROUTER}).`
+
 export function buildMcpInstructions(): string {
   const pool = [...WORKING_METHOD, ...HARD_RULES].map((entry) => entry.mcp)
   const lines = MCP_EVERY_REQUEST.map((opener) => {
@@ -312,16 +331,20 @@ export function buildMcpInstructions(): string {
   // The pointer is the last Essentials bullet, not a closing section: a host
   // that cuts at 2,048 characters dropped the closing section, and the model
   // then said nothing pointed at the full method (2026-10-18 probe, Claude Code 2.1.293).
+  // The Director card comes straight after the Essentials: Claude Code keeps the
+  // first 4,096 characters (2,048 before v2.1.296), and behind the every-request
+  // rules the card started past character 6,000, so no Claude Code session saw how
+  // a job starts. mcp-instructions-smoke and lockstep check 2 assert where it ends.
   return `${PREAMBLE.mcp}
 - WORKING METHOD: the full method, hard rules (exact model ids, variety counts, Seed Audio length) and guide index: slates_get_prompting_guide(topic: "${WORKING_METHOD_TOPIC}"). Read it once a production workflow starts.
-
-## Every request
-
-${lines.join('\n')}
 
 ## Start here
 
 ${DIRECTOR_CARD}
+
+## Every request
+
+${lines.join('\n')}
 
 ${MCP_FOOTER}`
 }
@@ -366,7 +389,7 @@ ${HARD_RULES.map((r) => r[surface]).join('\n')}
 
 ## Guide index: the router (${BRAIN_ROUTER}; load each guide via slates_get_prompting_guide)
 
-${ROUTER_BODY}
+${surface === 'mcp' ? MCP_ROUTER_POINTER : ROUTER_BODY}
 
 ${perModelIndex}
 ${surface === 'mcp' ? `\n${MCP_FOOTER}` : ''}`

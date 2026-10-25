@@ -61,7 +61,12 @@ async function withClient(connection, work) {
   let stderr = ''
   transport.stderr?.on('data', chunk => { stderr += chunk.toString() })
   const client = new Client({ name: 'ad-variant-export-check', version: '1.0.0' })
-  try { await client.connect(transport); return await work(client, fixture) }
+  try {
+    await client.connect(transport)
+    // As an agent starts: the router first, so no later result carries it (compact-mcp-check proves the attachment).
+    await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: 'slates-start-here' } })
+    return await work(client, fixture)
+  }
   catch (error) { throw new Error(`${error.message}\nMCP stderr: ${stderr}`, { cause: error }) }
   finally { await client.close(); await fixture.close() }
 }

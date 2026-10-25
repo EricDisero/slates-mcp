@@ -5,8 +5,9 @@
 // them via the slates_get_prompting_guide op.
 //
 // Output: packages/shared/src/skills/content.ts (gitignored, regenerated
-// on every build/typecheck). Each file's content is JSON.stringify'd so
-// backticks / ${ / backslashes in the markdown can't break the module.
+// on every build/typecheck), with scripts/brain-shape.json as BRAIN_SHAPE.
+// Each file's content is JSON.stringify'd so backticks / ${ / backslashes in
+// the markdown can't break the module.
 
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
@@ -41,9 +42,22 @@ for (const f of files) {
 }
 out += '}\n'
 
+// The brain's pinned shape rides beside the skills it describes: the layer list decides what the guide op serves
+// whole, and the My brain loader holds the user's files to its caps. scripts/brain-shape.json stays the one
+// source (the lint reads it directly); this is its copy for the published package, rebuilt with the skills.
+const shape = JSON.parse(readFileSync(join(pkgRoot, '..', '..', 'scripts', 'brain-shape.json'), 'utf8'))
+const embeddedShape = {
+  layers: shape.layers,
+  caps: shape.caps,
+  duplicates: { shingleWords: shape.duplicates.shingleWords, failAt: shape.duplicates.failAt },
+}
+out += `\nimport type { BrainShape } from './brain-check.js'\n\n`
+out += '/** scripts/brain-shape.json: the layers, the caps and the duplicate bar (src/skills/brain-check.ts). */\n'
+out += `export const BRAIN_SHAPE: BrainShape = ${JSON.stringify(embeddedShape, null, 2)}\n`
+
 mkdirSync(outDir, { recursive: true })
 writeFileSync(outFile, out)
-console.log(`[embed-skills] embedded ${files.length} skill(s) into src/skills/content.ts`)
+console.log(`[embed-skills] embedded ${files.length} skill(s) and the brain's shape into src/skills/content.ts`)
 
 // HyperFrames' own skills, copied unmodified into skills/hyperframes/<name>/ (its NOTICE): every
 // markdown file, keyed `<name>` for a skill's SKILL.md and `<name>/<path>` for the rest, plus

@@ -53,6 +53,17 @@ function essentialsInCut(label, text) {
   console.log(`  ..  ${label}: Essentials end at character ${next} of ${CLAUDE_CODE_INSTRUCTIONS_CUT}`)
 }
 
+// Claude Code keeps 4,096 from v2.1.296 (second-brain rules/mcp-server-design.md § The instructions). The
+// Director card, how every job starts, must end inside it: behind the every-request rules it began past 6,000.
+const CLAUDE_CODE_INSTRUCTIONS_KEPT = 4096
+function directorCardInCut(label, text, card) {
+  const start = text.indexOf(card)
+  const end = start < 0 ? -1 : start + card.length
+  check(`${label}: the Director card ends inside Claude Code's ${CLAUDE_CODE_INSTRUCTIONS_KEPT}-character cut`, start >= 0 && end <= CLAUDE_CODE_INSTRUCTIONS_KEPT, start < 0 ? 'the card is not in the instructions' : `it ends at character ${end}`)
+  if (start >= 0) console.log(`  ..  ${label}: the Director card ends at character ${end} of ${CLAUDE_CODE_INSTRUCTIONS_KEPT}`)
+}
+const { DIRECTOR_CARD } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+
 // Current Codex MCP guidance asks for a self-contained first 512 characters.
 function firstParagraphInCut(label, text) {
   const kept = text.slice(0, 512)
@@ -134,6 +145,7 @@ if (typeof instructions === 'string') {
   console.log(`  ..  ${instructions.length} chars of instructions on the wire`)
   firstParagraphInCut('the current run', instructions)
   essentialsInCut('the current run', instructions)
+  directorCardInCut('the current run', instructions, DIRECTOR_CARD)
 }
 
 check('tool list is non-empty', tools.length > 0, `${tools.length}`)
@@ -376,6 +388,7 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   check('the notice tells the agent to have the user restart the client', /quit and reopen the MCP client/.test(stale))
   firstParagraphInCut('a behind server', stale)
   essentialsInCut('a behind server (notice after first paragraph)', stale)
+  directorCardInCut('a behind server (the longest prefix)', stale, DIRECTOR_CARD)
   check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
   await staleClient.close()
   await staleFixture.close()

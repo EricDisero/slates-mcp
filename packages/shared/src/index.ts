@@ -1,8 +1,10 @@
 export * from './auth.js'
 export { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from './clients/cloud.js'
 export { SlatesDesktopClient, type DesktopHealth } from './clients/desktop.js'
-export { SKILLS } from './skills/content.js'
+export { BRAIN_SHAPE, SKILLS } from './skills/content.js'
+export { myBrainProblems, type BrainShape, type MyBrainProblem } from './skills/brain-check.js'
 export { parseSkillMetadata, type SkillMetadata } from './skills/metadata.js'
+export { ARCHIVE_AFTER_DAYS, archiveUnused, archiveUnusedDaily, brainSkills, loadMyBrain, myBrainDir, myBrainPreload, noteUsed, MY_BRAIN_PRELOAD_CHARS, type Brain } from './skills/my-brain.js'
 export * as operations from './operations/index.js'
 export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, IMAGE_MODELS, defaultContext, OperationCancelledError, type Operation, type OperationContext, type OperationResult, type OperationAnnotations, type OperationTier, type OperationGroup } from './operations/index.js'
 // The spend thresholds the DESKTOP and the SKILLS both quote. `CONFIRM_CREDITS`
@@ -58,7 +60,8 @@ export {
 // stay off the public surface — an export nothing calls is an export nothing
 // keeps honest, which is why `buildModelRouting` was deleted rather than left
 // here "in case".
-export { buildAgentDoctrine, buildMcpInstructions, type AgentSurface } from './prompts/agent-doctrine.js'
+export { buildAgentDoctrine, buildMcpInstructions, ROUTER_NOTICE, type AgentSurface } from './prompts/agent-doctrine.js'
+export { BRAIN_ROUTER, DIRECTOR_CARD, MY_BRAIN_TOPIC, PLAYBOOKS } from './prompts/brain.js'
 // Banned prompt tokens — EXTRACTED from the skills' own never-use lists and
 // inlined into the generate ops' descriptions. Enforcement of "load the guide"
 // that the model cannot skip, because a description is always in context.
@@ -80,7 +83,7 @@ export {
 // own `@card` blocks and delivered on the estimate result. The eval scorer reads
 // CRAFT_CARDS to build its lever vocabulary, so the assertion can never be
 // scored against a hand-retyped word list.
-export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, describeCraftCard } from './prompts/craft-cards.js'
+export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, craftCardOf, describeCraftCard } from './prompts/craft-cards.js'
 // Per-model prompting tips — the SSOT for the desktop "See prompting tips"
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'

@@ -1,8 +1,8 @@
 import { MAX_IMAGE_VARIATIONS } from '../prompts/generation-policy.js'
 import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
-import { retrieveGuide, type GuideDepth } from '../prompts/guide-retrieval.js'
-import { BRAIN_ROUTER } from '../prompts/brain.js'
+import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
+import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
 import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
@@ -21,6 +21,7 @@ import { SlatesCloudClient, SlatesCloudHttpError, type SlatesUserInfo, type Cred
 import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
+import { brainSkills, myBrainDir, myBrainPreload, noteUsed } from '../skills/my-brain.js'
 import { HYPERFRAMES_MAPPING, findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
 import { appManualIndex, appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
@@ -151,7 +152,8 @@ export class GuideNotReadError extends Error {
         `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:
 
 ` +
-        describeCraftCard(guide)
+        // The card this user's brain serves, so a model guide from their My brain is the one in the refusal.
+        describeCraftCard(guide, brainSkills().skills[guide])
     )
   }
 }
@@ -1949,7 +1951,8 @@ export const estimateGenerationCost: Operation<{
     // paid for on every turn of every session and read once — this is paid for
     // only by the call that is about to use the model.
     const skill = promptingSkillFor(input.model)
-    const card = describeCraftCard(skill)
+    // From the user's brain: their My brain card for this model rides first when they wrote one (craft-cards.ts).
+    const card = describeCraftCard(skill, brainSkills().skills[skill])
     const banned = describeBannedTokensForSkill(skill)
     // Before the card on purpose: the desktop strips a repeated card by cutting
     // the text at "--- HOW TO PROMPT", and this line must survive that.
@@ -10121,7 +10124,7 @@ export function resolveGuideTopic(topic: string): string | null {
   const t = topic.trim().toLowerCase()
   if (Object.hasOwn(SKILLS, t)) return t
   // The brain's front door: the Director card and the router (prompts/brain.ts).
-  if (['start-here', 'start here', 'start', 'router', 'brain', 'director-card', 'playbooks'].includes(t)) return BRAIN_ROUTER
+  if (ROUTER_ALIASES.includes(t)) return BRAIN_ROUTER
   if (t === 'slates-character-turnaround' || t === 'character-turnaround') {
     return 'slates-character-identity'
   }
@@ -10355,9 +10358,17 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const content = input.query || input.depth === 'full' ? appManualSections(input.query) : appManualIndex()
       return { text: content, data: { topic: 'app-manual', bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
+    if (topic === MY_BRAIN_TOPIC) {
+      // What an agent reads of the user's own brain before the router, on request: the router's answer carries it
+      // too, and so does the router the MCP server sends a connection that has not opened it.
+      const content = myBrainPreload() || `The user's own brain (My brain) is empty: no files in ${myBrainDir()}. Each file there is a markdown guide in the shared skills' shape (frontmatter, then an operative summary); a file named like a shared guide adds their rules to it, a new name adds a guide, and profile.md is read first.`
+      return { text: content, data: { topic: MY_BRAIN_TOPIC, bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
+    }
     const hyperframes = await loadHyperframes()
+    // The bundled skills with the user's My brain laid over them; theirs wins on a conflict (skills/my-brain.ts).
+    const brain = brainSkills()
     // A motion skill or file by its exact name wins over an alias (`motion-audio` is not `audio`).
-    const hf = topic && !Object.hasOwn(SKILLS, topic) ? findHyperframesGuide(hyperframes, topic) : null
+    const hf = topic && !Object.hasOwn(brain.skills, topic) ? findHyperframesGuide(hyperframes, topic) : null
     if (hf) {
       const depth = input.depth ?? 'card'
       const body = depth === 'card' && !input.query?.trim() ? hyperframesCard(hf.content) : retrieveGuide(hf.key, hf.content, depth, input.query)
@@ -10365,12 +10376,21 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const guide = `${hyperframesGuideHeader(hf.key)}${body}${others.length ? `\n\nIts other files (request each as a topic): ${others.join(', ')}` : ''}`
       return { text: guide, data: { topic: hf.key, tier: 'free', source: 'motion', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
-    const resolved = topic ? resolveGuideTopic(topic) : null
+    // The user's file by its exact name wins over an alias (their `flux-portraits` is theirs, not the FLUX guide);
+    // the router's names are reserved in the loader, so none of them reaches here as a local file.
+    const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic)) : null
     if (resolved) {
       const depth = input.depth ?? 'card'
-      const guide = retrieveGuide(resolved, SKILLS[resolved], depth, input.query)
+      const mine = brain.mine.has(resolved)
+      if (mine) noteUsed(resolved)
+      // A file laid over a shared guide says so itself (prompts/brain.ts, overlayGuide); a new name needs the line.
+      const own = mine && !Object.hasOwn(SKILLS, resolved) ? "From the user's own brain (My brain).\n\n" : ''
+      // The router's answer carries the user's brain in front, as Director's prompt does: the MCP server sends the
+      // router with the preload only to a connection that has not opened it, so this answer is the agent's one copy.
+      const preload = resolved === BRAIN_ROUTER ? myBrainPreload() : ''
+      const guide = `${preload ? `${preload}\n\n` : ''}${own}${retrieveGuide(resolved, brain.skills[resolved], depth, input.query)}`
       ctx?.guidesRead?.add(resolved)
-      return { text: guide, data: { topic: resolved, tier: 'free', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+      return { text: guide, data: { topic: resolved, tier: 'free', ...(mine ? { source: 'my-brain' } : {}), depth: servedDepth(resolved, depth, input.query), bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     const member = await memberGuideCatalog(ctx)
     const privateEntry = member.entries.find(entry => entry.name === topic)
@@ -10388,9 +10408,10 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       return { text: guide, data: { topic: privateEntry.name, tier: 'paid', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
-    const catalog = [...[...guideCatalog(SKILLS), ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
-    const result = discoverGuides(catalog, { ...SKILLS, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
-    const label = (entry: GuideCatalogEntry) => (entry.source === 'motion' ? 'motion' : entry.tier)
+    const own = guideCatalog(brain.skills).map(entry => (brain.mine.has(entry.name) ? { ...entry, source: 'my-brain' as const } : entry))
+    const catalog = [...[...own, ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
+    const result = discoverGuides(catalog, { ...brain.skills, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
+    const label = (entry: GuideCatalogEntry) => (entry.source === 'motion' ? 'motion' : entry.source === 'my-brain' ? 'yours' : entry.tier)
     const guide = result.guides.map(entry => `${entry.name} (${label(entry)}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
     const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${label(entry)}): ${entry.description}`).join('\n')}` : ''
     const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. Motion guides are the motion engine's own; topic motion/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`

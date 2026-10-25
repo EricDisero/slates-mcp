@@ -16,12 +16,19 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import {
   ALL_OPERATIONS,
-  SKILLS,
+  ARCHIVE_AFTER_DAYS,
+  brainSkills,
   parseSkillMetadata,
   MODEL_CAPABILITIES,
   MODEL_FACTS,
   SlatesCloudClient,
   buildMcpInstructions,
+  BRAIN_ROUTER,
+  MY_BRAIN_TOPIC,
+  ROUTER_NOTICE,
+  archiveUnusedDaily,
+  myBrainPreload,
+  noteUsed,
   APP_MANUAL,
   defaultContext,
   toolDefinitions,
@@ -386,8 +393,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       warn(data.prompt_warning)
     }
 
+    // The router rides the first result of a connection that has not opened it (ROUTER_NOTICE says why): as its
+    // own text block, so the result's own text still parses as the JSON many ops return, and in structured
+    // content, which is all Claude Code shows the model when it is present. Only on an op that spends nothing:
+    // a billable op's result reports a spend, and the router read there comes after the money is gone. A guide
+    // answer counts (an agent that opens a playbook first gets the router with it); the router's own answer
+    // marks it read and carries the user's brain itself.
+    let notice: string | null = null
+    if (!op.billable && !guidesRead.has(BRAIN_ROUTER)) {
+      guidesRead.add(BRAIN_ROUTER)
+      // The user's own brain comes before the router, as in Director (plan § My brain), unless this answer was it.
+      const mine = op.id === 'slates_get_prompting_guide' && data?.topic === MY_BRAIN_TOPIC ? '' : myBrainPreload()
+      notice = mine ? `${mine}\n\n${ROUTER_NOTICE}` : ROUTER_NOTICE
+      if (data && typeof data === 'object' && !Array.isArray(data)) data = { ...data, brain_router: notice }
+    }
+
     const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
       { type: 'text', text: result.text },
+      ...(notice ? [{ type: 'text' as const, text: notice }] : []),
     ]
     for (const img of result.images ?? []) {
       content.push({ type: 'image', data: img.data, mimeType: img.mimeType })
@@ -417,32 +440,43 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
 // prompt, the skill shows up in the host's own picker and the USER can invoke
 // it, which is a completely different actor making the decision.
 
+/** The bundled skills with the user's My brain laid over them, read per request like the guide op (theirs wins a name). */
+const skillsNow = () => brainSkills().skills
+
 /** First sentence of the frontmatter description — the picker's one-liner. */
-function skillSummary(name: string): string {
-  const { description } = parseSkillMetadata(SKILLS[name], name)
+function skillSummary(name: string, skills = skillsNow()): string {
+  const { description } = parseSkillMetadata(skills[name], name)
   const first = description.split(/(?<=\.)\s/)[0]
   return first.length > 300 ? `${first.slice(0, 297)}…` : first
 }
 
-const SKILL_NAMES = Object.keys(SKILLS).sort()
+/** The names at launch, for the resource template's description and the startup line; requests read skillsNow(). */
+const SKILL_NAMES = Object.keys(skillsNow()).sort()
 
-server.setRequestHandler(ListPromptsRequestSchema, async () => ({
-  prompts: SKILL_NAMES.map((name) => ({
-    name,
-    title: name.replace(/^slates-/, '').replace(/-/g, ' '),
-    description: skillSummary(name),
-  })),
-}))
+server.setRequestHandler(ListPromptsRequestSchema, async () => {
+  const skills = skillsNow()
+  return {
+    prompts: Object.keys(skills).sort().map((name) => ({
+      name,
+      title: name.replace(/^slates-/, '').replace(/-/g, ' '),
+      description: skillSummary(name, skills),
+    })),
+  }
+})
 
 server.setRequestHandler(GetPromptRequestSchema, async (request) => {
   const name = request.params.name
-  const content = SKILLS[name]
+  const brain = brainSkills()
+  const skills = brain.skills
+  const content = skills[name]
   if (content === undefined) {
-    throw new Error(`Unknown prompt: ${name}. Available: ${SKILL_NAMES.join(', ')}`)
+    throw new Error(`Unknown prompt: ${name}. Available: ${Object.keys(skills).sort().join(', ')}`)
   }
   guidesRead.add(name)
+  // Served is used: a My brain file read this way keeps its date, so archiveUnused never takes a file in use.
+  if (brain.mine.has(name)) noteUsed(name)
   return {
-    description: skillSummary(name),
+    description: skillSummary(name, skills),
     messages: [{ role: 'user' as const, content: { type: 'text' as const, text: content } }],
   }
 })
@@ -544,9 +578,12 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     }
     const skill = /^slates:\/\/skill\/(.+)$/.exec(uri)
     if (skill) {
-      const content = SKILLS[decodeURIComponent(skill[1])]
+      const name = decodeURIComponent(skill[1])
+      const brain = brainSkills()
+      const content = Object.hasOwn(brain.skills, name) ? brain.skills[name] : undefined
       if (content === undefined) throw new Error(`Unknown skill: ${skill[1]}`)
-      guidesRead.add(decodeURIComponent(skill[1]))
+      guidesRead.add(name)
+      if (brain.mine.has(name)) noteUsed(name)
       return content
     }
     const shots = /^slates:\/\/project\/([^/]+)\/shots$/.exec(uri)
@@ -576,6 +613,10 @@ async function main(): Promise<void> {
   if (updateAdvice) console.error(`[slates-mcp] ${updateAdvice}`)
   // Background refresh; the result is read by the next launch, never awaited.
   void refreshLatestVersion(PKG_NAME)
+  // My brain files long unused move to its archive/ (skills/my-brain.ts): at most once a day, and never
+  // fatal, since a server starts with every client session.
+  const archived = archiveUnusedDaily()
+  if (archived.length) console.error(`[slates-mcp] My brain: archived ${archived.length} file(s) unused for ${ARCHIVE_AFTER_DAYS} days: ${archived.join(', ')}`)
   console.error(
     `[slates-mcp] server started, v${pkg.version}, ${ops.length} tools registered, ` +
       `${SKILL_NAMES.length} skills as prompts, 3 resources + 2 templates, ` +

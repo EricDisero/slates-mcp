@@ -1,0 +1,93 @@
+{
+  "about": "The brain's fixed shape (second-brain plans/2026-10-25-slates-brain.md § Keeping it from turning into chaos, Eric 2026-10-25: 'definitely I should have the final say on everything'). Every skill file has one layer here; the router's Playbooks table must list exactly the playbooks, and its Rules section only rules. A new file, job or topic, a raised cap or a new known overlap is Eric's call: change this file only with his yes, and say so in the commit. scripts/brain-lint.mjs enforces it.",
+  "layers": {
+    "router": [
+      "slates-start-here"
+    ],
+    "playbook": [
+      "slates-ad-variants",
+      "slates-captions",
+      "slates-character-identity",
+      "slates-chatgpt-images",
+      "slates-cuts",
+      "slates-dialogue-blocking",
+      "slates-direct-response-ad",
+      "slates-edit-and-iterate",
+      "slates-motion",
+      "slates-one-prompt-film",
+      "slates-previs-blocking",
+      "slates-project-organization",
+      "slates-restyle-from-blocking",
+      "slates-script-craft",
+      "slates-storyboard-from-script",
+      "slates-ugc-influencer-ad"
+    ],
+    "rule": [
+      "slates-blocking-to-prompt",
+      "slates-camera-language",
+      "slates-cinematic-look",
+      "slates-content-policy",
+      "slates-cost-discipline",
+      "slates-layer-brand-captions",
+      "slates-layer-lower-third",
+      "slates-layer-title",
+      "slates-model-selection",
+      "slates-shot-variety",
+      "slates-style-prompting",
+      "slates-transitions",
+      "slates-vision-feedback-loop"
+    ],
+    "model": [
+      "slates-prompting-elevenlabs",
+      "slates-prompting-flux-3",
+      "slates-prompting-gpt-image-2-5",
+      "slates-prompting-inworld-tts",
+      "slates-prompting-kling-v3",
+      "slates-prompting-lip-sync",
+      "slates-prompting-ltx-2-5",
+      "slates-prompting-minimax-h3",
+      "slates-prompting-motion-transfer",
+      "slates-prompting-nano-banana-2-1",
+      "slates-prompting-omni-flash",
+      "slates-prompting-seed-audio",
+      "slates-prompting-seedance",
+      "slates-prompting-seedance-2-5",
+      "slates-prompting-seedream-5-lite",
+      "slates-prompting-wan-3"
+    ]
+  },
+  "caps": {
+    "fileWords": {
+      "router": 800,
+      "playbook": 2500,
+      "rule": 6000,
+      "model": 6500
+    },
+    "layerWords": {
+      "playbook": 22000,
+      "rule": 25000,
+      "model": 43000
+    },
+    "mine": {
+      "fileWords": 800,
+      "layerWords": 12000
+    }
+  },
+  "duplicates": {
+    "shingleWords": 9,
+    "failAt": 12,
+    "known": {
+      "slates-prompting-seedance + slates-prompting-seedance-2-5": 101,
+      "slates-layer-lower-third + slates-layer-title": 98,
+      "slates-layer-brand-captions + slates-layer-title": 60,
+      "slates-layer-brand-captions + slates-layer-lower-third": 55,
+      "slates-blocking-to-prompt + slates-dialogue-blocking": 49,
+      "slates-prompting-lip-sync + slates-prompting-motion-transfer": 42,
+      "slates-blocking-to-prompt + slates-restyle-from-blocking": 25,
+      "slates-prompting-kling-v3 + slates-prompting-seedance": 22,
+      "slates-prompting-ltx-2-5 + slates-prompting-minimax-h3": 15
+    },
+    "about": "Pairs of files that shared a passage when the check landed (2026-10-25), with the count of nine-word runs they shared then. Each is a lesson in two homes to merge; a count may only fall, and the lint fails on any new pair at failAt or more."
+  },
+  "sourcesSince": "8da4f09"
+}

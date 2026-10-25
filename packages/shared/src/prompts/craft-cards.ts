@@ -32,6 +32,7 @@
 // ============================================================
 
 import { SKILLS } from '../skills/content.js'
+import { splitOverlay } from './brain.js'
 
 /**
  * Hard ceiling per card, in characters.
@@ -82,11 +83,35 @@ export function craftCard(skill: string): string | null {
 }
 
 /**
+ * The card inside this content: the bundled card when the content is the bundled skill, else the content's own.
+ * A My brain file laid over a model guide (brain.ts, overlayGuide) gives its own card first, as the rules that
+ * win, then the shared card. An oversized card in a user's file reads as none, so the guide falls back to its
+ * summary instead of throwing.
+ */
+export function craftCardOf(skill: string, content: string): string | null {
+  if (SKILLS[skill] === content) return craftCard(skill)
+  const overlay = splitOverlay(content)
+  if (overlay) {
+    const own = craftCardOf(skill, overlay.theirs)
+    const shared = craftCard(skill) ?? craftCardOf(skill, overlay.shared)
+    if (!own || !shared) return own ?? shared
+    return `Their card (My brain), which wins where they differ:\n${own}\n\nThe shared card:\n${shared}`
+  }
+  try {
+    return extractCard(skill, content)
+  } catch {
+    return null
+  }
+}
+
+/**
  * The card as it appears in an op RESULT: the body, plus one line naming where
  * the rest lives so the agent knows the card is a summary and not the guide.
+ * `content` is the skill as this user's brain serves it (brainSkills().skills),
+ * so a card from their My brain rides; without it, the bundled card.
  */
-export function describeCraftCard(skill: string): string {
-  const card = craftCard(skill)
+export function describeCraftCard(skill: string, content?: string): string {
+  const card = content === undefined ? craftCard(skill) : craftCardOf(skill, content)
   if (!card) return ''
   return `${card}\n\nFull guide (examples, failure modes, sources): slates_get_prompting_guide({topic: "${skill}", depth: "full"}); use query for one section.`
 }

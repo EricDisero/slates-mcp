@@ -113,7 +113,9 @@ const MCP_INSTRUCTIONS_CEILING = 8_000
 // 15,350 → 15,600 (2026-10-25, the Slates brain step 1): the Director card (181 words) opens the method, and
 // the router (slates-start-here) replaced the flat index of first sentences, 446 characters net; the method
 // measured 15,500. It is fetched once a production workflow starts, never sent per request.
-const MCP_WORKING_METHOD_CEILING = 15_600
+// 15,600 → 13,000 (2026-10-25): the MCP method points at the router instead of carrying it, since ROUTER_NOTICE
+// sends the router once per connection; it measured 12,493.
+const MCP_WORKING_METHOD_CEILING = 13_000
 
 const failures = []
 const warnings = []
@@ -305,6 +307,26 @@ console.log('agent-surface-lockstep-check')
       const expected = ['Slates MCP server v0.0.0 (@slatesvideo/mcp-server).', canonical.slice(0, boundary), notice, canonical.slice(boundary + 2)].filter(Boolean).join('\n\n')
       if (calls !== 1 || composed !== expected) fail(CHECK, 'MCP instructions do not preserve buildMcpInstructions() with its first paragraph ahead of the optional notice.')
     }
+    // The longest prefix a user's client gets: the server's own update notice, as a cache claiming a newer
+    // release writes it. Claude Code keeps the first 4,096 characters (2,048 before v2.1.296,
+    // second-brain rules/mcp-server-design.md § The instructions), so the Essentials end inside 2,048 and the
+    // Director card, how every job starts, inside 4,096.
+    const KEEPS = 4096
+    const OLDER_KEEPS = 2048
+    // In source order: the server declares the notice before the instructions that use it.
+    const withNotice = ast.statements.filter(statement => ts.isVariableStatement(statement)
+      && statement.declarationList.declarations.some(declaration => ['updateAdvice', 'doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
+    const longest = runInNewContext(ts.transpileModule(withNotice.map(statement => statement.getText(ast)).join('\n') + '\ninstructions', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
+      pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', buildMcpInstructions: () => canonical,
+      updateNotice: shared.updateNotice, cachedLatestVersion: () => '99.0.0',
+    }, { timeout: 1000 })
+    const essentialsEnd = longest.indexOf('\n## ', longest.indexOf('## Essentials') + 1)
+    const cardStart = longest.indexOf(shared.DIRECTOR_CARD)
+    const cardEnd = cardStart < 0 ? -1 : cardStart + shared.DIRECTOR_CARD.length
+    if (!longest.includes('UPDATE AVAILABLE')) fail(CHECK, 'the longest-prefix composition carries no update notice; the check below would measure the short case.')
+    if (essentialsEnd < 0 || essentialsEnd > OLDER_KEEPS) fail(CHECK, `with the update notice the Essentials end at character ${essentialsEnd}, past the ${OLDER_KEEPS} older Claude Code builds keep.`)
+    if (cardStart < 0 || cardEnd > KEEPS) fail(CHECK, `with the update notice the Director card ${cardStart < 0 ? 'is missing from the instructions' : `ends at character ${cardEnd}`}, past the ${KEEPS} Claude Code keeps; a host that cuts there never sees how a job starts.`)
+    else console.log(`  ..  [${CHECK}] with the update notice: Essentials end at ${essentialsEnd} of ${OLDER_KEEPS}, the Director card at ${cardEnd} of ${KEEPS}`)
   } catch (error) {
     fail(CHECK, `${mcpServerPath}: cannot verify canonical instruction composition: ${error.message}`)
   }
@@ -747,7 +769,8 @@ console.log('agent-surface-lockstep-check')
   // …and the card must actually REACH an agent. It rides the estimate result;
   // an estimate op that stopped attaching it would silently undo all of this.
   const estimateSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
-  if (!/craft_card: card/.test(estimateSrc) || !/describeCraftCard\(skill\)/.test(estimateSrc)) {
+  // The second argument is the skill as the user's brain serves it, so their My brain card rides (my-brain-check).
+  if (!/craft_card: card/.test(estimateSrc) || !/describeCraftCard\(skill[,)]/.test(estimateSrc)) {
     fail(CHECK, `slates_estimate_generation_cost no longer attaches the craft card to its result — the positive half reaches nobody again.`)
   }
   if (!failures.some((f) => f.startsWith(`[${CHECK}]`))) {

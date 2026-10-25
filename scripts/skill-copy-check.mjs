@@ -12,6 +12,7 @@ const banned = [
   [/\bfal(?:\.ai)?\b/i, 'the serving provider fal'],
   [/\bpiapi\b/i, 'the serving provider PiAPI'],
   [/\bevolink\b/i, 'the serving provider EvoLink'],
+  [/\bbyteplus\b/i, 'the serving provider BytePlus'],
   [/\b(?:kuaishou|google) direct\b/i, 'a serving route name'],
 ]
 
