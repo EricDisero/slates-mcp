@@ -52,6 +52,16 @@ When the picture slows down, slow the sound with it and the moment lands. Put ev
 
 `effects` is sent whole, so send back every effect the clip keeps. Keys sit on whole frames: a clock between frames rounds to the nearest one. Export and listen across the ramp before calling it done.
 
+## Two clips stacked in a split screen
+
+Two clips share one tall frame, one above the other, with a picture over both for the labels. The worked example is a previs under its final in a 1080x1920 short at 24 fps, 360 frames. Each line is one op:
+
+- **The frame:** `slates_update_timeline_settings` with `width: 1080`, `height: 1920`, `frameRate: 24`, before any clip goes in: an empty timeline takes its size from its first clip, and a later larger clip raises the canvas.
+- **One clip per lane:** `slates_add_clip_to_timeline` with `startFrame: 0` and the lane's `trackId`. The previs (1920x1080) goes on video lane 1, frames 0 to 360. The final (1280x720) goes on video lane 2, frames 0 to 360; overlapping video resolves top lane wins, and its own sound lands on audio lane 1.
+- **Size and place each lane:** `slates_set_clip_keyframes` with one key at `frame: 0` per property; one key holds its value for the whole clip. `scale` multiplies the clip's framed size about the frame's centre (1 is as framed). `positionX` and `positionY` move its centre in frame widths and heights (0.1 is a tenth of the frame right or down). So a negative `positionY` sits above the middle. The previs takes `scale: 0.907407`, `positionY: 0.134375` (258 px below the middle of 1920). The final takes `scale: 0.901852`, `positionY: -0.197656` (379.5 px above).
+- **Labels over both:** `slates_add_image_overlay`, one item: the full-frame PNG's `assetId`, `x: 0.5`, `y: 0.5`, `width: 1`, `opacity: 1`, `startFrame: 0`, `endFrame: 360`. The labels, strip and reference row are all in that one picture. A text clip has no font choice today, which is why the labels are a picture.
+- **Read it back:** `slates_get_timeline` shows the frame size, the frame rate, each clip's range and its keys (`timeline.keyframes`). Check all of them against the numbers above.
+
 ## Check the cut
 
 After a pass, read the timeline again and watch it in the open Cut, or export it (`slates_export_video`) and look at the frames around each change. Say what you changed in the user's words: "tightened the opening by half a second, rolled the cut to her line".
