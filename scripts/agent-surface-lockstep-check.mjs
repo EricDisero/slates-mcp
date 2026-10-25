@@ -1007,6 +1007,14 @@ function zodDescriptions(op) {
       ['MAX_WORD_LENGTH', value(sharedOverlays, 'MAX_WORD_LENGTH'), 'OVERLAY_WORD_TEXT_MAX', value(opsSrc, 'OVERLAY_WORD_TEXT_MAX')],
       ["fraction(…, 'size')", deskRange('size'), 'OVERLAY_SIZE_RANGE', myRange('OVERLAY_SIZE_RANGE')],
       ["fraction(…, 'width')", deskRange('width'), 'OVERLAY_WIDTH_RANGE', myRange('OVERLAY_WIDTH_RANGE')],
+      // A text clip set exactly (slate 1.6.x): the fonts Slates carries, the exact size, the picture and the line.
+      ['TextFontId', union(styles, 'TextFontId'), 'TEXT_FONT_IDS', list(opsSrc, 'TEXT_FONT_IDS')],
+      ["fraction(…, 'fontSize')", deskRange('fontSize'), 'TEXT_FONT_SIZE_RANGE', myRange('TEXT_FONT_SIZE_RANGE')],
+      ["fraction(…, 'pictureHeight')", deskRange('pictureHeight'), 'TEXT_PICTURE_HEIGHT_RANGE', myRange('TEXT_PICTURE_HEIGHT_RANGE')],
+      ["fraction(…, 'pictureGap')", deskRange('pictureGap'), 'TEXT_PICTURE_GAP_RANGE', myRange('TEXT_PICTURE_GAP_RANGE')],
+      ["fraction(…, 'gap')", deskRange('gap'), 'TEXT_LINE_GAP_RANGE', myRange('TEXT_LINE_GAP_RANGE')],
+      ['MAX_LINE_NAME', value(sharedOverlays, 'MAX_LINE_NAME'), 'TEXT_LINE_NAME_MAX', value(opsSrc, 'TEXT_LINE_NAME_MAX')],
+      ['MAX_LINE_PLACE', value(sharedOverlays, 'MAX_LINE_PLACE'), 'TEXT_LINE_PLACE_MAX', value(opsSrc, 'TEXT_LINE_PLACE_MAX')],
       ['DEFAULT_OVERLAY_SECONDS', value(read('src', 'main', 'editor', 'overlays.ts'), 'DEFAULT_OVERLAY_SECONDS'), 'OVERLAY_DEFAULT_SECONDS', value(opsSrc, 'OVERLAY_DEFAULT_SECONDS')],
       // slate writes the batch cap inline in `overlayItems`.
       ['overlayItems batch cap', /body\.items\.length\s*>\s*(\d+)/.exec(read('src', 'main', 'agent', 'routes-editor.ts'))?.[1] ?? null, 'OVERLAY_BATCH_MAX', value(opsSrc, 'OVERLAY_BATCH_MAX')],

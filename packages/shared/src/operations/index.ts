@@ -6921,7 +6921,18 @@ export const addTimelineTrack: Operation<{
 // and the batch cap slate's `src/main/agent/routes-editor.ts`, which this package cannot import;
 // lockstep check 12 fails when they differ. The 0..1 position and
 // opacity are fractions by definition, not a desktop choice.
-const TEXT_STYLE_IDS = ['word-pop', 'keyword', 'subtitle', 'headline', 'clean'] as const
+const TEXT_STYLE_IDS = ['word-pop', 'keyword', 'subtitle', 'headline', 'clean', 'plain'] as const
+// A text clip set exactly (slate 1.6.x, capability text-fonts): the fonts Slates carries, the exact size,
+// the picture before the words and a line of clips, mirrored from slate's `src/shared/textStyles.ts` and
+// `src/shared/overlays.ts` like the rest (lockstep check 12).
+const TEXT_FONT_IDS = ['bebas-neue', 'montserrat-medium', 'montserrat-bold', 'montserrat-extrabold', 'montserrat-black',
+  'geist-regular', 'geist-medium', 'geist-semibold', 'geist-bold'] as const
+const TEXT_FONT_SIZE_RANGE = { min: 0.005, max: 0.5 } as const
+const TEXT_PICTURE_HEIGHT_RANGE = { min: 0.1, max: 5 } as const
+const TEXT_PICTURE_GAP_RANGE = { min: 0, max: 2 } as const
+const TEXT_LINE_GAP_RANGE = { min: 0, max: 4 } as const
+const TEXT_LINE_NAME_MAX = 40
+const TEXT_LINE_PLACE_MAX = 99
 const TEXT_STYLE_DEFAULT = 'subtitle'
 const OVERLAY_TEXT_MAX = 2000
 const OVERLAY_WORDS_MAX = 2000
@@ -6957,6 +6968,53 @@ const textLookInput = {
   size: textSizeInput.optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('The text colour as #rrggbb. Default: the style\'s.'),
 }
+/** The fields of a text clip set exactly; each is checked by the desktop again. */
+const textSetInput = {
+  font: z.enum(TEXT_FONT_IDS).describe("A font Slates carries, drawn the same in preview and export on any machine. Default: the style's font."),
+  fontSize: z.number().min(TEXT_FONT_SIZE_RANGE.min).max(TEXT_FONT_SIZE_RANGE.max)
+    .describe("The exact size as a fraction of the frame's height (72 px on a 1920-high frame is 0.0375); replaces size."),
+  pictureAssetId: z.string().min(1).describe('An image asset in the project (code IMG-A12 or id) drawn before the words, centred on them.'),
+  pictureHeight: z.number().min(TEXT_PICTURE_HEIGHT_RANGE.min).max(TEXT_PICTURE_HEIGHT_RANGE.max)
+    .describe("The picture's height as a multiple of the font size. Default: the capitals' height."),
+  pictureGap: z.number().min(TEXT_PICTURE_GAP_RANGE.min).max(TEXT_PICTURE_GAP_RANGE.max)
+    .describe('The space after the picture, a multiple of the font size. Default: 0.25.'),
+  line: z
+    .object({
+      name: z.string().max(TEXT_LINE_NAME_MAX).regex(/\S/, 'must not be blank'),
+      place: z.number().int().min(0).max(TEXT_LINE_PLACE_MAX).optional().describe('Left to right, lowest first. Default: 0; a tie keeps the lower lane first.'),
+    })
+    .strict()
+    .describe("Text clips on screen together with one line name are set side by side, centred as one on the first clip's x and y."),
+  gap: z.number().min(TEXT_LINE_GAP_RANGE.min).max(TEXT_LINE_GAP_RANGE.max)
+    .describe('In a line: the space before this clip, a multiple of its font size. Default: 0.25.'),
+}
+type TextSet = {
+  font?: (typeof TEXT_FONT_IDS)[number]; fontSize?: number; pictureAssetId?: string; pictureHeight?: number; pictureGap?: number
+  line?: { name: string; place?: number }; gap?: number
+}
+type TextSetPatch = { [K in keyof TextSet]?: TextSet[K] | null }
+const TEXT_SET_FIELDS = Object.keys(textSetInput) as (keyof TextSet)[]
+
+/**
+ * Items setting a text clip exactly need a desktop that takes the fields (an older one would drop them and
+ * draw in the style's font), and their pictures named by code become asset ids.
+ */
+async function textSetItems<T extends { pictureAssetId?: string | null }>(
+  ctx: OperationContext, desktop: ReturnType<OperationContext['desktop']>, projectId: string, items: T[]
+): Promise<T[]> {
+  if (!items.some((item) => TEXT_SET_FIELDS.some((field) => (item as Record<string, unknown>)[field] !== undefined))) return items
+  await desktop.requireCapability('text-fonts', 'bundled fonts, exact sizes, pictures and lines on text clips')
+  const named = items.flatMap((item) => (typeof item.pictureAssetId === 'string' ? [item.pictureAssetId] : []))
+  if (named.length === 0) return items
+  const refs = await resolveAssetRefs(ctx, projectId, named)
+  return items.map((item, i) => {
+    if (typeof item.pictureAssetId !== 'string') return item
+    const asset = refs.get(item.pictureAssetId)
+    if (!asset) throw new Error(`items[${i}].pictureAssetId "${item.pictureAssetId}" is not an asset in this project (slates_list_assets).`)
+    return { ...item, pictureAssetId: asset.id }
+  })
+}
+
 const overlayWordsInput = z
   .array(
     z
@@ -6983,11 +7041,11 @@ const overlayCount = (r: { clips?: unknown[] }, what: string): string => {
 
 export const addTextClip: Operation<{
   projectId: string; timelineId?: string
-  items: ({ text: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number]; x?: number; y?: number; size?: number; color?: string; startSec?: number; startFrame?: number; durationSec?: number; endFrame?: number; trackId?: string })[]
+  items: ({ text: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number]; x?: number; y?: number; size?: number; color?: string; startSec?: number; startFrame?: number; durationSec?: number; endFrame?: number; trackId?: string } & TextSet)[]
 }> = {
   id: 'slates_add_text_clip',
   description:
-    "Put text on the timeline: captions, a headline, a keyword, a call to action. Each item is one text clip on an overlay track, drawn over the video in preview and export; a batch lands in one transaction, all or none. Captions that follow the voice: one clip per line, with each word's timing in words. Read slates_get_timeline first for the frame rate and where clips sit. Returns the clips and the timeline. Change one later with slates_update_overlay_clip, remove it with slates_remove_clip.",
+    "Put text on the timeline: captions, a headline, a keyword, a call to action, a title-card label, a logo with words. Each item is one text clip on an overlay track, drawn over the video in preview and export; a batch lands in one transaction, all or none. Captions that follow the voice: one clip per line, with each word's timing in words. Set a label exactly with font (a font Slates carries) and fontSize (a fraction of the frame's height); it then centres the middle of its capitals on x, y. pictureAssetId draws an image before the words; clips sharing a line name are set side by side and centred as one, so a logo strip such as 'Blender + slates' is three items in one line (needs text-fonts; update Slates on refusal). Read slates_get_timeline first for the frame rate, where clips sit and textFonts. Returns the clips and the timeline. Change one later with slates_update_overlay_clip, remove it with slates_remove_clip.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     items: z
@@ -6997,6 +7055,13 @@ export const addTextClip: Operation<{
             text: overlayText(OVERLAY_TEXT_MAX).describe('What it says.'),
             words: overlayWordsInput.optional(),
             ...textLookInput,
+            font: textSetInput.font.optional(),
+            fontSize: textSetInput.fontSize.optional(),
+            pictureAssetId: textSetInput.pictureAssetId.optional(),
+            pictureHeight: textSetInput.pictureHeight.optional(),
+            pictureGap: textSetInput.pictureGap.optional(),
+            line: textSetInput.line.optional(),
+            gap: textSetInput.gap.optional(),
             ...overlayPlacementInput,
           })
           .strict()
@@ -7009,7 +7074,8 @@ export const addTextClip: Operation<{
     await desktop.requireCapability('timeline-overlays', 'text and image overlays')
     await requireNamedCut(desktop, input.timelineId)
     requireOverlayStart(input.items)
-    const r = await desktop.post<{ clips?: unknown[] }>('/agent/timeline/add-text', input)
+    const items = await textSetItems(ctx, desktop, input.projectId, input.items)
+    const r = await desktop.post<{ clips?: unknown[] }>('/agent/timeline/add-text', { ...input, items })
     return ok(r, `${overlayCount(r, 'text clip')} ${JSON.stringify(r)}`)
   },
 }
@@ -7056,11 +7122,11 @@ export const addImageOverlay: Operation<{
 
 export const updateOverlayClip: Operation<{
   projectId: string
-  items: ({ clipId: string; text?: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number] | null; x?: number | null; y?: number | null; size?: number | null; color?: string | null; width?: number | null; opacity?: number | null })[]
+  items: ({ clipId: string; text?: string; words?: z.infer<typeof overlayWordsInput>; style?: (typeof TEXT_STYLE_IDS)[number] | null; x?: number | null; y?: number | null; size?: number | null; color?: string | null; width?: number | null; opacity?: number | null } & TextSetPatch)[]
 }> = {
   id: 'slates_update_overlay_clip',
   description:
-    "Change a text clip's words or look, or an image overlay's place, size and opacity. Only the fields you name change; null puts one back to the style's or the default. words replaces a text clip's timings, and [] drops them; new text keeps the old timings, so send words with it. When the clip shows does not change here: to move one, remove it (slates_remove_clip) and add it again. A batch lands in one transaction, all or none. Returns the changed clips.",
+    "Change a text clip's words or look, or an image overlay's place, size and opacity. Only the fields you name change; null puts one back to the style's or the default. A text clip also takes font, fontSize, pictureAssetId (null takes the picture away), pictureHeight, pictureGap, line and gap, as slates_add_text_clip describes (needs text-fonts); in a line, x and y are read from its first clip. words replaces a text clip's timings, and [] drops them; new text keeps the old timings, so send words with it. When the clip shows does not change here: to move one, remove it (slates_remove_clip) and add it again. A batch lands in one transaction, all or none. Returns the changed clips.",
   input: z.object({
     projectId: z.string().uuid(),
     items: z
@@ -7077,6 +7143,13 @@ export const updateOverlayClip: Operation<{
             color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional().describe('Text clips: #rrggbb.'),
             width: imageWidthInput.nullable().optional().describe(`Image clips: ${imageWidthInput.description}`),
             opacity: z.number().min(0).max(1).nullable().optional().describe('Image clips.'),
+            font: textSetInput.font.nullable().optional(),
+            fontSize: textSetInput.fontSize.nullable().optional(),
+            pictureAssetId: textSetInput.pictureAssetId.nullable().optional().describe(`${textSetInput.pictureAssetId.description} null: none.`),
+            pictureHeight: textSetInput.pictureHeight.nullable().optional(),
+            pictureGap: textSetInput.pictureGap.nullable().optional(),
+            line: textSetInput.line.nullable().optional().describe(`${textSetInput.line.description} null: out of the line.`),
+            gap: textSetInput.gap.nullable().optional(),
           })
           .strict()
           .refine((item) => Object.keys(item).some((k) => k !== 'clipId'), { message: 'name at least one field to change besides clipId' })
@@ -7087,7 +7160,8 @@ export const updateOverlayClip: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-overlays', 'text and image overlays')
-    return ok(await desktop.post('/agent/timeline/update-overlay', input))
+    const items = await textSetItems(ctx, desktop, input.projectId, input.items)
+    return ok(await desktop.post('/agent/timeline/update-overlay', { ...input, items }))
   },
 }
 

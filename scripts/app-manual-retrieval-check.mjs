@@ -31,6 +31,8 @@ const FIRST_HIT = 0.9
 // [question, any of these heading fragments is a right first answer]
 const QUESTIONS = [
   ['how do I export my video as an mp4', ['Timeline: export an MP4']],
+  ['change the font of my title to bebas neue', ["a text clip's font, picture and line"]],
+  ['put the blender logo next to the words in one centred line', ["a text clip's font, picture and line", 'an agent sets a text clip']],
   ['send my edit to davinci resolve to color grade', ['Timeline: export for DaVinci']],
   ['how do I make a video from a picture', ['make a video from a picture', 'first frame and last frame']],
   ['how do I buy more credits', ['Buy credits']],
