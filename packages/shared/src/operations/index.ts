@@ -6447,7 +6447,7 @@ const getVariantsInput = z.object({
 }).strict()
 export const getVariants: Operation<z.infer<typeof getVariantsInput>> = {
   id: 'slates_get_variants',
-  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, edited by hand and left alone, or unbuilt, with behind once its sources changed since its timeline was built. The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. With grid, it adds the grid for a pick of alternatives per slot and of delivery formats: each combination (name, variantId and cutId, null when no row has it yet), files (combinations × formats), the formats offered with their sizes, and missingTakes (shotIds of intended takes the picked alternatives lack, and costs: the credits per take request, null when unpriceable, never a generation). Export that pick with slates_export_cuts variants. Reading writes nothing: a behind variant catches up when its timeline is opened (slates_get_timeline) or exported, after any slates_edit_variant_slots or slates_edit_variants call, and on rebuild, which also drops hand edits. Requires ad-variants; update Slates on capability refusal.",
+  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, edited by hand and left alone, or unbuilt, with behind once its sources changed since its timeline was built. The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. With grid, it adds the grid for a pick of alternatives per slot and of delivery formats: each combination (name, variantId and cutId, null when no row has it yet), files (combinations × formats), the formats offered with their sizes, and missingTakes (shotIds of intended takes the picked alternatives lack; credits, what making them bills in all, the figure to quote; costs, dollars per take request; both null when unpriceable; the grid never generates). Export that pick with slates_export_cuts variants. Reading writes nothing: a behind variant catches up when its timeline is opened (slates_get_timeline) or exported, after any slates_edit_variant_slots or slates_edit_variants call, and on rebuild, which also drops hand edits. Requires ad-variants; update Slates on capability refusal.",
   billable: false,
   input: getVariantsInput,
   async run(input, ctx) {
@@ -6456,9 +6456,19 @@ export const getVariants: Operation<z.infer<typeof getVariantsInput>> = {
     const { grid, ...ids } = input
     if (grid === undefined) return ok(await desktop.get('/agent/timeline/variants', ids))
     await desktop.requireCapability('variant-grid', 'the variant grid: combinations, files and missing takes')
-    return ok(await desktop.get('/agent/timeline/variants', { ...ids, grid: true,
-      picks: grid.picks === undefined ? undefined : JSON.stringify(grid.picks), aspects: grid.aspects?.join(',') }))
+    return ok(withGridCredits(await desktop.get('/agent/timeline/variants', { ...ids, grid: true,
+      picks: grid.picks === undefined ? undefined : JSON.stringify(grid.picks), aspects: grid.aspects?.join(',') })))
   },
+}
+
+/** The grid's missing takes in credits. A desktop before slate 9f9b9ea sends only `costs`, dollars per request,
+ *  so their credits are summed here, each request rounded alone as it bills. */
+function withGridCredits(answer: unknown): unknown {
+  const takes = (answer as { grid?: { missingTakes?: { costs?: number[] | null; credits?: number | null } } } | null)?.grid?.missingTakes
+  if (takes && takes.credits === undefined) {
+    takes.credits = Array.isArray(takes.costs) ? takes.costs.reduce((sum, cost) => sum + creditsFromDollars(cost), 0) : null
+  }
+  return answer
 }
 
 const variantSlotsInput = z.object({

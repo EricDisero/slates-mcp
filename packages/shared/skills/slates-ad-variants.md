@@ -24,7 +24,7 @@ An ad variant is one alternative per slot laid end to end over the cut's bed (it
 - `grid.picks`: slot id to the alternative ids to use; a slot left out takes all of them.
 - `grid.aspects`: format ids from the grid's `formats` (each with its size).
 
-It returns `combinations` (each with its `name`, and `variantId` and `cutId`, null until a row exists), `files` (combinations × formats) and `missingTakes`. Tell the user the count before exporting: "10 variants × 4 formats = 40 files". When `missingTakes.shotIds` is not empty, quote `costs` (credits per take request; null means unpriceable) and say which takes they are; never fill one from the grid.
+It returns `combinations` (each with its `name`, and `variantId` and `cutId`, null until a row exists), `files` (combinations × formats) and `missingTakes`. Tell the user the count before exporting: "10 variants × 4 formats = 40 files". When `missingTakes.shotIds` is not empty, quote `credits`, what making them bills in all (`costs` is the same in dollars per take request; null means unpriceable), and say which takes they are; never fill one from the grid.
 
 ## Export every file in one request
 

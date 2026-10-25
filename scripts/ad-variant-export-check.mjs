@@ -197,6 +197,18 @@ async function fastCheck() {
       assert.equal(calls.length, before, `${name}: refusal must precede transport`)
       assert(byId.get(name).description.length <= 2048, `${name}: description ${byId.get(name).description.length} > 2048`)
     }
+    // Missing takes are quoted in credits: the desktop's own count passes through; an older desktop's
+    // dollar costs become credits, each request rounded alone (14 + 3), and an unpriceable grid stays null.
+    const gridRead = async (missingTakes) => {
+      const answering = { ...desktop, get: async () => ({ slots: [], grid: { files: 2, missingTakes } }) }
+      return (await byId.get('slates_get_variants').run(byId.get('slates_get_variants').input.parse({ projectId, timelineId, grid: {} }), { ...ctx, desktop: () => answering })).data.grid.missingTakes
+    }
+    assert.deepEqual(await gridRead({ shotIds: ['s'], costs: [0.42, 0.07], credits: 99 }), { shotIds: ['s'], costs: [0.42, 0.07], credits: 99 }, 'the desktop\'s credits pass through')
+    assert.deepEqual(await gridRead({ shotIds: ['s'], costs: [0.42, 0.07] }), { shotIds: ['s'], costs: [0.42, 0.07], credits: 17 }, 'an older desktop\'s dollar costs read as credits')
+    assert.deepEqual(await gridRead({ shotIds: ['s'], costs: null }), { shotIds: ['s'], costs: null, credits: null })
+    assert.deepEqual(await gridRead({ shotIds: [], costs: [] }), { shotIds: [], costs: [], credits: 0 })
+    assert.match(byId.get('slates_get_variants').description, /credits, what making them bills in all/)
+    assert.doesNotMatch(byId.get('slates_get_variants').description, /costs: the credits/)
     assert.equal(byId.get('slates_get_variants').annotations.readOnlyHint, true)
     assert.equal(byId.get('slates_export_cuts').annotations.readOnlyHint, false)
   }
