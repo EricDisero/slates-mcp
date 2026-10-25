@@ -165,6 +165,42 @@ async function fastCheck() {
   assert.equal(byId.get('slates_export_cuts').input.safeParse({ ...batch, items: [] }).success, false)
   assert.equal(byId.get('slates_cancel_export_batch').input.safeParse({ projectId, batchId: 'b', mode: 'invalid' }).success, false)
 
+  // The variant grid (desktop engine plan E3b): its read rides slates_get_variants (a GET) and its export
+  // slates_export_cuts (a POST), each gated on variant-grid before any transport.
+  {
+    if (editorRoutes !== undefined) {
+      assert((await readFile(desktopSource('src/main/agent/server.ts'), 'utf8')).includes("'variant-grid'"), 'the variant-grid capability must land first')
+      assert((await readFile(desktopSource('src/main/agent/routes-variants.ts'), 'utf8')).includes("params.get('grid')"), 'the grid read must exist before the op')
+    }
+    const slotId = '44444444-4444-4444-8444-444444444444', altId = '55555555-5555-4555-8555-555555555555'
+    const pick = { picks: { [slotId]: [altId] }, aspects: ['master', '1x1'] }
+    gates.length = 0
+    await invoke('slates_get_variants', { projectId, timelineId })
+    assert.deepEqual([gates, calls.at(-1)], [['ad-variants'], ['GET', '/agent/timeline/variants', { projectId, timelineId }]], 'without grid, the read is as before')
+    gates.length = 0
+    await invoke('slates_get_variants', { projectId, timelineId, grid: pick })
+    assert.deepEqual(gates, ['ad-variants', 'variant-grid'])
+    assert.deepEqual(calls.at(-1), ['GET', '/agent/timeline/variants', { projectId, timelineId, grid: true, picks: JSON.stringify(pick.picks), aspects: 'master,1x1' }])
+    await invoke('slates_get_variants', { projectId, timelineId, grid: {} })
+    assert.deepEqual(calls.at(-1)[2], { projectId, timelineId, grid: true, picks: undefined, aspects: undefined }, 'an empty pick reads every alternative in the cut\'s formats')
+    const gridExport = { version: 2, projectId, batchId: 'grid-batch', items: [], variants: { timelineId, ...pick } }
+    gates.length = 0
+    await invoke('slates_export_cuts', gridExport)
+    assert.deepEqual(gates, ['named-cuts', 'ad-variant-export', 'variant-grid'])
+    assert.deepEqual(calls.at(-1), ['POST', '/agent/timeline/export-cuts', gridExport], 'the pick passes through; the desktop builds the rows and names the files')
+    assert.equal(byId.get('slates_export_cuts').input.safeParse({ ...gridExport, variants: { timelineId, picks: { [slotId]: ['not-a-uuid'] } } }).success, false)
+    assert.equal(byId.get('slates_export_cuts').input.safeParse({ ...gridExport, variants: { timelineId, aspects: [] } }).success, false)
+    for (const [name, input] of [['slates_get_variants', { projectId, timelineId, grid: pick }], ['slates_export_cuts', gridExport]]) {
+      const before = calls.length
+      const refusing = { ...desktop, requireCapability: async cap => { if (cap === 'variant-grid') throw new Error('Update Slates: variant-grid required') } }
+      await assert.rejects(() => byId.get(name).run(byId.get(name).input.parse(input), { ...ctx, desktop: () => refusing }), /variant-grid/)
+      assert.equal(calls.length, before, `${name}: refusal must precede transport`)
+      assert(byId.get(name).description.length <= 2048, `${name}: description ${byId.get(name).description.length} > 2048`)
+    }
+    assert.equal(byId.get('slates_get_variants').annotations.readOnlyHint, true)
+    assert.equal(byId.get('slates_export_cuts').annotations.readOnlyHint, false)
+  }
+
   // Real stdio MCP -> desktop client -> authenticated loopback HTTP. The fast
   // fixture proves routing only; it is not evidence of long-render safety.
   for (const capable of [false, true]) {

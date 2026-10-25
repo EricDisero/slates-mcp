@@ -22,8 +22,9 @@ let offset = 0
 for (;;) {
   const result = await run({ offset })
   // 12,000 until the 21 HyperFrames guides joined it (12,452 on 2026-10-18); their catalog line is
-  // the first sentence of the upstream description, capped at 160 characters.
-  assert(result.text.length < 14000, `the whole catalog stays bounded (${result.text.length})`)
+  // the first sentence of the upstream description, capped at 160 characters. 14,500 from 2026-10-25, when
+  // slates-ad-variants joined it (14,113).
+  assert(result.text.length < 14500, `the whole catalog stays bounded (${result.text.length})`)
   for (const name of names(result)) { assert(!found.has(name)); found.add(name) }
   if (result.data.nextOffset === null) break
   offset = result.data.nextOffset

@@ -107,6 +107,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['reference-breakdown', 'breaking a reference ad into shots'],
   ['product-intake', 'adding products from their pages'],
   ['ad-variants', 'ad variants on one shared body'],
+  ['variant-grid', 'the variant grid and its export from the segment cache'],
   ['loudness', 'measuring the loudness of a mix'],
 ]
 

@@ -107,7 +107,9 @@ const MCP_INSTRUCTIONS_CEILING = 8_000
 // 14,000 → 15,000 (2026-10-18): the guide index lists every non-model skill's first sentence (capped at
 // 180 characters), and the night's four craft skills (slates-transitions, slates-cuts, slates-captions,
 // slates-motion) took it past 14,000. Each entry is one line.
-const MCP_WORKING_METHOD_CEILING = 15_000
+// 15,000 → 15,500 (2026-10-25): slates-ad-variants (the variant grid and its export) joined the index, its
+// line cut to 86 characters; the rest of the index is unchanged.
+const MCP_WORKING_METHOD_CEILING = 15_500
 
 const failures = []
 const warnings = []

@@ -6357,13 +6357,18 @@ interface TimelineView {
 const legacyExportCutsInput = z.object({ projectId: z.string().uuid(), directory: z.string(), manifestId: z.string().min(1),
   action: z.enum(['start','status','cancel']).optional().describe('start (default) begins, or re-attaches to a running export; status reads it; cancel stops after the output being rendered.'),
   items: z.array(z.object({ timelineId: z.string().uuid(), format: z.enum(['mp4','xml']) }).strict()).min(1).optional().describe('Required to start.') }).strict()
+// A pick from a cut's variant grid (desktop engine plan E3b; slate shared/variantSlots.ts normalizeVariantGridPick).
+const variantGridPicks = z.record(z.string().uuid(), z.array(z.string().uuid())).describe('Slot id to the alternative ids picked in it; a slot left out takes all its alternatives.')
+const variantGridAspects = z.array(deliveryAspectInput).min(1).describe("Delivery format ids; default the cut's own formats, else master.")
 const adCopyInput = z.object({ destinationUrl: z.string().optional(), primaryText: z.string().optional(), headline: z.string().optional(), cta: z.string().optional() }).strict()
 const batchExportCutsInput = z.object({
   version: z.literal(2).describe('Use version 2 with batchId and items for delivery-format batches. Omit version for legacy directory/manifestId requests.'),
   projectId: z.string().uuid(), batchId: z.string().min(1).describe('Required for version 2. Reuse this id and the same items to reattach or retry.'),
   exportRoot: z.string().optional().describe('Optional export root; the desktop remembers it and creates a fresh batch folder.'),
   items: z.array(z.object({ timelineId: z.string().uuid(), aspects: z.array(deliveryAspectInput).min(1).optional(),
-    formats: z.array(z.enum(['mp4', 'xml'])).min(1).optional(), taxonomy: taxonomyInput.optional() }).strict()).min(1),
+    formats: z.array(z.enum(['mp4', 'xml'])).min(1).optional(), taxonomy: taxonomyInput.optional() }).strict()),
+  variants: z.object({ timelineId: z.string().uuid().describe('The cut with the slots, or any timeline of its family.'), picks: variantGridPicks.optional(), aspects: variantGridAspects.optional() }).strict()
+    .describe('A grid pick to export: each combination gets a variant row if it has none, and every variant exports in every format, beside any items. Requires variant-grid.').optional(),
   copy: adCopyInput.optional().describe('User-entered batch ad copy and destination defaults. Omission leaves them empty; never copy script or video text here.'),
   outputCopy: z.record(adCopyInput).optional().describe('Per-output ad copy overrides keyed by the desktop receipt output key.'),
 }).strict()
@@ -6373,19 +6378,21 @@ const exportCutsInput = z.object({
   ...legacyExportCutsInput.partial().shape,
   ...batchExportCutsInput.partial().shape,
   projectId: z.string().uuid(),
-  items: z.array(z.union([batchExportCutsInput.shape.items.element, legacyExportCutsInput.shape.items.unwrap().element])).min(1).optional().describe('Required for version 2 start/retry and legacy start. Version 2 selects existing timelineIds with aspects/formats/taxonomy; legacy selects timelineId/format.'),
+  items: z.array(z.union([batchExportCutsInput.shape.items.element, legacyExportCutsInput.shape.items.unwrap().element])).optional().describe('Required for version 2 start/retry (may be [] beside variants) and legacy start. Version 2 selects existing timelineIds with aspects/formats/taxonomy; legacy selects timelineId/format.'),
 }).strict().superRefine((input, ctx) => {
   const parsed = (input.version === 2 ? batchExportCutsInput : legacyExportCutsInput).safeParse(input)
   if (!parsed.success) for (const issue of parsed.error.issues) ctx.addIssue(issue)
+  if (input.items?.length === 0 && !(input.version === 2 && input.variants)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'items needs at least one cut, unless version 2 names variants' })
 })
 export const exportCuts: Operation<z.infer<typeof exportCutsInput>> = {
-  id: 'slates_export_cuts', description: 'Start or retry a background export of existing named cuts to local files without generating media or spending credits. Version 2 selects cuts × delivery aspects from slates_get_variant_grid and returns batchId, manifestPath and frozen named outputs immediately; poll slates_get_export_batch. Repeating the same batchId and selection reattaches or retries unfinished outputs; completed files are checked and never overwritten. Naming, delivery and provenance are frozen by the desktop. CSV contains completed MP4s only and is unverified against a live Meta import. Missing takes are reported per cut, never filled. Version 2 requires ad-variant-export; update Slates on capability refusal. Legacy directory/manifestId/items/action requests remain supported. For one cut, slates_export_video is enough.',
+  id: 'slates_export_cuts', description: 'Start or retry a background export of existing named cuts to local files without generating media or spending credits. Version 2 selects cuts × delivery aspects from slates_get_variant_grid and returns batchId, manifestPath and frozen named outputs immediately; poll slates_get_export_batch. Version 2 with variants (a pick read through slates_get_variants grid) and items [] exports every variant of a cut\'s slots in every picked format in one request, adding the rows a combination lacks: one body and ten hooks in four formats is forty named files. Each variant\'s picture is joined from parts rendered once per format and kept, so a shared body renders once and an unchanged export again renders nothing; each output\'s segments says parts, reused and why it rendered whole if it did. Variants requires variant-grid. Repeating the same batchId and selection reattaches or retries unfinished outputs; completed files are checked and never overwritten. Naming, delivery and provenance are frozen by the desktop. CSV contains completed MP4s only and is unverified against a live Meta import. Missing takes are reported per cut, never filled. Version 2 requires ad-variant-export; update Slates on capability refusal. Legacy directory/manifestId/items/action requests remain supported. For one cut, slates_export_video is enough.',
   billable: false,
   input: exportCutsInput,
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('named-cuts', 'named cuts')
     if (input.version === 2) await desktop.requireCapability('ad-variant-export', 'ad variant batch export and retry')
+    if (input.variants !== undefined) await desktop.requireCapability('variant-grid', 'exporting a variant grid pick')
     return ok(await desktop.post('/agent/timeline/export-cuts', input))
   },
 }
@@ -6413,7 +6420,7 @@ export const cancelExportBatch: Operation<{ projectId: string; batchId: string; 
 }
 
 export const getVariantGrid: Operation<{ projectId: string }> = {
-  id: 'slates_get_variant_grid', description: 'Read the variant grid of existing named cuts, recorded slot choices, missing takes and delivery format ids with actual dimensions. Shows absent combinations without creating them; missing-take prices are local quotes, never generation requests. Select existing timelineIds and returned aspects for slates_export_cuts. Requires ad-variant-export; update Slates on capability refusal.',
+  id: 'slates_get_variant_grid', description: 'Read the variant grid of existing named cuts, recorded slot choices, missing takes and delivery format ids with actual dimensions. Shows absent combinations without creating them; missing-take prices are local quotes, never generation requests. Select existing timelineIds and returned aspects for slates_export_cuts. For a cut\'s slots (hooks, body, end card) crossed with formats, read slates_get_variants with grid. Requires ad-variant-export; update Slates on capability refusal.',
   billable: false,
   input: z.object({ projectId: z.string().uuid() }).strict(),
   async run(input, ctx) {
@@ -6432,14 +6439,25 @@ const seamSetting = z.union([
 const variantChoices = z.record(z.string().uuid(), z.string().uuid()).describe('Slot id to alternative id. A slot left out plays its first alternative.')
 const variantSeams = z.record(z.string().uuid(), seamSetting).describe('Keyed by the slot AFTER the seam.')
 
-export const getVariants: Operation<{ projectId: string; timelineId: string }> = {
+const getVariantsInput = z.object({
+  projectId: z.string().uuid(),
+  timelineId: z.string().uuid(),
+  grid: z.object({ picks: variantGridPicks.optional(), aspects: variantGridAspects.optional() }).strict().optional()
+    .describe("Add the grid for this pick: {} for every alternative in the cut's formats. Requires variant-grid."),
+}).strict()
+export const getVariants: Operation<z.infer<typeof getVariantsInput>> = {
   id: 'slates_get_variants',
-  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, edited by hand and left alone, or unbuilt, with behind once its sources changed since its timeline was built. The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. Reading writes nothing: a behind variant catches up when its timeline is opened (slates_get_timeline) or exported, after any slates_edit_variant_slots or slates_edit_variants call, and on rebuild, which also drops hand edits. Requires ad-variants; update Slates on capability refusal.",
+  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, edited by hand and left alone, or unbuilt, with behind once its sources changed since its timeline was built. The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. With grid, it adds the grid for a pick of alternatives per slot and of delivery formats: each combination (name, variantId and cutId, null when no row has it yet), files (combinations × formats), the formats offered with their sizes, and missingTakes (shotIds of intended takes the picked alternatives lack, and costs: the credits per take request, null when unpriceable, never a generation). Export that pick with slates_export_cuts variants. Reading writes nothing: a behind variant catches up when its timeline is opened (slates_get_timeline) or exported, after any slates_edit_variant_slots or slates_edit_variants call, and on rebuild, which also drops hand edits. Requires ad-variants; update Slates on capability refusal.",
   billable: false,
-  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid() }).strict(),
+  input: getVariantsInput,
   async run(input, ctx) {
-    await ctx.desktop().requireCapability('ad-variants', 'ad variants on one shared body')
-    return ok(await ctx.desktop().get('/agent/timeline/variants', input))
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('ad-variants', 'ad variants on one shared body')
+    const { grid, ...ids } = input
+    if (grid === undefined) return ok(await desktop.get('/agent/timeline/variants', ids))
+    await desktop.requireCapability('variant-grid', 'the variant grid: combinations, files and missing takes')
+    return ok(await desktop.get('/agent/timeline/variants', { ...ids, grid: true,
+      picks: grid.picks === undefined ? undefined : JSON.stringify(grid.picks), aspects: grid.aspects?.join(',') }))
   },
 }
 
@@ -10097,6 +10115,7 @@ export function resolveGuideTopic(topic: string): string | null {
   // Starting from a finished ad: the breakdown and the remake.
   if (t === 'remake' || t === 'reference ad' || t === 'reference-ad' || t === 'breakdown' || t === 'break down') return 'slates-storyboard-from-script'
   if (t === 'cut' || t === 'cuts' || t === 'cutting' || t === 'editing' || t === 'pacing' || t === 'trim' || t === 'j-cut' || t === 'l-cut' || t === 'split-edit' || t === 'split edit') return 'slates-cuts'
+  if (['variants', 'variant', 'ad-variants', 'ad variants', 'hook variants', 'variant grid', 'variant-grid'].includes(t)) return 'slates-ad-variants'
   if (['captions', 'caption', 'subtitles', 'subtitle', 'transcribe', 'transcript', 'transcription'].includes(t)) return 'slates-captions'
   // `motion-graphics` is HyperFrames' own guide, matched by name before these aliases.
   if (['motion', 'motion-layers', 'motion layers', 'layers', 'html-clip', 'html clip', 'lower-third', 'lower third', 'end-card', 'end card'].includes(t)) return 'slates-motion'
