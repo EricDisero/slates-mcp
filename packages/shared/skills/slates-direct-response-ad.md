@@ -14,7 +14,7 @@ description: "Make a product ad that sells: clone an ad winning now (hook, beats
 - Quote the whole set and wait for the user's yes before any generation; then cut, check and export every variant. (§ 5. Quote, then generate; § 6. Cut and export)
 <!-- @operative:end -->
 
-An ad is a test in the user's ad account, and the ads that already win in a feed are the cheapest research there is: someone paid to find the hook, the order and the words that work. So the job is to copy a winner faithfully and change only what makes it theirs. Ask the user before starting: what are you selling, who buys it, where will the ad run, and is there an ad you want to copy? Ask it all in one message.
+An ad is a test in the user's ad account, and the ads that already win in a feed are the cheapest research there is: someone paid to find the hook, the order and the words that work. So the job is to copy a winner faithfully and change only what makes it theirs. Ask the user before starting: what are you selling, who buys it, where will the ad run, and is there an ad you want to copy? Ask it all in one message. When the brief already names the job (an objection to beat, a product, their board), put a first draft in that message too, every line paired with its picture and a bracket for each fact you lack, so they react to a draft rather than a questionnaire; it stands in until the reference arrives. <!-- src: brain craft eval, dr-objection sent only questions, 2026-10-25 -->
 
 ## 1. Find the winner
 
@@ -74,6 +74,7 @@ Price the whole set with the quote on the Shots (`slates_generate_from_shots` re
 
 <!-- @inject:ad-truth-rules -->
 - Every claim is literally true of the user's product: no invented guarantee, statistic, result or offer term, and no claim read off a reference picture.
+- Never suggest a price, discount or offer, even as an example ("say, about four dollars a can"): ask for theirs and leave a bracket in the line until they give it, because an example figure ends up in the ad. <!-- src: brain craft eval, dr-copy offered example prices while asking for the real one, 2026-10-25 -->
 - No fabricated testimonials or reviews. An AI person may present the product and say what it is; it never says or implies that it bought or used the product or got a result from it. Fake and AI-generated testimonials are banned outright in the United States (the FTC's rule on fake reviews, 16 CFR Part 465). Keep the reference's beat and give the line to someone who can say it truthfully, or turn it into a fact about the product.
 - A real person's likeness, a brand or a logo follows `slates-content-policy`.
 <!-- @end:ad-truth-rules -->
