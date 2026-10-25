@@ -41,6 +41,17 @@ Half a second (12 frames at 24 fps) is a common starting point. The clip next to
 
 `slates_update_clip` also sets `speed` (2 is twice as fast and half as long; 0.5 is slow motion and twice as long; `ripple: true` moves the lane's later clips by the change), `volume` (linear gain, 1 unchanged), and fades in frames for the picture (`fadeInFrames`, `fadeOutFrames`) and the sound (`audioFadeInFrames`, `audioFadeOutFrames`). A fade out to black at the end of a piece and a short sound fade on music edges are almost always right. Transitions between two clips: `slates-transitions`.
 
+## Audio follows the slow motion
+
+When the picture slows down, slow the sound with it and the moment lands. Put every key on one clock: in, hold, out, end, in frames from each sound clip's start (one short used 4.6, 5.2, 7.2 and 7.9 s: frames 110, 125, 173 and 190 at 24 fps). The ease into and out of the hold is `{ cubicBezier: [0.3333, 0, 0.6667, 1] }`; the key at the start of the hold is `linear`. Each line is one `slates_update_clip`:
+
+- **The music's tape speed:** `speedRamp` keys 1 at 110 (eased), 0.5 at 125, 0.5 at 173 (eased), 1 at 190. Pitch and tempo drop together, an octave at 0.5. The clip keeps its media in and out and its length becomes what the keys take, so choose the source range that lands at the length the cut needs, then read it back with `slates_get_timeline`. Not with `speed`.
+- **The music, muffled:** an `eq` effect with `params: { "lowpass.q": 0.7071 }` and `keyframes: { "lowpass.frequency": ... }` on the same four keys, 20000 to 1000 Hz and back. The cutoff moves by octave, so the eased keys sound like an even fall.
+- **The shot's own sound:** the same `eq` keys with the floor at 2500 Hz, lighter than the music's, so the action stays clear under it.
+- **Level:** a constant level is `volume` (linear; -4 dB is 0.631, +1 dB is 1.122). A dip on the slow part is a `volume` effect with `gainDb` keyed on the same clock. End the music with `audioFadeOutFrames` (6 is a quarter second at 24 fps).
+
+`effects` is sent whole, so send back every effect the clip keeps. Keys sit on whole frames: a clock between frames rounds to the nearest one. Export and listen across the ramp before calling it done.
+
 ## Check the cut
 
 After a pass, read the timeline again and watch it in the open Cut, or export it (`slates_export_video`) and look at the frames around each change. Say what you changed in the user's words: "tightened the opening by half a second, rolled the cut to her line".
