@@ -179,3 +179,33 @@ assert.equal((await call('estimate_generation_cost', override, ctx)).data.cost_k
 await call('generate_image', {...override, projectId: '11111111-1111-4111-8111-111111111111', prompt: 'Room', background: true}, ctx)
 assert.equal(posts.at(-1).body.gptQuality, 'max')
 assert.equal(posts.at(-1).body.resolution, '2k')
+
+// The plain text style came with text-fonts: alone it still asks for the token, so a desktop without it
+// refuses in words before any request, on add, update and captions; another style asks for nothing new.
+{
+  const projectId = '11111111-1111-4111-8111-111111111111', timelineId = '22222222-2222-4222-8222-222222222222'
+  const clipId = '33333333-3333-4333-8333-333333333333'
+  const fake = (refuse) => {
+    const seen = { gates: [], posts: [] }
+    const ctx = { desktop: () => ({
+      requireCapability: async (cap) => { seen.gates.push(cap); if (cap === refuse) throw new Error(`Update Slates: ${cap} required`) },
+      get: async () => ({}),
+      post: async (path) => { seen.posts.push(path); throw new Error(`posted ${path}`) },
+    }) }
+    return { seen, ctx }
+  }
+  const cases = [
+    ['add_text_clip', (style) => ({ projectId, items: [{ text: 'Hi', startSec: 0, style }] })],
+    ['update_overlay_clip', (style) => ({ projectId, items: [{ clipId, style }] })],
+    ['add_captions', (style) => ({ projectId, timelineId, style })],
+  ]
+  for (const [id, input] of cases) {
+    const older = fake('text-fonts')
+    await assert.rejects(() => call(id, input('plain'), older.ctx), /Update Slates: text-fonts/, `${id}: plain alone asks for text-fonts`)
+    assert.deepEqual(older.seen.posts, [], `${id}: the refusal comes before any request`)
+    const other = fake('text-fonts')
+    await assert.rejects(() => call(id, input('subtitle'), other.ctx), /posted/, `${id}: another style reaches the desktop`)
+    assert.ok(!other.seen.gates.includes('text-fonts'), `${id}: another style asks for nothing new`)
+  }
+  console.log(`prompt-control: the plain style asks for text-fonts before any request on ${cases.map(([id]) => id).join(', ')} passed`)
+}

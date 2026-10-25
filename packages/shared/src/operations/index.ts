@@ -7126,14 +7126,20 @@ type TextSet = {
 type TextSetPatch = { [K in keyof TextSet]?: TextSet[K] | null }
 const TEXT_SET_FIELDS = Object.keys(textSetInput) as (keyof TextSet)[]
 
+/** The plain style came with text-fonts (slate 22f76ea), so a desktop without the token lacks it. */
+const TEXT_FONTS_STYLE = 'plain'
+
 /**
- * Items setting a text clip exactly need a desktop that takes the fields (an older one would drop them and
- * draw in the style's font), and their pictures named by code become asset ids.
+ * Items setting a text clip exactly, or in the plain style, need a desktop that takes them (an older one
+ * would drop the fields and draw in the style's font, or not know the style), and their pictures named by
+ * code become asset ids.
  */
-async function textSetItems<T extends { pictureAssetId?: string | null }>(
+async function textSetItems<T extends { pictureAssetId?: string | null; style?: string | null }>(
   ctx: OperationContext, desktop: ReturnType<OperationContext['desktop']>, projectId: string, items: T[]
 ): Promise<T[]> {
-  if (!items.some((item) => TEXT_SET_FIELDS.some((field) => (item as Record<string, unknown>)[field] !== undefined))) return items
+  const needsFonts = (item: T): boolean => item.style === TEXT_FONTS_STYLE
+    || TEXT_SET_FIELDS.some((field) => (item as Record<string, unknown>)[field] !== undefined)
+  if (!items.some(needsFonts)) return items
   await desktop.requireCapability('text-fonts', 'bundled fonts, exact sizes, pictures and lines on text clips')
   const named = items.flatMap((item) => (typeof item.pictureAssetId === 'string' ? [item.pictureAssetId] : []))
   if (named.length === 0) return items
@@ -7389,6 +7395,7 @@ export const addCaptions: Operation<{
     await ctx.desktop().requireCapability('captions', 'captions')
     if (input.component) await ctx.desktop().requireCapability('caption-components', 'caption components')
     if (input.html !== undefined) await ctx.desktop().requireCapability('caption-html', 'caption layers of your own')
+    if (input.style === TEXT_FONTS_STYLE) await ctx.desktop().requireCapability('text-fonts', 'the plain text style')
     if (input.html !== undefined && input.component) throw new Error('html is your own caption layer and component a ready one. Pass one or the other.')
     if (input.html !== undefined && input.style) throw new Error('style is for text-clip captions; your html brings its own look. Pass one or the other.')
     if (input.variables && input.html === undefined) throw new Error('variables go with html, the composition that declares them.')
