@@ -7956,6 +7956,7 @@ export const breakDownReference: Operation<{
   projectId: string
   assetId?: string
   filePath?: string
+  url?: string
   build?: boolean
   transcribe?: boolean
   name?: string
@@ -7967,12 +7968,17 @@ export const breakDownReference: Operation<{
   id: 'slates_break_down_reference',
   billable: false,
   description:
-    "Start from a reference ad: break a finished video into a new board with one Shot per cut, as the clip's Break down into shots command does, so the user can remake it with their own product. Each Shot is postered with its cut's keyframe (a poster only, never a reference or first frame), named by its seconds in the reference, and holds the words heard in that cut on the Script page. Nothing is generated and nothing spends: the result carries the board's quote, the Shot codes and each timing gap in words (a cut shorter than the model's shortest length). Local and free; the first transcription can take minutes. build false saves each cut's keyframe and first-and-last composite to a frames folder and returns the cuts, without a board: look at them with slates_get_asset_image, then call again with build (the frames are reused) and `cuts` (each cut's description, written for the user's product, becomes its Shot's prompt; onScreenText becomes a direction line), `sections` (headings) and `roles` (who or what recurs; itemId points the role at the user's own Library item). A still becomes one Shot. Generate only after the user approves the quote (slates_generate_from_shots).",
+    "Start from a reference ad: break a finished video into a new board with one Shot per cut, as the clip's Break down into shots command does, so the user can remake it with their own product. Each Shot is postered with its cut's keyframe (a poster only, never a reference or first frame), named by its seconds in the reference, and holds the words heard in that cut on the Script page. Nothing is generated and nothing spends: the result carries the board's quote, the Shot codes and each timing gap in words (a cut shorter than the model's shortest length). Local and free; the first transcription can take minutes. Name the reference by assetId, filePath or url, one of them: a url is fetched into the project's Media first, and works for a Meta Ad Library ad link (facebook.com/ads/library/?id=...) or a direct link to a video file; TikTok Creative Center, YouTube and TikTok post links are refused with the reason (download the video, then pass filePath). The result's source names the link, its kind and the video file it fetched. build false saves each cut's keyframe and first-and-last composite to a frames folder and returns the cuts, without a board: look at them with slates_get_asset_image, then call again with build (the frames are reused) and `cuts` (each cut's description, written for the user's product, becomes its Shot's prompt; onScreenText becomes a direction line), `sections` (headings) and `roles` (who or what recurs; itemId points the role at the user's own Library item). A still becomes one Shot. Generate only after the user approves the quote (slates_generate_from_shots).",
   input: z
     .object({
       projectId: z.string().uuid(),
-      assetId: z.string().min(1).optional().describe('A video or picture already in the project: its code (VID-V3) or id. Give this or filePath.'),
+      assetId: z.string().min(1).optional().describe('A video or picture already in the project: its code (VID-V3) or id. Give this, filePath or url.'),
       filePath: z.string().min(1).optional().describe('An absolute path to a video or picture on this computer; it is imported first.'),
+      url: z
+        .string()
+        .url()
+        .optional()
+        .describe('A link to the reference: a Meta Ad Library ad or a direct video file link, fetched and imported first. Creative Center and post links are refused with the reason.'),
       build: z.boolean().optional().describe('false: save the frames and return the cuts, with no board. Default true.'),
       transcribe: z.boolean().optional().describe('Hear the words when no transcript is stored. Default true.'),
       name: z.string().min(1).max(80).optional().describe("The board's name. Defaults to the reference's."),
@@ -8009,18 +8015,22 @@ export const breakDownReference: Operation<{
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('reference-breakdown', 'breaking a reference ad into shots')
-    if (!input.assetId === !input.filePath) throw new Error('Give exactly one of assetId (a video or picture in the project) or filePath.')
+    if ([input.assetId, input.filePath, input.url].filter(Boolean).length !== 1) {
+      throw new Error('Give exactly one of assetId (a video or picture in the project), filePath or url.')
+    }
     const assetId = input.assetId ? (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id : input.assetId
     const r = await ctx.desktop().post<{
       breakdown: { segments: unknown[]; sourceCode?: string | null }
       board: { storyboardId: string; shotCodes: string[]; timing: string[]; warnings: string[] } | null
       reused: boolean
+      source: { url: string; kind: string; videoUrl: string } | null
     }>('/agent/reference/breakdown', { ...input, assetId })
     const cuts = r.breakdown.segments.length
+    const fetched = r.source ? `Fetched the ${r.source.kind === 'meta' ? 'Meta Ad Library ad' : 'video link'} into Media as ${r.breakdown.sourceCode ?? 'a video'}. ` : ''
     const head = r.board
       ? `Board ${r.board.storyboardId} built: ${r.board.shotCodes.length} Shot${r.board.shotCodes.length === 1 ? '' : 's'} (${r.board.shotCodes.join(', ')}), nothing generated.${r.board.timing.length ? ` Timing: ${r.board.timing.join(' ')}` : ''}`
       : `${cuts} cut${cuts === 1 ? '' : 's'} found in ${r.breakdown.sourceCode ?? 'the reference'}; frames saved, no board yet.`
-    return ok(r, `${head} ${JSON.stringify(r)}`)
+    return ok(r, `${fetched}${head} ${JSON.stringify(r)}`)
   },
 }
 
