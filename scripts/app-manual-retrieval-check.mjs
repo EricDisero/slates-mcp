@@ -100,6 +100,8 @@ const QUESTIONS = [
   ['make the cards bigger on the board', ['View panel', 'View sizes']],
   ['turn off sound on a video generation', ['video settings', 'Audio inside a video clip']],
   ['how do I rename a board', ['Boards', 'board name']],
+  ['remake a winning ad with my own product', ['break a reference ad into shots']],
+  ['turn this video into a shot list', ['break a reference ad into shots']],
   ['export several cuts at once', ['Export several cuts', 'Export several timelines']],
   ['export ad variants in several delivery formats', ['variant grid', 'delivery formats', 'Export several cuts', 'Export several timelines']],
   ['stop a batch export now and retry unfinished files', ['batch export', 'cancel and retry', 'Export several cuts', 'Export several timelines']],
