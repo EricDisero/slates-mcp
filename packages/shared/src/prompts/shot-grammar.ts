@@ -212,7 +212,7 @@ export const SPEECH_RATE = {
    * 250, not p90: those are rates real ads actually hit, and flagging an
    * achievable read is exactly how a check gets ignored.
    */
-  ceiling: { wpm: 283, n: 70, segment: 'max over every marked row' },
+  ceiling: { wpm: 283, n: 71, segment: 'max over every marked row' },
 } as const satisfies Record<string, SpeechRate>
 
 export type SpeechRegister = Exclude<keyof typeof SPEECH_RATE, 'ceiling'>
