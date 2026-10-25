@@ -30,7 +30,7 @@ It returns `combinations` (each with its `name`, and `variantId` and `cutId`, nu
 
 `slates_export_cuts` with `version: 2`, a new `batchId`, `items: []` and `variants: { timelineId, picks, aspects }` (the same pick the grid read). It adds a variant row for each combination that lacks one, then exports every variant in every format, each file named for the ad. Poll `slates_get_export_batch` with the `batchId`. The same `batchId` and pick reattaches or retries; finished files are never overwritten.
 
-Each output carries `segments`: the picture is joined from parts rendered once per format, so a shared body renders once, and the same pick exported again renders nothing new. `fallback` says why a file rendered whole. The sound is always mixed whole, seams included, so it matches a single export.
+An output whose picture is cut at a seam carries `segments`: the picture is joined from parts rendered once per format, so a shared body renders once, and the same pick exported again renders nothing new. `fallback` says why a file rendered whole. The sound is always mixed whole, seams included, so it matches a single export.
 
 ## After the export
 
