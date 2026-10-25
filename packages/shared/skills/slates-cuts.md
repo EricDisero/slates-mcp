@@ -43,14 +43,14 @@ Half a second (12 frames at 24 fps) is a common starting point. The clip next to
 
 ## Audio follows the slow motion
 
-When the picture slows down, slow the sound with it and the moment lands. Put every key on one clock: in, hold, out, end, in frames from each sound clip's start (one short used 4.6, 5.2, 7.2 and 7.9 s: frames 110, 125, 173 and 190 at 24 fps). The ease into and out of the hold is `{ cubicBezier: [0.3333, 0, 0.6667, 1] }`; the key at the start of the hold is `linear`. Each line is one `slates_update_clip`:
+When the picture slows down, slow the sound with it and the moment lands. Put every key on one clock: in, hold, out, end, in frames from each sound clip's start (one short used 4.6, 5.2, 7.2 and 7.9 s: frames 110.4, 124.8, 172.8 and 189.6 at 24 fps). Keep the fractions: a key may fall between frames and is read at that exact time, so the ramp lands on the beat and the clip ends where the time says (rounded to whole frames, that clock ran 0.2 frame long). The ease into and out of the hold is `{ cubicBezier: [0.3333, 0, 0.6667, 1] }`; the key at the start of the hold is `linear`. Each line is one `slates_update_clip`:
 
-- **The music's tape speed:** `speedRamp` keys 1 at 110 (eased), 0.5 at 125, 0.5 at 173 (eased), 1 at 190. Pitch and tempo drop together, an octave at 0.5. The clip keeps its media in and out and its length becomes what the keys take, so choose the source range that lands at the length the cut needs, then read it back with `slates_get_timeline`. Not with `speed`.
+- **The music's tape speed:** `speedRamp` keys 1 at 110.4 (eased), 0.5 at 124.8, 0.5 at 172.8 (eased), 1 at 189.6. 13.675 s of media on this clock plays in exactly 360 frames. Pitch and tempo drop together, an octave at 0.5. The clip keeps its media in and out and its length becomes what the keys take, so choose the source range that lands at the length the cut needs, then read it back with `slates_get_timeline`. Not with `speed`.
 - **The music, muffled:** an `eq` effect with `params: { "lowpass.q": 0.7071 }` and `keyframes: { "lowpass.frequency": ... }` on the same four keys, 20000 to 1000 Hz and back. The cutoff moves by octave, so the eased keys sound like an even fall.
 - **The shot's own sound:** the same `eq` keys with the floor at 2500 Hz, lighter than the music's, so the action stays clear under it.
 - **Level:** a constant level is `volume` (linear; -4 dB is 0.631, +1 dB is 1.122). A dip on the slow part is a `volume` effect with `gainDb` keyed on the same clock. End the music with `audioFadeOutFrames` (6 is a quarter second at 24 fps).
 
-`effects` is sent whole, so send back every effect the clip keeps. Keys sit on whole frames: a clock between frames rounds to the nearest one. Export and listen across the ramp before calling it done.
+`effects` is sent whole, so send back every effect the clip keeps. A key between frames needs a desktop with `keys-between-frames`; an older one refuses it. Export and listen across the ramp before calling it done.
 
 ## Music cut downbeat to downbeat
 
@@ -73,6 +73,7 @@ Two clips share one tall frame, one above the other, with a picture over both fo
 - **One clip per lane:** `slates_add_clip_to_timeline` with `startFrame: 0` and the lane's `trackId`. The previs (1920x1080) goes on video lane 1, frames 0 to 360. The final (1280x720) goes on video lane 2, frames 0 to 360; overlapping video resolves top lane wins, and its own sound lands on audio lane 1.
 - **Size and place each lane:** `slates_set_clip_keyframes` with one key at `frame: 0` per property; one key holds its value for the whole clip. `scale` multiplies the clip's framed size about the frame's centre (1 is as framed). `positionX` and `positionY` move its centre in frame widths and heights (0.1 is a tenth of the frame right or down). So a negative `positionY` sits above the middle. The previs takes `scale: 0.907407`, `positionY: 0.134375` (258 px below the middle of 1920). The final takes `scale: 0.901852`, `positionY: -0.197656` (379.5 px above).
 - **Labels over both:** text clips, frames 0 to 360, each in its own font at an exact size (`slates_add_text_clip` with `style: "plain"`, `font` such as `bebas-neue` or `montserrat-extrabold`, and `fontSize` as a fraction of the frame's height). A logo before its words is the clip's `pictureAssetId`; clips that share a `line` (`{ name, place }`) sit side by side, left to right by `place`, and are centred as one, which is how a `[logo] Blender + [logo] slates` strip is set. The reference row's pictures are `slates_add_image_overlay` items.
+- **A slow motion on both:** the same `speedRamp` on each lane's clip, on the exact clock of § Audio follows the slow motion (110.4, 124.8, 172.8, 189.6), keeps the two pictures in step; keys between frames are kept as sent, never rounded.
 - **Read it back:** `slates_get_timeline` shows the frame size, the frame rate, each clip's range and its keys (`timeline.keyframes`). Check all of them against the numbers above.
 
 ## Check the cut

@@ -6832,13 +6832,23 @@ const keyframeEasing = z.union([
 const keyframeKeys = z.array(
   z
     .object({
-      frame: z.number().int().min(0).describe("Frames from the clip's start, at the timeline's frame rate."),
+      frame: z.number().finite().min(0).describe("Frames from the clip's start, at the timeline's frame rate; may fall between frames, read at that exact time (110.4 is 4.6 s at 24 fps)."),
       value: z.number().finite(),
       easing: keyframeEasing.optional().describe('The curve from this key to the next. Default linear; hold jumps at the next key.'),
     })
     .strict()
 )
 const keyframeList = keyframeKeys.max(500)
+
+/** Any key off a whole frame, in any of these key lists or effect lists' keys. */
+function keysBetweenFrames(...lists: Array<ReadonlyArray<{ frame: number }> | ReadonlyArray<{ keyframes?: Record<string, ReadonlyArray<{ frame: number }>> }> | null | undefined>): boolean {
+  return lists.some((list) => (list ?? []).some((item) =>
+    'frame' in item ? !Number.isInteger(item.frame) : Object.values(item.keyframes ?? {}).some((keys) => keys.some((k) => !Number.isInteger(k.frame)))))
+}
+/** An older desktop refuses a key that is not a whole frame; ask first, so the refusal names the update. */
+async function requireKeysBetweenFrames(desktop: ReturnType<OperationContext['desktop']>, ...lists: Parameters<typeof keysBetweenFrames>): Promise<void> {
+  if (keysBetweenFrames(...lists)) await desktop.requireCapability('keys-between-frames', 'keys between frames (a frame such as 110.4)')
+}
 
 /** An effect list as the desktop stores it (`slate/src/shared/audioEffects.ts`); slates_get_timeline's audioEffects lists each type's parameters and ranges. */
 const audioEffectList = z
@@ -6895,6 +6905,7 @@ export const updateClip: Operation<{
     if (input.speed !== undefined && input.speedRamp !== undefined) throw new Error('Send speed (one speed) or speedRamp (keyed), not both.')
     if (input.effects !== undefined || input.speedRamp !== undefined || input.speedSound !== undefined) {
       await desktop.requireCapability('audio-effects', 'audio effects and speed ramps')
+      await requireKeysBetweenFrames(desktop, input.speedRamp, input.effects)
     }
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
     if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
@@ -7216,7 +7227,7 @@ export const setClipKeyframes: Operation<{
 }> = {
   id: 'slates_set_clip_keyframes',
   description:
-    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
+    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start and may fall between frames (110.4), read at that exact time. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
   input: z.object({
     projectId: z.string().uuid(),
     timelineId: z.string().uuid(),
@@ -7230,6 +7241,7 @@ export const setClipKeyframes: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-keyframes', 'clip keyframes')
+    await requireKeysBetweenFrames(desktop, ...Object.values(input.properties))
     return ok(await desktop.post('/agent/timeline/keyframes', input))
   },
 }
@@ -7439,6 +7451,7 @@ export const updateTimelineTrack: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on a lane')
+    await requireKeysBetweenFrames(desktop, input.effects)
     return ok(await desktop.post('/agent/timeline/update-track', input))
   },
 }
@@ -7484,6 +7497,7 @@ export const updateTimelineSettings: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on the master')
+    await requireKeysBetweenFrames(desktop, input.effects)
     if (input.audioBitrate !== undefined) await requireSoundPrecision(desktop)
     await requireNamedCut(desktop, input.timelineId)
     if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
