@@ -657,7 +657,7 @@ export const setSelection: Operation<{
 }> = {
   id: 'slates_set_selection',
   description:
-    "Select cards in Media, Shots on the Board or clips on the timeline, as clicks, Shift-click, Escape and Ctrl/Cmd+A do: replace makes the ids the whole selection, add and remove change only them, clear empties it, all ticks everything the tab shows (Media: the grid as filtered, folded rounds left out; Board: every Shot on the open board; timeline: every clip on the open timeline). Media needs its grid showing and the Board needs the Board or Script tab; slates_set_view switches. The timeline needs nothing open: it opens the Cut on the clips' timeline, scrolls to them and opens the Inspector on the last, so use it to show the user a clip instead of asking them to click it. Ids are asset ids or badge codes (Media), Shot ids or SHOT-A codes (Board) or clip ids from slates_get_timeline (timeline, all on one timeline). Answers with the selection as it settled and names any id it could not select. slates_get_selection reads it back (timeline clips under timeline.selectedClips); what is selected is what the user means by 'these'.",
+    "Select cards in Media, Shots on the Board or clips on the timeline, as clicks, Shift-click, Escape and Ctrl/Cmd+A do: replace makes the ids the whole selection, add and remove change only them, clear empties it, all ticks everything the tab shows (Media: the grid as filtered, folded rounds left out; Board: every Shot on the open board; timeline: every clip on the open timeline). Every surface needs a project open in the window, Media its grid showing and the Board the Board or Script tab; slates_set_view opens and switches. On the timeline, clip ids open the Cut on their timeline, scroll to them and open the Inspector on the last, so use it to show the user a clip instead of asking them to click it; all, or replace with no ids, needs a timeline open (slates_set_view cut.timelineId). Ids are asset ids or badge codes (Media), Shot ids or SHOT-A codes (Board) or clip ids from slates_get_timeline (timeline, all on one timeline). Answers with the selection as it settled and names any id it could not select. slates_get_selection reads it back (timeline clips under timeline.selectedClips); what is selected is what the user means by 'these'.",
   input: z
     .object({
       surface: z.enum(SELECTION_TARGETS),
@@ -677,8 +677,9 @@ export const setSelection: Operation<{
     if (!r.selection) return { text: `Nothing was changed (${r.reason ?? 'no answer'}).`, data: { selection: null } }
     const where = r.selection.surface === 'media' ? 'Media' : r.selection.surface === 'timeline' ? 'the timeline' : 'the Board'
     const named = (row: { id: string; code: string | null; label: string | null; track?: string; start?: { timecode: string } }): string => {
-      const name = row.code ? (row.label ? `${row.code} — ${row.label}` : row.code) : row.label ?? row.id
-      return row.track && row.start ? `${name} (${row.track}, ${row.start.timecode}, ${row.id})` : name
+      const coded = row.code ? (row.label ? `${row.code} — ${row.label}` : row.code) : null
+      // A timeline row appends its id, so its label may stand in for a code; a Media or Board row without one is named by its id.
+      return row.track && row.start ? `${coded ?? row.label ?? row.id} (${row.track}, ${row.start.timecode}, ${row.id})` : coded ?? row.id
     }
     const notes = r.notes?.length ? ` Not applied: ${r.notes.join('; ')}.` : ''
     return {

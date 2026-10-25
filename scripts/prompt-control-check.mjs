@@ -209,3 +209,24 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   }
   console.log(`prompt-control: the plain style asks for text-fonts before any request on ${cases.map(([id]) => id).join(', ')} passed`)
 }
+
+// slates_set_selection names each row so an agent can act on it: a Media or Board row without a code keeps
+// its id (its label alone would lose it), a timeline row its label and then its id; and the description
+// says what the desktop refuses (no project open; all, or replace with no ids, with no timeline open).
+{
+  const projectId = '11111111-1111-4111-8111-111111111111', assetId = '44444444-4444-4444-8444-444444444444'
+  const clipId = '55555555-5555-4555-8555-555555555555'
+  const answering = (selection) => ({ desktop: () => ({ requireCapability: async () => {}, post: async () => ({ selection, notes: [] }) }) })
+  const media = await call('set_selection', { surface: 'media', mode: 'replace', ids: [assetId] },
+    answering({ surface: 'media', projectId, ids: [assetId], items: [{ id: assetId, code: null, label: 'Shirt' }, { id: 'a2', code: 'IMG-A2', label: 'Hat' }] }))
+  assert.equal(media.text, `2 selected on Media: ${assetId}, IMG-A2 — Hat.`)
+  const timeline = await call('set_selection', { surface: 'timeline', mode: 'replace', ids: [clipId] },
+    answering({ surface: 'timeline', projectId, ids: [clipId], items: [{ id: clipId, code: null, label: 'Opening', track: 'V1', start: { frame: 0, timecode: '00:00:00:00' } }] }))
+  assert.equal(timeline.text, `1 selected on the timeline: Opening (V1, 00:00:00:00, ${clipId}).`)
+  const description = op('set_selection').description
+  assert.ok(description.length <= 2048, `slates_set_selection: description ${description.length} > 2048`)
+  assert.doesNotMatch(description, /needs nothing open/)
+  assert.match(description, /Every surface needs a project open/)
+  assert.match(description, /all, or replace with no ids, needs a timeline open/)
+  console.log('prompt-control: selection rows keep their ids, and the selection description names what needs a project or timeline open, passed')
+}
