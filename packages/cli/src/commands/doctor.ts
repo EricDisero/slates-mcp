@@ -105,6 +105,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['media-folder', 'choosing the folder a generation or upload lands in'],
   ['reference-breakdown', 'breaking a reference ad into shots'],
   ['product-intake', 'adding products from their pages'],
+  ['ad-variants', 'ad variants on one shared body'],
 ]
 
 export async function runDoctor(): Promise<void> {

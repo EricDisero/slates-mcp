@@ -363,6 +363,9 @@ const TASK_ALIASES: Readonly<Record<string, string>> = {
   slates_break_down_reference: 'remake recreate winning ad advert advertisement storyboard scene shot list link url meta facebook ad library',
   slates_get_product_page: 'product page link url shop store shopify brand logo colours price',
   slates_import_product: 'product page link url shop store shopify brand logo colours palette add library item',
+  slates_get_variants: 'ad variants hooks body end card slots combinations shared body seam',
+  slates_edit_variant_slots: 'ad variants hook body end card slot alternative collapse clips shared body bed music',
+  slates_edit_variants: 'ad variants combinations hooks seam j-cut l-cut crossfade rebuild ab test',
 }
 
 /** Rank exact task words by rarity across the current registry, returning at most ten. */

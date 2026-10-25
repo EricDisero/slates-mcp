@@ -6408,6 +6408,72 @@ export const getVariantGrid: Operation<{ projectId: string }> = {
   },
 }
 
+// Ad variants on one shared body (desktop engine plan E3b; the design heads slate's main/editor/variants.ts).
+const seamSetting = z.union([
+  z.literal('auto'),
+  z.object({ kind: z.enum(['cut', 'j', 'l', 'crossfade']), frames: z.number().int().min(0).max(600).optional() }).strict(),
+]).describe("'auto' for the automatic pick, or { kind, frames }: j (the next slot's sound leads by frames), l (this slot's sound runs on), crossfade (its length), cut (frames ignored).")
+const variantChoices = z.record(z.string().uuid(), z.string().uuid()).describe('Slot id to alternative id. A slot left out plays its first alternative.')
+const variantSeams = z.record(z.string().uuid(), seamSetting).describe('Keyed by the slot AFTER the seam.')
+
+export const getVariants: Operation<{ projectId: string; timelineId: string }> = {
+  id: 'slates_get_variants',
+  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, or edited by hand and left alone (behind once its sources changed). The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. Reading brings every unedited variant's timeline up to date with its body, hooks and bed. Requires ad-variants; update Slates on capability refusal.",
+  billable: false,
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid() }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variants', 'ad variants on one shared body')
+    return ok(await ctx.desktop().get('/agent/timeline/variants', input))
+  },
+}
+
+const variantSlotsInput = z.object({
+  projectId: z.string().uuid(),
+  action: z.enum(['add', 'update', 'remove', 'add-alternative', 'update-alternative', 'remove-alternative']),
+  timelineId: z.string().uuid().optional().describe('The cut: for add, and for add-alternative with slotName instead of slotId.'),
+  slotId: z.string().uuid().optional().describe('For update, remove and add-alternative.'),
+  slotName: z.string().min(1).max(80).optional().describe('add-alternative without slotId: makes this slot first.'),
+  alternativeId: z.string().uuid().optional().describe('For update-alternative and remove-alternative.'),
+  name: z.string().min(1).max(80).optional().describe("A slot's or an alternative's name. Defaults: Hook, Body, End card; '<slot> 1'."),
+  at: z.number().int().min(0).optional().describe('add: the position among the slots.'),
+  orderIndex: z.number().int().min(0).optional().describe('update or update-alternative: move it to this position.'),
+  bedFrame: z.number().int().min(0).nullable().optional().describe("update: the bed frame this slot's first frame meets in every variant (one slot per cut); null clears it."),
+  clipIds: z.array(z.string().uuid()).min(1).optional().describe('add-alternative: move these clips (and their linked sound) off the cut into a new sequence; what stays is the bed.'),
+  sequenceId: z.string().uuid().optional().describe('add-alternative: an existing timeline of this project to hold as it is.'),
+}).strict()
+export const editVariantSlots: Operation<z.infer<typeof variantSlotsInput>> = {
+  id: 'slates_edit_variant_slots',
+  description: "Add, rename, move or remove a cut's ad-variant slots (hook, body, end card: names, never types) and their alternatives, as the Ad variants view in the Inspector does. add-alternative with clipIds collapses those clips off the cut into a new nested sequence, so the body exists once and a fix to it shows in every variant; the first slot made from clips, or one named Body, anchors the bed where its clips sat. Without clipIds or sequenceId it makes an empty sequence to fill with slates_add_clip_to_timeline (its sequenceId is the timelineId). Removing a slot or an alternative never deletes a timeline: a sequence no slot holds becomes an ordinary cut. Every unedited variant rebuilds after. Returns the whole set as slates_get_variants does, with the new slotId or alternativeId. Requires ad-variants; update Slates on capability refusal.",
+  billable: false,
+  input: variantSlotsInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variants', 'ad variants on one shared body')
+    return ok(await ctx.desktop().post('/agent/timeline/variant-slots', input))
+  },
+}
+
+const variantsInput = z.object({
+  projectId: z.string().uuid(),
+  action: z.enum(['add', 'update', 'remove', 'rebuild']),
+  timelineId: z.string().uuid().optional().describe('add: the cut with the slots.'),
+  variantId: z.string().uuid().optional().describe('update, remove and rebuild.'),
+  combinations: z.boolean().optional().describe("add: one row per combination of the slots' alternatives not already a row."),
+  rows: z.array(z.object({ name: z.string().min(1).max(80).optional(), choices: variantChoices.optional(), seams: variantSeams.optional() }).strict()).optional().describe('add: the rows to add; omit for one row of first alternatives.'),
+  name: z.string().min(1).max(80).optional().describe('update: the row and its timeline take it.'),
+  choices: variantChoices.optional().describe('update: merged into the row.'),
+  seams: variantSeams.optional().describe("update: merged; 'auto' gives a seam back to the automatic pick."),
+}).strict()
+export const editVariants: Operation<z.infer<typeof variantsInput>> = {
+  id: 'slates_edit_variants',
+  description: "Add, change, rebuild or remove ad variant rows on a cut's slots, as the Ad variants view does. Each row picks one alternative per slot and is built into an ordinary timeline (cutId), named for ad export, ready for slates_export_cuts. Seams: the picture always cuts where slots meet; the sound is picked from the transcripts (L-cut when the outgoing line runs past its picture, J-cut when the next slot opens on speech, a short crossfade when both sides have sound on audio lanes, else a cut, a picture cut over the bed with no dialogue), or set by hand per seam; either way held to the media past the cut, with the reason in the result. A row's timeline rebuilds by itself when its sources change, unless edited by hand; rebuild takes the sources and drops the hand edits. remove deletes the row and its timeline unless edited by hand. Returns the whole set and the new variantIds. Requires ad-variants; update Slates on capability refusal.",
+  billable: false,
+  input: variantsInput,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('ad-variants', 'ad variants on one shared body')
+    return ok(await ctx.desktop().post('/agent/timeline/variants', input))
+  },
+}
+
 export const getRecipe: Operation<{ recipe: string; projectId?: string }> = {
   id: 'slates_get_recipe', description: 'Find what made an exported ad from its recipe ID, its full ad name or its file name (anything holding __r-<id>). Returns every export that carried the recipe (batch, export time, ad name, files per format, the timeline id and name, its taxonomy); then each clip with its timing and asset and, when generated, the model, prompt, references and key settings frozen at export, and the Shot and board it came from (Shot, board and asset names and labels are read as they are now, not frozen); then any timeline that still renders the recipe. Searches every project unless projectId is given. When nothing matches, notFound says why: exported before ad names carried a recipe ID, or the timeline changed and its export folder is unreachable. Read-only; never generates or spends. Requires recipe-lookup; update Slates on capability refusal.',
   billable: false,
@@ -10380,6 +10446,9 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getExportBatch as unknown as Operation<unknown>,
   cancelExportBatch as unknown as Operation<unknown>,
   getVariantGrid as unknown as Operation<unknown>,
+  getVariants as unknown as Operation<unknown>,
+  editVariantSlots as unknown as Operation<unknown>,
+  editVariants as unknown as Operation<unknown>,
   getRecipe as unknown as Operation<unknown>,
   reframeClip as unknown as Operation<unknown>,
   getReframeReport as unknown as Operation<unknown>,
