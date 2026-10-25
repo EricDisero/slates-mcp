@@ -6418,16 +6418,18 @@ export const getVariantGrid: Operation<{ projectId: string }> = {
 }
 
 // Ad variants on one shared body (desktop engine plan E3b; the design heads slate's main/editor/variants.ts).
+// The desktop's normalizeSeamSetting (slate shared/variantSlots.ts): frames 1 to 600 for j, l and crossfade; a cut takes none.
 const seamSetting = z.union([
   z.literal('auto'),
-  z.object({ kind: z.enum(['cut', 'j', 'l', 'crossfade']), frames: z.number().int().min(0).max(600).optional() }).strict(),
-]).describe("'auto' for the automatic pick, or { kind, frames }: j (the next slot's sound leads by frames), l (this slot's sound runs on), crossfade (its length), cut (frames ignored).")
+  z.object({ kind: z.literal('cut'), frames: z.number().optional() }).strict(),
+  z.object({ kind: z.enum(['j', 'l', 'crossfade']), frames: z.number().int().min(1).max(600) }).strict(),
+]).describe("'auto' for the automatic pick, { kind: 'cut' }, or { kind, frames } with frames 1 to 600: j (the next slot's sound leads by frames), l (this slot's sound runs on), crossfade (its length).")
 const variantChoices = z.record(z.string().uuid(), z.string().uuid()).describe('Slot id to alternative id. A slot left out plays its first alternative.')
 const variantSeams = z.record(z.string().uuid(), seamSetting).describe('Keyed by the slot AFTER the seam.')
 
 export const getVariants: Operation<{ projectId: string; timelineId: string }> = {
   id: 'slates_get_variants',
-  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, or edited by hand and left alone (behind once its sources changed). The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. Reading brings every unedited variant's timeline up to date with its body, hooks and bed. Requires ad-variants; update Slates on capability refusal.",
+  description: "Read a cut's ad variants: hooks, a shared body and an end card as slots laid end to end, each slot's alternatives (each a timeline: sequenceId, its length), and the variant rows, one alternative per slot, each built into an ordinary timeline (cutId) with its seams (J-cut, L-cut, crossfade or cut, who picked it and why, and what the media held back) and its state: current, edited by hand and left alone, or unbuilt, with behind once its sources changed since its timeline was built. The cut's own lanes are the bed under every variant. Any timeline of the family answers: the cut, a slot's sequence or a variant's timeline. Reading writes nothing: a behind variant catches up when its timeline is opened (slates_get_timeline) or exported, after any slates_edit_variant_slots or slates_edit_variants call, and on rebuild, which also drops hand edits. Requires ad-variants; update Slates on capability refusal.",
   billable: false,
   input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid() }).strict(),
   async run(input, ctx) {
@@ -6452,7 +6454,7 @@ const variantSlotsInput = z.object({
 }).strict()
 export const editVariantSlots: Operation<z.infer<typeof variantSlotsInput>> = {
   id: 'slates_edit_variant_slots',
-  description: "Add, rename, move or remove a cut's ad-variant slots (hook, body, end card: names, never types) and their alternatives, as the Ad variants view in the Inspector does. add-alternative with clipIds collapses those clips off the cut into a new nested sequence, so the body exists once and a fix to it shows in every variant; the first slot made from clips, or one named Body, anchors the bed where its clips sat. Without clipIds or sequenceId it makes an empty sequence to fill with slates_add_clip_to_timeline (its sequenceId is the timelineId). Removing a slot or an alternative never deletes a timeline: a sequence no slot holds becomes an ordinary cut. Every unedited variant rebuilds after. Returns the whole set as slates_get_variants does, with the new slotId or alternativeId. Requires ad-variants; update Slates on capability refusal.",
+  description: "Add, rename, move or remove a cut's ad-variant slots (hook, body, end card: names, never types) and their alternatives, as the Ad variants view in the Inspector does. add-alternative with clipIds collapses those clips off the cut into a new nested sequence, so the body exists once and a fix to it shows in every variant; the first slot made from clips, or one named Body, anchors the bed where its clips sat. Without clipIds or sequenceId it makes an empty sequence to fill with slates_add_clip_to_timeline (its sequenceId is the timelineId). Removing an alternative also removes the variant rows that pick it (removedVariantIds), each with its timeline unless edited by hand; removing a slot drops each row's pick for it. A removed slot's or alternative's own sequence stays, as an ordinary cut. Every unedited variant rebuilds after. Returns the whole set as slates_get_variants does, with the new slotId or alternativeId. Requires ad-variants; update Slates on capability refusal.",
   billable: false,
   input: variantSlotsInput,
   async run(input, ctx) {
@@ -6474,7 +6476,7 @@ const variantsInput = z.object({
 }).strict()
 export const editVariants: Operation<z.infer<typeof variantsInput>> = {
   id: 'slates_edit_variants',
-  description: "Add, change, rebuild or remove ad variant rows on a cut's slots, as the Ad variants view does. Each row picks one alternative per slot and is built into an ordinary timeline (cutId), named for ad export, ready for slates_export_cuts. Seams: the picture always cuts where slots meet; the sound is picked from the transcripts (L-cut when the outgoing line runs past its picture, J-cut when the next slot opens on speech, a short crossfade when both sides have sound on audio lanes, else a cut, a picture cut over the bed with no dialogue), or set by hand per seam; either way held to the media past the cut, with the reason in the result. A row's timeline rebuilds by itself when its sources change, unless edited by hand; rebuild takes the sources and drops the hand edits. remove deletes the row and its timeline unless edited by hand. Returns the whole set and the new variantIds. Requires ad-variants; update Slates on capability refusal.",
+  description: "Add, change, rebuild or remove ad variant rows on a cut's slots, as the Ad variants view does. Each row picks one alternative per slot and is built into an ordinary timeline (cutId), named for ad export, ready for slates_export_cuts. Seams: the picture always cuts where slots meet; the sound is picked from the transcripts (L-cut when the outgoing line runs past its picture, J-cut when the next slot opens on speech, a short crossfade when both sides have sound on audio lanes, else a cut, a picture cut over the bed with no dialogue), or set by hand per seam; either way held to the media past the cut, with the reason in the result. A row's timeline catches up with its sources when opened, exported or after any slot or row action, unless edited by hand; rebuild takes the sources and drops the hand edits. remove deletes the row and its timeline unless edited by hand. Returns the whole set and the new variantIds. Requires ad-variants; update Slates on capability refusal.",
   billable: false,
   input: variantsInput,
   async run(input, ctx) {
@@ -6522,7 +6524,7 @@ export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
 }
 
 export const listTimelines: Operation<{ projectId: string }> = {
-  id: 'slates_list_timelines', description: 'List the independent named cuts in a project. Use the selected timelineId for edits, builds and exports.',
+  id: 'slates_list_timelines', description: "List the independent named cuts in a project (not a slot's alternative timelines: slates_get_variants names those). Use the selected timelineId for edits, builds and exports.",
   input: z.object({ projectId: z.string().uuid() }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('named-cuts', 'named cuts')
