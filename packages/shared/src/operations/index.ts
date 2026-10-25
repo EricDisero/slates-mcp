@@ -6579,6 +6579,32 @@ export const getTimeline: Operation<{ projectId: string; timelineId?: string }> 
   },
 }
 
+// ── Sound to the sample (music edits between frames) ───────────
+// Mirrors of slate's limits, held equal by lockstep check 12: the rate a sound clip set to the sample counts
+// its file in (`AUDIO_SOURCE_FPS`, src/shared/clipTiming.ts), the crossfade's millisecond range and curves
+// (src/shared/transitions.ts) and the export's sound bitrates (src/shared/audioBitrate.ts).
+const SOUND_SAMPLE_RATE = 48000
+const SOUND_CROSSFADE_MS = { min: 1, max: 10000 }
+const SOUND_CURVES = ['equal-power', 'linear'] as const
+const AUDIO_BITRATES = [128, 192, 256, 320] as const
+const AUDIO_BITRATE_DEFAULT = 320
+const audioBitrateInput = z.union(AUDIO_BITRATES.map((kbps) => z.literal(kbps)) as [z.ZodLiteral<128>, z.ZodLiteral<192>, z.ZodLiteral<256>, z.ZodLiteral<320>])
+
+type SoundEdges = { startSec?: number; sourceInSec?: number; sourceOutSec?: number; sourceInSample?: number; sourceOutSample?: number }
+const soundEdgesInput = {
+  startSec: z.number().min(0).optional().describe('Audio lane: where its sound starts on the timeline, in seconds to the sample; it may fall between frames.'),
+  sourceInSec: z.number().min(0).optional().describe('Audio lane: where in its file the sound starts, in seconds, to the sample.'),
+  sourceOutSec: z.number().positive().optional().describe('Audio lane: where in its file the sound ends, in seconds, to the sample.'),
+  sourceInSample: z.number().int().min(0).optional().describe(`The media in as a sample count at ${SOUND_SAMPLE_RATE} Hz, instead of sourceInSec.`),
+  sourceOutSample: z.number().int().positive().optional().describe(`The media out as a sample count at ${SOUND_SAMPLE_RATE} Hz, instead of sourceOutSec.`),
+}
+const SOUND_EDGE_FIELDS = Object.keys(soundEdgesInput) as (keyof SoundEdges)[]
+const asksSoundEdges = (input: SoundEdges): boolean => SOUND_EDGE_FIELDS.some((field) => input[field] !== undefined)
+/** An older desktop drops the fields and keeps the clip on its frames; this one refuses instead. */
+async function requireSoundPrecision(desktop: ReturnType<OperationContext['desktop']>): Promise<void> {
+  await desktop.requireCapability('sound-precision', 'sound edges to the sample, millisecond crossfades and the sound bitrate')
+}
+
 export const addClipToTimeline: Operation<{
   projectId: string; timelineId?: string
   assetId: string
@@ -6586,10 +6612,10 @@ export const addClipToTimeline: Operation<{
   startFrame?: number
   sourceInFrame?: number
   sourceOutFrame?: number
-}> = {
+} & SoundEdges> = {
   id: 'slates_add_clip_to_timeline',
   description:
-    "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). Use slates_get_timeline first to see current clips and pick positions. To lay a board's chosen clips in board order, use slates_edit_cut (build) instead.",
+    "Append a video or audio asset from the project to the project's timeline (or place it at an explicit startFrame). Defaults match the desktop UI: video clips go to the end of the first video track; audio clips (music, voiceover, AI audio) go after the last clip on the first AUDIO track and are mixed under the video on export. An empty timeline auto-adopts the first video clip's resolution and frame rate; later higher-resolution clips raise the canvas. Overlapping video clips resolve top-track-wins. Optionally trim with sourceInFrame/sourceOutFrame (frames at the SOURCE fps). An audio asset may instead take startSec, sourceInSec and sourceOutSec (or sourceInSample/sourceOutSample) to the sample, for a music edit between frames; with no startSec it starts where the lane's last sound ends, so clips appended in turn butt exactly. Use slates_get_timeline first to see current clips and pick positions. To lay a board's chosen clips in board order, use slates_edit_cut (build) instead.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     assetId: z.string().uuid().describe('Video or audio asset already in the project.'),
@@ -6597,11 +6623,17 @@ export const addClipToTimeline: Operation<{
     startFrame: z.number().int().min(0).optional().describe('Timeline frame to place the clip at. Default: append after the last clip.'),
     sourceInFrame: z.number().int().min(0).optional(),
     sourceOutFrame: z.number().int().min(1).optional(),
+    ...soundEdgesInput,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
     await requireNamedCut(desktop, input.timelineId)
+    const precise = asksSoundEdges(input)
+    if (precise && (input.startFrame !== undefined || input.sourceInFrame !== undefined || input.sourceOutFrame !== undefined)) {
+      throw new Error("Send the clip's edges in frames or in seconds and samples, not both.")
+    }
+    if (precise) await requireSoundPrecision(desktop)
     const r = await desktop.post<
       TimelineView & {
         success: boolean
@@ -6622,6 +6654,7 @@ export const addClipToTimeline: Operation<{
       startFrame: input.startFrame,
       sourceInFrame: input.sourceInFrame,
       sourceOutFrame: input.sourceOutFrame,
+      ...Object.fromEntries(SOUND_EDGE_FIELDS.map((field) => [field, input[field]])),
     })
     const clip = r.clip ?? {}
     // Code + label for the chat reference: prefer fields on the clip, fall
@@ -6684,16 +6717,19 @@ const transitionShape = {
   durationSec: z.number().positive().optional().describe('The same, in seconds.'),
   alignment: z.enum(['center', 'start', 'end']).optional().describe('center (default) straddles the cut; start begins at the cut; end finishes at it.'),
   params: z.record(z.string(), z.unknown()).optional().describe("The kind's settings. freeze: true holds the edge frame where the media runs short. On a picture transition, audio: false stops the clips' sound crossfading with it."),
+  durationMs: z.number().min(SOUND_CROSSFADE_MS.min).max(SOUND_CROSSFADE_MS.max).optional().describe(`Audio lane: the crossfade's length in milliseconds (${SOUND_CROSSFADE_MS.min} to ${SOUND_CROSSFADE_MS.max}), placed to the sample, so it may be shorter than a frame. Instead of durationFrames or durationSec.`),
+  curve: z.enum(SOUND_CURVES).optional().describe("Audio lane: 'equal-power' (default) for two different sounds, 'linear' (straight lines, a triangular crossfade) for a join inside one piece of music."),
 }
+type TransitionSound = { durationMs?: number; curve?: typeof SOUND_CURVES[number] }
 
 export const addTransition: Operation<{
   projectId: string
   fromClipId?: string; toClipId?: string; clipId?: string; side?: 'start' | 'end'
   kind?: string; durationFrames?: number; durationSec?: number; alignment?: 'center' | 'start' | 'end'; params?: Record<string, unknown>
-}> = {
+} & TransitionSound> = {
   id: 'slates_add_transition',
   description:
-    "Put a transition (dissolve, wipe, crossfade and the other kinds) on a cut between two clips that meet on one lane, as the Cut's clip menu does. Name the cut by fromClipId and toClipId, or by one clipId and side ('end' runs this clip into the next, 'start' the last clip into this one). A cut holds one transition, so adding where one exists changes it. It never refuses short media: the result's shortHandles says how many frames are missing and offers the fixes (slates_update_transition fix: freeze or shorten). For a fade to or from black, set the clip's fades with slates_update_clip instead. The open Cut shows the change.",
+    "Put a transition (dissolve, wipe, crossfade and the other kinds) on a cut between two clips that meet on one lane, as the Cut's clip menu does. Name the cut by fromClipId and toClipId, or by one clipId and side ('end' runs this clip into the next, 'start' the last clip into this one). A cut holds one transition, so adding where one exists changes it. It never refuses short media: the result's shortHandles says how many frames are missing and offers the fixes (slates_update_transition fix: freeze or shorten). On an audio lane, durationMs sets a crossfade to the millisecond and curve how the sounds cross: a 10 ms linear crossfade with alignment 'end' joins two cuts of one song as a triangular crossfade does. For a fade to or from black, set the clip's fades with slates_update_clip instead. The open Cut shows the change.",
   input: z.object({
     projectId: z.string().uuid(),
     fromClipId: z.string().uuid().optional().describe('The clip before the cut.'),
@@ -6706,6 +6742,7 @@ export const addTransition: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-transitions', 'transitions')
     if (!input.fromClipId && !input.toClipId && !input.clipId) throw new Error('Name the cut: fromClipId and toClipId, or clipId with side.')
+    if (input.durationMs !== undefined || input.curve !== undefined) await requireSoundPrecision(desktop)
     return ok(await desktop.post('/agent/timeline/add-transition', input))
   },
 }
@@ -6713,10 +6750,10 @@ export const addTransition: Operation<{
 export const updateTransition: Operation<{
   projectId: string; transitionId: string; fix?: 'freeze' | 'shorten'
   kind?: string; durationFrames?: number; durationSec?: number; alignment?: 'center' | 'start' | 'end'; params?: Record<string, unknown>
-}> = {
+} & TransitionSound> = {
   id: 'slates_update_transition',
   description:
-    "Change a transition's kind, length, alignment or settings by its id (slates_get_timeline lists them under transitions), or apply one of the two fixes for short media: fix 'freeze' holds the edge frame for the missing frames, fix 'shorten' cuts it to the longest the media covers. Only the fields you name change. Returns the transition with its span and any frames still missing.",
+    "Change a transition's kind, length, alignment or settings by its id (slates_get_timeline lists them under transitions), or apply one of the two fixes for short media: fix 'freeze' holds the edge frame for the missing frames, fix 'shorten' cuts it to the longest the media covers. Only the fields you name change; on an audio lane durationMs and curve set a crossfade to the millisecond, and a length in frames or seconds replaces one in milliseconds. Returns the transition with its span (durationSec, curve) and any frames still missing.",
   input: z.object({
     projectId: z.string().uuid(),
     transitionId: z.string().uuid(),
@@ -6726,6 +6763,7 @@ export const updateTransition: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-transitions', 'transitions')
+    if (input.durationMs !== undefined || input.curve !== undefined) await requireSoundPrecision(desktop)
     return ok(await desktop.post('/agent/timeline/update-transition', input))
   },
 }
@@ -6826,10 +6864,10 @@ export const updateClip: Operation<{
   speedRamp?: z.infer<typeof keyframeKeys> | null
   speedSound?: 'tape' | 'keep-pitch' | null
   ripple?: boolean
-}> = {
+} & SoundEdges> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (its low-pass), each fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it.",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (its low-pass), each fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -6848,7 +6886,8 @@ export const updateClip: Operation<{
     effects: audioEffectList.nullable().optional().describe("A clip with sound: its effect list, sent whole; null clears it. A split picture's go to its sound clip."),
     speedRamp: keyframeKeys.max(4000).nullable().optional().describe("Speeds (0.05 to 20) keyed in frames from the clip's start; null goes back to one speed. Its linked sound follows."),
     speedSound: z.enum(['tape', 'keep-pitch']).nullable().optional().describe("How a constant speed's sound plays: tape moves pitch with speed; keep-pitch (or null) holds it. A ramp's is always tape."),
-    ripple: z.boolean().optional().describe("With speed or speedRamp: move the lane's later clips instead of covering them."),
+    ripple: z.boolean().optional().describe("With speed, speedRamp or a sound clip's new media out: move the lane's later clips instead of covering them."),
+    ...soundEdgesInput,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -6860,6 +6899,10 @@ export const updateClip: Operation<{
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
     if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
+    if (asksSoundEdges(input)) {
+      if (input.speed !== undefined || input.speedRamp !== undefined) throw new Error("Set a clip's speed and its edges in seconds or samples in two calls.")
+      await requireSoundPrecision(desktop)
+    }
     return ok(await desktop.post('/agent/timeline/update-clip', input))
   },
 }
@@ -7422,10 +7465,11 @@ export const updateTimelineSettings: Operation<{
   frameRate?: 24 | 30 | 60
   masterVolume?: number
   effects?: z.infer<typeof audioEffectList> | null
+  audioBitrate?: typeof AUDIO_BITRATES[number] | null
 } & CutOptions> = {
   id: 'slates_update_timeline_settings',
   description:
-    "Update a timeline's output settings: resolution, frame rate (24/30/60; all clips are conformed to it on export), masterVolume, or delivery formats, naming taxonomy and explicit variant grid bindings. New fields require ad-variant-export; null clears them. Read aspects and dimensions from slates_get_variant_grid. Delivery-only updates on an explicit timeline return the computed formats. masterVolume is the output fader (linear gain: 0 is silent, 1 is unity, 4 is the maximum boost) applied to the preview and the final mix; use it to prevent clipping when stacking loud tracks. These are normally auto-managed: the first video clip sets fps and resolution, higher-res clips raise the canvas, and delivery preserves the master aspect. Changing frameRate keeps clip positions, lengths and markers in seconds, rounded to the nearest new frame. effects puts an effect list on the master, after the output fader (the same shape as slates_update_clip, keys in frames from the timeline start).",
+    "Update a timeline's output settings: resolution, frame rate (24/30/60; all clips are conformed to it on export), masterVolume, or delivery formats, naming taxonomy and explicit variant grid bindings. New fields require ad-variant-export; null clears them. Read aspects and dimensions from slates_get_variant_grid. Delivery-only updates on an explicit timeline return the computed formats. masterVolume is the output fader (linear gain: 0 is silent, 1 is unity, 4 is the maximum boost) applied to the preview and the final mix; use it to prevent clipping when stacking loud tracks. These are normally auto-managed: the first video clip sets fps and resolution, higher-res clips raise the canvas, and delivery preserves the master aspect. Changing frameRate keeps clip positions, lengths and markers in seconds, rounded to the nearest new frame. effects puts an effect list on the master, after the output fader (the same shape as slates_update_clip, keys in frames from the timeline start). audioBitrate is the exported MP4's sound in kb/s, the Sound bitrate the settings button shows.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     width: z.number().int().min(16).optional(),
@@ -7433,12 +7477,14 @@ export const updateTimelineSettings: Operation<{
     frameRate: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
     masterVolume: z.number().min(0).max(4).optional().describe('Output fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
     effects: audioEffectList.nullable().optional().describe("The master's effect list, sent whole; null clears it."),
+    audioBitrate: audioBitrateInput.nullable().optional().describe(`The export's AAC sound in kb/s: ${AUDIO_BITRATES.join(', ')}; null goes back to the default ${AUDIO_BITRATE_DEFAULT}.`),
     ...cutOptionsInput,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on the master')
+    if (input.audioBitrate !== undefined) await requireSoundPrecision(desktop)
     await requireNamedCut(desktop, input.timelineId)
     if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
       await desktop.requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')
@@ -7460,11 +7506,12 @@ export const exportVideo: Operation<{
   outputPath: string
   overwrite?: boolean
   aspect?: string
+  audioBitrate?: typeof AUDIO_BITRATES[number]
 }> = {
   id: 'slates_export_video',
   billable: false,
   description:
-    "Render the project's timeline to an MP4 file on disk through the desktop app's timeline engine, the renderer its monitor shows, so the file matches the preview (H.264 + AAC, every video lane composited with its transitions, fades and keyframes, gaps rendered as black; the Slates window must be open). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
+    "Render the project's timeline to an MP4 file on disk through the desktop app's timeline engine, the renderer its monitor shows, so the file matches the preview (H.264 + AAC, every video lane composited with its transitions, fades and keyframes, gaps rendered as black; the Slates window must be open). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline. The sound is AAC at the timeline's Sound bitrate (slates_update_timeline_settings audioBitrate; default 320 kb/s) unless audioBitrate names one for this file. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
   input: z
     .object({
       projectId: z.string().uuid().optional(),
@@ -7476,6 +7523,7 @@ export const exportVideo: Operation<{
         .describe('Absolute path for the rendered file, ending in .mp4 (e.g. C:\\Users\\you\\Videos\\ad.mp4 or /Users/you/ad.mp4). slates_get_project_directory gives a sensible default folder.'),
       overwrite: z.boolean().optional(),
       aspect: deliveryAspectInput.optional().describe('Optional delivery aspect from slates_get_variant_grid; requires ad-variant-export. Omission keeps existing export behavior.'),
+      audioBitrate: audioBitrateInput.optional().describe(`This file's AAC sound in kb/s (${AUDIO_BITRATES.join(', ')}); omit for the timeline's Sound bitrate.`),
     })
     .refine((d) => !!d.projectId !== !!d.timelineId, {
       message: 'Pass exactly one of projectId or timelineId',
@@ -7484,6 +7532,7 @@ export const exportVideo: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('export', 'video export')
     if (input.aspect !== undefined) await desktop.requireCapability('ad-variant-export', 'single video delivery export')
+    if (input.audioBitrate !== undefined) await requireSoundPrecision(desktop)
     const r = await desktop.post<{
       success: boolean
       outputPath?: string
@@ -7499,6 +7548,7 @@ export const exportVideo: Operation<{
       outputPath: input.outputPath,
       overwrite: input.overwrite,
       aspect: input.aspect,
+      audioBitrate: input.audioBitrate,
     })
     const mb = r.fileSizeBytes != null ? (r.fileSizeBytes / (1024 * 1024)).toFixed(1) : '?'
     return ok(

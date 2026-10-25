@@ -34,6 +34,8 @@ const QUESTIONS = [
   ['change the font of my title to bebas neue', ["a text clip's font, picture and line"]],
   ['put the blender logo next to the words in one centred line', ["a text clip's font, picture and line", 'an agent sets a text clip']],
   ['send my edit to davinci resolve to color grade', ['Timeline: export for DaVinci']],
+  ['cut the song from one downbeat to the next with a 10 ms crossfade', ['a music edit between frames']],
+  ['set the audio bitrate of my export to 320 kbps', ['settings button', 'export an MP4']],
   ['how do I make a video from a picture', ['make a video from a picture', 'first frame and last frame']],
   ['how do I buy more credits', ['Buy credits']],
   ['how do I delete a project', ['Home: delete a project']],

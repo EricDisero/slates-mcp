@@ -998,7 +998,16 @@ function zodDescriptions(op) {
       return m ? `${Number(m[1])}..${Number(m[2])}` : null
     }
     const deskRange = (field) => range(sharedOverlays, new RegExp(`fraction\\(\\s*[\\w.]+\\s*,\\s*'${field}'\\s*,\\s*\\{\\s*min:\\s*([\\d.]+)\\s*,\\s*max:\\s*([\\d.]+)\\s*\\}`))
-    const myRange = (name) => range(opsSrc, new RegExp(`const ${name}\\b[^=]*=\\s*\\{\\s*min:\\s*([\\d.]+)\\s*,\\s*max:\\s*([\\d.]+)\\s*\\}`))
+    // A named { min, max }: this package's, and slate's where it names one (the crossfade's milliseconds).
+    const namedRange = (src, name) => range(src, new RegExp(`const ${name}\\b[^=]*=\\s*\\{\\s*min:\\s*([\\d.]+)\\s*,\\s*max:\\s*([\\d.]+)\\s*\\}`))
+    const myRange = (name) => namedRange(opsSrc, name)
+    // A list of numbers (the export's bitrates), and the sources of the sound rows below.
+    const numbers = (src, name) => {
+      const m = new RegExp(`const ${name}\\b[^=]*=\\s*\\[([^\\]]*)\\]`).exec(src)
+      return m ? [...m[1].matchAll(/\d+(?:\.\d+)?/g)].map((x) => Number(x[0])).join(',') : null
+    }
+    const transitionsSrc = read('src', 'shared', 'transitions.ts')
+    const bitrateSrc = read('src', 'shared', 'audioBitrate.ts')
     const values = [
       ['TextStyleId', union(styles, 'TextStyleId'), 'TEXT_STYLE_IDS', list(opsSrc, 'TEXT_STYLE_IDS')],
       ['DEFAULT_TEXT_STYLE', value(styles, 'DEFAULT_TEXT_STYLE'), 'TEXT_STYLE_DEFAULT', value(opsSrc, 'TEXT_STYLE_DEFAULT')],
@@ -1015,6 +1024,12 @@ function zodDescriptions(op) {
       ["fraction(…, 'gap')", deskRange('gap'), 'TEXT_LINE_GAP_RANGE', myRange('TEXT_LINE_GAP_RANGE')],
       ['MAX_LINE_NAME', value(sharedOverlays, 'MAX_LINE_NAME'), 'TEXT_LINE_NAME_MAX', value(opsSrc, 'TEXT_LINE_NAME_MAX')],
       ['MAX_LINE_PLACE', value(sharedOverlays, 'MAX_LINE_PLACE'), 'TEXT_LINE_PLACE_MAX', value(opsSrc, 'TEXT_LINE_PLACE_MAX')],
+      // Sound to the sample: the sample rate, the crossfade's millisecond range and curves, the export's bitrates.
+      ['AUDIO_SOURCE_FPS', value(read('src', 'shared', 'clipTiming.ts'), 'AUDIO_SOURCE_FPS'), 'SOUND_SAMPLE_RATE', value(opsSrc, 'SOUND_SAMPLE_RATE')],
+      ['SOUND_CROSSFADE_MS', namedRange(transitionsSrc, 'SOUND_CROSSFADE_MS'), 'SOUND_CROSSFADE_MS', myRange('SOUND_CROSSFADE_MS')],
+      ['SOUND_CURVES', list(transitionsSrc, 'SOUND_CURVES'), 'SOUND_CURVES', list(opsSrc, 'SOUND_CURVES')],
+      ['AUDIO_BITRATES', numbers(bitrateSrc, 'AUDIO_BITRATES'), 'AUDIO_BITRATES', numbers(opsSrc, 'AUDIO_BITRATES')],
+      ['DEFAULT_AUDIO_BITRATE', value(bitrateSrc, 'DEFAULT_AUDIO_BITRATE'), 'AUDIO_BITRATE_DEFAULT', value(opsSrc, 'AUDIO_BITRATE_DEFAULT')],
       ['DEFAULT_OVERLAY_SECONDS', value(read('src', 'main', 'editor', 'overlays.ts'), 'DEFAULT_OVERLAY_SECONDS'), 'OVERLAY_DEFAULT_SECONDS', value(opsSrc, 'OVERLAY_DEFAULT_SECONDS')],
       // slate writes the batch cap inline in `overlayItems`.
       ['overlayItems batch cap', /body\.items\.length\s*>\s*(\d+)/.exec(read('src', 'main', 'agent', 'routes-editor.ts'))?.[1] ?? null, 'OVERLAY_BATCH_MAX', value(opsSrc, 'OVERLAY_BATCH_MAX')],

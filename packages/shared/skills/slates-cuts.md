@@ -1,6 +1,6 @@
 ---
 name: slates-cuts
-description: "Tighten an edit on a Slates timeline: trim, roll, ripple, slip, split, speed, J-cuts and L-cuts."
+description: "Cut a Slates timeline: trim, roll, ripple, slip, split, speed, J/L-cuts, music cut to the sample."
 ---
 
 # Cutting — Slates craft
@@ -51,6 +51,19 @@ When the picture slows down, slow the sound with it and the moment lands. Put ev
 - **Level:** a constant level is `volume` (linear; -4 dB is 0.631, +1 dB is 1.122). A dip on the slow part is a `volume` effect with `gainDb` keyed on the same clock. End the music with `audioFadeOutFrames` (6 is a quarter second at 24 fps).
 
 `effects` is sent whole, so send back every effect the clip keeps. Keys sit on whole frames: a clock between frames rounds to the nearest one. Export and listen across the ramp before calling it done.
+
+## Music cut downbeat to downbeat
+
+To shorten a song, or loop a bar, cut from one downbeat to a later one and join them with a 10 ms crossfade. A beat rarely lands on a frame, so set the edges in seconds (to the sample, at 48 kHz) instead of frames. Find each downbeat's time in the file first, from the user, a beat map or by listening. The worked example keeps 28.000 to 39.890 s of a song, then 41.570 s onward, 16.000 s in all, at 24 fps:
+
+- **The first piece:** `slates_add_clip_to_timeline` with the audio `assetId`, `startSec: 0`, `sourceInSec: 28`, `sourceOutSec: 39.89`. Its sound ends at 11.890 s, between frames 285 and 286.
+- **The second piece:** the same asset on the same lane (`trackId` from the first result), `startSec: 11.89` (where the first ends), `sourceInSec: 41.58`, `sourceOutSec: 45.69`. Leave out `startSec` and it starts where the lane's last sound ends, which is the same place.
+- **The join:** `slates_add_transition` with `fromClipId` and `toClipId`, `durationMs: 10`, `curve: "linear"`, `alignment: "end"`. The first piece fades out over its last 10 ms (11.880 to 11.890 s) while the second fades in over the 10 ms of its file before its in point, so the later downbeat lands at 11.890 s and the second piece is heard from 41.570 s. Linear suits a join inside one song: both sides are the same music and add up. Two different sounds want `"equal-power"`, the default.
+- **Read it back:** `slates_get_timeline` lists each clip's `startSec`, `endSec`, `sourceInSec` and `sourceOutSec` (with `sampleAxis: true`) and the transition's `durationSec` and `curve`. The second piece should end at 16.000 s.
+
+If you were handed the edit as filter text, `atrim=28.000:39.890` then `atrim=41.570:57.570` joined by a 10 ms triangular crossfade and cut to 16 s, it is the edit above: the first trim is the first piece, and the second piece's in point is the second trim's start plus the crossfade (41.570 + 0.010 = 41.580), its out where 16 s runs out (41.580 + 16 - 11.890 = 45.690).
+
+Sample counts work too: `sourceInSample` and `sourceOutSample` instead of the seconds. To move a join, `slates_update_clip` with the first piece's new `sourceOutSec`, then the second piece's `startSec` set to the first's new `endSec` (from `slates_get_timeline`); `ripple: true` moves later clips by whole frames only, so it does not keep a join exact. A clip with a speed ramp keeps its edges on frames. The preview hands the sound over at the nearest frame; the export joins it to the sample, so export (`slates_export_video`, `audioBitrate: 320` for the clearest sound) and listen across the join.
 
 ## Two clips stacked in a split screen
 
