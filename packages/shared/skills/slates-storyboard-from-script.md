@@ -23,7 +23,7 @@ A new Shot files itself into the open scene, else the board's last scene; pass `
 
 ## Start from a reference ad
 
-A reference gives the structure (the cuts, their lengths, where the words fall); the remake puts the user's product, people and words in it. Breaking down is local and free and generates nothing. A pasted link is not fetched: the video must be in Media or on disk (`filePath`).
+A reference gives the structure (the cuts, their lengths, where the words fall); the remake puts the user's product, people and words in it. Breaking down is local and free and generates nothing. Name the reference by `assetId`, `filePath` or `url`: a url is fetched into Media first and works for a Meta Ad Library ad link or a direct link to a video file; TikTok Creative Center and post links (YouTube, TikTok, Facebook, Instagram) are refused with the reason, so download the video and pass `filePath`.
 
 1. `slates_get_reference_breakdown` reads the cuts and any stored words and writes nothing.
 2. `slates_break_down_reference` with `build: false` saves each cut's keyframe and a first-and-last composite and returns their codes. Look at every one with `slates_get_asset_image` before writing.

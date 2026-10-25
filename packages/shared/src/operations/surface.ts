@@ -107,8 +107,11 @@ const startsWithAny = (id: string, prefixes: readonly string[]): boolean =>
 
 /** Ops that can fetch from the HyperFrames registry on GitHub: a listing, a block, a caption component. */
 const REGISTRY_IDS: ReadonlySet<string> = new Set(['slates_list_motion_blocks', 'slates_add_html_clip', 'slates_add_captions'])
-/** Ops that fetch a web page the user names (product intake): the desktop reads a store's page and its pictures. */
-const WEB_PAGE_IDS: ReadonlySet<string> = new Set(['slates_get_product_page', 'slates_import_product'])
+/**
+ * Ops that fetch a web address the user names: product intake (a store's page and its pictures) and a
+ * reference link (a Meta Ad Library page and the ad's video file, or a direct video link).
+ */
+const WEB_PAGE_IDS: ReadonlySet<string> = new Set(['slates_get_product_page', 'slates_import_product', 'slates_break_down_reference'])
 
 /**
  * Derive an op's four hints.
