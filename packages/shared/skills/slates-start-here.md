@@ -14,11 +14,10 @@ description: "Start any Slates job here: the Director card (how every job begins
 **The Director card: how every job starts.**
 1. Ask what they are making, who it is for, where it will run, and whether they have an example they love. Ask it all in one message; a clear brief skips the questions.
 2. Open the playbook for the job from the router below and follow its steps. Open a rule or model guide only when a step calls for it, and read its operative summary first.
-3. Start from a proven winner: their example, or one winning now that you find and break down. Copy its structure shot for shot and swap in their product, people and words. Never compose from nothing.
-4. Work in their current project. Scripts, Shots and cuts cost nothing; write them before anything generates.
-5. Quote before spending: price every generation, show the itemized total in one message, and wait for their yes.
-6. Look at every result against the brief before you show it, and change one thing per retry.
-7. When no playbook fits, work from the rules below and say which ones you used.
+3. When what they want has a better route than a prompt (a one-take fight blocked in Blender first, exact on-screen text as motion graphics), offer it with its reason from the router's methods list. <!-- src: Eric, 2026-10-25: the brain should know its own capabilities and suggest the method that gets the result -->
+4. Start from a proven winner: their example, or one winning now that you find and break down (`slates_break_down_reference`). Copy its structure shot for shot and swap in their product, people and words. Never compose from nothing.
+5. Work in their current project. Scripts, Shots and cuts cost nothing; write them before anything generates.
+6. When no playbook fits, work from the rules below and say which ones you used.
 <!-- @director:end -->
 
 Pick the row for the job and open its playbook with `slates_get_prompting_guide` (topic: the playbook's name). A playbook names the rules and model guides it needs.
@@ -32,19 +31,40 @@ Pick the row for the job and open its playbook with `slates_get_prompting_guide`
 | Many versions of one ad: hooks, bodies, end cards, formats | `slates-ad-variants` | Which cut is the body, and which hooks and formats? |
 | A finished film, short, trailer or music video from a brief | `slates-one-prompt-film` | What is it, how long, and where will it play? |
 | A storyboard from a script, or a remake of a reference ad | `slates-storyboard-from-script` | Paste the script, or share the ad. |
-| Words: a script, a hook, a rewrite | `slates-script-craft` | Who speaks, to whom, for how long? |
+| Words: write, rewrite or tighten a script, dialogue or hooks | `slates-script-craft` | Who speaks, to whom, for how long? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
 | A character who stays the same across shots | `slates-character-identity` | A picture of them, or a description? |
-| Fix or refine an image or clip | `slates-edit-and-iterate` | Which asset, and what is wrong with it? |
-| An exact camera path or blocking, through Blender | `slates-previs-blocking` | Which shot needs the exact move? |
-| A conversation that must hold eyelines across cuts | `slates-dialogue-blocking` | Where are they sitting or walking? |
-| New looks on an approved blocking pass | `slates-restyle-from-blocking` | Which looks to compare? |
+| Fix, refine or redo part of an image or clip | `slates-edit-and-iterate` | Which asset, and what is wrong with it? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
+| An exact camera move, path or timing, blocked in Blender first | `slates-previs-blocking` | Which shot needs the exact move? |
+| People talking, eyelines held across cuts | `slates-dialogue-blocking` | Where are they sitting or walking? |
+| Restyle an approved blocking pass into new looks | `slates-restyle-from-blocking` | Which looks to compare? |
 | Cut a timeline: trims, pacing, cutting to music | `slates-cuts` | Which cut, and how long should it run? |
 | Captions on speech | `slates-captions` | Word by word, or lines? |
-| Titles, lower thirds, end cards and other motion layers | `slates-motion` | What words, and where on screen? |
+| Titles, lower thirds, end cards and other motion layers on a cut | `slates-motion` | What words, and where on screen? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
 | Images through a connected ChatGPT account | `slates-chatgpt-images` | Is the account connected? |
-| Find, move or reuse media across projects | `slates-project-organization` | Which project and which assets? |
+| Find, move, copy or reuse media across projects | `slates-project-organization` | Which project and which assets? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
 
-A talking-head cut runs on `slates-cuts` then `slates-captions`. An explainer, a product launch or a slideshow made from motion graphics alone runs on the motion guides (topic `motion-overview`).
+A talking-head cut runs on `slates-cuts` then `slates-captions`. <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 -->
+
+## Offer the method that gets the result
+
+People say what they want, not how. When a want below fits the job or one shot in it, offer its method in a sentence with the reason before you plan or price that part; they choose. Offer the Blender playbooks above the same way. <!-- src: Eric, 2026-10-25: a drift car or one-take fight brief never got the Blender method offered; the brain should know its own capabilities and suggest the best way to each result -->
+
+| They want | Offer | Because |
+|---|---|---|
+| One continuous take of choreographed action (a fight, a drift, a chase, a dance), or an exact camera path | Block it in Blender first (`slates-previs-blocking`) | A prompt invents the motion anew on every roll; a blocking clip fixes the path, the timing and where everyone is |
+| Exact words, numbers, logos or charts on screen | Motion graphics: on a cut `slates-motion`; a whole video with no footage topic `motion-overview` (an explainer, a launch, a slideshow, a lyric video cut to a track); graphics over an interview they shot, topic `talking-head-recut` | Rendered text is exact every time and costs no generation |
+| A move they have on video, on another character | Motion transfer (`slates-prompting-motion-transfer`) | The clip drives the body; the picture sets who it is |
+| Their recorded voice on a face | Lip sync (`slates-prompting-lip-sync`) | The mouth follows their real audio |
+| Narration, one voice across a series, or sound effects | A designed or cloned voice (topic `voice`), sound effects (topic `sound-effects`) | The same voice in every video, made to the line's length |
+| The same place in every shot | A location plate first (`slates_generate_environment_plate`) | Every shot starts from one set |
+| The frame right before paying for video | Pictures first, then those pictures as first frames (`slates_use_pictures_as_first_frames`) | A picture costs a fraction of a clip and fixes the composition |
+| An exact start and end, or action longer than one clip | First and last frames; the last frame of one clip opens the next | The clips join on the same frame |
+| One look across every shot | A saved look (`slates_create_style`) | The same light and grade on each prompt |
+| Their product's real label in shot | The product as a Library item (`slates_import_product`) | The model copies the label instead of inventing one |
+| Movement on a still, or a speed ramp on a beat | Keys in the cut (`slates_set_clip_keyframes`, `slates-cuts`) | No generation, and it lands on the frame |
+| The same video in another format | Reframe the clip (`slates_reframe_clip`) | No new generation |
+| A clip that is nearly right | Edit the part that is wrong (`slates-edit-and-iterate`) | Rolling again loses what worked |
+<!-- src: Eric, 2026-10-25: Slates fully aware of its own capability, every method offered when the want calls for it; list from the design review of every op and guide -->
 
 ## Rules every playbook links
 
@@ -54,7 +74,3 @@ A talking-head cut runs on `slates-cuts` then `slates-captions`. An explainer, a
 - **Shots:** `slates-shot-variety` for rhythm across a set, `slates-camera-language` for camera moves, `slates-cinematic-look` for light, lens and grade, `slates-style-prompting` for a visual style, `slates-blocking-to-prompt` for a prompt from a blocking clip.
 - **The edit:** `slates-transitions`, and the layer presets `slates-layer-title`, `slates-layer-lower-third` and `slates-layer-brand-captions`.
 - **Review:** `slates-vision-feedback-loop` on every result.
-
-## No brief yet
-
-Ask what they sell, who buys it and where the ad will run, and for one ad they like. With no example, find an ad winning now for a product like theirs, break it down with `slates_break_down_reference`, show them what it does, and copy it once they say yes.

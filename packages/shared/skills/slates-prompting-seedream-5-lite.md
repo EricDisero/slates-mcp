@@ -119,4 +119,4 @@ Flat pricing supports iteration: draft, evaluate inline, diagnose one specific d
 
 ## Sources
 
-- [ByteDance — Seedream Prompt Guide](https://docs.byteplus.com/en/docs/ModelArk/1829186)
+- ByteDance — Seedream Prompt Guide (ModelArk docs, doc 1829186) <!-- src: white-label rule, serving providers never named, 2026-10-25 -->

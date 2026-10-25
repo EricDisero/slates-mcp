@@ -40,13 +40,43 @@ hand-mirrored in **two** repos and gated by `slates-web/scripts/check-skills-pac
 
 **The skills are one layered brain (2026-10-25; second-brain `plans/2026-10-25-slates-brain.md`).**
 `slates-start-here` holds the Director card (between `@director` markers, extracted by
-`src/prompts/brain.ts` into both surfaces' doctrine) and the router: one playbook per job and the rules
-they link, which replaced the doctrine's flat guide index. Every other file leads with an operative
-summary (`@operative` markers, two to seven bullets each ending on `(§ heading)`), or its craft card on a
-model guide; `retrieveGuide`'s default card depth returns it. `npm run check:brain` (in the build) holds
-the caps, the summaries and that every skill is reachable from the router.
+`src/prompts/brain.ts` into both surfaces' doctrine) and the router: one playbook per job, the method to
+offer for each result (§ Offer the method that gets the result: Blender blocking for a choreographed
+one-take, motion graphics for exact on-screen text, and the rest), and the rules they link. **A new
+capability that beats a prompt for some result gets its line there**, or agents never offer it. Every
+other file leads with an operative summary (`@operative` markers, two to seven bullets each ending on
+`(§ heading)`), or its craft card on a model guide. `retrieveGuide` serves the router and every playbook whole
+at its default depth (an agent follows a playbook's steps) and a rule or model guide at that summary or card. The
+desktop doctrine carries the router whole; an MCP connection that has not opened it gets it once, with the
+user's My brain preload in front, as its own content block on the first result of a tool that spends nothing
+(`ROUTER_NOTICE`; never a billable op's result), and the router's own answer carries the preload itself, so
+the MCP working method only points at it. `npm run check:brain` (in the build) holds the rest (`scripts/brain-lint.mjs`):
+- **The shape is pinned** in `scripts/brain-shape.json`: every file in one layer (router, playbook, rule,
+  model), the caps on each file and each layer, the known duplicate passages. **Changing that file is
+  Eric's call.**
+- **One home per lesson:** two files sharing a nine-word passage fail unless the pair is pinned, and a
+  pinned count may only fall. Merge into one home and point at it.
+- **A source on every new block:** `<!-- src: what taught it, YYYY-MM-DD -->` on each line or block added
+  since `sourcesSince`.
+- **Nothing ships without Eric:** the npm publish of shared refuses a skill or shape commit he has not
+  approved (`scripts/brain-review.mjs --check`), and the plugins carry only the approved commit's skills
+  (`build-plugins.mjs`). The same script builds his review page; `--approve` takes his exported decisions,
+  refuses while a held commit is not reverted, and runs `scripts/brain-eval/gate.mjs`: the candidate against
+  a build of the approved brain in the same batch, tied to each build by its brain hash, rejecting a case
+  sign test the candidate loses or a craft mean that falls. Only then does the approved commit move.
+  How to run the evals: `scripts/brain-eval/README.md`.
+- **My brain**, the user's own files in `~/.slates/my-brain`, lays over the bundled skills on their
+  machine: a file named like a shared guide adds to it in the guide op, prompts and resources (their file
+  first, as the rules that win where they differ, then the shared guide, so a later shared fix still reaches
+  them), a new name adds a guide, and the router, its aliases and the `my-brain` topic stay shared. Every
+  load holds each file to the shape in `src/skills/brain-check.ts` (a summary, the `caps.mine` caps from
+  `brain-shape.json`, embedded at build, and one home per lesson among their files and against every bundled
+  skill); a file that fails, or is unreadable, is skipped and named in the preload. 60 days unused, by the
+  later of last load and last edit, archives a file, run at MCP server start at most once a day.
+  `src/skills/my-brain.ts`; `brain-lint.mjs --root <dir> --mine` runs the same checks plus the summary's
+  shape and a source on every block.
 
-1. Drop a markdown file with frontmatter into `packages/shared/skills/`, with an operative summary under its title, and name it in the router (`slates-start-here`) or in a playbook the router names.
+1. Drop a markdown file with frontmatter into `packages/shared/skills/`, with an operative summary under its title, and name it in the router (`slates-start-here`) or in a playbook the router names. Pin it in `brain-shape.json` (Eric's yes) and source it.
 2. Use portable `name:` and `description:` frontmatter. The shared `src/skills/metadata.ts` parser validates it before embedding or installation. Descriptions distinguish when to use the skill; detailed craft belongs in the body.
 3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
 4. **🚨 A first-party prompt guide is authority on the MODEL; the ENDPOINT SCHEMA is authority on the

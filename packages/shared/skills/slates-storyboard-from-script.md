@@ -10,6 +10,7 @@ description: "Save a supplied script or treatment as an editable Slates document
 - Read the document and its revision first, and keep supplied words, speakers, headings and explicit shot lists. (§ Save the words once)
 - Write words and structure through `slates_update_script_document`; create a board or scene only when the destination needs one. (§ Save the words once)
 - Bind passages with `slates_make_shot_from_script` and never write the dialogue a second time in a custom prompt. (§ Bind production where wanted)
+- Once the Shots exist, match each to its method in the router and offer it where it beats a prompt. (§ Bind production where wanted) <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
 - For a reference ad, read `slates_get_reference_breakdown`, then look at every keyframe with `slates_get_asset_image` before writing. (§ Start from a reference ad)
 - Keep the reference's pacing and beats, never its brand, logo or people. (§ Start from a reference ad)
 - Follow `slates-cost-discipline` for any generation, and inspect existing generation IDs before retrying a timeout. (§ Review without imposing a format)
@@ -31,13 +32,17 @@ A new document-created recipe is script-driven: its prompt compiles from the act
 
 A new Shot files itself into the open scene, else the board's last scene; pass `sceneId` or `frameId` to `slates_create_shot` to place it, and read codes from the result, since a deleted Shot's code can be reused. Keep recurring identities in existing Library references; a working speaker name does not require a placeholder character.
 
+With the Shots read back, go down the list against `slates-start-here` § Offer the method that gets the result. A beat of choreographed action held in one take is blocked in Blender, a card of figures or a title is a motion layer, a line they recorded goes on with lip sync; name the shot code, the method and why, and let them choose per shot. <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
+
 ## Start from a reference ad
 
 A reference gives the structure (the cuts, their lengths, where the words fall); the remake puts the user's product, people and words in it. Breaking down is local and free and generates nothing. Name the reference by `assetId`, `filePath` or `url`: a url is fetched into Media first and works for a Meta Ad Library ad link or a direct link to a video file; TikTok Creative Center and post links (YouTube, TikTok, Facebook, Instagram) are refused with the reason, so download the video and pass `filePath`.
 
+<!-- @inject:reference-breakdown -->
 1. `slates_get_reference_breakdown` reads the cuts and any stored words and writes nothing.
 2. `slates_break_down_reference` with `build: false` saves each cut's keyframe and a first-and-last composite and returns their codes. Look at every one with `slates_get_asset_image` before writing.
 3. Call it again without `build: false` (the frames are reused) with `cuts` (a `description` per cut written for the user's product becomes its prompt; `onScreenText` stays a direction line), `sections` (the beats as headings) and `roles` (who or what recurs; `itemId` points a role at the user's Library item from `slates_list_library`). On a long reference, build first and write the rest a page at a time with `slates_update_shot`.
+<!-- @end:reference-breakdown -->
 
 The new board's Script page holds the reference's words, one paragraph per cut: rewrite them for the user's product with `slates_edit_script`, and each range follows its words. Each Shot is named by its seconds in the reference; a cut shorter than the model allows is reported in `timing` and trimmed on the timeline, never padded in the prompt. Keyframes are posters only, never a reference or first frame. Keep the reference's pacing and beats, never its brand, logo or people.
 

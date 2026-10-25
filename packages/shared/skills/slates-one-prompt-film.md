@@ -8,6 +8,7 @@ description: "Turn a video brief into a finished, editable Slates production and
 <!-- @operative:start -->
 **Operative summary.**
 - Carry the piece through to an exported file, using existing work and entering wherever the creator is. (§ Make the intended piece visible)
+- Check every shot against the router's methods list before pricing it, and offer the better route for that shot. (§ Make the intended piece visible) <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
 - Inspect composed requests with `slates_get_shot` and follow `slates-cost-discipline` before any spend. (§ Inspect the actual requests and estimate)
 - Quote saved shots with `slates_generate_from_shots`, and other generations with `slates_estimate_generation_cost`. (§ Inspect the actual requests and estimate)
 - On an uncertain timeout, read the shot's generation IDs and job status before any retry. (§ Generate only the authorized material)
@@ -22,11 +23,13 @@ Use the current project and document unless another destination is requested. Sa
 
 Preserve fixed passages, explicit creative choices and custom prompt bytes. Recurring cast, repeated framing, silence and dependent scenes are valid when they serve the piece. For a recurring cast member or location, create it and bind its identity sheet or plate before the shots (`slates-character-identity`); those are generations, so quote them with the shots.
 
+Before pricing, read each shot against the router's methods list (`slates-start-here` § Offer the method that gets the result): a fight or a chase in one take goes to Blender blocking, exact words or numbers to a motion layer, a recorded line to lip sync. Offer the method for that shot with its reason, so one film can mix them. <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
+
 ## Inspect the actual requests and estimate
 
 Use `slates_get_shot` to inspect the composed prompt, settings and references. Model choices and supported settings come from `slates-model-selection`, the current capability surface and the selected model's guide. Do not carry limits or prices from an old example.
 
-Follow `slates-cost-discipline` and the user's generation policy. Quote saved shots with `slates_generate_from_shots` and any other generation (audio, lip sync, motion transfer, AI edits) with `slates_estimate_generation_cost`, then confirm the set. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing the script or shots, choosing takes, importing, trimming and building a cut spend nothing; an AI edit of an image or clip (`slates_edit_image`, `slates_edit_video`) is a generation. To judge composition before video spend, price picture previews (`draft` on `slates_generate_from_shots`) and use the approved pictures as first frames. A shot whose exact camera path or cut timing prompting has not held can be blocked first (`slates-previs-blocking`).
+Follow `slates-cost-discipline` and the user's generation policy. Quote saved shots with `slates_generate_from_shots` and any other generation (audio, lip sync, motion transfer, AI edits) with `slates_estimate_generation_cost`, then confirm the set. Existing authorization covers its enumerated requests, not extra takes or changed inputs. Editing the script or shots, choosing takes, importing, trimming and building a cut spend nothing; an AI edit of an image or clip (`slates_edit_image`, `slates_edit_video`) is a generation. To judge composition before video spend, price picture previews (`draft` on `slates_generate_from_shots`) and use the approved pictures as first frames. <!-- src: design review of the brain, 2026-10-25: blocking is offered per shot up front, not only after prompting fails -->
 
 Keep reusable historical media separate from new requests. Matching words alone do not prove matching voice, references or settings. An explicitly requested extra take is never deduplicated away.
 

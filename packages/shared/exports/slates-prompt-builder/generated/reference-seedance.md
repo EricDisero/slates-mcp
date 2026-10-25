@@ -55,7 +55,7 @@
 ByteDance's video model, on Slates credits. Audio always generated alongside the video. Single model `seedance-2` across the full resolution ladder (480p / 720p / 1080p / native 4K — 4K video is Pro-only, default 1080p), 4–15s, first+last frame, and up to 9 reference images / 3 videos / 3 audio clips.
 
 > **How to read this file.**
-> **[official :NNNN]** — ByteDance's own Seedance prompting guide, line `NNNN` of the archived doc dump (`research/byteplus-seedance-2-0-api-docs.md`). Receipt-grade; treat as law.
+> **[official :NNNN]** — ByteDance's own Seedance prompting guide, line `NNNN` of our archived copy of the API docs. Receipt-grade; treat as law. <!-- src: white-label rule, serving providers never named, 2026-10-25 -->
 > **[community]** — third-party guides and our own field notes. Useful, but an `[official]` block always wins.
 > **[slates]** — how the Slates app composes or bills this; not ByteDance doctrine.
 >
@@ -434,7 +434,7 @@ Stability phrases that help:
 ## Sources
 
 **Official (authoritative):**
-- ByteDance — Seedance 2.0 prompting guide, archived at `research/byteplus-seedance-2-0-api-docs.md` (all `:NNNN` refs above)
+- ByteDance — Seedance 2.0 prompting guide and API docs, our archived copy (all `:NNNN` refs above) <!-- src: white-label rule, serving providers never named, 2026-10-25 -->
 
 **Community (secondary):**
 - [apiyi.com — Seedance 2.0 Prompt Guide](https://help.apiyi.com/en/seedance-2-0-prompt-guide-video-generation-camera-style-tips-en.html)

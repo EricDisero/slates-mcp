@@ -19,9 +19,16 @@ A creator ad works because a person the viewer believes talks to them about a pr
 ## 1. Find the winner and break it down
 
 - Take the user's example, or find a creator ad running now for a product like theirs and show it with why it works. One reference per ad.
-- Break it down for free with `slates_get_reference_breakdown` and `slates_break_down_reference` (`slates-storyboard-from-script` § Start from a reference ad), and look at every keyframe.
+- Break it down for free and look at every keyframe: <!-- src: design review of the brain, 2026-10-25: the steps ride every ad playbook from one partial -->
+
+<!-- @inject:reference-breakdown -->
+1. `slates_get_reference_breakdown` reads the cuts and any stored words and writes nothing.
+2. `slates_break_down_reference` with `build: false` saves each cut's keyframe and a first-and-last composite and returns their codes. Look at every one with `slates_get_asset_image` before writing.
+3. Call it again without `build: false` (the frames are reused) with `cuts` (a `description` per cut written for the user's product becomes its prompt; `onScreenText` stays a direction line), `sections` (the beats as headings) and `roles` (who or what recurs; `itemId` points a role at the user's Library item from `slates_list_library`). On a long reference, build first and write the rest a page at a time with `slates_update_shot`.
+<!-- @end:reference-breakdown -->
+
 - List every piece before changing one: the opening line and picture, each beat, where the product enters, the cut lengths, the captions, the call to action, and the register (phone selfie, desk talk, walk and talk, a demo in hand).
-- Keep the reference's pacing and beats, never its creator, brand or logo.
+- Swap the creator, the brand and the logo; keep the rest. <!-- src: brain lint, one home per lesson, 2026-10-25 -->
 
 ## 2. Cast the creator
 
@@ -56,10 +63,18 @@ Inspect each composed request, price the set, show the prompts and the total, an
 
 ## 6. Cut and export
 
-Cut in the reference's order and pace (`slates-cuts`): the hook's first frame already moving, no air between lines. Caption the speech (`slates-captions`). Save each hook as a version and export every hook, body and format in one job (`slates-ad-variants`).
+Cut in the reference's order and pace (`slates-cuts`): the hook's first frame already moving, no air between lines. Caption the speech (`slates-captions`). Save each hook as a version; the export of the set is `slates-ad-variants`. <!-- src: brain lint, one home per lesson, 2026-10-25 -->
 
 ## The truth rules
 
-- An AI creator may present the product, say it is AI and show what the product does. It never says or implies that it bought or used the product or got a result from it, and never gives a review or a before-and-after as if it lived one. Fake and AI-generated testimonials are banned outright in the United States (the FTC's rule on fake reviews, 16 CFR Part 465).
+<!-- @inject:ad-truth-rules -->
+- Every claim is literally true of the user's product: no invented guarantee, statistic, result or offer term, and no claim read off a reference picture.
+- No fabricated testimonials or reviews. An AI person may present the product and say what it is; it never says or implies that it bought or used the product or got a result from it. Fake and AI-generated testimonials are banned outright in the United States (the FTC's rule on fake reviews, 16 CFR Part 465). Keep the reference's beat and give the line to someone who can say it truthfully, or turn it into a fact about the product.
+- A real person's likeness, a brand or a logo follows `slates-content-policy`.
+<!-- @end:ad-truth-rules -->
+
+What a creator ad adds: <!-- src: design review of the brain, 2026-10-25: the truth rules ride every ad playbook from one partial -->
+
+- An AI creator may say it is AI and show what the product does; it never shows a before-and-after as if it lived one. <!-- src: design review of the brain, 2026-10-25: only what the shared truth rules do not already say -->
 - When the reference's creator speaks as a customer, keep the beat and its timing and change the line: a fact about the product, something the character heard, or the real owner speaking.
-- Every claim is true of the product; no invented results or offer terms.
+

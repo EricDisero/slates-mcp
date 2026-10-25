@@ -1,6 +1,6 @@
 ---
 name: slates-previs-blocking
-description: "Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip. Use when those controls are required or prompting has failed to hold them."
+description: "Block a shot in Blender and guide generation with the clip: an exact camera path, cut timing, spatial continuity, or a one-take of choreographed action (a fight, a drift, a chase) that prompting cannot hold."
 ---
 
 # Previs blocking — design the shot, then generate it

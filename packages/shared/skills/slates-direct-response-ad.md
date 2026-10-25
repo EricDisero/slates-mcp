@@ -20,19 +20,23 @@ An ad is a test in the user's ad account, and the ads that already win in a feed
 
 - **The user has one:** take it. Their link, file or saved asset is the reference.
 - **They have none:** find an ad running now for a product like theirs, the longer it has run the better, and show it to them with why it works before you build on it. A Meta Ad Library link works directly.
+- **They have a board already:** it is their draft, and it may copy no winner. Ask which ad it copies, or find one, and write the hooks from it before you reprice a shot. <!-- src: brain craft eval, dr-plan built on the board with no reference and one hook, 2026-10-25 -->
 - **One reference per ad.** A batch of ads is that many references, one each; contrast between ads comes free because each source differs.
 - **Composing is the failure.** Taking one device from a winner and building your own ad around it, mixing devices from several ads, or improving on the winner are all composing. Copy it.
 
 ## 2. Break it down
 
-Breaking down is local and free and generates nothing; `slates-storyboard-from-script` § Start from a reference ad has the full steps.
+It costs nothing and generates nothing; how to pass the reference is `slates-storyboard-from-script` § Start from a reference ad. <!-- src: design review of the brain, 2026-10-25: the steps ride every ad playbook from one partial -->
 
-1. `slates_get_reference_breakdown` reads the cuts and words without writing anything.
-2. `slates_break_down_reference` with `build: false` saves each cut's keyframe; look at every one with `slates_get_asset_image`.
-3. List every piece of the reference before you change one: the hook's picture and line, each beat, each cut's length, the on-screen text, the sound, the offer and the call to action.
-4. Build the board: each cut's `description` rewritten for the user's product, the beats as `sections`, and `roles` pointing at the product.
+<!-- @inject:reference-breakdown -->
+1. `slates_get_reference_breakdown` reads the cuts and any stored words and writes nothing.
+2. `slates_break_down_reference` with `build: false` saves each cut's keyframe and a first-and-last composite and returns their codes. Look at every one with `slates_get_asset_image` before writing.
+3. Call it again without `build: false` (the frames are reused) with `cuts` (a `description` per cut written for the user's product becomes its prompt; `onScreenText` stays a direction line), `sections` (the beats as headings) and `roles` (who or what recurs; `itemId` points a role at the user's Library item from `slates_list_library`). On a long reference, build first and write the rest a page at a time with `slates_update_shot`.
+<!-- @end:reference-breakdown -->
 
-Put the product in the Library first, so it stays identical in every shot: `slates_import_product` reads its page into a product and its brand into a look. Keep the reference's pacing and beats, never its brand, logo or people.
+Before you write a line for the build, list every piece of the reference: the hook's picture and line, each beat, each cut's length, the on-screen text, the sound, the offer and the call to action. <!-- src: design review of the brain, 2026-10-25 -->
+
+Put the product in the Library first, so it stays identical in every shot: `slates_import_product` reads its page into a product and its brand into a look. <!-- src: brain lint, one home per lesson, 2026-10-25 -->
 
 ## 3. Write the script
 
@@ -68,6 +72,8 @@ Price the whole set with the quote on the Shots (`slates_generate_from_shots` re
 
 ## The truth rules
 
+<!-- @inject:ad-truth-rules -->
 - Every claim is literally true of the user's product: no invented guarantee, statistic, result or offer term, and no claim read off a reference picture.
 - No fabricated testimonials or reviews. An AI person may present the product and say what it is; it never says or implies that it bought or used the product or got a result from it. Fake and AI-generated testimonials are banned outright in the United States (the FTC's rule on fake reviews, 16 CFR Part 465). Keep the reference's beat and give the line to someone who can say it truthfully, or turn it into a fact about the product.
 - A real person's likeness, a brand or a logo follows `slates-content-policy`.
+<!-- @end:ad-truth-rules -->
