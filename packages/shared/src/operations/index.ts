@@ -6710,16 +6710,49 @@ export const editTimelineClips: Operation<{
   },
 }
 
+const keyframeEasing = z.union([
+  z.enum(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'hold']),
+  z.object({ cubicBezier: z.tuple([z.number().min(0).max(1), z.number(), z.number().min(0).max(1), z.number()]) }).strict(),
+])
+const keyframeKeys = z.array(
+  z
+    .object({
+      frame: z.number().int().min(0).describe("Frames from the clip's start, at the timeline's frame rate."),
+      value: z.number().finite(),
+      easing: keyframeEasing.optional().describe('The curve from this key to the next. Default linear; hold jumps at the next key.'),
+    })
+    .strict()
+)
+const keyframeList = keyframeKeys.max(500)
+
+/** An effect list as the desktop stores it (`slate/src/shared/audioEffects.ts`); slates_get_timeline's audioEffects lists each type's parameters and ranges. */
+const audioEffectList = z
+  .array(
+    z
+      .object({
+        id: z.string().max(64).optional().describe('Kept when sent back; a new effect gets one.'),
+        type: z.enum(['volume', 'eq']).describe("volume: gain in dB (param gainDb, -60 silent to +12). eq: its low-pass (params 'lowpass.frequency' in Hz, 20 to 20000, swept by octave; 'lowpass.q', 0.1 to 10, 0.71 flat)."),
+        bypass: z.boolean().optional(),
+        params: z.record(z.number()).optional().describe('Fixed values by parameter name.'),
+        keyframes: z.record(keyframeKeys.max(4000)).optional().describe('Keys by parameter name; a keyed parameter reads its keys instead of its fixed value.'),
+      })
+      .strict()
+  )
+  .max(16)
+
 export const updateClip: Operation<{
   projectId: string; clipId: string
   speed?: number | null; volume?: number | null; audioOffsetFrames?: number | null
   fadeInFrames?: number | null; fadeOutFrames?: number | null; audioFadeInFrames?: number | null; audioFadeOutFrames?: number | null
   look?: { blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light'; grain?: number; saturation?: number } | null
+  effects?: z.infer<typeof audioEffectList> | null
+  speedRamp?: z.infer<typeof keyframeKeys> | null
+  speedSound?: 'tape' | 'keep-pitch' | null
   ripple?: boolean
 }> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look.",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (its low-pass), each fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -6735,11 +6768,18 @@ export const updateClip: Operation<{
       grain: z.number().min(0).max(1).optional(),
       saturation: z.number().min(0).max(2).optional(),
     }).strict().nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1). null clears it.'),
-    ripple: z.boolean().optional().describe("With speed: move the lane's later clips instead of covering them."),
+    effects: audioEffectList.nullable().optional().describe("A clip with sound: its effect list, sent whole; null clears it. A split picture's go to its sound clip."),
+    speedRamp: keyframeKeys.max(4000).nullable().optional().describe("Speeds (0.05 to 20) keyed in frames from the clip's start; null goes back to one speed. Its linked sound follows."),
+    speedSound: z.enum(['tape', 'keep-pitch']).nullable().optional().describe("How a constant speed's sound plays: tape moves pitch with speed; keep-pitch (or null) holds it. A ramp's is always tape."),
+    ripple: z.boolean().optional().describe("With speed or speedRamp: move the lane's later clips instead of covering them."),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-editing', "a clip's speed, volume, split edit and fades")
+    if (input.speed !== undefined && input.speedRamp !== undefined) throw new Error('Send speed (one speed) or speedRamp (keyed), not both.')
+    if (input.effects !== undefined || input.speedRamp !== undefined || input.speedSound !== undefined) {
+      await desktop.requireCapability('audio-effects', 'audio effects and speed ramps')
+    }
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
     if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
@@ -6975,21 +7015,6 @@ export const updateOverlayClip: Operation<{
 }
 
 const KEYFRAME_PROPERTY_IDS = ['positionX', 'positionY', 'scale', 'rotation', 'opacity', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom', 'focusX', 'focusY', 'zoom'] as const
-const keyframeEasing = z.union([
-  z.enum(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out', 'hold']),
-  z.object({ cubicBezier: z.tuple([z.number().min(0).max(1), z.number(), z.number().min(0).max(1), z.number()]) }).strict(),
-])
-const keyframeList = z
-  .array(
-    z
-      .object({
-        frame: z.number().int().min(0).describe("Frames from the clip's start, at the timeline's frame rate."),
-        value: z.number().finite(),
-        easing: keyframeEasing.optional().describe('The curve from this key to the next. Default linear; hold jumps at the next key.'),
-      })
-      .strict()
-  )
-  .max(500)
 
 export const setClipKeyframes: Operation<{
   projectId: string; timelineId: string; clipId: string
@@ -7202,10 +7227,11 @@ export const updateTimelineTrack: Operation<{
   muted?: boolean
   locked?: boolean
   volume?: number
+  effects?: z.infer<typeof audioEffectList> | null
 }> = {
   id: 'slates_update_timeline_track',
   description:
-    'Update a timeline track: rename, mute/unmute, lock/unlock, or set its volume fader (linear gain, -∞ to +12 dB). Track volume applies to both preview and MP4 export — audio-track clips are mixed at this gain; a muted video track still shows video but its embedded audio is silenced.',
+    'Update a timeline track: rename, mute/unmute, lock/unlock, or set its volume fader (linear gain, -∞ to +12 dB). Track volume applies to both preview and MP4 export — audio-track clips are mixed at this gain; a muted video track still shows video but its embedded audio is silenced. effects puts an effect list on a sound lane, heard after its clips\' own (the same shape as slates_update_clip, keys in frames from the timeline start).',
   input: z.object({
     projectId: z.string().uuid(),
     trackId: z.string().uuid(),
@@ -7213,10 +7239,12 @@ export const updateTimelineTrack: Operation<{
     muted: z.boolean().optional(),
     locked: z.boolean().optional(),
     volume: z.number().min(0).max(4).optional().describe('Track fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
+    effects: audioEffectList.nullable().optional().describe('A video or audio lane: its effect list, sent whole; null clears it.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
+    if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on a lane')
     return ok(await desktop.post('/agent/timeline/update-track', input))
   },
 }
@@ -7242,21 +7270,24 @@ export const updateTimelineSettings: Operation<{
   height?: number
   frameRate?: 24 | 30 | 60
   masterVolume?: number
+  effects?: z.infer<typeof audioEffectList> | null
 } & CutOptions> = {
   id: 'slates_update_timeline_settings',
   description:
-    "Update a timeline's output settings: resolution, frame rate (24/30/60; all clips are conformed to it on export), masterVolume, or delivery formats, naming taxonomy and explicit variant grid bindings. New fields require ad-variant-export; null clears them. Read aspects and dimensions from slates_get_variant_grid. Delivery-only updates on an explicit timeline return the computed formats. masterVolume is the output fader (linear gain: 0 is silent, 1 is unity, 4 is the maximum boost) applied to the preview and the final mix; use it to prevent clipping when stacking loud tracks. These are normally auto-managed: the first video clip sets fps and resolution, higher-res clips raise the canvas, and delivery preserves the master aspect. Changing frameRate keeps clip positions, lengths and markers in seconds, rounded to the nearest new frame.",
+    "Update a timeline's output settings: resolution, frame rate (24/30/60; all clips are conformed to it on export), masterVolume, or delivery formats, naming taxonomy and explicit variant grid bindings. New fields require ad-variant-export; null clears them. Read aspects and dimensions from slates_get_variant_grid. Delivery-only updates on an explicit timeline return the computed formats. masterVolume is the output fader (linear gain: 0 is silent, 1 is unity, 4 is the maximum boost) applied to the preview and the final mix; use it to prevent clipping when stacking loud tracks. These are normally auto-managed: the first video clip sets fps and resolution, higher-res clips raise the canvas, and delivery preserves the master aspect. Changing frameRate keeps clip positions, lengths and markers in seconds, rounded to the nearest new frame. effects puts an effect list on the master, after the output fader (the same shape as slates_update_clip, keys in frames from the timeline start).",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     width: z.number().int().min(16).optional(),
     height: z.number().int().min(16).optional(),
     frameRate: z.union([z.literal(24), z.literal(30), z.literal(60)]).optional(),
     masterVolume: z.number().min(0).max(4).optional().describe('Output fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
+    effects: audioEffectList.nullable().optional().describe("The master's effect list, sent whole; null clears it."),
     ...cutOptionsInput,
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
+    if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on the master')
     await requireNamedCut(desktop, input.timelineId)
     if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
       await desktop.requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')

@@ -52,6 +52,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['timeline-transitions', 'transitions on cuts'],
   ['timeline-editing', 'trim, roll, ripple, slip, move, split and clip settings'],
   ['clip-look', "a clip's blend, grain and colour"],
+  ['audio-effects', 'audio effects and speed ramps'],
   ['transcripts', 'transcribing speech on this machine'],
   ['captions', 'captions'],
   ['transcript-edit', 'correcting a transcript'],
