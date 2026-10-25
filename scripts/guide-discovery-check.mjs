@@ -17,14 +17,17 @@ const everyGuide = Object.keys(SKILLS).length + HYPERFRAMES_SKILL_NAMES.length
 
 // The catalog is computed from every source skill, not a hand-maintained subset: Slates' own and
 // HyperFrames' copied folders (skills/hyperframes/, its NOTICE).
+// The catalog's largest page, printed in the pass message. Measured 14,113 characters on 2026-10-25 (one page,
+// once slates-ad-variants joined); the ceiling, 14,400, sits a little above it. Raise it only by re-measuring:
+// a HyperFrames guide's line is the first sentence of its upstream description, capped at 160 characters.
+const CATALOG_CEILING = 14_400
+let catalogChars = 0
 const found = new Set()
 let offset = 0
 for (;;) {
   const result = await run({ offset })
-  // 12,000 until the 21 HyperFrames guides joined it (12,452 on 2026-10-18); their catalog line is
-  // the first sentence of the upstream description, capped at 160 characters. 14,500 from 2026-10-25, when
-  // slates-ad-variants joined it (14,113).
-  assert(result.text.length < 14500, `the whole catalog stays bounded (${result.text.length})`)
+  catalogChars = Math.max(catalogChars, result.text.length)
+  assert(result.text.length < CATALOG_CEILING, `the whole catalog stays bounded (${result.text.length}, ceiling ${CATALOG_CEILING})`)
   for (const name of names(result)) { assert(!found.has(name)); found.add(name) }
   if (result.data.nextOffset === null) break
   offset = result.data.nextOffset
@@ -139,4 +142,4 @@ const offline = { ...disconnected, cloud: () => { throw new Error('a free guide 
 assert((await run({ topic: 'seedance-2.5' }, offline)).text.length > 0)
 assert(!Object.hasOwn(SKILLS, privateName))
 assert(ALL_OPERATIONS.some(op => op.id === getPromptingGuide.id))
-console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), natural briefs, ad ranking, pagination, aliases, sections, manual and private access passed.`)
+console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), catalog ${catalogChars} characters (ceiling ${CATALOG_CEILING}), natural briefs, ad ranking, pagination, aliases, sections, manual and private access passed.`)
