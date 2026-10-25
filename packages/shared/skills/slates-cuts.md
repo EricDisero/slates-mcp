@@ -50,7 +50,7 @@ When the picture slows down, slow the sound with it and the moment lands. Put ev
 - **The shot's own sound:** the same `eq` keys with the floor at 2500 Hz, lighter than the music's, so the action stays clear under it.
 - **Level:** a constant level is `volume` (linear; -4 dB is 0.631, +1 dB is 1.122). A dip on the slow part is a `volume` effect with `gainDb` keyed on the same clock. End the music with `audioFadeOutFrames` (6 is a quarter second at 24 fps).
 
-`effects` is sent whole, so send back every effect the clip keeps. A key between frames needs a desktop with `keys-between-frames`; an older one refuses it. Export and listen across the ramp before calling it done.
+`effects` is sent whole, so send back every effect the clip keeps. A key between frames needs a desktop with `keys-between-frames`; an older one refuses it. To show the user the result, `slates_set_selection` with `surface: "timeline"` and the clip's id selects it, scrolls the timeline to it and opens its Inspector. Export and listen across the ramp before calling it done.
 
 ## Music cut downbeat to downbeat
 
@@ -75,6 +75,7 @@ Two clips share one tall frame, one above the other, with a picture over both fo
 - **Labels over both:** text clips, frames 0 to 360, each in its own font at an exact size (`slates_add_text_clip` with `style: "plain"`, `font` such as `bebas-neue` or `montserrat-extrabold`, and `fontSize` as a fraction of the frame's height). A logo before its words is the clip's `pictureAssetId`; clips that share a `line` (`{ name, place }`) sit side by side, left to right by `place`, and are centred as one, which is how a `[logo] Blender + [logo] slates` strip is set. The reference row's pictures are `slates_add_image_overlay` items.
 - **A slow motion on both:** the same `speedRamp` on each lane's clip, on the exact clock of § Audio follows the slow motion (110.4, 124.8, 172.8, 189.6), keeps the two pictures in step; keys between frames are kept as sent, never rounded.
 - **Read it back:** `slates_get_timeline` shows the frame size, the frame rate, each clip's range and its keys (`timeline.keyframes`). Check all of them against the numbers above.
+- **Show a lane to the user:** `slates_set_selection` with `surface: "timeline"`, `mode: "replace"` and the clip's id (from `slates_get_timeline`) selects it, scrolls the timeline to it and opens its Inspector; no need to ask the user to click it.
 
 ## Check the cut
 

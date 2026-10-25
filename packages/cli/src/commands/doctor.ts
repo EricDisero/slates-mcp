@@ -97,6 +97,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['frame-extract', 'extracting a frame from a clip'],
   ['view-v2', 'showing and opening things in the window'],
   ['selection-set', 'ticking cards and shots'],
+  ['timeline-select', 'selecting timeline clips'],
   ['first-frames', 'using pictures as first frames'],
   ['grid-extract', 'extracting cells from a grid picture'],
   ['frame-preferred-clip', 'choosing the clip a slot uses'],

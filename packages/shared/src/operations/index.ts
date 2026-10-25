@@ -641,11 +641,12 @@ export const getSelection: Operation<Record<string, never>> = {
 
 // 1.6.1: what is ticked. Mirrors slate's `SELECTION_TARGETS` and `SELECTION_MODES` in `@shared/types/view`
 // (lockstep check 12), which this package cannot import.
-const SELECTION_TARGETS = ['media', 'board'] as const
+const SELECTION_TARGETS = ['media', 'board', 'timeline'] as const
 const SELECTION_MODES = ['replace', 'add', 'remove', 'clear', 'all'] as const
 
 /**
- * SET what is selected, as the user's clicks do: the cards ticked in Media, the Shots ticked on the Board.
+ * SET what is selected, as the user's clicks do: the cards ticked in Media, the Shots ticked on the Board, the
+ * clips selected on the timeline (which also opens the Cut on them, scrolls to them and opens the Inspector).
  * Pairs with `slates_get_selection`, which reads it: "tick the shots with no clip, then price them" is this op
  * and then the quote. The desktop applies it through the stores the grids write and answers with what SETTLED.
  */
@@ -656,25 +657,29 @@ export const setSelection: Operation<{
 }> = {
   id: 'slates_set_selection',
   description:
-    "Tick or untick cards in Media or Shots on the Board, as clicks, Shift-click, Escape and Ctrl/Cmd+A do: replace makes the ids the whole selection, add and remove change only them, clear empties it, all ticks everything the tab shows (Media: the grid as filtered, folded rounds left out; Board: every Shot on the open board). Media needs its grid showing and the Board needs the Board or Script tab; slates_set_view switches. Ids are asset ids or badge codes (Media) or Shot ids or SHOT-A codes (Board). Answers with the selection as it settled and names any id it could not tick. slates_get_selection reads it back; what is selected is what the user means by 'these'.",
+    "Select cards in Media, Shots on the Board or clips on the timeline, as clicks, Shift-click, Escape and Ctrl/Cmd+A do: replace makes the ids the whole selection, add and remove change only them, clear empties it, all ticks everything the tab shows (Media: the grid as filtered, folded rounds left out; Board: every Shot on the open board; timeline: every clip on the open timeline). Media needs its grid showing and the Board needs the Board or Script tab; slates_set_view switches. The timeline needs nothing open: it opens the Cut on the clips' timeline, scrolls to them and opens the Inspector on the last, so use it to show the user a clip instead of asking them to click it. Ids are asset ids or badge codes (Media), Shot ids or SHOT-A codes (Board) or clip ids from slates_get_timeline (timeline, all on one timeline). Answers with the selection as it settled and names any id it could not select. slates_get_selection reads it back (timeline clips under timeline.selectedClips); what is selected is what the user means by 'these'.",
   input: z
     .object({
       surface: z.enum(SELECTION_TARGETS),
       mode: z.enum(SELECTION_MODES),
-      ids: z.array(z.string().min(1)).max(500).optional().describe('Asset ids or codes (media) or Shot ids or codes (board). Not used by clear or all.'),
+      ids: z.array(z.string().min(1)).max(500).optional().describe('Asset ids or codes (media), Shot ids or codes (board) or clip ids (timeline). Not used by clear or all.'),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('selection-set', 'setting what is selected')
+    if (input.surface === 'timeline') await ctx.desktop().requireCapability('timeline-select', 'selecting timeline clips')
     if ((input.mode === 'add' || input.mode === 'remove') && !input.ids?.length) throw new Error(`${input.mode} needs ids.`)
     const r = await ctx.desktop().post<{
-      selection: { surface: string; projectId: string; ids: string[]; items: Array<{ id: string; code: string | null; label: string | null }> } | null
+      selection: { surface: string; projectId: string; timelineId?: string | null; ids: string[]; items: Array<{ id: string; code: string | null; label: string | null; track?: string; start?: { frame: number; timecode: string } }> } | null
       reason?: string
       notes?: string[]
     }>('/agent/selection', input)
     if (!r.selection) return { text: `Nothing was changed (${r.reason ?? 'no answer'}).`, data: { selection: null } }
-    const where = r.selection.surface === 'media' ? 'Media' : 'the Board'
-    const named = (row: { id: string; code: string | null; label: string | null }): string => (row.code ? (row.label ? `${row.code} — ${row.label}` : row.code) : row.id)
+    const where = r.selection.surface === 'media' ? 'Media' : r.selection.surface === 'timeline' ? 'the timeline' : 'the Board'
+    const named = (row: { id: string; code: string | null; label: string | null; track?: string; start?: { timecode: string } }): string => {
+      const name = row.code ? (row.label ? `${row.code} — ${row.label}` : row.code) : row.label ?? row.id
+      return row.track && row.start ? `${name} (${row.track}, ${row.start.timecode}, ${row.id})` : name
+    }
     const notes = r.notes?.length ? ` Not applied: ${r.notes.join('; ')}.` : ''
     return {
       text: (r.selection.items.length ? `${r.selection.items.length} selected on ${where}: ${r.selection.items.map(named).join(', ')}.` : `Nothing is selected on ${where}.`) + notes,
