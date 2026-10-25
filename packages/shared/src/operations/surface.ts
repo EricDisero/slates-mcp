@@ -186,7 +186,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
   script: ['slates_get_script_document', 'slates_update_script_document', 'slates_get_script_sections', 'slates_update_script_section', 'slates_get_script_suggestions', 'slates_update_script_suggestions', 'slates_get_script_uses', 'slates_preview_script_variation', 'slates_create_script_variation', 'slates_get_shot_inputs', 'slates_reuse_shot_take'],
   timeline: [
     'slates_list_timelines', 'slates_save_timeline', 'slates_export_cuts',
-    'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid',
+    'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid', 'slates_get_recipe',
     'slates_reframe_clip', 'slates_get_reframe_report',
     'slates_get_timeline',
     'slates_add_clip_to_timeline',
@@ -280,7 +280,7 @@ export function tierFor(id: string): OperationTier {
 export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, favorites, pins, the Library (user-named categories of saved references: characters, locations, products, looks) and styles, templates (list, export, import), exporting original asset files, moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
-  timeline: 'named cuts and exporting several at once; the timeline (tracks, clips, markers, settings), text, picture and HTML motion layers, captions, video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
+  timeline: 'named cuts and exporting several at once, what made an exported ad (its recipe ID); the timeline (tracks, clips, markers, settings), text, picture and HTML motion layers, captions, video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
   admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }

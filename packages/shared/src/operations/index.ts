@@ -6408,6 +6408,19 @@ export const getVariantGrid: Operation<{ projectId: string }> = {
   },
 }
 
+export const getRecipe: Operation<{ recipe: string; projectId?: string }> = {
+  id: 'slates_get_recipe', description: 'Find what made an exported ad from its recipe ID, its full ad name or its file name (anything holding __r-<id>). Returns every export that carried the recipe (batch, export time, ad name, files per format, the timeline id and name, its taxonomy); then each clip with its asset and, when generated, the model, prompt, references and key settings frozen at export, and the Shot and board it came from; then any timeline that still renders the recipe. Searches every project unless projectId is given. When nothing matches, notFound says why: exported before Slates 1.6.4, or the timeline changed and its export folder is unreachable. Read-only; never generates or spends. Requires recipe-lookup; update Slates on capability refusal.',
+  billable: false,
+  input: z.object({
+    recipe: z.string().min(1).describe('The recipe ID (the characters after __r-), or a whole ad name, file name or path containing __r-<id>.'),
+    projectId: z.string().uuid().optional().describe('Search only this project; omit to search every project.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('recipe-lookup', 'looking up the recipe behind an exported ad')
+    return ok(await ctx.desktop().get('/agent/timeline/recipe', input))
+  },
+}
+
 const reframeReportInput = z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid(), aspect: deliveryAspectInput, clipId: z.string().uuid().optional() }).strict()
 export const getReframeReport: Operation<z.infer<typeof reframeReportInput>> = {
   id: 'slates_get_reframe_report', description: 'Inspect effective delivery framing, computed dimensions, kept frame percentage, upscale and stale-take or missing-media warnings for a cut or one clip. Read before reframing; warnings never trigger generation or disable export. Requires ad-variant-export; update Slates on capability refusal.',
@@ -10155,6 +10168,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getExportBatch as unknown as Operation<unknown>,
   cancelExportBatch as unknown as Operation<unknown>,
   getVariantGrid as unknown as Operation<unknown>,
+  getRecipe as unknown as Operation<unknown>,
   reframeClip as unknown as Operation<unknown>,
   getReframeReport as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,

@@ -75,6 +75,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['board-quote', 'Shot prices and the board quote'],
   ['board-progress', 'board progress'],
   ['cut-edit', 'editing a cut'],
+  ['recipe-lookup', 'what made an exported ad'],
   ['sheet-tool-seats', 'sheet tools on the default image seat'],
   ['image-variations', 'more than 4 images per call'],
   ['shot-position', 'placing a new Shot at a slot'],

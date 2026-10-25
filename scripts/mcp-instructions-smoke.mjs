@@ -143,6 +143,7 @@ check('slates_generate_video is listed by default', tools.some((t) => t.name ===
 for (const [name, readOnly] of [
   ['slates_export_cuts', false], ['slates_get_export_batch', true], ['slates_cancel_export_batch', false],
   ['slates_get_variant_grid', true], ['slates_reframe_clip', false], ['slates_get_reframe_report', true],
+  ['slates_get_recipe', true],
 ]) {
   const tool = tools.find(t => t.name === name)
   check(`${name} is exposed by default with correct read/write annotations`, !!tool && tool.annotations?.readOnlyHint === readOnly && tool.annotations?.openWorldHint === false)

@@ -82,6 +82,7 @@ async function fastCheck() {
     editorRoutes = await readFile(desktopSource('src/main/agent/routes-editor.ts'), 'utf8')
     const caps = await readFile(desktopSource('src/main/agent/server.ts'), 'utf8')
     assert(caps.includes("'ad-variant-export'"), 'desktop capability must land first')
+    assert(caps.includes("'recipe-lookup'"), 'the recipe-lookup capability must land first')
   } else {
     console.log(`SKIP: desktop capability declaration and editor-route presence assertions; desktop checkout absent: ${desktopCheckout}`)
   }
@@ -142,6 +143,23 @@ async function fastCheck() {
     assert.equal(op.billable, false, `${id} must be non-billable`)
     assert.equal(op.annotations.openWorldHint, false)
     assert(op.description.length <= 2048)
+  }
+  // What made an ad: one read-only GET on its own capability, refused before any transport on an older desktop.
+  {
+    const op = byId.get('slates_get_recipe'), input = { recipe: 'angle-A__r-5a799d1ef9__9x16.mp4', projectId }
+    gates.length = 0
+    await invoke('slates_get_recipe', input)
+    assert.deepEqual(gates, ['recipe-lookup'])
+    assert.deepEqual(calls.at(-1), ['GET', '/agent/timeline/recipe', input], 'the ad name passes through untouched; the desktop extracts the ID')
+    if (editorRoutes !== undefined) assert(editorRoutes.includes("r.add('GET', '/agent/timeline/recipe'"), '/agent/timeline/recipe must exist before op')
+    assert.deepEqual([op.billable, op.annotations.readOnlyHint, op.annotations.destructiveHint, op.annotations.openWorldHint], [false, true, false, false])
+    assert(op.description.length <= 2048)
+    assert.equal(op.input.safeParse({ recipe: '' }).success, false)
+    assert.equal(op.input.safeParse({ recipe: 'abcdef1234', projectId: 'not-a-uuid' }).success, false)
+    const before = calls.length
+    const refusing = { ...desktop, requireCapability: async cap => { throw new Error(`Update Slates: ${cap} required`) } }
+    await assert.rejects(() => op.run(op.input.parse(input), { ...ctx, desktop: () => refusing }), /Update Slates: recipe-lookup/)
+    assert.equal(calls.length, before, 'refusal must precede transport')
   }
   assert.equal(byId.get('slates_export_cuts').input.safeParse({ ...batch, directory: 'mixed-v1' }).success, false)
   assert.equal(byId.get('slates_export_cuts').input.safeParse({ ...batch, items: [] }).success, false)
