@@ -105,6 +105,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['shot-from-asset', 'saving a result as a Shot'],
   ['media-folder', 'choosing the folder a generation or upload lands in'],
   ['reference-breakdown', 'breaking a reference ad into shots'],
+  ['reference-cancel', 'stopping a reference breakdown'],
   ['product-intake', 'adding products from their pages'],
   ['ad-variants', 'ad variants on one shared body'],
   ['variant-grid', 'the variant grid and its export from the segment cache'],

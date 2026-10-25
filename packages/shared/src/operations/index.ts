@@ -8255,11 +8255,13 @@ export const breakDownReference: Operation<{
   cuts?: Array<{ index: number; description?: string; onScreenText?: string }>
   sections?: Array<{ label: string; fromCut: number }>
   roles?: Array<{ name: string; kind?: 'person' | 'location' | 'product'; itemId?: string; cuts: number[] }>
+  jobId?: string
+  cancel?: boolean
 }> = {
   id: 'slates_break_down_reference',
   billable: false,
   description:
-    "Start from a reference ad: break a finished video into a new board with one Shot per cut, as the clip's Break down into shots command does, so the user can remake it with their own product. Each Shot is postered with its cut's keyframe (a poster only, never a reference or first frame), named by its seconds in the reference, and holds the words heard in that cut on the Script page. Nothing is generated and nothing spends: the result carries the board's quote, the Shot codes and each timing gap in words (a cut shorter than the model's shortest length). Local and free; the first transcription can take minutes. Name the reference by assetId, filePath or url, one of them: a url is fetched into the project's Media first, and works for a Meta Ad Library ad link (facebook.com/ads/library/?id=...) or a direct link to a video file; TikTok Creative Center, YouTube and TikTok post links are refused with the reason (download the video, then pass filePath). The result's source names the link, its kind and the video file it fetched. build false saves each cut's keyframe and first-and-last composite to a frames folder and returns the cuts, without a board: look at them with slates_get_asset_image, then call again with build (the frames are reused) and `cuts` (each cut's description, written for the user's product, becomes its Shot's prompt; onScreenText becomes a direction line), `sections` (headings) and `roles` (who or what recurs; itemId points the role at the user's own Library item). A still becomes one Shot. Generate only after the user approves the quote (slates_generate_from_shots).",
+    "Start from a reference ad: break a finished video into a new board with one Shot per cut, as the clip's Break down into shots command does, so the user can remake it with their own product. Each Shot is postered with its cut's keyframe (a poster only, never a reference or first frame), named by its seconds in the reference, and holds the words heard in that cut on the Script page. Nothing is generated and nothing spends: the result carries the board's quote, the Shot codes and each timing gap in words (a cut shorter than the model's shortest length). Local and free; the first transcription can take minutes. Name the reference by assetId, filePath or url, one of them: a url is fetched into the project's Media first, and works for a Meta Ad Library ad link (facebook.com/ads/library/?id=...) or a direct link to a video file; TikTok Creative Center, YouTube and TikTok post links are refused with the reason (download the video, then pass filePath). The result's source names the link, its kind and the video file it fetched. build false saves each cut's keyframe and first-and-last composite to a frames folder and returns the cuts, without a board: look at them with slates_get_asset_image, then call again with build (the frames are reused) and `cuts` (each cut's description, written for the user's product, becomes its Shot's prompt; onScreenText becomes a direction line), `sections` (headings) and `roles` (who or what recurs; itemId points the role at the user's own Library item). A still becomes one Shot. Generate only after the user approves the quote (slates_generate_from_shots). To be able to stop a run, name it with jobId; cancel true with that jobId (and projectId, nothing else) stops it at its next step, removing its frames and any video it fetched.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -8302,10 +8304,19 @@ export const breakDownReference: Operation<{
         )
         .optional()
         .describe('Who or what recurs. Without itemId a role becomes a new Library item to fill in.'),
+      jobId: z.string().min(1).max(120).optional().describe('A name for this run, so a later call with cancel can stop it.'),
+      cancel: z.boolean().optional().describe('true: stop the run named by jobId instead of starting one.'),
     })
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('reference-breakdown', 'breaking a reference ad into shots')
+    if (input.cancel) {
+      if (!input.jobId) throw new Error('cancel stops a run by its jobId: give the jobId the breakdown was started with.')
+      await ctx.desktop().requireCapability('reference-cancel', 'stopping a reference breakdown')
+      const c = await ctx.desktop().post<{ jobId: string; cancelled: boolean }>('/agent/reference/cancel', { jobId: input.jobId })
+      return ok(c, c.cancelled ? `Stopping breakdown ${c.jobId}: it ends at its next step, its frames and any fetched video removed.` : `No breakdown named ${c.jobId} is running.`)
+    }
+    if (input.jobId) await ctx.desktop().requireCapability('reference-cancel', 'naming a reference breakdown so it can be stopped')
     if ([input.assetId, input.filePath, input.url].filter(Boolean).length !== 1) {
       throw new Error('Give exactly one of assetId (a video or picture in the project), filePath or url.')
     }
@@ -8315,7 +8326,7 @@ export const breakDownReference: Operation<{
       board: { storyboardId: string; shotCodes: string[]; timing: string[]; warnings: string[] } | null
       reused: boolean
       source: { url: string; kind: string; videoUrl: string } | null
-    }>('/agent/reference/breakdown', { ...input, assetId })
+    }>('/agent/reference/breakdown', { ...input, assetId, cancel: undefined })
     const cuts = r.breakdown.segments.length
     const fetched = r.source ? `Fetched the ${r.source.kind === 'meta' ? 'Meta Ad Library ad' : 'video link'} into Media as ${r.breakdown.sourceCode ?? 'a video'}. ` : ''
     const head = r.board
