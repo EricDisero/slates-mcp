@@ -6584,6 +6584,50 @@ export const getTimeline: Operation<{ projectId: string; timelineId?: string }> 
   },
 }
 
+// ── Loudness: the mix as its export writes it, measured ──────────
+// The desktop renders the cut's sound with the export's own core and measures it (slate
+// src/main/editor/loudness.ts); the answer's shape is slate's src/shared/loudness.ts.
+interface LoudnessView {
+  mix?: { integratedLufs: number | null; loudnessRangeLu: number | null; truePeakDbtp: number | null }
+  lanes?: Array<{ name: string; integratedLufs: number | null; truePeakDbtp: number | null }>
+  target?: { integratedLufs: number; truePeakDbtp: number }
+}
+const loudnessInput = z.object({
+  projectId: z.string().uuid(),
+  timelineId: z.string().uuid().optional().describe("The cut to measure; absent: the project's default timeline."),
+  fromSec: z.number().min(0).optional().describe('Measure from here (timeline seconds), as if the span were exported alone.'),
+  toSec: z.number().positive().optional().describe('Measure to here (timeline seconds); absent: the end.'),
+  trackId: z.string().min(1).optional().describe('Read this one lane alone (with the mix); absent: every lane heard.'),
+})
+export const getTimelineLoudness: Operation<z.infer<typeof loudnessInput>> = {
+  id: 'slates_get_timeline_loudness',
+  description:
+    "Measure a timeline's loudness as its export writes it: integrated LUFS (gated, ITU-R BS.1770), loudness range (LRA, LU), " +
+    'true peak (dBTP, read 4x oversampled) and sample peak of the whole mix, the same for each lane alone (every other lane muted), ' +
+    'and a short-term (3 s) and momentary (400 ms) reading per second in `mix.trace`. Read-only: the desktop renders the sound to a ' +
+    'temporary file and measures it; nothing is saved and nothing is spent. Check a mix against its bar before exporting: a short for ' +
+    'social is -14 LUFS integrated with a true peak of -1 dBTP or under (`target` in the answer, shown, never enforced). To move the ' +
+    'integrated level by D dB, multiply masterVolume by 10^(D/20) with slates_update_timeline_settings, then measure again and check the ' +
+    'true peak. fromSec and toSec measure one span alone; trackId reads one lane. Null means silence, or a span too short (range and ' +
+    "short-term need 3 s). Same numbers as the Output level popover's Measure. Requires the desktop's loudness capability; update Slates on refusal.",
+  billable: false,
+  input: loudnessInput,
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('loudness', 'the loudness meter')
+    await requireNamedCut(desktop, input.timelineId)
+    const r = await desktop.get<LoudnessView>('/agent/timeline/loudness', input)
+    const show = (n: number | null | undefined, unit: string): string => (n == null ? '-' : `${n} ${unit}`)
+    const lanes = (r.lanes ?? []).map((l) => `${l.name} ${show(l.integratedLufs, 'LUFS')}`).join(', ')
+    return ok(
+      r,
+      `Mix: ${show(r.mix?.integratedLufs, 'LUFS')} integrated, range ${show(r.mix?.loudnessRangeLu, 'LU')}, true peak ${show(r.mix?.truePeakDbtp, 'dBTP')} ` +
+        `(target ${r.target?.integratedLufs ?? '?'} LUFS, ${r.target?.truePeakDbtp ?? '?'} dBTP).${lanes ? ` Lanes: ${lanes}.` : ''}\n\n` +
+        JSON.stringify(r, null, 2)
+    )
+  },
+}
+
 // ── Sound to the sample (music edits between frames) ───────────
 // Mirrors of slate's limits, held equal by lockstep check 12: the rate a sound clip set to the sample counts
 // its file in (`AUDIO_SOURCE_FPS`, src/shared/clipTiming.ts), the crossfade's millisecond range and curves
@@ -10607,6 +10651,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   reframeClip as unknown as Operation<unknown>,
   getReframeReport as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,
+  getTimelineLoudness as unknown as Operation<unknown>,
   addClipToTimeline as unknown as Operation<unknown>,
   reorderClips as unknown as Operation<unknown>,
   removeClip as unknown as Operation<unknown>,

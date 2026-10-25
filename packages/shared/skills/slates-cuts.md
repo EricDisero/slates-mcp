@@ -80,3 +80,7 @@ Two clips share one tall frame, one above the other, with a picture over both fo
 ## Check the cut
 
 After a pass, read the timeline again and watch it in the open Cut, or export it (`slates_export_video`) and look at the frames around each change. Say what you changed in the user's words: "tightened the opening by half a second, rolled the cut to her line".
+
+## Check the mix
+
+Before exporting, measure it with `slates_get_timeline_loudness`: the mix as the export writes it, each lane alone, and a reading per second. A short for social sits at -14 LUFS integrated with a true peak of -1 dBTP or under. To move the integrated level by D dB, multiply `masterVolume` by 10^(D/20) with `slates_update_timeline_settings` (from -17 LUFS to -14 is 3 dB: times 1.41), then measure again; if raising it pushes the true peak above -1 dBTP, bring down the lane that peaks (`lanes` in the answer) instead of the whole mix. A lane far louder or quieter than the rest is the one to fix with its clips' `volume`.

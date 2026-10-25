@@ -194,6 +194,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid', 'slates_get_recipe',
     'slates_reframe_clip', 'slates_get_reframe_report',
     'slates_get_timeline',
+    'slates_get_timeline_loudness',
     'slates_add_clip_to_timeline',
     'slates_reorder_clips',
     'slates_remove_clip',

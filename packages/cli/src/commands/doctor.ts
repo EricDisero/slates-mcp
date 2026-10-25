@@ -107,6 +107,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['reference-breakdown', 'breaking a reference ad into shots'],
   ['product-intake', 'adding products from their pages'],
   ['ad-variants', 'ad variants on one shared body'],
+  ['loudness', 'measuring the loudness of a mix'],
 ]
 
 export async function runDoctor(): Promise<void> {
