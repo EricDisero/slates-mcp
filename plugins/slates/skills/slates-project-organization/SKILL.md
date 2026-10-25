@@ -6,12 +6,6 @@ description: "Organize a Slates project: asset codes (IMG-A12, VID-V3), folders,
 
 # Organizing a Slates project
 
-**Operative summary.**
-- Keep reusable references in the Library, not in folders, and file work product into folders as you make it. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
-- Name assets to the user by code plus label, never by UUID or description. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
-- Resolve a code the user names with `slates_list_assets` and confirm it back in the same vocabulary. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
-- Read codes again after moving or copying to another project, since new codes are issued there. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
-
 Slates already gives every reusable reference a home: the **Library**, in categories the user names (Characters, Locations, Products, Looks…; `slates_list_library`), each item used in a prompt as `@name`, or `#name` for a look. Keep references there rather than in folders, and add a category only when the user asks for one. Add an item with `slates_create_library_item` and read its `mention` from the result (a taken name comes back suffixed). `slates_update_library_item` renames or moves an item and rewrites every Shot that cites it.
 
 **Folders hold work product by where it sits in the film.** Create with `slates_create_folder`; file assets with `slates_move_assets_to_folder` (`folderId: null` is the project root). Creating a folder does not open it: to file a batch as it is made, pass `folderId` on each generate or upload call; with none, results follow the folder open in the user's window. Folder, favorite and export tools take asset UUIDs, so resolve a code with `slates_list_assets` first. `slates_delete_folder` leaves its files in Media.

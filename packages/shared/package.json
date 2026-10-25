@@ -55,7 +55,7 @@
     "build-chatgpt-skill": "node scripts/build-chatgpt-skill.mjs",
     "build": "node scripts/build-chatgpt-skill.mjs --check && node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc && node scripts/render-capability-partials.mjs --check && node scripts/update-check-check.mjs",
     "typecheck": "node scripts/sync-partials.mjs --check && node scripts/build-prompt-builder.mjs --check && node scripts/embed-skills.mjs && tsc --noEmit",
-    "prepublishOnly": "npm run build && node ../../scripts/cinematic-catalogue-check.mjs && node ../../scripts/prompt-control-check.mjs",
+    "prepublishOnly": "npm run build && node ../../scripts/brain-review.mjs --check && node ../../scripts/brain-lint.mjs --self-test && node ../../scripts/brain-eval/tokens.mjs && node ../../scripts/cinematic-catalogue-check.mjs && node ../../scripts/prompt-control-check.mjs",
     "render-partials": "node scripts/render-capability-partials.mjs"
   },
   "repository": {

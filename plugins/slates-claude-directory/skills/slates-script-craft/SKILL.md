@@ -6,13 +6,6 @@ description: "Write or revise script passages, openings, bridges and saved varia
 
 # Script craft and variations
 
-**Operative summary.**
-- Apply the scoped edit, read it back, and on a stale revision reread and keep both authors' changes. (§ Apply the requested scope)
-- For suggestions, propose each replacement with `slates_update_script_suggestions`, quoting the exact words it replaces. (§ Apply the requested scope)
-- Make openings differ by idea, not adjectives, and keep any bridge the opening needs inside the version. (§ Distinct openings and compatible bridges)
-- Preview one requested combination with `slates_preview_script_variation` before creating it; never expand every combination. (§ Distinct openings and compatible bridges)
-- Prefer a concrete actor doing something over abstract benefit language; never invent testimonials, results or offer terms. (§ Spoken flow and pacing; § Opening, argument and payoff)
-
 Work in the user's document. Read its revision, requested passage and neighboring context. Keep supplied facts, deliberate cadence and fixed sections intact. A script may be silent, a conversation, one continuous sentence, independent scenes, or any mixture. These are tools to choose from, not required stages.
 
 

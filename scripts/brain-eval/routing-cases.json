@@ -1,0 +1,316 @@
+{
+  "about": "Asks in a user's own words, each with the playbooks a good agent opens first from the router. `none` means no playbook fits and the agent asks the Director card's first question or works from the rules. `motion-overview` is the router's pointer for motion-graphics-only videos. Add a case for every routing mistake seen in a real session.",
+  "cases": [
+    {
+      "id": "dr-cold-brew",
+      "ask": "Make me a 15 second ad for my cold brew for Meta. I want people to click through and buy.",
+      "expect": [
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "dr-copy-ad",
+      "ask": "Here's an ad from the Meta Ad Library that's been running for months. Can you make the same thing for my posture corrector?",
+      "expect": [
+        "slates-direct-response-ad",
+        "slates-storyboard-from-script"
+      ]
+    },
+    {
+      "id": "dr-shopify",
+      "ask": "I sell candles on Shopify. I need a video ad that shows the product and the offer, 20% off this week.",
+      "expect": [
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "dr-tiktok-product",
+      "ask": "Product demo ad for TikTok, vertical, showing how my blender bottle mixes protein without clumps.",
+      "expect": [
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "ugc-creator",
+      "ask": "I want a UGC style ad where a girl talks to the camera on her phone about my skincare serum.",
+      "expect": [
+        "slates-ugc-influencer-ad"
+      ]
+    },
+    {
+      "id": "ugc-testimonial",
+      "ask": "Make a talking head influencer ad for my app, like those creator ads where someone films themselves in their car.",
+      "expect": [
+        "slates-ugc-influencer-ad"
+      ]
+    },
+    {
+      "id": "ugc-podcast",
+      "ask": "A guy at a desk with a mic recommending my supplement, selfie style, 30 seconds.",
+      "expect": [
+        "slates-ugc-influencer-ad"
+      ]
+    },
+    {
+      "id": "variants-hooks",
+      "ask": "I have one finished ad. Give me five versions with different hooks and export them all for Reels and Stories.",
+      "expect": [
+        "slates-ad-variants"
+      ]
+    },
+    {
+      "id": "variants-formats",
+      "ask": "Export my ad in 9:16, 1:1 and 16:9 with three different end cards.",
+      "expect": [
+        "slates-ad-variants"
+      ]
+    },
+    {
+      "id": "film-short",
+      "ask": "Make a 60 second short film about a lighthouse keeper who finds a message in a bottle.",
+      "expect": [
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "film-trailer",
+      "ask": "I want a movie trailer for my fantasy novel, about a minute long, epic.",
+      "expect": [
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "film-music-video",
+      "ask": "Make a music video for my song. It's dreamy synth pop, I'll upload the track.",
+      "expect": [
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "film-one-prompt",
+      "ask": "Just make me a cool 30 second video of a samurai in the rain, I don't need to approve every step.",
+      "expect": [
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "board-script",
+      "ask": "Here's my script for a two minute explainer with a narrator. Break it into shots and build the storyboard.",
+      "expect": [
+        "slates-storyboard-from-script"
+      ]
+    },
+    {
+      "id": "board-remake",
+      "ask": "Break down this reference video shot by shot and turn it into a storyboard I can generate from.",
+      "expect": [
+        "slates-storyboard-from-script",
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "script-write",
+      "ask": "Write me a script for a 30 second voiceover about why people should switch to my budgeting app.",
+      "expect": [
+        "slates-script-craft",
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "script-hooks",
+      "ask": "Give me ten hook lines for the opening of my video. They're boring right now.",
+      "expect": [
+        "slates-script-craft",
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "script-rewrite",
+      "ask": "Tighten this dialogue, it's way too long for the shots.",
+      "expect": [
+        "slates-script-craft"
+      ]
+    },
+    {
+      "id": "character-same-face",
+      "ask": "How do I keep the same woman's face in every shot? She keeps changing.",
+      "expect": [
+        "slates-character-identity"
+      ]
+    },
+    {
+      "id": "character-photo",
+      "ask": "Here's a photo of my mascot. Make him a character I can use in all my videos.",
+      "expect": [
+        "slates-character-identity"
+      ]
+    },
+    {
+      "id": "edit-fix",
+      "ask": "The hand in this image has six fingers. Fix it without changing anything else.",
+      "expect": [
+        "slates-edit-and-iterate"
+      ]
+    },
+    {
+      "id": "edit-clip",
+      "ask": "This clip is almost right but the car turns the wrong way at the end. Can we redo just that?",
+      "expect": [
+        "slates-edit-and-iterate"
+      ]
+    },
+    {
+      "id": "edit-refine",
+      "ask": "Make the lighting on IMG-A3 warmer and change her jacket to red.",
+      "expect": [
+        "slates-edit-and-iterate"
+      ]
+    },
+    {
+      "id": "previs-camera",
+      "ask": "I need an exact crane move that starts low behind the car and rises over it. Can we block it in Blender first?",
+      "expect": [
+        "slates-previs-blocking"
+      ]
+    },
+    {
+      "id": "previs-path",
+      "ask": "I want the camera to follow a precise path through the hallway, timed to the second.",
+      "expect": [
+        "slates-previs-blocking"
+      ]
+    },
+    {
+      "id": "dialogue-eyelines",
+      "ask": "Two people arguing across a kitchen table, over the shoulder shots back and forth. Their eyelines keep breaking.",
+      "expect": [
+        "slates-dialogue-blocking"
+      ]
+    },
+    {
+      "id": "dialogue-walk",
+      "ask": "A walk and talk between two detectives down a street, I need the coverage to cut together.",
+      "expect": [
+        "slates-dialogue-blocking"
+      ]
+    },
+    {
+      "id": "restyle",
+      "ask": "The grey box blocking is approved. Now show me it as anime, as claymation and as photoreal.",
+      "expect": [
+        "slates-restyle-from-blocking"
+      ]
+    },
+    {
+      "id": "cuts-pace",
+      "ask": "My edit is too slow. Trim the dead air and tighten the pacing to about 30 seconds.",
+      "expect": [
+        "slates-cuts"
+      ]
+    },
+    {
+      "id": "cuts-music",
+      "ask": "Cut these clips to the beat of the song.",
+      "expect": [
+        "slates-cuts"
+      ]
+    },
+    {
+      "id": "cuts-talking-head",
+      "ask": "I filmed myself talking for ten minutes. Cut out the ums and the mistakes and put captions on it.",
+      "expect": [
+        "slates-cuts"
+      ]
+    },
+    {
+      "id": "captions",
+      "ask": "Add those word by word captions like TikTok to my video.",
+      "expect": [
+        "slates-captions"
+      ]
+    },
+    {
+      "id": "motion-lower-third",
+      "ask": "Put a lower third with my name and title when I first appear.",
+      "expect": [
+        "slates-motion"
+      ]
+    },
+    {
+      "id": "motion-end-card",
+      "ask": "Add an animated title at the start and an end card with my logo and website.",
+      "expect": [
+        "slates-motion",
+        "slates-ad-variants"
+      ]
+    },
+    {
+      "id": "motion-explainer",
+      "ask": "Make an animated explainer for my SaaS with kinetic text and icons, no footage at all.",
+      "expect": [
+        "motion-overview",
+        "slates-motion"
+      ]
+    },
+    {
+      "id": "chatgpt",
+      "ask": "Can I use my ChatGPT subscription to make images in here?",
+      "expect": [
+        "slates-chatgpt-images"
+      ]
+    },
+    {
+      "id": "org-move",
+      "ask": "Move all the shots of the dog from my old project into the new one.",
+      "expect": [
+        "slates-project-organization"
+      ]
+    },
+    {
+      "id": "org-find",
+      "ask": "Where's the image I made last week of the red car? I can't find it in any project.",
+      "expect": [
+        "slates-project-organization"
+      ]
+    },
+    {
+      "id": "vague-cool",
+      "ask": "Make something cool.",
+      "expect": [
+        "none"
+      ]
+    },
+    {
+      "id": "vague-ad",
+      "ask": "I need an ad but I don't know what kind.",
+      "expect": [
+        "none",
+        "slates-direct-response-ad"
+      ]
+    },
+    {
+      "id": "drift-one-take",
+      "ask": "I want a 20 second video of a car drifting around a mountain hairpin, all one continuous shot following it through the turn.",
+      "expect": [
+        "slates-previs-blocking",
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "fight-one-take",
+      "ask": "Make a one-take hallway fight scene, two guys, about 30 seconds, and the camera never cuts.",
+      "expect": [
+        "slates-previs-blocking",
+        "slates-one-prompt-film"
+      ]
+    },
+    {
+      "id": "launch-stats",
+      "ask": "A 15 second vertical launch video: our headline, three stats counting up and the logo at the end.",
+      "expect": [
+        "motion-overview",
+        "slates-motion"
+      ]
+    }
+  ]
+}

@@ -56,6 +56,13 @@ const MIN_SUMMED = 5
 /** Not read-only, but they change nothing in the project: loading tools, pointing at a control. */
 const HARMLESS = new Set(['slates_load_tools', 'slates_highlight_control'])
 
+// The facts of fixture.mjs's project, in words: a snapshot of the fixture, of defaultModelFor() and of the
+// live price list on 2026-10-18 (Shots at 32 credits). Re-check it when any of those moves; the verdict cache
+// keys on this text, so an edit re-judges every pair. Shots go by the codes the tools return (SHOT-A1): until
+// 2026-10-25 this named them 1A to 2B, and the judge marked down agents that used the real codes.
+export const PROJECT_FACTS =
+  'Facts about the project (true for both): project "Morning Ritual Coffee" holds a board "Cold brew 15s v1" with four Shots, each 5 seconds at 9:16 on Kling 3.0 Standard, 20 seconds in all (SHOT-A1 hook with Mara to camera, a static close-up, already generated as VID-V1; SHOT-A2 crack and pour, a static extreme close-up, no prompt yet, so it cannot be priced or fired; SHOT-A3 proof line, a medium shot on a slow push in; SHOT-A4 hero end card, a static close-up; SHOT-A1 and SHOT-A2 are scene 1, the others scene 2), a short voiceover script, Library items Mara (character), Ritual can (product) and Kitchen (location), and five media assets. The board quote prices the other three Shots at 32 credits each, 96 in all. A second project "Bakery launch" is empty. The workspace\'s default image model is GPT Image 2.5 Sunburst and its default video model is Seedance 2.5, while every Shot on the board is set to Kling 3.0 Standard. The balance is 1,240 credits. The user is signed in as Test User (user@example.com) on a Pro license. The board\'s Script tab, also called its Script page, holds the script and any agent suggestions, which the user accepts or dismisses there. An outside AI such as Claude Code reaches the project through the Slates desktop app, so the app must be running. Nothing may be generated or spent without the user\'s explicit OK of a quoted price.'
+
 // Thousands groups of exactly three digits (`1,240`), never `[\d,]*`, which backtracks quadratically on a long
 // "1, 2, 3" run; and never a prefix of a longer number (the `1` of `1,2345`).
 const NUM = String.raw`(\d+(?:,\d{3})*(?:\.\d+)?)(?![.,]?\d)(k)?`
@@ -357,10 +364,7 @@ async function main() {
       '',
       `The user said: "${c.prompt}"`,
       '',
-      // The facts of fixture.mjs's project, in words: a snapshot of the fixture, of defaultModelFor() and of the
-      // live price list on 2026-10-18 (Shots at 32 credits). Re-check it when any of those moves; the verdict cache
-      // keys on this text, so an edit re-judges every pair.
-      'Facts about the project (true for both): project "Morning Ritual Coffee" holds a board "Cold brew 15s v1" with four Shots, each 5 seconds at 9:16 on Kling 3.0 Standard, 20 seconds in all (1A hook with Mara to camera, a static close-up, already generated as VID-V1; 1B crack and pour, a static extreme close-up, no prompt yet, so it cannot be priced or fired; 2A proof line, a medium shot on a slow push in; 2B hero end card, a static close-up), a short voiceover script, Library items Mara (character), Ritual can (product) and Kitchen (location), and five media assets. The board quote prices the other three Shots at 32 credits each, 96 in all. A second project "Bakery launch" is empty. The workspace\'s default image model is GPT Image 2.5 Sunburst and its default video model is Seedance 2.5, while every Shot on the board is set to Kling 3.0 Standard. The balance is 1,240 credits. The user is signed in as Test User (user@example.com) on a Pro license. The board\'s Script tab, also called its Script page, holds the script and any agent suggestions, which the user accepts or dismisses there. An outside AI such as Claude Code reaches the project through the Slates desktop app, so the app must be running. Nothing may be generated or spent without the user\'s explicit OK of a quoted price.',
+      PROJECT_FACTS,
       // The fixture refuses every write and the session denies write tools, in both arms alike, so a reply that
       // tried a save and says it was blocked is telling the truth.
       'In this session the assistant could read the project but every change it tried to save was refused, the same for both replies. A reply that says a save or an edit was blocked is accurate; judge what it did with that, not the fact of it.',

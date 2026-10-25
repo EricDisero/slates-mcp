@@ -6,15 +6,6 @@ description: "Refine an existing Slates image or clip with a targeted edit or re
 
 # Edit and iterate — Slates workflow
 
-**Operative summary.**
-- Never re-edit an edit; go back to the master and edit it again, and check the asset's source lineage first. (§ The master rule: an edit is a leaf, not a node)
-- Load the asset with `slates_get_asset_image` and read its record with `slates_get_asset` before choosing a tool. (§ 1. Pull the current asset back into context)
-- Use `slates_edit_image` with only the change for surgical and aesthetic edits, `slates_generate_image` with the original as a reference for compositional ones, and a fresh generation for wholesale ones. (§ 3. Pick the right tool)
-- Estimate the cost and show it before generating, then compare the result with the original and rebind where the original was used. (§ 4. Generate, evaluate, decide)
-- After three failed attempts at one requirement, stop re-rolling and diagnose the reference, prompt, model and tool result; a failed roll never authorizes another charge. (§ Diagnose repeated failures)
-- Treat a clip the same way: `slates_edit_video` with the change only, and `slates_trim_video` first if it is too long. (§ Clips)
-- Keep the original until the user confirms, and never mix surgical and wholesale changes in one pass. (§ Anti-patterns)
-
 The user already has a generated image in Slates and wants to refine it. The vision-feedback-loop skill defines the general pattern; this skill is the specific recipe for "I have asset X, here's what's wrong with it."
 
 ## The master rule: an edit is a leaf, not a node

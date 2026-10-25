@@ -2,7 +2,7 @@
 // Claude Code session against that arm's built MCP server and the fixture.
 //
 //   node scripts/behaviour-ab/run.mjs --baseline <slates-mcp checkout> --candidate <slates-mcp checkout> \
-//     --out scripts/behaviour-ab/results/<date> [--cases id,id] [--arms baseline,candidate] [--runs 2] [--from-run 1] \
+//     --out scripts/behaviour-ab/results/<date> [--cases-file <json>] [--cases id,id] [--arms baseline,candidate] [--runs 2] [--from-run 1] \
 //     [--model claude-opus-5-5] [--concurrency 3] [--desktop <slate dir>]
 //
 // Each arm must be built (packages/shared/dist and packages/mcp/dist). Every run
@@ -20,6 +20,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { brainHash } from '../brain-eval/brain-hash.mjs'
 import { fetchPriceList, startFixture, SHOT_COST_KEY } from './fixture.mjs'
 import { armHome, realCloudToken } from './home.mjs'
 import { arg, countArg, runClaude, scrubHome } from './lib.mjs'
@@ -37,7 +38,8 @@ const concurrency = countArg('concurrency', '3')
 const desktopDir = resolve(arg('desktop', process.env.SLATES_DESKTOP_DIR ?? join(repo, '..', 'slate')))
 const armDirs = { baseline: arg('baseline') && resolve(arg('baseline')), candidate: resolve(arg('candidate', repo)) }
 const arms = arg('arms', 'baseline,candidate').split(',')
-const { cases: allCases } = JSON.parse(readFileSync(join(here, 'cases.json'), 'utf8'))
+// Another case set in the same shape, such as the brain's craft briefs (scripts/brain-eval/craft-cases.json).
+const { cases: allCases } = JSON.parse(readFileSync(resolve(arg('cases-file', join(here, 'cases.json'))), 'utf8'))
 const wanted = arg('cases') ? arg('cases').split(',') : null
 const unknownCases = (wanted ?? []).filter((id) => !allCases.some((c) => c.id === id))
 if (unknownCases.length) throw new Error(`No such case: ${unknownCases.join(', ')}`)
@@ -105,6 +107,8 @@ function toTrace(stdout) {
           // result, still counts as sourced.
           priced: pricedIn(text),
           balances: balancesIn(text),
+          // The router the server attaches once a connection (ROUTER_NOTICE in shared), at the end of a result.
+          ...(/This session has not opened the router \(slates-start-here\)/.test(text) ? { router: true } : {}),
         })
       }
     }
@@ -168,9 +172,12 @@ async function oneRun(job, tools, priceList) {
 
 mkdirSync(join(out, 'traces'), { recursive: true })
 const toolsByArm = {}
+// The brain each arm's build hands an agent, so a result can be tied to the brain it tested (brain-eval/gate.mjs).
+const hashByArm = {}
 for (const arm of arms) {
   if (!armDirs[arm] || !existsSync(join(armDirs[arm], 'packages', 'mcp', 'dist', 'server.js'))) throw new Error(`Arm ${arm}: no built server under ${armDirs[arm]}`)
   toolsByArm[arm] = await armTools(armDirs[arm])
+  hashByArm[arm] = await brainHash(armDirs[arm])
 }
 
 // One price list for the whole batch, so both arms quote from the same data.
@@ -201,7 +208,7 @@ writeFileSync(armsFile, scrubHome(JSON.stringify({
   priceListHash: before?.priceListHash ?? priceListHash,
   arms: {
     ...(before?.arms ?? {}),
-    ...Object.fromEntries(arms.map((a) => [a, { dir: armDirs[a], allowed: toolsByArm[a].allowed, removed: toolsByArm[a].removed, billable: toolsByArm[a].billable, tools: toolsByArm[a].all.length }])),
+    ...Object.fromEntries(arms.map((a) => [a, { dir: armDirs[a], brainHash: hashByArm[a], allowed: toolsByArm[a].allowed, removed: toolsByArm[a].removed, billable: toolsByArm[a].billable, tools: toolsByArm[a].all.length }])),
   },
 }, null, 2)))
 
