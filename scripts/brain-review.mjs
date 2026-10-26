@@ -53,7 +53,12 @@ const LAYERS = ['router', 'playbook', 'rule', 'motion', 'model']
 const RANK = { router: 0, doctrine: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
 const LABEL = { router: 'Router', doctrine: 'Doctrine', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
 // The brain's deep layers: slates-api's brain/, approved by the commit brain-approved.json pins there.
-const BRAIN = brainDir()
+const BRAIN = brainDir({ optional: true })
+if (!BRAIN) {
+  // Single-repo CI (or any checkout without slates-api) cannot review: the review reads both repos, and nothing may publish.
+  console.error('✗ brain review: slates-api is not beside this checkout, so the brain cannot be reviewed here. Publish from a machine with slates-api checked out beside slates-mcp (or SLATES_BRAIN_DIR set).')
+  process.exit(1)
+}
 const API = dirname(BRAIN)
 const BRAIN_PATH = basename(BRAIN)
 const PIN = join(API, 'brain-approved.json')
