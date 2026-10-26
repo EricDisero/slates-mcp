@@ -1374,7 +1374,7 @@ const SPEND_LIMIT = z.number().int().min(0).nullable()
 export const getSpendLimits: Operation<{ projectId?: string }> = {
   id: 'slates_get_spend_limits',
   description:
-    "The project's spend limit and this session's budget, in credits: each limit (null is none), what is spent against it and what is left, as shown beside Generate. A generation over either one is refused with its cost and what is left; read this before a run of generations.",
+    "The project's spend limit and this session's budget, in credits, where a session is this MCP connection or CLI run and a new one starts at the full default budget: each limit (null is none), what is spent against it and what is left, as shown beside Generate. A generation over either one is refused with its cost and what is left; read this before a run of generations.",
   input: z.object({ projectId: z.string().uuid().optional().describe('Defaults to the open project.') }).strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('spend-limits', 'spend limits')
@@ -1385,12 +1385,12 @@ export const getSpendLimits: Operation<{ projectId?: string }> = {
 export const setSpendLimits: Operation<{ projectId?: string; projectLimitCredits?: number | null; sessionBudgetCredits?: number | null; confirm?: boolean }> = {
   id: 'slates_set_spend_limits',
   description:
-    "Set the project's spend limit or this session's budget, in credits; null removes one. Lowering a limit is yours to do. Raising or removing one needs the user's OK: without confirm it changes nothing and returns requires_confirm. Pass confirm=true only to relay that OK, as after a generation refused over a limit.",
+    "Set the project's spend limit or this session's budget (per MCP connection or CLI run, not across them), in credits; null removes one. Lowering a limit is yours to do. Raising or removing one, the session budget included, needs the user's OK in chat first: without confirm it changes nothing and returns requires_confirm. Pass confirm=true only after the user says yes, never on your own.",
   input: z
     .object({
       projectId: z.string().uuid().optional().describe('Defaults to the open project.'),
       projectLimitCredits: SPEND_LIMIT.optional().describe('What this project may spend in all, by hand and by every agent.'),
-      sessionBudgetCredits: SPEND_LIMIT.optional().describe('What this session may spend.'),
+      sessionBudgetCredits: SPEND_LIMIT.optional().describe('What this MCP connection or CLI run may spend.'),
       confirm: z.boolean().optional().describe("Set true only to relay the user's explicit OK to raise or remove a limit."),
     })
     .strict(),
