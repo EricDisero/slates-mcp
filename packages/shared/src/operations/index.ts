@@ -7427,7 +7427,7 @@ const CAPTION_COMPONENTS = [
 ] as const
 
 const htmlCompositionInput = z.string().min(1).describe('A composition: a whole HTML document whose GSAP timeline is registered on window.__timelines.')
-const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false.")
+const htmlVariablesInput = z.record(z.union([z.string(), z.number(), z.boolean()])).describe("Values for the composition's or block's declared variables, by name: text, numbers or true/false. A picture (declared type image) takes an image asset id (UUID) of this project, or \"\" for the layer's own picture, and reads back as its path in the project folder (images/logo.png); a web address or another project's picture is refused.")
 
 type CaptionsResult = {
   trackId: string; createdTrack: boolean; clipIds: string[]; words: number; phrases: number; timing: string[]
