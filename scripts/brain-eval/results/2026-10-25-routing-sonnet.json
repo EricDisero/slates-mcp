@@ -1,0 +1,906 @@
+{
+  "model": "sonnet",
+  "runs": 2,
+  "arms": {
+    "candidate": {
+      "root": "C:\\Coding Projects\\slates\\slates-mcp",
+      "brainHash": "2a042a3e83cf9b35",
+      "accuracy": 1,
+      "hits": 86,
+      "answered": 86,
+      "errors": 0,
+      "results": [
+        {
+          "case": "board-remake",
+          "run": 1,
+          "expect": [
+            "slates-storyboard-from-script",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-storyboard-from-script",
+          "raw": "playbook: slates-storyboard-from-script",
+          "hit": true
+        },
+        {
+          "case": "board-remake",
+          "run": 2,
+          "expect": [
+            "slates-storyboard-from-script",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-storyboard-from-script",
+          "raw": "playbook: slates-storyboard-from-script",
+          "hit": true
+        },
+        {
+          "case": "board-script",
+          "run": 1,
+          "expect": [
+            "slates-storyboard-from-script"
+          ],
+          "picked": "slates-storyboard-from-script",
+          "raw": "`playbook: slates-storyboard-from-script`",
+          "hit": true
+        },
+        {
+          "case": "board-script",
+          "run": 2,
+          "expect": [
+            "slates-storyboard-from-script"
+          ],
+          "picked": "slates-storyboard-from-script",
+          "raw": "`playbook: slates-storyboard-from-script`",
+          "hit": true
+        },
+        {
+          "case": "captions",
+          "run": 1,
+          "expect": [
+            "slates-captions"
+          ],
+          "picked": "slates-captions",
+          "raw": "`playbook: slates-captions`",
+          "hit": true
+        },
+        {
+          "case": "captions",
+          "run": 2,
+          "expect": [
+            "slates-captions"
+          ],
+          "picked": "slates-captions",
+          "raw": "`playbook: slates-captions`",
+          "hit": true
+        },
+        {
+          "case": "character-photo",
+          "run": 1,
+          "expect": [
+            "slates-character-identity"
+          ],
+          "picked": "slates-character-identity",
+          "raw": "`playbook: slates-character-identity`",
+          "hit": true
+        },
+        {
+          "case": "character-photo",
+          "run": 2,
+          "expect": [
+            "slates-character-identity"
+          ],
+          "picked": "slates-character-identity",
+          "raw": "`playbook: slates-character-identity`",
+          "hit": true
+        },
+        {
+          "case": "character-same-face",
+          "run": 1,
+          "expect": [
+            "slates-character-identity"
+          ],
+          "picked": "slates-character-identity",
+          "raw": "`playbook: slates-character-identity`",
+          "hit": true
+        },
+        {
+          "case": "character-same-face",
+          "run": 2,
+          "expect": [
+            "slates-character-identity"
+          ],
+          "picked": "slates-character-identity",
+          "raw": "`playbook: slates-character-identity`",
+          "hit": true
+        },
+        {
+          "case": "chatgpt",
+          "run": 1,
+          "expect": [
+            "slates-chatgpt-images"
+          ],
+          "picked": "slates-chatgpt-images",
+          "raw": "`playbook: slates-chatgpt-images`",
+          "hit": true
+        },
+        {
+          "case": "chatgpt",
+          "run": 2,
+          "expect": [
+            "slates-chatgpt-images"
+          ],
+          "picked": "slates-chatgpt-images",
+          "raw": "`playbook: slates-chatgpt-images`",
+          "hit": true
+        },
+        {
+          "case": "cuts-music",
+          "run": 1,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "cuts-music",
+          "run": 2,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "cuts-pace",
+          "run": 1,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "cuts-pace",
+          "run": 2,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "cuts-talking-head",
+          "run": 1,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "cuts-talking-head",
+          "run": 2,
+          "expect": [
+            "slates-cuts"
+          ],
+          "picked": "slates-cuts",
+          "raw": "`playbook: slates-cuts`",
+          "hit": true
+        },
+        {
+          "case": "dialogue-eyelines",
+          "run": 1,
+          "expect": [
+            "slates-dialogue-blocking"
+          ],
+          "picked": "slates-dialogue-blocking",
+          "raw": "`playbook: slates-dialogue-blocking`",
+          "hit": true
+        },
+        {
+          "case": "dialogue-eyelines",
+          "run": 2,
+          "expect": [
+            "slates-dialogue-blocking"
+          ],
+          "picked": "slates-dialogue-blocking",
+          "raw": "`playbook: slates-dialogue-blocking`",
+          "hit": true
+        },
+        {
+          "case": "dialogue-walk",
+          "run": 1,
+          "expect": [
+            "slates-dialogue-blocking"
+          ],
+          "picked": "slates-dialogue-blocking",
+          "raw": "`playbook: slates-dialogue-blocking`",
+          "hit": true
+        },
+        {
+          "case": "dialogue-walk",
+          "run": 2,
+          "expect": [
+            "slates-dialogue-blocking"
+          ],
+          "picked": "slates-dialogue-blocking",
+          "raw": "`playbook: slates-dialogue-blocking`",
+          "hit": true
+        },
+        {
+          "case": "dr-cold-brew",
+          "run": 1,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "playbook: slates-direct-response-ad",
+          "hit": true
+        },
+        {
+          "case": "dr-cold-brew",
+          "run": 2,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-copy-ad",
+          "run": 1,
+          "expect": [
+            "slates-direct-response-ad",
+            "slates-storyboard-from-script"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-copy-ad",
+          "run": 2,
+          "expect": [
+            "slates-direct-response-ad",
+            "slates-storyboard-from-script"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-shopify",
+          "run": 1,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-shopify",
+          "run": 2,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-tiktok-product",
+          "run": 1,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "dr-tiktok-product",
+          "run": 2,
+          "expect": [
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-direct-response-ad",
+          "raw": "`playbook: slates-direct-response-ad`",
+          "hit": true
+        },
+        {
+          "case": "drift-one-take",
+          "run": 1,
+          "expect": [
+            "slates-previs-blocking",
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "drift-one-take",
+          "run": 2,
+          "expect": [
+            "slates-previs-blocking",
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "edit-clip",
+          "run": 1,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "`playbook: slates-edit-and-iterate`",
+          "hit": true
+        },
+        {
+          "case": "edit-clip",
+          "run": 2,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "`playbook: slates-edit-and-iterate`",
+          "hit": true
+        },
+        {
+          "case": "edit-fix",
+          "run": 1,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "`playbook: slates-edit-and-iterate`",
+          "hit": true
+        },
+        {
+          "case": "edit-fix",
+          "run": 2,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "playbook: slates-edit-and-iterate",
+          "hit": true
+        },
+        {
+          "case": "edit-refine",
+          "run": 1,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "playbook: slates-edit-and-iterate",
+          "hit": true
+        },
+        {
+          "case": "edit-refine",
+          "run": 2,
+          "expect": [
+            "slates-edit-and-iterate"
+          ],
+          "picked": "slates-edit-and-iterate",
+          "raw": "`playbook: slates-edit-and-iterate`",
+          "hit": true
+        },
+        {
+          "case": "fight-one-take",
+          "run": 1,
+          "expect": [
+            "slates-previs-blocking",
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "fight-one-take",
+          "run": 2,
+          "expect": [
+            "slates-previs-blocking",
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "film-music-video",
+          "run": 1,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-music-video",
+          "run": 2,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-one-prompt",
+          "run": 1,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-one-prompt",
+          "run": 2,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-short",
+          "run": 1,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-short",
+          "run": 2,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-trailer",
+          "run": 1,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "film-trailer",
+          "run": 2,
+          "expect": [
+            "slates-one-prompt-film"
+          ],
+          "picked": "slates-one-prompt-film",
+          "raw": "`playbook: slates-one-prompt-film`",
+          "hit": true
+        },
+        {
+          "case": "launch-stats",
+          "run": 1,
+          "expect": [
+            "motion-overview",
+            "slates-motion"
+          ],
+          "picked": "motion-overview",
+          "raw": "`playbook: motion-overview`",
+          "hit": true
+        },
+        {
+          "case": "launch-stats",
+          "run": 2,
+          "expect": [
+            "motion-overview",
+            "slates-motion"
+          ],
+          "picked": "motion-overview",
+          "raw": "`playbook: motion-overview`",
+          "hit": true
+        },
+        {
+          "case": "motion-end-card",
+          "run": 1,
+          "expect": [
+            "slates-motion",
+            "slates-ad-variants"
+          ],
+          "picked": "slates-motion",
+          "raw": "`playbook: slates-motion`",
+          "hit": true
+        },
+        {
+          "case": "motion-end-card",
+          "run": 2,
+          "expect": [
+            "slates-motion",
+            "slates-ad-variants"
+          ],
+          "picked": "slates-motion",
+          "raw": "`playbook: slates-motion`",
+          "hit": true
+        },
+        {
+          "case": "motion-explainer",
+          "run": 1,
+          "expect": [
+            "motion-overview",
+            "slates-motion"
+          ],
+          "picked": "motion-overview",
+          "raw": "`playbook: motion-overview`",
+          "hit": true
+        },
+        {
+          "case": "motion-explainer",
+          "run": 2,
+          "expect": [
+            "motion-overview",
+            "slates-motion"
+          ],
+          "picked": "motion-overview",
+          "raw": "playbook: motion-overview",
+          "hit": true
+        },
+        {
+          "case": "motion-lower-third",
+          "run": 1,
+          "expect": [
+            "slates-motion"
+          ],
+          "picked": "slates-motion",
+          "raw": "`playbook: slates-motion`",
+          "hit": true
+        },
+        {
+          "case": "motion-lower-third",
+          "run": 2,
+          "expect": [
+            "slates-motion"
+          ],
+          "picked": "slates-motion",
+          "raw": "playbook: slates-motion",
+          "hit": true
+        },
+        {
+          "case": "org-find",
+          "run": 1,
+          "expect": [
+            "slates-project-organization"
+          ],
+          "picked": "slates-project-organization",
+          "raw": "`playbook: slates-project-organization`",
+          "hit": true
+        },
+        {
+          "case": "org-find",
+          "run": 2,
+          "expect": [
+            "slates-project-organization"
+          ],
+          "picked": "slates-project-organization",
+          "raw": "`playbook: slates-project-organization`",
+          "hit": true
+        },
+        {
+          "case": "org-move",
+          "run": 1,
+          "expect": [
+            "slates-project-organization"
+          ],
+          "picked": "slates-project-organization",
+          "raw": "playbook: slates-project-organization",
+          "hit": true
+        },
+        {
+          "case": "org-move",
+          "run": 2,
+          "expect": [
+            "slates-project-organization"
+          ],
+          "picked": "slates-project-organization",
+          "raw": "`playbook: slates-project-organization`",
+          "hit": true
+        },
+        {
+          "case": "previs-camera",
+          "run": 1,
+          "expect": [
+            "slates-previs-blocking"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "previs-camera",
+          "run": 2,
+          "expect": [
+            "slates-previs-blocking"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "previs-path",
+          "run": 1,
+          "expect": [
+            "slates-previs-blocking"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "previs-path",
+          "run": 2,
+          "expect": [
+            "slates-previs-blocking"
+          ],
+          "picked": "slates-previs-blocking",
+          "raw": "`playbook: slates-previs-blocking`",
+          "hit": true
+        },
+        {
+          "case": "restyle",
+          "run": 1,
+          "expect": [
+            "slates-restyle-from-blocking"
+          ],
+          "picked": "slates-restyle-from-blocking",
+          "raw": "playbook: slates-restyle-from-blocking",
+          "hit": true
+        },
+        {
+          "case": "restyle",
+          "run": 2,
+          "expect": [
+            "slates-restyle-from-blocking"
+          ],
+          "picked": "slates-restyle-from-blocking",
+          "raw": "playbook: slates-restyle-from-blocking",
+          "hit": true
+        },
+        {
+          "case": "script-hooks",
+          "run": 1,
+          "expect": [
+            "slates-script-craft",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "script-hooks",
+          "run": 2,
+          "expect": [
+            "slates-script-craft",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "script-rewrite",
+          "run": 1,
+          "expect": [
+            "slates-script-craft"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "script-rewrite",
+          "run": 2,
+          "expect": [
+            "slates-script-craft"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "script-write",
+          "run": 1,
+          "expect": [
+            "slates-script-craft",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "script-write",
+          "run": 2,
+          "expect": [
+            "slates-script-craft",
+            "slates-direct-response-ad"
+          ],
+          "picked": "slates-script-craft",
+          "raw": "`playbook: slates-script-craft`",
+          "hit": true
+        },
+        {
+          "case": "ugc-creator",
+          "run": 1,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "ugc-creator",
+          "run": 2,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "ugc-podcast",
+          "run": 1,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "ugc-podcast",
+          "run": 2,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "ugc-testimonial",
+          "run": 1,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "ugc-testimonial",
+          "run": 2,
+          "expect": [
+            "slates-ugc-influencer-ad"
+          ],
+          "picked": "slates-ugc-influencer-ad",
+          "raw": "`playbook: slates-ugc-influencer-ad`",
+          "hit": true
+        },
+        {
+          "case": "vague-ad",
+          "run": 1,
+          "expect": [
+            "none",
+            "slates-direct-response-ad"
+          ],
+          "picked": "none",
+          "raw": "`playbook: none`",
+          "hit": true
+        },
+        {
+          "case": "vague-ad",
+          "run": 2,
+          "expect": [
+            "none",
+            "slates-direct-response-ad"
+          ],
+          "picked": "none",
+          "raw": "`playbook: none`",
+          "hit": true
+        },
+        {
+          "case": "vague-cool",
+          "run": 1,
+          "expect": [
+            "none"
+          ],
+          "picked": "none",
+          "raw": "`playbook: none`",
+          "hit": true
+        },
+        {
+          "case": "vague-cool",
+          "run": 2,
+          "expect": [
+            "none"
+          ],
+          "picked": "none",
+          "raw": "`playbook: none`",
+          "hit": true
+        },
+        {
+          "case": "variants-formats",
+          "run": 1,
+          "expect": [
+            "slates-ad-variants"
+          ],
+          "picked": "slates-ad-variants",
+          "raw": "`playbook: slates-ad-variants`",
+          "hit": true
+        },
+        {
+          "case": "variants-formats",
+          "run": 2,
+          "expect": [
+            "slates-ad-variants"
+          ],
+          "picked": "slates-ad-variants",
+          "raw": "`playbook: slates-ad-variants`",
+          "hit": true
+        },
+        {
+          "case": "variants-hooks",
+          "run": 1,
+          "expect": [
+            "slates-ad-variants"
+          ],
+          "picked": "slates-ad-variants",
+          "raw": "`playbook: slates-ad-variants`",
+          "hit": true
+        },
+        {
+          "case": "variants-hooks",
+          "run": 2,
+          "expect": [
+            "slates-ad-variants"
+          ],
+          "picked": "slates-ad-variants",
+          "raw": "`playbook: slates-ad-variants`",
+          "hit": true
+        }
+      ]
+    },
+    "baseline": {
+      "root": "~\\AppData\\Local\\Temp\\claude\\C--Coding-Projects\\84111b01-34c8-4c73-89f4-8b2ef9710d25\\scratchpad\\approved-14f9007",
+      "brainHash": "4a14d77653a85a45",
+      "noRouter": true,
+      "accuracy": 0,
+      "hits": 0,
+      "answered": 0,
+      "errors": 0,
+      "results": []
+    }
+  }
+}

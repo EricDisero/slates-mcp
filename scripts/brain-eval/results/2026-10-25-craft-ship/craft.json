@@ -1,0 +1,3448 @@
+{
+  "summary": {
+    "model": "claude-opus-5-5",
+    "brainHash": "edb1e4b2ce709aa3",
+    "runs": 50,
+    "finished": 50,
+    "judged": 50,
+    "routerOpened": 0.98,
+    "playbookLoaded": 0.88,
+    "readFirst": 0.94,
+    "forbiddenRuns": 1,
+    "craft": 1.4636666666666664,
+    "brainTokens": {
+      "mean": 3748,
+      "max": 7601
+    }
+  },
+  "arms": {
+    "baseline": {
+      "model": "claude-opus-5-5",
+      "brainHash": "4a14d77653a85a45",
+      "runs": 50,
+      "finished": 50,
+      "judged": 50,
+      "routerOpened": null,
+      "playbookLoaded": 0.42,
+      "readFirst": 0.42,
+      "forbiddenRuns": 3,
+      "craft": 1.1176666666666664,
+      "brainTokens": {
+        "mean": 5455,
+        "max": 17212
+      }
+    },
+    "candidate": {
+      "model": "claude-opus-5-5",
+      "brainHash": "edb1e4b2ce709aa3",
+      "runs": 50,
+      "finished": 50,
+      "judged": 50,
+      "routerOpened": 0.98,
+      "playbookLoaded": 0.88,
+      "readFirst": 0.94,
+      "forbiddenRuns": 1,
+      "craft": 1.4636666666666664,
+      "brainTokens": {
+        "mean": 3748,
+        "max": 7601
+      }
+    }
+  },
+  "rows": [
+    {
+      "case": "dr-plan",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-direct-response-ad",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 9426,
+      "tokens": 225738,
+      "craft": 0.4,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        "note": "No winning ad to copy was requested or proposed, there is only one hook, and the credit figures (88) are asserted rather than quoted from a tool (the board quote says 32 per shot), though it does wait for approval."
+      }
+    },
+    {
+      "case": "dr-plan",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-direct-response-ad",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 10199,
+      "tokens": 265887,
+      "craft": 0.4,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          0,
+          1,
+          0
+        ],
+        "note": "No winning ad is asked for or proposed for breakdown, only one hook is offered rather than several on one body, and the 88-credit cost looks hand-computed rather than quoted by a tool (though it does wait for approval)."
+      }
+    },
+    {
+      "case": "dr-plan",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 164710,
+      "craft": 0.8,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          0,
+          1,
+          1
+        ],
+        "note": "Only one hook is offered, with no alternative openings on a shared body, and the ad to copy is requested late rather than anchoring the plan. The hook line also doesn't name the viewer or the payoff strongly in the first two seconds."
+      }
+    },
+    {
+      "case": "dr-plan",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 136308,
+      "craft": 0.6,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          0,
+          1,
+          0
+        ],
+        "note": "The reply gives one hook and no alternates on a shared body, and its 71-credit total looks self-computed (26 per 4s, 19 per 3s) rather than quoted by a tool, which conflicts with the board quote of 32 per shot, though it does wait for the user's OK."
+      }
+    },
+    {
+      "case": "dr-hooks",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|script-craft)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 42666,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          1
+        ],
+        "note": "Hooks 1 and 2 are both Mara-to-camera spoken lines with no distinct opening picture, and the viewer/payoff is implied rather than named; the reply also claims to have pulled script text that wasn't verified."
+      }
+    },
+    {
+      "case": "dr-hooks",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|script-craft)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 43036,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          0,
+          2
+        ],
+        "note": "All three hooks are spoken lines for Mara to camera with no distinct opening picture, so they read as the same shot with new text."
+      }
+    },
+    {
+      "case": "dr-hooks",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|script-craft)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-script-craft"
+      ],
+      "brainTokens": 7601,
+      "tokens": 113519,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          0,
+          2
+        ],
+        "note": "Only hook 2 has its own opening picture; hooks 1 and 3 are just new spoken lines over the same SHOT-A1 close-up of Mara, and the viewer/payoff is implied rather than explicit in each."
+      }
+    },
+    {
+      "case": "dr-hooks",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|script-craft)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ad-variants"
+      ],
+      "brainTokens": 3100,
+      "tokens": 87476,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          2
+        ],
+        "note": "Hooks A and C don't name a clear viewer (B targets people who already buy cold brew), and the payoff is vague; the reply also never says the save was blocked and offers a save that would be refused."
+      }
+    },
+    {
+      "case": "dr-copy",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [
+        "unsourced figure \"$3.49\"",
+        "unsourced figure \"$12.99\""
+      ],
+      "guides": [
+        "working-method",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 8176,
+      "tokens": 115062,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          2,
+          2
+        ],
+        "note": "It never asks for the ad's link or file to break down; it invents its own three-shot structure (crack, slow-mo spill, price) instead of copying the described ad, and adds details like wet slate that the user never mentioned."
+      }
+    },
+    {
+      "case": "dr-copy",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|storyboard-from-script)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-prompting-seedance-2-5",
+        "slates-content-policy"
+      ],
+      "brainTokens": 8993,
+      "tokens": 176362,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          2,
+          1
+        ],
+        "note": "It never asks for the ad link or file to break down, and it ignores the existing four-shot board in favor of its own 8s clip plan (Seedance, not the board's Kling), so it improves on the reference instead of copying it."
+      }
+    },
+    {
+      "case": "dr-copy",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 78679,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2,
+          2
+        ],
+        "note": "The draft pads the described beats (adds a wide settle shot, a hand/music layer) and puts the price slam over the hero shot instead of copying the ad's crack, slow-motion spill, price slam; it also ignores the existing 4-Shot board by proposing a new one."
+      }
+    },
+    {
+      "case": "dr-copy",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(direct-response-ad|storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 121848,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2,
+          1
+        ],
+        "note": "It invented a new 10 s two-shot structure and a placeholder price instead of working on the existing board, and its quote of 96 credits is for a draft that uses Seedance rather than the board's Kling shots, so the pricing doesn't match the project's actual quote."
+      }
+    },
+    {
+      "case": "dr-claims",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 8143,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2,
+          1
+        ],
+        "note": "The script invents a claim that \"Thousands of people already made it part of their routine\" with on-screen \"Loved by thousands of customers\" text over review shots, and it misdescribes the product as a multivitamin with capsules, ignoring the actual Morning Ritual cold brew board and existing Shots instead of working in the project."
+      }
+    },
+    {
+      "case": "dr-claims",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 7898,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          0
+        ],
+        "note": "The reply ignores the existing 'Morning Ritual Coffee' board (a coffee brand with four Shots and Mara) and invents a capsule/supplement ad with a '[X,000+] customers' placeholder, so it doesn't move the real project forward and asks about format already set (9:16, 15–20s)."
+      }
+    },
+    {
+      "case": "dr-claims",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 78578,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "The reply claims it wrote a draft and will update Shots, though saves were refused and it describes the board loosely (three shots instead of four, wrong shot content), so progress is real but partly inaccurate."
+      }
+    },
+    {
+      "case": "dr-claims",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": false
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 8176,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1,
+          0
+        ],
+        "note": "The reply never uses the existing project (board, Shots, Mara, Ritual can, 9:16 15s) and asks generic questions already answered by it, so the ad doesn't move forward; it also treats Ritual as a supplement and offers alternatives that are partly invented product claims."
+      }
+    },
+    {
+      "case": "dr-objection",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-direct-response-ad",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 9786,
+      "tokens": 331096,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          0,
+          2
+        ],
+        "note": "The reply never asks for or proposes a winning ad to copy, and it spends much of the runtime arguing with words (a 'rushed' explanation and an 18-hour steep claim) instead of letting the sip and reaction carry the proof. It also ignores the board's existing Kling 3.0 setup and prices on Seedance 2.5, with invented asset names and a 16s total."
+      }
+    },
+    {
+      "case": "dr-objection",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-direct-response-ad",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 9483,
+      "tokens": 296702,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          0,
+          2
+        ],
+        "note": "The reply never asks for or proposes a winning ad to copy; it also spends the body on a skeptic-to-convert arc that dilutes a single emotion, and the objection is partly argued in dialogue."
+      }
+    },
+    {
+      "case": "dr-objection",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 140896,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1,
+          1
+        ],
+        "note": "The concept shows the objection false by having someone drink it black, but it never commits to a specific winning ad to copy, only asking the user for one. Some body lines also lack a clear paired picture, and the draft leaves the taste claim as a bracketed placeholder."
+      }
+    },
+    {
+      "case": "dr-objection",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-direct-response-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-direct-response-ad"
+      ],
+      "brainTokens": 3870,
+      "tokens": 97572,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          2,
+          2
+        ],
+        "note": "The body shows the pour and the unused sugar and creamer, but it is a claim about not needing to doctor it, not someone tasting it or reacting, and it adds a second message (sugar/milk, plus brew time and offer) rather than one emotion."
+      }
+    },
+    {
+      "case": "ugc-plan",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 6484,
+      "tokens": 124969,
+      "craft": 1.2,
+      "judge": {
+        "scores": [
+          0,
+          2,
+          2,
+          0,
+          2
+        ],
+        "note": "Mara says 'what replaced my second coffee' and 'no two p.m. crash' (claims of use and result), and the reply never asks for or proposes a reference creator ad to copy."
+      }
+    },
+    {
+      "case": "ugc-plan",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 15267,
+      "tokens": 178882,
+      "craft": 1.2,
+      "judge": {
+        "scores": [
+          0,
+          2,
+          2,
+          0,
+          2
+        ],
+        "note": "Mara says 'Now I just crack one of these' and 'Best part of my morning' while sipping, which is first-person product use and a result claim. The reply also never asks for or proposes a creator ad to copy."
+      }
+    },
+    {
+      "case": "ugc-plan",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 4242,
+      "tokens": 131338,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Strong overall; main weakness is ignoring the existing Kling 3.0 four-shot board in favor of a single Seedance clip, and the 326-credit quote is unsupported by the board's quote, but all rubric lines are met."
+      }
+    },
+    {
+      "case": "ugc-plan",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 4242,
+      "tokens": 155289,
+      "craft": 1.2,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          2,
+          2,
+          1
+        ],
+        "note": "It never asks which creator ad to copy or proposes a reference ad, and it ignores the existing Kling 3.0 four-shot board in favour of a single Seedance take, which only partly keeps Mara consistent and gives a quote that isn't tied to the board's pricing."
+      }
+    },
+    {
+      "case": "ugc-review",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5",
+        "working-method"
+      ],
+      "brainTokens": 15192,
+      "tokens": 124958,
+      "craft": 0.25,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "note": "The reply writes a fabricated one-month personal review in Mara's voice (AI character claiming lived use) with no mention of fake-review concerns, and ignores the board's Kling shots and the blocked saves (falsely says it 'wrote' and priced it)."
+      }
+    },
+    {
+      "case": "ugc-review",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 10197,
+      "tokens": 145558,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          0,
+          2
+        ],
+        "note": "The reply writes the fake 'a month of this every morning' lived-experience review for AI Mara and never declines it; it only adds a late dramatization-label caveat, with no truthful product fact or real-owner alternative."
+      }
+    },
+    {
+      "case": "ugc-review",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ugc-influencer-ad",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 4242,
+      "tokens": 106991,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1,
+          2
+        ],
+        "note": "The truthful beat is made of bracketed placeholders the user must fill in, and the reply invents a new 15s Seedance setup with prices instead of working in the existing board."
+      }
+    },
+    {
+      "case": "ugc-review",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ugc-influencer-ad$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ugc-influencer-ad"
+      ],
+      "brainTokens": 3586,
+      "tokens": 104674,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: it says it 'wrote' the draft though saves were blocked, but it declines the lived review, cites the FTC rule, keeps the beat with factual lines, and offers to generate at 96 credits."
+      }
+    },
+    {
+      "case": "variants",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ad-variants$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 57764,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          1,
+          1
+        ],
+        "note": "The reply never commits to a single export job covering all hooks and formats (it just says 10 files), and it misstates the project facts (says the shots lack videos and the ad is uncut) instead of planning around them."
+      }
+    },
+    {
+      "case": "variants",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-ad-variants$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 53945,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "note": "The reply asks clarifying questions instead of committing to a plan; it mentions swapping only the hook over a shared body and a 1:1 reframe, but never states one export job or the versions structure concretely."
+      }
+    },
+    {
+      "case": "variants",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ad-variants$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [
+        "unsourced figure \"$6\""
+      ],
+      "guides": [
+        "slates-start-here",
+        "slates-ad-variants"
+      ],
+      "brainTokens": 3100,
+      "tokens": 79879,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: it never says the reply's save was blocked, and it asks for a competitor link it can't fetch, but all four rubric lines are concretely covered."
+      }
+    },
+    {
+      "case": "variants",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-ad-variants$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-ad-variants"
+      ],
+      "brainTokens": 3100,
+      "tokens": 81693,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          2
+        ],
+        "note": "The reply never commits to a single export job covering all hooks and formats beyond 'exported together', and it claims 1:1 is reframed at no cost without saying how; it also asks for an outside winning ad it cannot fetch rather than just planning."
+      }
+    },
+    {
+      "case": "film",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-one-prompt-film$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-one-prompt-film",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 5747,
+      "tokens": 194694,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          1
+        ],
+        "note": "The reply gives one model (Seedance 2.5, the workspace default) for every shot with no per-shot reasoning, and its 492-credit quote isn't clearly from a tool, though it does wait for approval before spending."
+      }
+    },
+    {
+      "case": "film",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-one-prompt-film$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-one-prompt-film",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 10179,
+      "tokens": 200280,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          0
+        ],
+        "note": "The cost figures (82 and 58 credits per shot) have no visible tool quote behind them and look invented, and the reply picks Seedance for every shot without per-shot reasoning, though it does stop and ask before spending."
+      }
+    },
+    {
+      "case": "film",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-one-prompt-film$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-one-prompt-film",
+        "slates-cost-discipline",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 4360,
+      "tokens": 110156,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2,
+          0
+        ],
+        "note": "The cost table is the assistant's own estimate with no quote from a tool, and it picks Seedance 2.5 for every clip with no per-shot model reasoning, ignoring the board's Kling 3.0 Standard setup and its 32-credit quote; it does stop and wait for a go-ahead before spending anything."
+      }
+    },
+    {
+      "case": "film",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-one-prompt-film$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-one-prompt-film",
+        "slates-cost-discipline",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 4360,
+      "tokens": 228470,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          0
+        ],
+        "note": "The cost table has no sign of coming from a quote tool (it ignores the board's 32-credit/shot quote and Kling setting, and the reply says nothing about the sixth picture/credit math), and it proposes a new 5-shot plan instead of using the existing board, though it does wait for approval."
+      }
+    },
+    {
+      "case": "board-script",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-storyboard-from-script$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 54195,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          0,
+          0
+        ],
+        "note": "The reply never mentions that making shots is free while generating is quoted first (the 96-credit quote), and it does not address varied shot sizes; it only maps lines to shots with no visual proof."
+      }
+    },
+    {
+      "case": "board-script",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-storyboard-from-script$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 57456,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          0
+        ],
+        "note": "The reply never says that making Shots is free while generating needs a quoted price (96 credits for the three ungenerated Shots), and it claims the script is already split, which gives the user little to act on."
+      }
+    },
+    {
+      "case": "board-script",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-storyboard-from-script$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-storyboard-from-script"
+      ],
+      "brainTokens": 3587,
+      "tokens": 133408,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          1
+        ],
+        "note": "The reply made no new shots and asked the user a clarifying question, though the board already had a script mapped to shots; it never committed to a varied shot list, and cost was only mentioned in passing without noting that SHOT-A2 can't be priced or the 96-credit quote."
+      }
+    },
+    {
+      "case": "board-script",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-storyboard-from-script$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-storyboard-from-script"
+      ],
+      "brainTokens": 3247,
+      "tokens": 115532,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          0,
+          0
+        ],
+        "note": "The reply never mentions the varied shot sizes (static close-up, extreme close-up, medium push-in) and never says that shots are free while generating costs credits and needs a quoted OK, though it correctly reads the existing script and maps each line to a Shot."
+      }
+    },
+    {
+      "case": "script",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(script-craft|direct-response-ad)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 64465,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          1,
+          1
+        ],
+        "note": "It never proposed a trimmed script as a suggestion; it argued the voiceover already fits and pushed shot trimming or merging, though the user asked for a script rewrite to fit 15 seconds."
+      }
+    },
+    {
+      "case": "script",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(script-craft|direct-response-ad)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 56348,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          1,
+          1
+        ],
+        "note": "The reply did not rewrite or cut the voiceover or propose a script suggestion; it argued the script already fits and recommended shortening shots instead, so the user's request went undone."
+      }
+    },
+    {
+      "case": "script",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(script-craft|direct-response-ad)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-script-craft"
+      ],
+      "brainTokens": 3292,
+      "tokens": 83564,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2,
+          2
+        ],
+        "note": "It declined to rewrite and proposed no concrete shorter script, only a one-line example tweak, and the script was found to already fit, which is reasonable but delivers little of the cut-to-fit rewrite as a suggestion."
+      }
+    },
+    {
+      "case": "script",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(script-craft|direct-response-ad)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-script-craft"
+      ],
+      "brainTokens": 3292,
+      "tokens": 91432,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "note": "The reply never rewrites or proposes a script change, and it says the voiceover already fits and blames the shots, so it never cuts words to fit 15 seconds. It also never mentions that its save attempts were refused."
+      }
+    },
+    {
+      "case": "character",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-character-identity$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "app-manual",
+        "slates-prompting-kling-v3",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 1227,
+      "tokens": 166581,
+      "craft": 1.3333333333333333,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2
+        ],
+        "note": "The plan fixes only the proof-line shot (2A) and leaves out 1B and 2B, so Mara's identity is not bound on every shot, and it never offers an identity sheet or any project-wide binding."
+      }
+    },
+    {
+      "case": "character",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-character-identity$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-character-identity"
+      ],
+      "brainTokens": 7413,
+      "tokens": 171153,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2
+        ],
+        "note": "It binds Mara only on SHOT-A3 (and optionally A1) and doesn't commit to a firm bind-everywhere plan, leaving the source picture undecided and the identity sheet unmade."
+      }
+    },
+    {
+      "case": "character",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-character-identity$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-character-identity",
+        "app-manual"
+      ],
+      "brainTokens": 6002,
+      "tokens": 369389,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2
+        ],
+        "note": "The reply binds the sheet only to the two shots Mara appears in rather than every shot, and it misses that this is a four-shot ad with Kitchen/Ritual can items, though excluding non-Mara shots is defensible; it also doesn't clearly state the binding is blocked."
+      }
+    },
+    {
+      "case": "character",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-character-identity$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-character-identity"
+      ],
+      "brainTokens": 5116,
+      "tokens": 174436,
+      "craft": 1.3333333333333333,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1
+        ],
+        "note": "Plan commits to a Library identity sheet for Mara but binding is only for shots with @Mara (1A, 2A) and is contingent on the user supplying a face; the 3-credit quote is given, though the reply sends the user to generate it in the app rather than asking OK for a quoted price here."
+      }
+    },
+    {
+      "case": "edit",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-edit-and-iterate$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 500,
+      "tokens": 87959,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2,
+          2
+        ],
+        "note": "It used IMG-A2, a generated hero image of the can, as the label reference instead of the Ritual can Library item, so the label source isn't the product's canonical asset."
+      }
+    },
+    {
+      "case": "edit",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-edit-and-iterate$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-edit-and-iterate",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 4492,
+      "tokens": 144593,
+      "craft": 1.5,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2,
+          2
+        ],
+        "note": "It used a generated image (IMG-A2) as the label reference rather than the Ritual can Library item, which is the product's canonical source for the label."
+      }
+    },
+    {
+      "case": "edit",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-edit-and-iterate$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-edit-and-iterate",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 4230,
+      "tokens": 177566,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: the reply says it couldn't see the blur and hedges on whether IMG-A2 shows the label clearly, but it still commits to a single-change plan with a quote before spending."
+      }
+    },
+    {
+      "case": "edit",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-edit-and-iterate$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-edit-and-iterate",
+        "slates-prompting-kling-v3",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 4998,
+      "tokens": 168542,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: the 32-credit price and the claim that Kling O3 Video Edit exists are asserted without clear grounding in the board quote, but the plan is otherwise tight."
+      }
+    },
+    {
+      "case": "cuts",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-cuts$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 4226,
+      "tokens": 96175,
+      "craft": 0,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "note": "The reply ignores the board's four 5-second Shots (A1 generated as VID-V1, A2 unprompted, A3 and A4 priced at 32 credits each) and wrongly says the project lacks footage. It builds no cut, gives no moving open, no trimming and no 15s fit, and suggests stills and an 8-12 shot count instead of the real board."
+      }
+    },
+    {
+      "case": "cuts",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-cuts$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 117405,
+      "craft": 0.5,
+      "judge": {
+        "scores": [
+          0,
+          1,
+          1,
+          0
+        ],
+        "note": "The reply ignores the board's real Shots (A1-A4, 20s, A1 already generated as VID-V1) and invents a plan with different pricing (21 credits vs the 32 quoted), a pour-over-ice opener that isn't a moving hook, and no named cut."
+      }
+    },
+    {
+      "case": "cuts",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-cuts$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-cuts"
+      ],
+      "brainTokens": 5112,
+      "tokens": 114138,
+      "craft": 0.25,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          1,
+          0
+        ],
+        "note": "The reply doesn't use the board's real Shots (A1–A4, VID-V1, generated shots) and invents a different asset set; it commits to no cut order, no moving hook, and no trimming, only asking questions and offering options."
+      }
+    },
+    {
+      "case": "cuts",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-cuts$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-cuts"
+      ],
+      "brainTokens": 6564,
+      "tokens": 101852,
+      "craft": 0,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "note": "The reply ignores the board's four Shots (Cold brew 15s v1, SHOT-A1 to A4) and builds no cut: it claims no footage and reports only 'VID-V1' plus stills, so there's no hook-first ordering, trimming, or 15s fit."
+      }
+    },
+    {
+      "case": "captions",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-captions$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 124460,
+      "craft": 0.6666666666666666,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          1
+        ],
+        "note": "No captions were applied; the reply commits to word-pop text clips but never addresses placement away from faces or the product, and it depends on a transcript it could not get."
+      }
+    },
+    {
+      "case": "captions",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-captions$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 94775,
+      "craft": 0.6666666666666666,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          1
+        ],
+        "note": "No captions were applied; the reply plans word-by-word highlighted captions but never commits to a position clear of faces and the product, and the real transcript was unavailable."
+      }
+    },
+    {
+      "case": "captions",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-captions$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-captions"
+      ],
+      "brainTokens": 3769,
+      "tokens": 124114,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1
+        ],
+        "note": "No captions were applied; the reply only commits to a plan (big word-by-word captions, low and clear of her face) and never addresses keeping them off the Ritual can, and it blocks on a missing cut and an unreadable transcript, though that blockage is stated accurately."
+      }
+    },
+    {
+      "case": "captions",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-captions$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-captions"
+      ],
+      "brainTokens": 3769,
+      "tokens": 110880,
+      "craft": 1,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1
+        ],
+        "note": "No captions were produced; the reply commits to word-by-word captions and keeping them clear of her face, but never mentions the product and never obtained the real speech, asking the user for transcript or lines instead."
+      }
+    },
+    {
+      "case": "end-card",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(motion|ad-variants)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 41824,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1,
+          0
+        ],
+        "note": "The reply claims no timeline and no logo exist, contradicting the four-Shot board with SHOT-A4 as the hero end card. It never commits to the end card, and it invents asset names and a 3-second fade-in design that don't match the project."
+      }
+    },
+    {
+      "case": "end-card",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(motion|ad-variants)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-motion"
+      ],
+      "brainTokens": 274,
+      "tokens": 38586,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          1,
+          2
+        ],
+        "note": "The reply never commits to the exact text 'Try it at ritual.coffee' (it doesn't mention it or the verb-led CTA) and wrongly claims there's no timeline, instead of placing a card as the final Shot (SHOT-A4 hero end card) on the board; it only stalls and asks questions."
+      }
+    },
+    {
+      "case": "end-card",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(motion|ad-variants)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-motion"
+      ],
+      "brainTokens": 3127,
+      "tokens": 105761,
+      "craft": 0.75,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          1,
+          2
+        ],
+        "note": "The reply never commits to the exact text 'Try it at ritual.coffee' or a verb-led CTA, so it doesn't build the end card; it only asks for a logo and a cut, though it does invent nothing about the offer."
+      }
+    },
+    {
+      "case": "end-card",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(motion|ad-variants)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)",
+        "slates-motion"
+      ],
+      "brainTokens": 3127,
+      "tokens": 94322,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "note": "It never actually adds the end card: it stops to ask about the logo and the timeline, and it wrongly says there is no edit even though the board has four Shots, so the end-card placement and the 'Try it at ritual.coffee' text are only a plan, not committed work."
+      }
+    },
+    {
+      "case": "previs",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-previs-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-prompting-kling-v3",
+        "slates-previs-blocking",
+        "slates-camera-language"
+      ],
+      "brainTokens": 7484,
+      "tokens": 271703,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1
+        ],
+        "note": "It never gives a concrete price for the Seedance switch and only says it will quote later; the free blocking render is stated clearly, but the paid generation is left without a figure or any note that Kling's 32-credit quote would change."
+      }
+    },
+    {
+      "case": "previs",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-previs-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-previs-blocking",
+        "slates-camera-language"
+      ],
+      "brainTokens": 7406,
+      "tokens": 216350,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2
+        ],
+        "note": "It never states explicitly that the rendered grey-box clip will be fed to the video model as the motion/reference input; it only says 'turning the clip into the final shot' is paid, so the reference use is implied rather than committed to."
+      }
+    },
+    {
+      "case": "previs",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-previs-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-previs-blocking"
+      ],
+      "brainTokens": 5089,
+      "tokens": 225357,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2
+        ],
+        "note": "The reply never commits to feeding the rendered grey clip in as the video reference; it only says Kling might not accept one and offers Seedance. It also cites a SHOT-A4 prompt and \"2B\" labeling that the project facts don't support."
+      }
+    },
+    {
+      "case": "previs",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-previs-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-previs-blocking"
+      ],
+      "brainTokens": 5089,
+      "tokens": 236397,
+      "craft": 1.3333333333333333,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1
+        ],
+        "note": "The reply never commits to using the grey-box render as the video reference; it only mentions 'a motion reference' while discussing a model switch. It also says the render is free but doesn't clearly state what is quoted versus free for the new generation."
+      }
+    },
+    {
+      "case": "dialogue",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-dialogue-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-camera-language",
+        "working-method",
+        "slates-dialogue-blocking",
+        "slates-prompting-kling-v3"
+      ],
+      "brainTokens": 10423,
+      "tokens": 162463,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: the friend is described in the prompt rather than fixed as a Library character, and the scene sits between Hook and Proof, which conflicts with the stated scene structure; otherwise the plan is strong."
+      }
+    },
+    {
+      "case": "dialogue",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-dialogue-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-script-craft",
+        "slates-camera-language",
+        "slates-dialogue-blocking"
+      ],
+      "brainTokens": 8590,
+      "tokens": 225842,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          2,
+          0,
+          2,
+          1
+        ],
+        "note": "The plan never says the scene is set in the Kitchen location or that the Kitchen Library item will be used, though it keeps eyelines consistent with a fixed left/right layout for Mara and Jo."
+      }
+    },
+    {
+      "case": "dialogue",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-dialogue-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-dialogue-blocking"
+      ],
+      "brainTokens": 5731,
+      "tokens": 153569,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2,
+          2
+        ],
+        "note": "The line-of-the-180 plan is muddled: it fixes Mara right and the friend left, but says the near shoulder flips in reverses and offers no explicit same-side camera placement, and the friend is not fixed as a Library character."
+      }
+    },
+    {
+      "case": "dialogue",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-dialogue-blocking$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-dialogue-blocking"
+      ],
+      "brainTokens": 4279,
+      "tokens": 136994,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: the reply says the friend is on the left of frame for both shots, but shot 1D's reverse puts the friend left and Mara's shoulder right, which is consistent. The main gap is that the friend isn't in the Library and the scene wasn't actually added."
+      }
+    },
+    {
+      "case": "org",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-project-organization$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 46763,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2
+        ],
+        "note": "The copy was never done (blocked), and the reply attributes the block to Claude Code 'don't ask' mode rather than a plain save refusal; it does plan a copy rather than a move, but delivers no result."
+      }
+    },
+    {
+      "case": "org",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-project-organization$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 46732,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2
+        ],
+        "note": "The copy was blocked, so nothing moved; the reply says so accurately, though it never states outright that nothing was spent (only that nothing changed)."
+      }
+    },
+    {
+      "case": "org",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-project-organization$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)"
+      ],
+      "brainTokens": 1453,
+      "tokens": 55039,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2
+        ],
+        "note": "The copy was never done (the save was blocked), so the reply only proposes a copy, though it does state a clear copy plan and that nothing changed."
+      }
+    },
+    {
+      "case": "org",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-project-organization$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here (attached)"
+      ],
+      "brainTokens": 1453,
+      "tokens": 55076,
+      "craft": 1.6666666666666667,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2
+        ],
+        "note": "The copy was never done because the save was blocked. The reply is honest about this and commits to a copy (not a move), but it delivers no result."
+      }
+    },
+    {
+      "case": "vague",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-start-here$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 43409,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          2,
+          2
+        ],
+        "note": "It never asks for an example ad the user likes to copy, and its questions about product, venue and length only come as a fallback after proposing to finish the existing board."
+      }
+    },
+    {
+      "case": "vague",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-start-here$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 33151,
+      "craft": 1.25,
+      "judge": {
+        "scores": [
+          1,
+          0,
+          2,
+          2
+        ],
+        "note": "It never asks for a reference ad to copy, and it only asks which project to use instead of covering what they sell, who buys it, and where it runs, though it does use the project's existing contents."
+      }
+    },
+    {
+      "case": "vague",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-start-here$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here"
+      ],
+      "brainTokens": 1793,
+      "tokens": 40139,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1,
+          2
+        ],
+        "note": "Reply says the board has 4 shots as hook, proof, end card, which is a slightly wrong summary, and it offers a choice between two projects instead of just proposing the cold brew; it never mentions the Mara/Ritual can/Kitchen items by name or the existing generated shot."
+      }
+    },
+    {
+      "case": "vague",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-start-here$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here"
+      ],
+      "brainTokens": 1793,
+      "tokens": 67066,
+      "craft": 1.75,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          1,
+          2
+        ],
+        "note": "Project facts are mis-stated: it says shots 1 and 4 have a picture (the facts say only A1 is generated as VID-V1, with A2 lacking a prompt and A3/A4 not stated as having pictures), claims A3 is empty, and invents a 'brief says 15 s' Meta/TikTok detail, so the project is only partly used accurately."
+      }
+    },
+    {
+      "case": "drift-one-take",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance"
+      ],
+      "brainTokens": 15046,
+      "tokens": 107872,
+      "craft": 0.6,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        "note": "Never offers to block the drift in Blender first (and so gives no reason); it goes straight to a prompt-only generation, though it does plan one continuous shot with a clear camera path and waits for the OK on a quoted price."
+      }
+    },
+    {
+      "case": "drift-one-take",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-prompting-seedance-2-5",
+        "slates-model-selection"
+      ],
+      "brainTokens": 15778,
+      "tokens": 113766,
+      "craft": 0.6,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          0,
+          2,
+          1
+        ],
+        "note": "Never offers to block the drift in Blender first (or explains why a blocking clip fixes path and timing), and it never says its prices came from a tool, though it does wait for the user's OK before generating."
+      }
+    },
+    {
+      "case": "drift-one-take",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 2449,
+      "tokens": 65836,
+      "craft": 1.6,
+      "judge": {
+        "scores": [
+          1,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "Blender is offered only as a secondary 'another option' after a prompt-only draft is already priced and recommended, rather than proposed first; the 231/569/3 prices are claimed as 'quoted just now' with no visible tool call, so their provenance is unclear."
+      }
+    },
+    {
+      "case": "drift-one-take",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 2449,
+      "tokens": 63993,
+      "craft": 1.4,
+      "judge": {
+        "scores": [
+          1,
+          1,
+          2,
+          2,
+          1
+        ],
+        "note": "Blender blocking is only a trailing 'something to consider' after a prompt-first plan, and the 231/569 credit prices have no visible tool source; the rest is sound."
+      }
+    },
+    {
+      "case": "fight-one-take",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-model-selection",
+        "slates-content-policy",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 15988,
+      "tokens": 103854,
+      "craft": 0.8,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          2,
+          1,
+          1
+        ],
+        "note": "Never offers to block the choreography and camera in Blender first, and doesn't explain that a prompt alone won't hold the same moves and timing across rolls; it also claims the app and pricing service were unreachable, and gives a rough '6x' cost estimate not from a tool."
+      }
+    },
+    {
+      "case": "fight-one-take",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-prompting-seedance-2-5",
+        "slates-model-selection",
+        "slates-content-policy"
+      ],
+      "brainTokens": 16023,
+      "tokens": 114446,
+      "craft": 0.8,
+      "judge": {
+        "scores": [
+          0,
+          0,
+          2,
+          1,
+          1
+        ],
+        "note": "No offer to block the choreography and camera in Blender first, and no explanation of why a prompt alone won't hold a choreographed take; it also claims to have priced the work with figures that conflict with the stated setup, though it does wait for the OK before spending."
+      }
+    },
+    {
+      "case": "fight-one-take",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-previs-blocking"
+      ],
+      "brainTokens": 5089,
+      "tokens": 128312,
+      "craft": 1.4,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          0,
+          1
+        ],
+        "note": "The reply never addresses the content policy for the violence (no gore, fictional people); it also quotes 416 and 347 credits with no sign they came from a pricing tool, though it does wait for approval before generating."
+      }
+    },
+    {
+      "case": "fight-one-take",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-(previs-blocking|one-prompt-film)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-previs-blocking",
+        "slates-content-policy"
+      ],
+      "brainTokens": 5464,
+      "tokens": 46511,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "The reply offers no price from a tool; it only promises one later and says nothing gets made until the total is approved, so the cost line is only partly met."
+      }
+    },
+    {
+      "case": "mascot-dance",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-prompting-motion-transfer$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [
+        "unsourced figure \"64 credits\""
+      ],
+      "guides": [
+        "slates-prompting-motion-transfer"
+      ],
+      "brainTokens": 7077,
+      "tokens": 115675,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "The cost figures (64 or 84 credits) came from a 'setup guide', not from a Slates pricing tool, so they are estimates rather than a tool quote, though the reply does promise an exact quote and to wait for the OK."
+      }
+    },
+    {
+      "case": "mascot-dance",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^slates-prompting-motion-transfer$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 0,
+      "tokens": 57230,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "Cost handling is only a plan: it says it will get a price and wait for approval, but no price has been fetched from a tool yet, and it also claims a 'small image cost' and model tiers without a tool quote."
+      }
+    },
+    {
+      "case": "mascot-dance",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-prompting-motion-transfer$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-prompting-motion-transfer"
+      ],
+      "brainTokens": 2366,
+      "tokens": 108679,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "It never gets a tool-based price: it only says it will price and show the exact cost before generating, with the 5-second block detail unsourced, so the cost line is only partly met."
+      }
+    },
+    {
+      "case": "mascot-dance",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^slates-prompting-motion-transfer$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-prompting-motion-transfer"
+      ],
+      "brainTokens": 2366,
+      "tokens": 131868,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          1
+        ],
+        "note": "It never gives a tool-derived price (none was available) and describes a per-5-second billing rule from memory; it does promise to quote and wait for OK, but only conditionally, after reconnection."
+      }
+    },
+    {
+      "case": "launch-stats",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^(motion-overview|product-launch-video|slates-motion|motion-graphics)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 4277,
+      "tokens": 105068,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          2,
+          2
+        ],
+        "note": "It never states the real reason for motion graphics (exact rendered text); it only says no credits are used and offers generated footage as an option, so line 2 gets partial credit."
+      }
+    },
+    {
+      "case": "launch-stats",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^(motion-overview|product-launch-video|slates-motion|motion-graphics)$/",
+          "pass": false
+        }
+      ],
+      "readFirst": false,
+      "forbidden": [],
+      "guides": [],
+      "brainTokens": 4288,
+      "tokens": 49109,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          2,
+          2,
+          2
+        ],
+        "note": "It never explains why motion graphics fits (exact text, no generation cost); it only notes the plan costs no credits because nothing is generated."
+      }
+    },
+    {
+      "case": "launch-stats",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^(motion-overview|product-launch-video|slates-motion|motion-graphics)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "motion-overview"
+      ],
+      "brainTokens": 2606,
+      "tokens": 41377,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: it asks which project to use and doesn't mention that the save was blocked, but the reply is otherwise on target."
+      }
+    },
+    {
+      "case": "launch-stats",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^(motion-overview|product-launch-video|slates-motion|motion-graphics)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "motion-overview",
+        "motion-overview/references/routes/product-launch-video.md"
+      ],
+      "brainTokens": 3102,
+      "tokens": 75623,
+      "craft": 2,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          2,
+          2
+        ],
+        "note": "Minor: the reply doesn't mention the blocked saves, and it suggests a new project rather than staying in the workspace, but it still meets every rubric line."
+      }
+    },
+    {
+      "case": "film-mixed-methods",
+      "arm": "baseline",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^(slates-one-prompt-film|slates-storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [
+        "unsourced figure \"414 credits\"",
+        "unsourced figure \"Total: 414\""
+      ],
+      "guides": [
+        "working-method",
+        "slates-one-prompt-film",
+        "slates-content-policy",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 17212,
+      "tokens": 203307,
+      "craft": 1.4,
+      "judge": {
+        "scores": [
+          0,
+          2,
+          2,
+          1,
+          2
+        ],
+        "note": "The one-take fight is planned as a single 10s generated Seedance clip with no Blender blocking offered, and the user is not offered a choice of method per shot."
+      }
+    },
+    {
+      "case": "film-mixed-methods",
+      "arm": "baseline",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": null
+        },
+        {
+          "must": "guide /^(slates-one-prompt-film|slates-storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "working-method",
+        "slates-one-prompt-film",
+        "slates-content-policy",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5",
+        "slates-prompting-seedance-2-5"
+      ],
+      "brainTokens": 5897,
+      "tokens": 148397,
+      "craft": 1.2,
+      "judge": {
+        "scores": [
+          0,
+          2,
+          1,
+          1,
+          2
+        ],
+        "note": "The fight is planned as a single prompted 12s generation with no Blender blocking offered, and the user is never given a per-shot choice of method (only the text card is treated differently)."
+      }
+    },
+    {
+      "case": "film-mixed-methods",
+      "arm": "candidate",
+      "run": 1,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^(slates-one-prompt-film|slates-storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-one-prompt-film"
+      ],
+      "brainTokens": 3292,
+      "tokens": 64657,
+      "craft": 1.4,
+      "judge": {
+        "scores": [
+          2,
+          1,
+          1,
+          1,
+          2
+        ],
+        "note": "The end card is text 'added in the edit' rather than committed as a motion layer, and the plan never offers a method choice per shot beyond the fight, with identity sheets listed but no Library character or location plate named."
+      }
+    },
+    {
+      "case": "film-mixed-methods",
+      "arm": "candidate",
+      "run": 2,
+      "ok": true,
+      "musts": [
+        {
+          "must": "router reached",
+          "pass": true
+        },
+        {
+          "must": "guide /^(slates-one-prompt-film|slates-storyboard-from-script)$/",
+          "pass": true
+        }
+      ],
+      "readFirst": true,
+      "forbidden": [],
+      "guides": [
+        "slates-start-here",
+        "slates-one-prompt-film"
+      ],
+      "brainTokens": 3292,
+      "tokens": 65715,
+      "craft": 1.8,
+      "judge": {
+        "scores": [
+          2,
+          2,
+          2,
+          1,
+          2
+        ],
+        "note": "It plans six shots in 30s, but the user only gets a choice of method for the fight; the other shots are fixed as generated video and the end card as an edit text layer, so per-shot method choice is only partial."
+      }
+    }
+  ]
+}
