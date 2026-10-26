@@ -3,10 +3,11 @@
 // § Step 3.) Each ask in routing-cases.json goes to a headless Claude Code session holding exactly
 // what every agent holds at the start of a job, the Director card and the router (read from the
 // markdown, cut the way the package cuts them), and the session names the playbook it would open
-// first. Scored by code: a hit is any name in the case's `expect`.
+// first. Scored by code: a hit is any name in the case's `expect`, once the pick is resolved as the guide op resolves
+// a topic (an alias, a missing `slates-` prefix, a small typo), since that is the guide the agent would be served.
 //
 //   node scripts/brain-eval/routing.mjs --root <build of the approved commit> [--model sonnet] [--runs 1] [--cases id,id]
-//     [--concurrency 4] [--min 0.9]
+//     [--concurrency 4] [--min 0.9] [--out <file>]
 //
 // Two arms in one batch, their asks interleaved so a slow hour hits both alike: `candidate`, this checkout,
 // and `baseline`, the build at --root (a checkout of scoreboard.json approvedCommit, built), which gate.mjs
@@ -16,10 +17,12 @@
 // Runs on the signed-in Claude plan, no tools, no settings, no CLAUDE.md (lib.mjs). Writes
 // results/<date>-routing-<model>.json with each arm's root and brain hash (brain-hash.mjs), which gate.mjs
 // needs; an arm's hash is null when its markdown differs from its build, since it would then name a brain
-// this run did not test. Fails when the candidate is under --min.
+// this run did not test. --out writes a rerun of a few cases elsewhere, so it never replaces the batch's file.
+// Fails when the candidate is under --min.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { arg, countArg, runClaude, scrubHome } from '../behaviour-ab/lib.mjs'
 import { ROUTER, readSkills } from '../brain-lint.mjs'
 import { brainHash, unbuiltSkills } from './brain-hash.mjs'
@@ -46,6 +49,15 @@ async function armOf(name, root) {
 const arms = {}
 for (const [name, root] of Object.entries(roots)) arms[name] = await armOf(name, root)
 if (arms.candidate.noRouter) throw new Error(`the candidate has no router (${ROUTER}); nothing to test`)
+// Both arms resolve picks through this checkout's resolver, which the brain hash does not cover, so the
+// difference between the arms stays the brain.
+const { SKILLS, operations } = await import(pathToFileURL(join(roots.candidate, 'packages', 'shared', 'dist', 'index.js')).href)
+const ANSWERS = ['none', 'motion-overview']
+function served(picked) {
+  if (!picked || ANSWERS.includes(picked) || Object.hasOwn(SKILLS, picked)) return picked
+  const near = operations.nearestGuideName(picked, [...Object.keys(SKILLS), ...ANSWERS.slice(1)])
+  return operations.resolveGuideTopic(picked) ?? (near && 'name' in near ? near.name : picked)
+}
 const { cases: all } = JSON.parse(readFileSync(join(here, 'routing-cases.json'), 'utf8'))
 const wanted = arg('cases')?.split(',')
 const cases = all.filter((c) => !wanted || wanted.includes(c.id))
@@ -94,9 +106,10 @@ async function worker() {
   while (next < jobs.length) {
     const { arm, c, run } = jobs[next++]
     const r = await ask(arm, c)
-    const hit = !!r.picked && c.expect.includes(r.picked)
-    results[arm.name].push({ case: c.id, run, expect: c.expect, ...r, hit })
-    console.log(`${hit ? '✓' : '✗'} ${arm.name} ${c.id} #${run}: ${r.picked ?? r.error}${hit ? '' : ` (expected ${c.expect.join(' or ')})`}`)
+    const resolved = served(r.picked)
+    const hit = !!resolved && c.expect.includes(resolved)
+    results[arm.name].push({ case: c.id, run, expect: c.expect, ...r, ...(resolved !== r.picked ? { resolved } : {}), hit })
+    console.log(`${hit ? '✓' : '✗'} ${arm.name} ${c.id} #${run}: ${r.picked ?? r.error}${resolved !== r.picked ? ` → ${resolved}` : ''}${hit ? '' : ` (expected ${c.expect.join(' or ')})`}`)
   }
 }
 await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker))
@@ -109,7 +122,7 @@ const summary = Object.fromEntries(Object.entries(arms).map(([name, arm]) => {
 }))
 const out = join(here, 'results')
 mkdirSync(out, { recursive: true })
-const file = join(out, `${new Date().toISOString().slice(0, 10)}-routing-${model}.json`)
+const file = arg('out') ? resolve(arg('out')) : join(out, `${new Date().toISOString().slice(0, 10)}-routing-${model}.json`)
 writeFileSync(file, scrubHome(JSON.stringify({ model, runs, arms: summary }, null, 2)))
 for (const [name, x] of Object.entries(summary)) console.log(`routing on ${model}, ${name}: ${x.noRouter ? 'no router in this build' : `${x.hits}/${x.answered} (${Math.round((x.accuracy ?? 0) * 100)}%), ${x.errors} errors`}`)
 console.log(`→ ${scrubHome(file)}`)
