@@ -40,8 +40,8 @@ import { splitOverlay } from './brain.js'
  * A card is a CARD. The largest skill is 5,736 words and loading it whole is
  * exactly the cost this mechanism exists to avoid — if a card needs more than
  * this, the extra belongs in the body of the skill, which is one
- * `slates_get_prompting_guide` call away. Asserted at load, so an over-long
- * card fails the build rather than quietly inflating every estimate result.
+ * `slates_get_prompting_guide` call away. check:agent-surface § 8 fails the build on an over-long card; a served
+ * brain arrives at run time, so there an over-long card is skipped and named (oversizedCraftCards), never thrown.
  */
 export const CRAFT_CARD_CEILING = 2400
 
@@ -72,18 +72,31 @@ function extractCard(skill: string, content: string): string | null {
  * Every card, keyed by skill name, from the brain this process holds (skills/served.ts): rebuilt when that brain
  * changes, integrity asserted on each build. Model guides are served by tier, so without a brain there are none.
  */
-let built: { brain: ServedBrain; cards: Readonly<Record<string, string>> } | undefined
-function cards(): Readonly<Record<string, string>> {
+let built: { brain: ServedBrain; cards: Readonly<Record<string, string>>; oversized: readonly string[] } | undefined
+function build(): NonNullable<typeof built> {
   const brain = servedBrain()
   if (built?.brain !== brain) {
-    const cards = Object.fromEntries(
-      Object.entries(brainFiles())
-        .map(([skill, content]) => [skill, extractCard(skill, content)] as const)
-        .filter((entry): entry is readonly [string, string] => entry[1] !== null)
-    )
-    built = { brain, cards: Object.freeze(cards) }
+    const cards: Record<string, string> = {}
+    const oversized: string[] = []
+    for (const [skill, content] of Object.entries(brainFiles())) {
+      try {
+        const card = extractCard(skill, content)
+        if (card !== null) cards[skill] = card
+      } catch (error) {
+        // One over-long card must not take down every estimate: that guide goes without a card, and says why.
+        oversized.push(skill)
+        console.error(String((error as Error).message))
+      }
+    }
+    built = { brain, cards: Object.freeze(cards), oversized: Object.freeze(oversized) }
   }
-  return built.cards
+  return built
+}
+const cards = (): Readonly<Record<string, string>> => build().cards
+
+/** The guides in the held brain whose card is over the ceiling and so rides no estimate result. */
+export function oversizedCraftCards(): readonly string[] {
+  return build().oversized
 }
 
 /** A live view of cards(), so `CRAFT_CARDS[name]`, `in` and `Object.keys` follow the served brain. */

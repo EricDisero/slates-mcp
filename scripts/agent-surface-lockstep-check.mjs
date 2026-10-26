@@ -199,6 +199,7 @@ const {
   toolDefinitions,
   craftCard,
   CRAFT_CARD_CEILING,
+  oversizedCraftCards,
 } = shared
 // The model guides checks 4 and 8 read are the brain's (slates-api brain/), held the way a member's server holds them.
 const brain = brainDir()
@@ -729,7 +730,12 @@ console.log('agent-surface-lockstep-check')
 {
   const CHECK = '8 craft-cards'
   const perModel = Object.keys(SKILLS).filter((n) => n.startsWith('slates-prompting-'))
+  // A served card over the ceiling is skipped at run time (craft-cards.ts), so the build is where it fails.
+  for (const skill of oversizedCraftCards()) {
+    fail(CHECK, `${skill}'s card is over the ${CRAFT_CARD_CEILING} ceiling; move the overflow into the body of the skill.`)
+  }
   for (const skill of perModel) {
+    if (oversizedCraftCards().includes(skill)) continue
     if (!craftCard(skill)) {
       fail(CHECK, `${skill}.md has no <!-- @card:start --> block. The card is the ONE piece of positive craft guidance that reaches the agent without a fetch — write one, 250-400 words.`)
     }
@@ -737,9 +743,6 @@ console.log('agent-surface-lockstep-check')
       fail(CHECK, `${skill}.md has no @banned block with backticked tokens. Its prompts are matched against another model's never-use list.`)
     }
     const card = craftCard(skill)
-    if (card && card.length > CRAFT_CARD_CEILING) {
-      fail(CHECK, `${skill}'s card is ${card.length} chars, over the ${CRAFT_CARD_CEILING} ceiling.`)
-    }
     // 🚨 A CARD MUST NAME ITS LEVERS AS LITERAL PHRASES. The eval scorer's
     // `craft_levers_present` reads the BACKTICKED spans out of the card — never
     // a hand-typed word list, for the same reason `banned.mjs` imports its list

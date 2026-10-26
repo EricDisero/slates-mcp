@@ -84,7 +84,7 @@ export {
 // own `@card` blocks and delivered on the estimate result. The eval scorer reads
 // CRAFT_CARDS to build its lever vocabulary, so the assertion can never be
 // scored against a hand-retyped word list.
-export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, craftCardOf, describeCraftCard } from './prompts/craft-cards.js'
+export { CRAFT_CARDS, CRAFT_CARD_CEILING, craftCard, craftCardOf, describeCraftCard, oversizedCraftCards } from './prompts/craft-cards.js'
 // Per-model prompting tips — the SSOT for the desktop "See prompting tips"
 // modals. The desktop renders these; it never hand-writes tips content.
 export { PROMPTING_TIPS, getPromptingTips, type PromptingTipsEntry, type PromptingTipCard, type PromptingTipsKey } from './prompts/prompting-tips.js'
