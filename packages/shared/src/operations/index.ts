@@ -1469,6 +1469,38 @@ export const editAssetTranscript: Operation<{ projectId: string; assetId: string
   },
 }
 
+// Cut by transcript (slate roadmap item 13): the desktop route is POST /agent/timeline/cut-transcript, the same
+// core as the transcript page's Cut (slate `src/main/editor/transcriptCut.ts`).
+export const cutByTranscript: Operation<{
+  projectId: string; clipId: string; words?: Array<{ from: number; to: number }>; pauses?: number[]
+  ranges?: Array<{ startSec: number; endSec: number }>; linked?: boolean; trackIds?: string[]
+}> = {
+  id: 'slates_cut_by_transcript',
+  billable: false,
+  description:
+    "Cut words or pauses out of a video or audio clip on the timeline by its transcript, as Cut on the clip's Transcript page does: each stretch leaves the clip, which splits around it, and the gap closes (ripple), at the clip's own in point and speed. Name words by their index in slates_get_asset_transcript's words (from and to, inclusive), pauses by the index of the word each follows, or stretches of the file's own seconds. A word's cut reaches up to 60 ms before it and 100 ms after it into silence, never into a neighbouring word; a pause keeps 100 ms after the word before and 60 ms before the word after, so no word loses its first or last sound. The clip's linked sound and the captions heard from it are cut the same way; trackIds adds more lanes (a picture above it, a music bed) to keep in sync; linked false cuts only the clip's lane. Words an earlier cut left in later pieces are found there. Returns the clips written, ids deleted, durationFrames, each stretch cut in timeline seconds (latest first), removedSec, and timing: aligned words land within a frame or two, recognizer words within about a quarter second (transcribe again with force first). Free. Requires transcript-cut; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      clipId: z.string().uuid().describe('The video or audio clip on the timeline whose words to cut.'),
+      words: z.array(z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }).strict()).min(1).optional()
+        .describe("Runs of words to cut, by index in the asset's transcript words, from and to inclusive."),
+      pauses: z.array(z.number().int().min(0)).min(1).optional().describe('Pauses to cut, each by the index of the word it follows.'),
+      ranges: z.array(z.object({ startSec: z.number().min(0), endSec: z.number().min(0) }).strict()).min(1).optional()
+        .describe("Stretches of the file's own seconds to cut, as the transcript counts them."),
+      linked: z.boolean().optional().describe("False: cut only the clip's lane, not its linked sound's. Default true."),
+      trackIds: z.array(z.string().uuid()).min(1).optional().describe('More lanes to cut and close up the same way, to keep them in sync.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    if (!input.words && !input.pauses && !input.ranges) throw new Error('Name words, pauses or ranges to cut.')
+    await ctx.desktop().requireCapability('transcript-cut', 'cut by transcript')
+    const r = await ctx.desktop().post<{ cut: Array<{ startSec: number; endSec: number }>; removedSec: number; durationFrames: number; timing: string | null }>('/agent/timeline/cut-transcript', input)
+    const rough = r.timing === 'recognizer' ? " These words have the recognizer's rough timing: transcribe again with force for aligned edges." : ''
+    return ok(r, `Cut ${r.cut.length} stretch${r.cut.length === 1 ? '' : 'es'}, ${r.removedSec.toFixed(2)} s in all; the timeline is now ${r.durationFrames} frames.${rough}`)
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -10758,6 +10790,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   transcribeAsset as unknown as Operation<unknown>,
   getAssetTranscript as unknown as Operation<unknown>,
   editAssetTranscript as unknown as Operation<unknown>,
+  cutByTranscript as unknown as Operation<unknown>,
   extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,

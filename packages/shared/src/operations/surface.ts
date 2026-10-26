@@ -213,6 +213,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_transcribe_asset',
     'slates_get_asset_transcript',
     'slates_edit_asset_transcript',
+    'slates_cut_by_transcript',
     'slates_add_html_clip',
     'slates_update_html_clip',
     'slates_check_composition',
