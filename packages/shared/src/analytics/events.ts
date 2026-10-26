@@ -31,7 +31,7 @@ export type AnalyticsKind =
   | 'account'
   /** Offers, leads and codes from the offer machine. */
   | 'offer'
-  /** A server-side failure worth counting. */
+  /** A failure worth counting, on the server or in the app. */
   | 'ops';
 
 export interface AnalyticsEvent {
@@ -161,6 +161,14 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'account_email_reverted', senders: API, kind: 'account', what: 'An email change undone' },
   { name: 'refund_processed', senders: API, kind: 'account', what: 'A refund taken back what its payment granted' },
   { name: 'dispute_opened', senders: API, kind: 'account', what: 'A chargeback opened' },
+
+  // ── Failures (second-brain plans/2026-10-25-slates-bug-capture.md): crashes as `$exception`, and the failures that throw nothing ──
+  { name: '$exception', senders: [...APP, ...API], kind: 'ops', what: 'An error: posthog-js exception capture in the app, captureException in main and slates-api', library: true },
+  { name: 'generation_failed', senders: APP, kind: 'ops', what: 'A generation turned failed: its model, error class and provider status, never the prompt' },
+  { name: 'export_failed', senders: APP, kind: 'ops', what: 'An MP4 or XML export failed, by error class' },
+  { name: 'agent_op_failed', senders: APP, kind: 'ops', what: "An outside agent's /agent request answered 500, or a Studio Agent tool call threw" },
+  { name: 'action_retried', senders: APP, kind: 'ops', what: 'One action (same target, same input) failed three times inside ten minutes' },
+  { name: 'session_ended_after_error', senders: APP, kind: 'ops', what: 'The app quit within a minute of one of the failures above' },
 ];
 
 const BY_NAME = new Map(ANALYTICS_EVENTS.map((e) => [e.name, e]));
