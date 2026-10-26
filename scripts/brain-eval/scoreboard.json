@@ -1,7 +1,8 @@
 {
-  "about": "The brain Eric last approved: its commit and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
+  "about": "The brain Eric last approved: its commit, the slates-api commit brain-approved.json pins with it (approvedApiCommit) and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
   "approvedCommit": "14f9007",
   "approvedBrainHash": "4a14d77653a85a45",
+  "approvedApiCommit": "a4b3ff258875014ed417b0a811f22f1d25503e1d",
   "approvedOn": "2026-10-23",
   "firstBaseline": "14f9007 is shared 0.7.7, the last brain published before the review rule (2026-10-25), so it stands in for an approval Eric never gave; his first --approve replaces it."
 }

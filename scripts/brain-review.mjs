@@ -77,9 +77,19 @@ if (!pin.commit) throw new Error(`${PIN} has no commit`)
 /** The two homes of the brain: where each is, what it watches and the commit Eric approved there. */
 const REPOS = {
   mcp: { cwd: root, watched: WATCHED, approved },
-  api: { cwd: API, watched: [BRAIN_PATH], approved: pin.commit },
+  // The files, the code that decides who reads which and what a locked file says, and the pin itself.
+  api: { cwd: API, watched: [BRAIN_PATH, 'src/lib/brain.ts', 'src/lib/brain-notice.ts', 'brain-approved.json'], approved: pin.commit },
 }
 const gitAt = (repo, ...args) => gitRaw(args, { cwd: REPOS[repo].cwd }).trim()
+/** True when a brain-approved.json text pins the approval scoreboard.json holds: its slates-api commit and hash. */
+function recordsApproval(text) {
+  try {
+    const p = JSON.parse(text)
+    return p.commit === board.approvedApiCommit && p.approvedBrainHash === board.approvedBrainHash
+  } catch {
+    return false
+  }
+}
 const argv = process.argv
 const flag = (name) => { const k = argv.indexOf(`--${name}`); return k < 0 ? undefined : argv[k + 1] }
 const flagAll = (name) => argv.flatMap((a, k) => (a === `--${name}` ? [argv[k + 1]] : [])).filter(Boolean)
@@ -130,6 +140,9 @@ function pending(ranges = {}) {
         const [add, del, path] = row.split('\t')
         return { path, add: Number(add) || 0, del: Number(del) || 0, layer: layerOf(path) }
       })
+      // The commit that records the approval scoreboard.json holds (only brain-approved.json, pinning that approval)
+      // is the approval itself, not a change waiting on one.
+      if (repo === 'api' && files.every((f) => f.path === 'brain-approved.json') && recordsApproval(at(['show', `${full}:brain-approved.json`]))) continue
       const diff = at(['show', '--format=', '-U0', full, '--', ...watched])
       // The sources the commit's added lines carry (`<!-- src: … -->`, required since brain-shape.json's sourcesSince).
       const sources = [...new Set([...diff.matchAll(/^\+.*?<!--\s*src:\s*([^>]*?)\s*-->/gm)].map((m) => m[1]))]
@@ -196,7 +209,7 @@ const pid = (diff) => (diff.trim() ? execFileSync('git', ['patch-id', '--stable'
 function reverts(r, h, repo = 'mcp') {
   const { cwd, watched } = REPOS[repo]
   const at = (args) => gitRaw(args, { cwd })
-  const isWatched = repo === 'mcp' ? watchedPath : (p) => p.startsWith(`${BRAIN_PATH}/`)
+  const isWatched = repo === 'mcp' ? watchedPath : (p) => p.startsWith(`${BRAIN_PATH}/`) || watched.includes(p)
   if (pid(at(['show', '--format=', r])) === pid(at(['diff', h, `${h}^`]))) return true
   const touched = at(['show', '--name-only', '--format=', r]).trim().split('\n').filter(Boolean)
   const undo = pid(at(['diff', h, `${h}^`, '--', ...watched]))
@@ -281,6 +294,10 @@ if (argv.includes('--approve')) {
   // The page's head, plus only the reverts of what he held: what he approved and nothing else.
   board.approvedCommit = after.mcp.length ? git('rev-parse', '--short', 'HEAD') : page.headShort
   board.approvedBrainHash = current.brainHash
+  // slates-api serves the brain at this commit from its next deploy (its build exports brain/ at the pin), and its
+  // snapshot refuses a pin whose commit and hash are not these (approvedApiCommit, approvedBrainHash).
+  pin.commit = after.api.length ? gitAt('api', 'rev-parse', 'HEAD') : heads.api
+  board.approvedApiCommit = pin.commit
   board.approvedOn = new Date().toISOString().slice(0, 10)
   delete board.firstBaseline
   board.lastApproval = {
@@ -292,9 +309,8 @@ if (argv.includes('--approve')) {
     gate: gate.lines,
   }
   writeFileSync(BOARD, JSON.stringify(board, null, 2) + '\n')
-  // slates-api serves the brain at this commit from its next deploy (its build exports brain/ at the pin).
-  pin.commit = after.api.length ? gitAt('api', 'rev-parse', 'HEAD') : heads.api
   pin.approvedOn = board.approvedOn
+  pin.approvedBrainHash = current.brainHash
   pin.standsFor = `the brain Eric approved with slates-mcp ${board.approvedCommit} (brain ${current.brainHash})`
   writeFileSync(PIN, JSON.stringify(pin, null, 2) + '\n')
   console.log(`✓ brain review: ${items.length - held.length} approved, ${held.length} held and reverted; the approved brain is now ${board.approvedCommit} here and ${pin.commit.slice(0, 7)} in slates-api (brain ${current.brainHash}). Next: npm run build:plugins, then commit scoreboard.json with plugins/** here, and brain-approved.json in slates-api.`)
