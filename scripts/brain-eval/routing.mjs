@@ -8,8 +8,11 @@
 // The names it resolves against are the bundled guides and motion-overview, what the card and router list; member
 // and My brain names are left out, so a pick near one of those is scored as typed.
 //
-//   node scripts/brain-eval/routing.mjs --root <build of the approved commit> [--model sonnet] [--runs 1] [--cases id,id]
-//     [--concurrency 4] [--min 0.9] [--out <file>]
+//   node scripts/brain-eval/routing.mjs --root <build of the approved commit> [--baseline-brain <dir>] [--model sonnet]
+//     [--runs 1] [--cases id,id] [--concurrency 4] [--min 0.9] [--out <file>]
+//
+// A baseline build that is served its brain is hashed on its own folder: --baseline-brain, slates-api brain/ at the
+// approved pin (an export). The candidate's is scripts/brain-source.mjs's (SLATES_BRAIN_DIR or ../slates-api/brain).
 //
 // Two arms in one batch, their asks interleaved so a slow hour hits both alike: `candidate`, this checkout,
 // and `baseline`, the build at --root (a checkout of scoreboard.json approvedCommit, built), which gate.mjs
@@ -37,20 +40,21 @@ const runs = countArg('runs', '1')
 const concurrency = countArg('concurrency', '4')
 const min = Number(arg('min', '0.9'))
 const roots = { candidate: resolve(here, '..', '..'), ...(arg('root') ? { baseline: resolve(arg('root')) } : {}) }
+const brains = { candidate: brainDir(), baseline: arg('baseline-brain') ? resolve(arg('baseline-brain')) : brainDir() }
 if (!roots.baseline) console.warn('warning: no --root, so no baseline arm; gate.mjs refuses a routing file without one.')
 
 /** What one arm's agent holds: its build's hash and its markdown's card and router, cut as the package cuts them. */
-async function armOf(name, root) {
+async function armOf(name, root, brain) {
   const skillsDir = join(root, 'packages', 'shared', 'skills')
   if (!existsSync(join(root, 'packages', 'shared', 'dist', 'index.js'))) throw new Error(`${name} arm: no build under ${root} (npm run build there first)`)
-  const unbuilt = await unbuiltSkills(root)
+  const unbuilt = await unbuiltSkills(root, { brain })
   if (unbuilt.length) console.warn(`warning: ${name}: ${unbuilt.length} skills differ from the build (${unbuilt.join(', ')}); this arm records no brain hash and the gate will refuse it. npm run build there first.`)
   const skills = readSkills(skillsDir)
   // The markdown, cut as the package cuts it, so a router edit is tested before a build.
-  return { name, root, brainHash: unbuilt.length ? null : await brainHash(root), ...(skills[ROUTER] ? brainLayers(skills) : { noRouter: true }) }
+  return { name, root, brainHash: unbuilt.length ? null : await brainHash(root, { brain }), ...(skills[ROUTER] ? brainLayers(skills) : { noRouter: true }) }
 }
 const arms = {}
-for (const [name, root] of Object.entries(roots)) arms[name] = await armOf(name, root)
+for (const [name, root] of Object.entries(roots)) arms[name] = await armOf(name, root, brains[name])
 if (arms.candidate.noRouter) throw new Error(`the candidate has no router (${ROUTER}); nothing to test`)
 // Both arms resolve picks through this checkout's resolver, which the brain hash does not cover, so the
 // difference between the arms stays the brain.

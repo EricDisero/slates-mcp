@@ -28,7 +28,7 @@
 //       every held commit is reverted, the only commits after the page's head are those reverts, packages/shared is
 //       committed and the gate (brain-eval/gate.mjs) passes; then the approved brain becomes the page's head (with the
 //       reverts of what he held) and approvedBrainHash this build's hash.
-//   node scripts/brain-review.mjs --pin-approved-hash <checkout>
+//   node scripts/brain-review.mjs --pin-approved-hash <checkout> [--baseline-brain <slates-api brain/ at the pin>]
 //       Once, when scoreboard.json has no approvedBrainHash: records the hash of <checkout>, a built copy of
 //       approvedCommit (a `git archive` export will do) whose sources match the commit. --approve keeps it current.
 import { execFileSync } from 'node:child_process'
@@ -143,9 +143,9 @@ function pending(ranges = {}) {
 }
 
 /** The build's brain, or the reason there is none to name. */
-async function builtBrain(dir = root) {
+async function builtBrain(dir = root, brain) {
   try {
-    return await currentBrain(dir)
+    return await currentBrain(dir, { brain })
   } catch (error) {
     return { error: `no build to hash under ${dir} (${String(error?.message ?? error).split('\n')[0]}); npm run build first` }
   }
@@ -179,7 +179,8 @@ if (argv.includes('--pin-approved-hash')) {
   })
   if (!sources.length) refuse.push(`the approved commit ${approved} has no packages/shared sources`)
   if (differs.length) refuse.push(`${dir} is not the approved commit ${approved}: ${differs.length} source files differ or are missing (${differs.slice(0, 5).join(', ')}${differs.length > 5 ? ', …' : ''})`)
-  const built = await builtBrain(dir)
+  // A served build of the approved commit is hashed on its own brain: slates-api brain/ at the approved pin.
+  const built = await builtBrain(dir, flag('baseline-brain') && resolve(flag('baseline-brain')))
   if (built.error) refuse.push(built.error)
   else if (built.unbuilt.length) refuse.push(`the build in ${dir} is older than its skills (${built.unbuilt.join(', ')}); npm run build there`)
   if (board.approvedBrainHash && !built.error && board.approvedBrainHash !== built.brainHash) refuse.push(`scoreboard.json already pins ${board.approvedBrainHash}; only --approve moves it`)
@@ -302,7 +303,7 @@ if (argv.includes('--approve')) {
 
 const specOut = flag('spec')
 if (!specOut) {
-  console.error('usage: brain-review.mjs --spec <out.json> --notes <notes.json> | --check | --approve --spec <spec.json> --decisions <decisions.json> --craft <craft.json> --routing <routing.json> | --pin-approved-hash <checkout>')
+  console.error('usage: brain-review.mjs --spec <out.json> --notes <notes.json> | --check | --approve --spec <spec.json> --decisions <decisions.json> --craft <craft.json> --routing <routing.json> | --pin-approved-hash <checkout> [--baseline-brain <dir>]')
   process.exit(2)
 }
 const { commits, dirty } = pending()

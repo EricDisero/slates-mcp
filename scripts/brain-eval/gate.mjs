@@ -41,9 +41,14 @@ export function readResults({ routing = [], craft = [] }) {
   return { routing: routing.map(read), craft: craft.map(read) }
 }
 
-/** The working tree's brain: its hash and the skills its build is older than. */
-export async function currentBrain(root = ROOT) {
-  return { brainHash: await brainHash(root), unbuilt: await unbuiltSkills(root) }
+/**
+ * A build's brain: its hash and the skills its build is older than. `brain` is the folder a served build is handed
+ * (default scripts/brain-source.mjs's); a baseline build of the approved commit is hashed on its own, slates-api
+ * brain/ at the approved pin, never on the working copy's.
+ */
+export async function currentBrain(root = ROOT, { brain } = {}) {
+  const opts = brain ? { brain } : {}
+  return { brainHash: await brainHash(root, opts), unbuilt: await unbuiltSkills(root, opts) }
 }
 
 const pct = (x) => (x == null ? 'n/a' : `${Math.round(x * 100)}%`)
@@ -149,12 +154,13 @@ if (import.meta.url === pathToFileURL(resolve(process.argv[1] ?? '')).href) {
   const all = (flag) => process.argv.flatMap((a, i) => (a === `--${flag}` ? [process.argv[i + 1]] : [])).filter(Boolean)
   const files = { routing: all('routing'), craft: all('craft') }
   if (!files.routing.length && !files.craft.length) {
-    console.error('usage: gate.mjs --routing <routing.json> [--routing …] [--craft <craft.json>]')
+    console.error('usage: gate.mjs --routing <routing.json> [--routing …] [--craft <craft.json>] [--brain <dir>]')
     process.exit(1)
   }
   const board = readBoard()
   const results = readResults(files)
-  const current = await currentBrain()
+  // --brain: the folder the candidate build was served, when it is not the default (an eval on an export).
+  const current = await currentBrain(ROOT, { brain: all('brain')[0] && resolve(all('brain')[0]) })
   const { lines, fail } = compare(board, results, current)
   console.log(lines.join('\n'))
   if (fail.length) {
