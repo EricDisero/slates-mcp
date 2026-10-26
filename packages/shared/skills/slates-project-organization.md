@@ -7,11 +7,14 @@ description: "Organize a Slates project: asset codes (IMG-A12, VID-V3), folders,
 
 <!-- @operative:start -->
 **Operative summary.**
-- Keep reusable references in the Library, not in folders, and file work product into folders as you make it. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
+- Keep reusable references in the Library, not in folders, and file work product into folders as you make it. (§ Library, folders and favorites)
+- Shape the folders to what the project already holds, read with `slates_list_assets`: a convention is a start, and no folder stays empty. (§ Library, folders and favorites) <!-- src: brain behaviour A/B, a stock ad folder set misfiled the project's voice-over and left empty folders, 2026-10-25 -->
 - Name assets to the user by code plus label, never by UUID or description. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
 - Resolve a code the user names with `slates_list_assets` and confirm it back in the same vocabulary. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
 - Read codes again after moving or copying to another project, since new codes are issued there. (§ Asset codes — the shared vocabulary (IMG-A12 / VID-V3 / AUD-S1))
 <!-- @operative:end -->
+
+## Library, folders and favorites
 
 Slates already gives every reusable reference a home: the **Library**, in categories the user names (Characters, Locations, Products, Looks…; `slates_list_library`), each item used in a prompt as `@name`, or `#name` for a look. Keep references there rather than in folders, and add a category only when the user asks for one. Add an item with `slates_create_library_item` and read its `mention` from the result (a taken name comes back suffixed). `slates_update_library_item` renames or moves an item and rewrites every Shot that cites it.
 
@@ -25,7 +28,7 @@ To send media to another project, `slates_copy_assets_to_project` duplicates it 
 
 To reuse a whole piece rather than one reference, use a TEMPLATE: `slates_export_template` saves a board, a scene or one Shot (recipes, script words, references and the Library items they mention; never takes) as a file, `slates_get_template` reads what a file holds and its swap slots, and `slates_import_template` adds it to a project, optionally swapping a slot for one of that project's own assets. With no path, `slates_get_template` lists the saved templates. An import generates nothing: price the new Shots with `slates_get_board_quote` and fire them only after the user approves the price.
 
-Conventions by project type:
+Conventions by project type, as a start: read the project's assets first and shape the folders to them, so every asset has a folder that fits it (voice-over and music in `Audio`) and no folder is made empty. <!-- src: brain behaviour A/B, a stock ad folder set misfiled the project's voice-over and left empty folders, 2026-10-25 -->
 - **Short film / narrative:** `Shots` (scene stills) · `Clips` (generated video) · `Final` (the export). Use one folder per scene (`Scene 1`, `Scene 2`, …) instead when the piece has distinct locations/beats.
 - **Ad / UGC:** `Hooks` · `B-roll` · `Talking-head` · `Final`.
 
