@@ -72,3 +72,9 @@ token*.json
 # package. scripts/brain-leak-check.mjs and each builder's --check hold the line.
 packages/shared/exports/slates-prompt-builder/generated/
 packages/shared/exports/slates-chatgpt-images/generated/
+
+# Eval traces quote the playbooks a session read, and the brain is private (slates-api brain/): they stay on the
+# machine that ran them. The scored files (scores.json, craft.json, report.md, the routing JSON) are committed. The
+# traces tracked before 2026-10-25 predate the move and stay as they were.
+scripts/behaviour-ab/results/*/traces/
+scripts/brain-eval/results/*/traces/

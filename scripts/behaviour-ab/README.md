@@ -16,7 +16,7 @@ It runs real headless Claude Code sessions against two builds of this repo, the 
 | `run.mjs` | Runs each case in each arm `--runs` times and writes one trace per run |
 | `score.mjs` | Scores the traces by code, asks a blind Sonnet judge to compare each pair of replies, and writes `scores.json` and `report.md` |
 | `score-check.mjs` | Breaks each scoring rule on synthetic traces and checks it is caught; run it after changing `score.mjs` |
-| `results/<date>/` | Committed results: `arms.json`, `traces/`, `scores.json`, `report.md`, with the home folder written as `~` |
+| `results/<date>/` | Committed: `arms.json`, `scores.json`, `report.md`, with the home folder written as `~`. `traces/` stays local (gitignored): a trace quotes the playbooks a session read, and the brain is private. Traces tracked before 2026-10-25 predate the move |
 
 ## Running it
 

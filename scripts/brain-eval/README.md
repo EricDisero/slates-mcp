@@ -12,7 +12,7 @@ The skills are one layered brain (second-brain `plans/2026-10-25-slates-brain.md
 | `gate.mjs` | The gate: each result's candidate arm against its baseline arm, the approved brain in the same batch. What it refuses is under [The gate](#the-gate). It writes nothing | free, reads results |
 | `scoreboard.json` | The approved brain: `approvedCommit`, `approvedBrainHash` and the last approval's record. Only `brain-review.mjs --approve` moves it | |
 | `brain-hash.mjs` | The hash of what a build hands an agent (the skills, both surfaces' doctrine, the MCP instructions, the router notice). `run.mjs` records it per arm, `routing.mjs` and `craft.mjs` copy it into their results, and the gate refuses an arm from any other brain. `node scripts/brain-eval/brain-hash.mjs [<checkout>]` prints a build's | free, reads the build |
-| `results/` | Committed results: `<date>-routing-<model>.json`, `<date>-craft/` (traces, `craft.json`, `craft.md`) | |
+| `results/` | Committed: `<date>-routing-<model>.json` and `<date>-craft/` (`craft.json`, `craft.md`). The craft run's `traces/` stay local (gitignored): they quote the private playbooks | |
 
 ## Running it
 
