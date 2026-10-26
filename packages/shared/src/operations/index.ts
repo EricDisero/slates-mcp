@@ -6626,13 +6626,16 @@ export const getReframeReport: Operation<z.infer<typeof reframeReportInput>> = {
 const reframeClipInput = reframeReportInput.extend({ clipId: z.string().uuid(), framing: z.object({
   mode: z.enum(['fill', 'fit']).optional(), focusX: z.number().min(0).max(1).optional(),
   focusY: z.number().min(0).max(1).optional(), zoom: z.number().min(1).optional(),
-}).strict().nullable().describe('Normalized focus and zoom for this clip/aspect. Null resets the override; the desktop binds it to the current take.') })
+}).strict().nullable().optional().describe('Normalized focus and zoom for this clip/aspect. Null resets the override; the desktop binds it to the current take. Required unless follow is set.'),
+  follow: z.enum(['face', 'off']).optional().describe('"face" finds the face in the clip and keys its focusX/focusY to it (smooth, held where the face is lost; every format draws those keys, each keyframe editable by hand or with slates_set_clip_keyframes); "off" removes those keys. Runs on the computer and spends nothing.') })
 export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
-  id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. Requires ad-variant-export; update Slates on capability refusal.',
+  id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. follow: "face" makes a vertical cut follow a talking head (framing, when sent too, lands first) and answers follow: the clip keyframes, samples, found, still and the lost spans in seconds. Requires ad-variant-export, and reframe-follow for follow; update Slates on capability refusal.',
   billable: false,
   input: reframeClipInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('ad-variant-export', 'clip delivery reframing')
+    if (input.follow) await ctx.desktop().requireCapability('reframe-follow', 'following a face')
+    else if (input.framing === undefined) throw new Error('Send framing (null resets it) or follow')
     return ok(await ctx.desktop().post('/agent/timeline/reframe', input))
   },
 }
