@@ -157,6 +157,12 @@ function addedLines(diff) {
   return hidden ? [...shown, `… and ${hidden} more added lines (git show)`] : shown
 }
 
+// Every line a -U0 diff adds or removes is blank or a comment line (opening with //, a slash-star or a star).
+function commentOnly(diff) {
+  const changed = diff.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)).map((l) => l.slice(1).trim())
+  return changed.length > 0 && changed.every((l) => l === '' || /^(\/\/|\/\*|\*)/.test(l))
+}
+
 /**
  * The brain commits in each home, from its approved commit to HEAD unless `ranges` ({ mcp, api: { from, to } }) says
  * otherwise, oldest first within a home, and the brain files not committed in either. Each commit names its `repo`.
@@ -176,6 +182,8 @@ function pending(ranges = {}) {
       })
       if (isApproval(repo, full, files)) continue
       const diff = at(['show', '--format=', '-U0', full, '--', ...watched])
+      // A commit that changes only comments in the access code changes nothing any caller is served or refused.
+      if (files.every((f) => f.layer === 'access') && commentOnly(diff)) continue
       // The sources the commit's added lines carry (`<!-- src: … -->`, required since brain-shape.json's sourcesSince).
       const sources = [...new Set([...diff.matchAll(/^\+.*?<!--\s*src:\s*([^>]*?)\s*-->/gm)].map((m) => m[1]))]
       commits.push({ repo, full, hash, date, subject, files, sources, added: addedLines(diff) })
