@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { SKILLS, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
-import { getPromptingGuide, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
+import { getPromptingGuide, nearestGuideName, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
 import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
 import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
@@ -69,6 +69,26 @@ assert.equal(resolveGuideTopic('video-edit'), 'slates-prompting-omni-flash')
 assert.equal(resolveGuideTopic('subtitles'), 'slates-captions')
 assert.equal(resolveGuideTopic('lower third'), 'slates-motion')
 assert.equal(resolveGuideTopic('remake'), 'slates-storyboard-from-script')
+// Near-miss names: Haiku named "previs-blocking" and "slaes-direct-response-ad" in the 2026-10-25 routing eval.
+// A missing prefix or a small typo serves the one closest guide; a name as close to two names gets both, not a guess.
+const guideNames = Object.keys(SKILLS)
+assert.deepEqual(nearestGuideName('previs-blocking', guideNames), { name: 'slates-previs-blocking' })
+assert.deepEqual(nearestGuideName('Previs Blocking', guideNames), { name: 'slates-previs-blocking' })
+assert.deepEqual(nearestGuideName('slaes-direct-response-ad', guideNames), { name: 'slates-direct-response-ad' })
+assert.deepEqual(nearestGuideName('slates-captoins', guideNames), { name: 'slates-captions' })
+assert.deepEqual(nearestGuideName('slates-cuta', ['slates-cuts', 'slates-cute']), { tied: ['slates-cute', 'slates-cuts'] })
+assert.equal(nearestGuideName('slates-cut', guideNames), null, 'a name under four letters must match exactly')
+assert.equal(nearestGuideName('slates-dirct-respons-adz', guideNames), null, 'three edits is another guide')
+assert.equal(nearestGuideName('quux flibbertigibbet', guideNames), null)
+assert.equal(resolveGuideTopic('previs-blocking'), null, 'a model id never resolves by nearness')
+const prefixOffline = { ...disconnected, cloud: () => { throw new Error('a missing prefix must not reach the cloud') } }
+assert.equal((await run({ topic: 'previs-blocking' }, prefixOffline)).data.topic, 'slates-previs-blocking')
+assert.equal((await run({ topic: 'slaes-direct-response-ad' })).data.topic, 'slates-direct-response-ad')
+assert.equal((await run({ topic: 'motion-overveiw' })).data.topic, 'motion-overview')
+const twins = { ...disconnected, cloud: () => ({ get: async () => ({ skills: [{ name: 'slates-captionz', description: 'Fixture captions playbook.', tier: 'paid' }] }) }) }
+const tie = await run({ topic: 'slates-captionx' }, twins)
+assert.deepEqual(tie.data.tied, ['slates-captions', 'slates-captionz'])
+assert(tie.text.startsWith('"slates-captionx" is equally close to slates-captions and slates-captionz;'), tie.text.slice(0, 120))
 assert(!('guides' in (await run({ topic: 'camera', query: 'dolly' })).data))
 assert((await run({ topic: 'app-manual', query: 'export mp4' })).text.length > 0)
 
@@ -142,4 +162,4 @@ const offline = { ...disconnected, cloud: () => { throw new Error('a free guide 
 assert((await run({ topic: 'seedance-2.5' }, offline)).text.length > 0)
 assert(!Object.hasOwn(SKILLS, privateName))
 assert(ALL_OPERATIONS.some(op => op.id === getPromptingGuide.id))
-console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), catalog ${catalogChars} characters (ceiling ${CATALOG_CEILING}), natural briefs, ad ranking, pagination, aliases, sections, manual and private access passed.`)
+console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), catalog ${catalogChars} characters (ceiling ${CATALOG_CEILING}), natural briefs, ad ranking, pagination, aliases, near-miss names, sections, manual and private access passed.`)

@@ -10296,6 +10296,43 @@ export function resolveGuideTopic(topic: string): string | null {
   return null
 }
 
+/** Edits between two names: insert, delete, substitute or swap two neighbours (optimal string alignment). */
+function editDistance(a: string, b: string): number {
+  const d = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)])
+  for (let j = 1; j <= b.length; j++) d[0][j] = j
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1)
+    }
+  }
+  return d[a.length][b.length]
+}
+
+/**
+ * The one guide a near-miss name means: the name without its `slates-` prefix, or a typo of one name
+ * ("slaes-direct-response-ad"). Two names equally close come back as `tied`, for the caller to name rather
+ * than pick. Only the guide op uses it: a model id resolves exactly or not at all (resolveGuideTopic), since
+ * a near guess there would gate a generation on another model's guide.
+ */
+export function nearestGuideName(topic: string, names: readonly string[]): { name: string } | { tied: string[] } | null {
+  const t = topic.trim().toLowerCase().replace(/[\s_]+/g, '-')
+  if (!t) return null
+  if (names.includes(t)) return { name: t }
+  if (names.includes(`slates-${t}`)) return { name: `slates-${t}` }
+  // Two edits in a long name, one in a short one, none under four letters: past that it is another guide.
+  const core = t.replace(/^slates-/, '').length
+  const allowed = core >= 8 ? 2 : core >= 4 ? 1 : 0
+  let best = allowed + 1
+  let closest: string[] = []
+  for (const name of new Set(names)) {
+    const d = Math.min(editDistance(t, name), editDistance(`slates-${t}`, name))
+    if (d < best) { best = d; closest = [name] } else if (d === best && d <= allowed) closest.push(name)
+  }
+  if (!closest.length) return null
+  return closest.length === 1 ? { name: closest[0] } : { tied: closest.sort() }
+}
+
 // Discovery is the first call of most briefs: a slow or unentitled member check
 // must not cost every call a round trip, or hang free craft behind a 30s read.
 const MEMBER_CATALOG_TTL_MS = 60_000
@@ -10377,8 +10414,9 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       return { text: guide, data: { topic: hf.key, tier: 'free', source: 'motion', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     // The user's file by its exact name wins over an alias (their `flux-portraits` is theirs, not the FLUX guide);
-    // the router's names are reserved in the loader, so none of them reaches here as a local file.
-    const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic)) : null
+    // the router's names are reserved in the loader, so none of them reaches here as a local file. A name missing
+    // its `slates-` prefix is that guide, resolved here so it never waits on the member check.
+    const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic) ?? (Object.hasOwn(brain.skills, `slates-${topic}`) ? `slates-${topic}` : null)) : null
     if (resolved) {
       const depth = input.depth ?? 'card'
       const mine = brain.mine.has(resolved)
@@ -10410,12 +10448,16 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
     const own = guideCatalog(brain.skills).map(entry => (brain.mine.has(entry.name) ? { ...entry, source: 'my-brain' as const } : entry))
     const catalog = [...[...own, ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
+    // A typo of one guide's name serves that guide; a name as close to two is answered with both, never a guess.
+    const near = topic && topic !== 'catalog' && topic !== 'index' ? nearestGuideName(topic, catalog.map(entry => entry.name)) : null
+    if (near && 'name' in near) return getPromptingGuide.run({ ...input, topic: near.name }, ctx)
+    const tied = near && 'tied' in near ? near.tied : []
     const result = discoverGuides(catalog, { ...brain.skills, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
     const label = (entry: GuideCatalogEntry) => (entry.source === 'motion' ? 'motion' : entry.source === 'my-brain' ? 'yours' : entry.tier)
     const guide = result.guides.map(entry => `${entry.name} (${label(entry)}): ${entry.description}${entry.sections.length ? `\n  Matching sections: ${entry.sections.join('; ')}` : ''}`).join('\n\n')
     const rest = result.rest.length ? `\n\nEvery other guide (keyword hints above only see shared words; choose by the brief):\n${result.rest.map(entry => `- ${entry.name} (${label(entry)}): ${entry.description}`).join('\n')}` : ''
-    const text = `${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. Motion guides are the motion engine's own; topic motion/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`
-    return { text, data: { ...result, memberAccess: member.access, bytes: Buffer.byteLength(text, 'utf8') } }
+    const text = `${tied.length ? `"${input.topic}" is equally close to ${tied.join(' and ')}; request one of them by name.\n\n` : ''}${result.fallback ? 'No keyword match; choose relevant craft from the catalog.\n\n' : ''}${guide}${rest}\n\n${result.total} ${result.query && !result.fallback ? 'keyword matches' : 'guides'}; nextOffset: ${result.nextOffset ?? 'none'}. Member guides: ${member.access}. Retrieve a name with depth card/index or query for a section. Motion guides are the motion engine's own; topic motion/${HYPERFRAMES_MAPPING} maps their CLI and Studio onto Slates. The user does not need to choose guides.`
+    return { text, data: { ...result, ...(tied.length ? { tied } : {}), memberAccess: member.access, bytes: Buffer.byteLength(text, 'utf8') } }
   },
 }
 
