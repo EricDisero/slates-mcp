@@ -7668,7 +7668,7 @@ export const addHtmlClip: Operation<{
 }> = {
   id: 'slates_add_html_clip',
   description:
-    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. It loads the project's own pictures, SVGs and fonts by their path in the project's folder (images/logo.svg, fonts/Brand.woff2; the folder is projectsFolder from slates_get_app_settings, then the project id) and no other file; an export fails, naming the font, when a declared font does not load. Slates' composition check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (topic: slates-motion).",
+    "Put an HTML motion layer on the timeline: an animated caption, lower third, end card, title, logo sting or background plate, drawn on an overlay track in preview and export. An HTML clip is a composition, an HTML document with a GSAP timeline registered on window.__timelines. Pass your own html, or block with the name of a registry block (slates_list_motion_blocks) and its variables; html with block replaces the block's document and keeps its files. It loads the project's own pictures, SVGs, fonts, stylesheets and scripts by their path in the project's folder (images/logo.svg, fonts/Brand.woff2, css/brand.css, js/library.js; the folder is projectsFolder from slates_get_app_settings, then the project id) and no other file; an export fails, naming the font, when a declared font does not load. Slates' composition check runs before the clip lands and its findings come back here: fix every error with slates_update_html_clip before moving on. Keep a transparent foreground and a background plate on separate tracks. Free. Read slates_get_timeline first for the frame rate and where clips sit. Craft: slates_get_prompting_guide (topic: slates-motion).",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -7694,7 +7694,7 @@ export const addHtmlClip: Operation<{
 export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html?: string; variables?: Record<string, string | number | boolean> | null }> = {
   id: 'slates_update_html_clip',
   description:
-    "Change an HTML clip's composition or its variables. Slates' composition check runs again and its findings come back here: fix every error before moving on. Only what you pass changes. To move or retime one, remove it (slates_remove_clip) and add it again.",
+    "Change an HTML clip's composition or its variables. Like slates_add_html_clip, the composition loads the project's own pictures, SVGs, fonts, stylesheets and scripts by their path in the project's folder. Slates' composition check runs again and its findings come back here: fix every error before moving on. Only what you pass changes. To move or retime one, remove it (slates_remove_clip) and add it again.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -7714,7 +7714,7 @@ export const updateHtmlClip: Operation<{ projectId: string; clipId: string; html
 export const checkComposition: Operation<{ html: string }> = {
   id: 'slates_check_composition',
   description:
-    "Check a composition before it lands, with Slates' composition check: its errors and warnings, each with a code, a message and, where it has one, the selector it found. Writes nothing. slates_add_html_clip and slates_update_html_clip run the same check, so use this one while drafting.",
+    "Check a composition before it lands, with Slates' composition check: its errors and warnings, each with a code, a message and, where it has one, the selector it found. Writes nothing. A file the composition names by its path in the project's folder (a picture, SVG, font, stylesheet or script) is served to it, so name one there instead of a remote address the check flags. slates_add_html_clip and slates_update_html_clip run the same check, so use this one while drafting.",
   input: z.object({ html: htmlCompositionInput }).strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('html-clips', 'HTML layers')
