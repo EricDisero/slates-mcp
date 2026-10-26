@@ -12,7 +12,7 @@ description: "Refine an existing Slates image or clip with a targeted edit or re
 - Use `slates_edit_image` with only the change for surgical and aesthetic edits, `slates_generate_image` with the original as a reference for compositional ones, and a fresh generation for wholesale ones. (§ 3. Pick the right tool)
 - Estimate the cost and show it before generating, then compare the result with the original and rebind where the original was used. (§ 4. Generate, evaluate, decide)
 - After three failed attempts at one requirement, stop re-rolling and diagnose the reference, prompt, model and tool result; a failed roll never authorizes another charge. (§ Diagnose repeated failures)
-- Treat a clip the same way: `slates_edit_video` with the change only, and `slates_trim_video` first if it is too long. (§ Clips)
+- Treat a clip the same way: `slates_edit_video` with the change only, named with its price. (§ Clips) <!-- src: brain A/B, a too-dark fix named no change, 2026-10-25 -->
 - Keep the original until the user confirms, and never mix surgical and wholesale changes in one pass. (§ Anti-patterns)
 <!-- @operative:end -->
 
@@ -73,7 +73,7 @@ Continue autonomously when the brief is clear, a specific correction is supporte
 
 ### Clips
 
-The same recipe holds for video. Look with `slates_get_asset_video_frames`. A clip that is nearly right: `slates_edit_video` with the change only; the result is a new clip linked to its source. A clip longer than the edit model's window: `slates_trim_video` first, then edit the trimmed clip. A revised generation that continues from a clip: `slates_extract_video_frame` at its last frame, used as the next first frame. Before paying for a regeneration of a Shot, `slates_get_shot_inputs` lists finished takes with the same inputs, and `slates_reuse_shot_take` adds one free. Otherwise price it with `slates_get_board_quote` for that Shot (or `slates_estimate_generation_cost`) and show the figure before asking for the OK.
+The same recipe holds for video. Look with `slates_get_asset_video_frames`. A clip that is nearly right: `slates_edit_video` with the change only; the result is a new clip linked to its source. A clip longer than the edit model's window: `slates_trim_video` first, then edit the trimmed clip. A revised generation that continues from a clip: `slates_extract_video_frame` at its last frame, used as the next first frame. Before paying for a regeneration of a Shot, `slates_get_shot_inputs` lists finished takes with the same inputs, and `slates_reuse_shot_take` adds one free. Otherwise price it with `slates_get_board_quote` for that Shot (or `slates_estimate_generation_cost`) and show the figure before asking for the OK. Show the one change with the price: the exact edit instruction or the words changed in the Shot's prompt, and what it fixes ("too dark": the light named in the prompt, never a rewrite of the whole prompt); a plan that names no change is not ready to price. <!-- src: brain behaviour A/B, a too-dark fix priced a redo with no lighting change named, 2026-10-25 -->
 
 ### 5. Hand back
 - "Asset updated. Frame 3 now uses {new_asset_id}."
