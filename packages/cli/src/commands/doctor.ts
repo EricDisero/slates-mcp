@@ -117,6 +117,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['loudness', 'measuring the loudness of a mix'],
   ['spend-limits', 'spend limits for a project and an agent session'],
   ['beat-grid', "a music clip's beat grid and cutting to it"],
+  ['transcript-cut', 'cut by transcript'],
 ]
 
 export async function runDoctor(): Promise<void> {
