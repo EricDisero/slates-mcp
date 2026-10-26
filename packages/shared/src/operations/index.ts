@@ -8395,13 +8395,14 @@ export const importProduct: Operation<{
   filePaths?: string[]
   name?: string
   categoryId?: string
+  itemId?: string
   brand?: boolean
   maxPictures?: number
 }> = {
   id: 'slates_import_product',
   billable: false,
   description:
-    "Add a product to the Library from its page, as the app's Add as product does: the product becomes a thing (in Products, or the things categoryId given) with the page's first picture as its picture, the next ones as its extra pictures and the page's bullet points, price and link as its notes; its brand becomes a look with the brand's logo as its picture and the page's and logo's colours as its palette. A look of the same name already in the Library is filled in where empty, never overwritten. Pictures land in a Media folder named after the product. Give url, filePaths (absolute paths to pictures on this computer, the product's first), or both. html is the page's HTML when you already have it (a page that builds itself with JavaScript, read in your own browser); url still names the page and its pictures are still fetched. Free; nothing is generated. The result gives the product and the brand with their mention (@name, #name) for prompts and for slates_break_down_reference roles (itemId), each picture and where it came from, each picture left out with its reason, and notes on what the page lacked.",
+    "Add a product to the Library from its page, as the app's Add as product does: the product becomes a thing (in Products, or the things categoryId given) with the page's first picture as its picture, the next ones as its extra pictures and the page's bullet points, price and link as its notes; its brand becomes a look with the brand's logo as its picture and the page's and logo's colours as its palette. A look of the same name already in the Library is filled in where empty, never overwritten. Pictures land in a Media folder named after the product. Give url, filePaths (absolute paths to pictures on this computer, the product's first), or both. html is the page's HTML when you already have it (a page that builds itself with JavaScript, read in your own browser); url still names the page and its pictures are still fetched. itemId fills a thing already in the Library instead of making a product, as the card's Fill from the copied product page… does: the page's pictures go after its extra pictures (the first becomes its picture when it has none; a picture it holds is not added twice), its notes are filled only when empty, and its name and category stay; not with categoryId or name. Free; nothing is generated. The result gives the product and the brand with their mention (@name, #name) for prompts and for slates_break_down_reference roles (itemId), each picture and where it came from, each picture left out with its reason, and notes on what the page lacked.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -8410,6 +8411,7 @@ export const importProduct: Operation<{
       filePaths: z.array(z.string().min(1)).optional().describe('Absolute paths to pictures of the product on this computer, first in the order given.'),
       name: z.string().min(1).max(120).optional().describe("The product's name. Defaults to the page's, else the first file's."),
       categoryId: z.string().uuid().optional().describe('A things category (slates_list_library) to file the product in. Defaults to Products.'),
+      itemId: z.string().uuid().optional().describe('A thing already in the Library (slates_list_library) to fill from the page instead of making a product.'),
       brand: z.boolean().optional().describe('false: make no look for the brand. Default true.'),
       maxPictures: z.number().int().min(1).optional().describe('How many pictures to fetch from the page. Default 6; the desktop takes at most 12.'),
     })
@@ -8418,8 +8420,13 @@ export const importProduct: Operation<{
     await ctx.desktop().requireCapability('product-intake', 'adding products from their pages')
     if (!input.url && !input.filePaths?.length) throw new Error('Give url (the product page), filePaths (pictures on this computer), or both.')
     if (input.html && !input.url) throw new Error('html needs url: the address the page came from.')
+    if (input.itemId) {
+      await ctx.desktop().requireCapability('product-fill', 'filling an item already in the Library from a product page')
+      if (input.categoryId || input.name) throw new Error('itemId fills an item that keeps its name and category: leave out categoryId and name.')
+    }
     const r = await ctx.desktop().post<{
       product: { name: string; mention: string }
+      filled?: boolean
       brand: { name: string; mention: string } | null
       brandReused: boolean
       pictures: unknown[]
@@ -8428,7 +8435,8 @@ export const importProduct: Operation<{
     }>('/agent/library/intake', input)
     const brand = r.brand ? ` Its brand ${r.brand.mention} ${r.brandReused ? 'was already in the Library and was filled in' : 'is a new look'}.` : ''
     const left = r.skipped.length ? ` ${r.skipped.length} picture${r.skipped.length === 1 ? '' : 's'} left out (see skipped).` : ''
-    const head = `Added ${r.product.mention} with ${r.pictures.length} picture${r.pictures.length === 1 ? '' : 's'}.${brand}${left}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}`
+    const pictures = `${r.pictures.length} ${r.filled ? 'more ' : ''}picture${r.pictures.length === 1 ? '' : 's'}`
+    const head = `${r.filled ? `Filled ${r.product.mention} with` : `Added ${r.product.mention} with`} ${pictures}.${brand}${left}${r.notes.length ? ` ${r.notes.join(' ')}` : ''}`
     return ok(r, `${head} ${JSON.stringify(r)}`)
   },
 }

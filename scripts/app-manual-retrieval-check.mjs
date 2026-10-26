@@ -110,6 +110,7 @@ const QUESTIONS = [
   ['turn this video into a shot list', ['break a reference ad into shots']],
   ['break down an ad from a Meta Ad Library link', ['break down a reference ad from a link']],
   ['add my product from its shop page link', ['add a product from its page link']],
+  ['add the pictures from a shop page to a product I already have', ['fill an item from a product page link']],
   ['make ad variants with different hooks and one body', ['ad variants']],
   ['J-cut between the hook and the body', ['the seam between a hook and the body']],
   ['export several cuts at once', ['Export several cuts', 'Export several timelines']],
