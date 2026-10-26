@@ -10318,15 +10318,21 @@ function editDistance(a: string, b: string): number {
  */
 export function nearestGuideName(topic: string, names: readonly string[]): { name: string } | { tied: string[] } | null {
   const t = topic.trim().toLowerCase().replace(/[\s_]+/g, '-')
-  if (!t) return null
+  if (!t || t.length > 128) return null
   if (names.includes(t)) return { name: t }
   if (names.includes(`slates-${t}`)) return { name: `slates-${t}` }
   // Two edits in a long name, one in a short one, none under four letters: past that it is another guide.
   const core = t.replace(/^slates-/, '').length
   const allowed = core >= 8 ? 2 : core >= 4 ? 1 : 0
+  // A version is not a typo: seedance-2-0 is not seedance-2-5, and kling-v2 is not kling-v3.
+  const digits = (s: string) => (s.match(/\d+/g) ?? []).join('.')
+  const version = digits(t)
   let best = allowed + 1
   let closest: string[] = []
   for (const name of new Set(names)) {
+    if (digits(name) !== version) continue
+    // A length gap past the budget, against the name as typed or prefixed, is past it in edits too.
+    if (Math.abs(name.length - t.length) > allowed && Math.abs(name.length - t.length - 7) > allowed) continue
     const d = Math.min(editDistance(t, name), editDistance(`slates-${t}`, name))
     if (d < best) { best = d; closest = [name] } else if (d === best && d <= allowed) closest.push(name)
   }
@@ -10474,7 +10480,11 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     const catalog = [...[...own, ...member.entries, ...lockedEntries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
     // A typo of one guide's name serves that guide; a name as close to two is answered with both, never a guess.
     const near = topic && topic !== 'catalog' && topic !== 'index' ? nearestGuideName(topic, catalog.map(entry => entry.name)) : null
-    if (near && 'name' in near) return getPromptingGuide.run({ ...input, topic: near.name }, ctx)
+    if (near && 'name' in near) {
+      const served = await getPromptingGuide.run({ ...input, topic: near.name }, ctx)
+      // Said first, so the agent sees the substitution and learns the real name.
+      return { ...served, text: `Served ${near.name} for "${input.topic}", the closest guide name.\n\n${served.text}` }
+    }
     const tied = near && 'tied' in near ? near.tied : []
     const result = discoverGuides(catalog, { ...brain.skills, ...hyperframesSkillBodies(hyperframes) }, input.query ?? (topic && topic !== 'catalog' && topic !== 'index' ? input.topic : undefined), input.limit, input.offset)
     const label = (entry: GuideCatalogEntry) => (entry.source === 'motion' ? 'motion' : entry.source === 'my-brain' ? 'yours' : entry.tier)
