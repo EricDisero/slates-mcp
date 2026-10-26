@@ -1,6 +1,9 @@
 // The guide gate (operations/index.ts `requireGuideRead`): a session that keeps a
 // ledger cannot generate on a model until it has fetched that model's guide.
 import assert from 'node:assert/strict'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { toolModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 import { useBrainSource } from '../packages/shared/dist/skills/served.js'
@@ -69,4 +72,23 @@ for (const [op, input, guide] of seats) {
   await notGated(op.run({ ...input }, fresh))
 }
 
-console.log('guide-gate: refused with the card before any spend; the guide fetch opens it per model; a new model is refused again; the tool seats and ChatGPT images gate the same way; no ledger, no gate')
+// 6. No brain on this machine (never connected, nothing cached): asking for the guide does not open the gate, since
+// no card came with the answer, and the refusal sends the agent to connect the account, not round to the guide again.
+const noBrain = mkdtempSync(join(tmpdir(), 'slates-no-brain-'))
+useBrainSource(noBrain)
+const unconnected = session()
+const reachedBefore = reached.length
+const answer = await getPromptingGuide.run({ topic: 'seedance-2.5' }, unconnected)
+assert.ok(answer.data.unavailable, 'the guide is not on this machine')
+assert.equal(unconnected.guidesRead.size, 0, 'a guide that never arrived does not count as read')
+await assert.rejects(generateVideo.run({ ...video }, unconnected), (err) => {
+  assert.ok(err instanceof GuideNotReadError)
+  assert.match(err.message, /not on this machine/)
+  assert.match(err.message, /connect Slates/)
+  return true
+})
+assert.equal(reached.length, reachedBefore, 'a generation without the guide never reaches the desktop')
+useBrainSource(brain)
+rmSync(noBrain, { recursive: true })
+
+console.log('guide-gate: refused with the card before any spend; the guide fetch opens it per model; a new model is refused again; the tool seats and ChatGPT images gate the same way; no ledger, no gate; with no brain on the machine the gate stays shut and the refusal says to connect')

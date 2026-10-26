@@ -148,13 +148,19 @@ export class OperationCancelledError extends Error {
 export class GuideNotReadError extends Error {
   code = 'GUIDE_NOT_READ'
   constructor(readonly model: string, readonly guide: string) {
+    const head = `Refused: this session has not read ${guide}, the guide for ${model}. Nothing was generated or charged. `
+    const body = brainSkills().skills[guide]
+    const served = servedBrain()
     super(
-      `Refused: this session has not read ${guide}, the guide for ${model}. Nothing was generated or charged. ` +
-        `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:
-
-` +
-        // The card this user's brain serves, so a model guide from their My brain is the one in the refusal.
-        describeCraftCard(guide, brainSkills().skills[guide])
+      body !== undefined || served.locked.some(entry => entry.name === guide)
+        ? head +
+            `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:\n\n` +
+            // The card this user's brain serves, so a model guide from their My brain is the one in the refusal.
+            describeCraftCard(guide, body)
+        : // No copy here and none locked: the brain never arrived, so asking for the guide again cannot help.
+          head +
+            `The guide comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ` +
+            `Tell the user to connect Slates (Settings → AI tools, or \`slates login\`); then call slates_get_prompting_guide with topic "${guide}" and call this again.`
     )
   }
 }
@@ -10442,7 +10448,9 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       // nothing cached yet).
       const lockedAlias = served.locked.find(entry => entry.name === resolved)
       const guide = lockedAlias?.notice ?? `The guide ${resolved} comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). Connect Slates (Settings → AI tools, or \`slates login\`), then ask again.`
-      ctx?.guidesRead?.add(resolved)
+      // A locked guide's notice carries its craft card (slates-api lib/brain.ts lockedNotice), so it counts as read; a
+      // guide that never arrived does not, so no generation runs without the card (Eric, 2026-10-23: a hard blocker).
+      if (lockedAlias) ctx?.guidesRead?.add(resolved)
       return { text: guide, data: { topic: resolved, ...(lockedAlias ? { tier: lockedAlias.tier, locked: true } : { unavailable: true }), bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     if (resolved) {
