@@ -248,6 +248,8 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_get_usage',
     'slates_get_app_settings',
     'slates_set_app_settings',
+    'slates_get_spend_limits',
+    'slates_set_spend_limits',
   ],
   // A third transport nobody without Blender installed can reach.
   blender: [
@@ -288,7 +290,7 @@ export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, favorites, pins, the Library (user-named categories of saved references: characters, locations, products, looks) and styles, templates (list, export, import), exporting original asset files, moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
   timeline: 'named cuts and exporting several at once, what made an exported ad (its recipe ID); the timeline (tracks, clips, markers, settings), text, picture and HTML motion layers, captions, video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
-  admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge',
+  admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge; spend limits',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }
 

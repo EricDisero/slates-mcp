@@ -115,6 +115,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['variant-grid', 'the variant grid and its export from the segment cache'],
   ['loudness', 'measuring the loudness of a mix'],
 ]
+  ['spend-limits', 'spend limits for a project and an agent session'],
 
 export async function runDoctor(): Promise<void> {
   const checks: Check[] = []

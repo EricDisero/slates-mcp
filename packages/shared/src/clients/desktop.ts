@@ -1,4 +1,9 @@
+import { randomUUID } from 'node:crypto'
 import { requireDesktop } from '../auth.js'
+
+// One agent session per process (an MCP server's connection, or one CLI run): the desktop counts
+// what it spends against the person's per-session spend limit (`slates_get_spend_limits`).
+const AGENT_SESSION = randomUUID()
 
 // Thin client for the local Slates desktop HTTP server (127.0.0.1:PORT).
 // All workflow/state ops (projects, characters, storyboards, frames,
@@ -120,7 +125,7 @@ export class SlatesDesktopClient {
       }
     }
     const res = await this.fetchOrFriendly(url.toString(), {
-      headers: { Authorization: `Bearer ${this.token}` },
+      headers: { Authorization: `Bearer ${this.token}`, 'X-Slates-Session': AGENT_SESSION },
     })
     return this.handle<T>(path, res)
   }
@@ -131,6 +136,7 @@ export class SlatesDesktopClient {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.token}`,
+        'X-Slates-Session': AGENT_SESSION,
       },
       body: JSON.stringify(body),
     })

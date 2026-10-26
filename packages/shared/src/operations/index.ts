@@ -1369,6 +1369,40 @@ export const setAppSettings: Operation<AppSettingsPatch> = {
   },
 }
 
+const SPEND_LIMIT = z.number().int().min(0).nullable()
+
+export const getSpendLimits: Operation<{ projectId?: string }> = {
+  id: 'slates_get_spend_limits',
+  description:
+    "The project's spend limit and this session's budget, in credits: each limit (null is none), what is spent against it and what is left, as shown beside Generate. A generation over either one is refused with its cost and what is left; read this before a run of generations.",
+  input: z.object({ projectId: z.string().uuid().optional().describe('Defaults to the open project.') }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('spend-limits', 'spend limits')
+    return ok(await ctx.desktop().get('/agent/spend-limits', { projectId: input.projectId }))
+  },
+}
+
+export const setSpendLimits: Operation<{ projectId?: string; projectLimitCredits?: number | null; sessionBudgetCredits?: number | null; confirm?: boolean }> = {
+  id: 'slates_set_spend_limits',
+  description:
+    "Set the project's spend limit or this session's budget, in credits; null removes one. Lowering a limit is yours to do. Raising or removing one needs the user's OK: without confirm it changes nothing and returns requires_confirm. Pass confirm=true only to relay that OK, as after a generation refused over a limit.",
+  input: z
+    .object({
+      projectId: z.string().uuid().optional().describe('Defaults to the open project.'),
+      projectLimitCredits: SPEND_LIMIT.optional().describe('What this project may spend in all, by hand and by every agent.'),
+      sessionBudgetCredits: SPEND_LIMIT.optional().describe('What this session may spend.'),
+      confirm: z.boolean().optional().describe("Set true only to relay the user's explicit OK to raise or remove a limit."),
+    })
+    .strict(),
+  async run(input, ctx) {
+    if (input.projectLimitCredits === undefined && input.sessionBudgetCredits === undefined) {
+      throw new Error('Pass projectLimitCredits, sessionBudgetCredits or both.')
+    }
+    await ctx.desktop().requireCapability('spend-limits', 'spend limits')
+    return ok(await ctx.desktop().post('/agent/spend-limits', input))
+  },
+}
+
 export const getAsset: Operation<{ projectId: string; assetId: string }> = {
   id: 'slates_get_asset',
   description:
@@ -10788,6 +10822,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getAsset as unknown as Operation<unknown>,
   linkAssetSource as unknown as Operation<unknown>,
   transcribeAsset as unknown as Operation<unknown>,
+  getSpendLimits as unknown as Operation<unknown>,
+  setSpendLimits as unknown as Operation<unknown>,
   getAssetTranscript as unknown as Operation<unknown>,
   editAssetTranscript as unknown as Operation<unknown>,
   cutByTranscript as unknown as Operation<unknown>,
