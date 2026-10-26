@@ -3,7 +3,12 @@ import { findBannedTokens } from '../packages/shared/dist/prompts/banned-tokens.
 import { composeReferences, cleanPrompt } from '../packages/shared/dist/prompts/reference-composer.js'
 import { MODEL_CAPABILITIES, DEFAULT_GPT_QUALITY } from '../packages/shared/dist/prompts/model-capabilities.js'
 import { defaultModelFor } from '../packages/shared/dist/prompts/model-facts.js'
-import { ALL_OPERATIONS, SKILLS, toolDefinitions } from '../packages/shared/dist/index.js'
+import { ALL_OPERATIONS, brainFiles, toolDefinitions, useBrainSource } from '../packages/shared/dist/index.js'
+import { brainOrSkip } from './brain-source.mjs'
+
+// The cinematic catalogue is the brain's (slates-api brain/), held as a member's server holds it.
+useBrainSource(brainOrSkip('prompt-control'))
+const SKILLS = brainFiles()
 
 const op = (id) => ALL_OPERATIONS.find((o) => o.id === `slates_${id}`)
 const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)

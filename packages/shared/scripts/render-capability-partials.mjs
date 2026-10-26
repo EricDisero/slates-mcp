@@ -32,10 +32,15 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { brainDir } from '../../../scripts/brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
-const partialsDir = join(pkgRoot, 'skills', '_partials')
+// These partials are injected into brain files only, so they live in slates-api's brain/_partials/; single-repo CI
+// has no brain and skips.
+const brain = brainDir()
+if (!brain) process.exit(0)
+const partialsDir = join(brain, '_partials')
 const CHECK = process.argv.includes('--check')
 
 const dist = join(pkgRoot, 'dist', 'index.js')

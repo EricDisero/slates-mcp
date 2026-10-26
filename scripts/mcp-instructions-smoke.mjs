@@ -22,6 +22,12 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { mcpFixture } from './ad-variant-export-check.mjs'
+import { brainDir } from './brain-source.mjs'
+
+// The servers spawned below hold the brain from its folder (shared/src/skills/served.ts), as a member's holds it
+// from the server; this process reads the same folder to count what they should expose.
+const brain = brainDir()
+if (brain) process.env.SLATES_BRAIN_DIR = brain
 
 const here = dirname(fileURLToPath(import.meta.url))
 const serverPath = join(here, '..', 'packages', 'mcp', 'dist', 'server.js')
@@ -296,7 +302,9 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   // Derived, not typed: the server exposes every embedded skill, so the
   // expected count is whatever the built package holds (a hand-typed "33" sat
   // here for a month after the corpus reached 34).
-  const { SKILLS } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  const { brainFiles, useBrainSource } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
+  if (brain) useBrainSource(brain)
+  const SKILLS = brainFiles()
   const { buildAgentDoctrine } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
   const { buildMcpInstructions } = await import(pathToFileURL(join(here, '..', 'packages', 'shared', 'dist', 'index.js')).href)
   check('wire instructions preserve every canonical instruction byte', (() => { const canonical = buildMcpInstructions(); const first = canonical.indexOf('\n\n'); const wire = (instructions ?? '').slice((instructions ?? '').indexOf('\n\n') + 2); return wire.startsWith(canonical.slice(0, first)) && wire.endsWith(canonical.slice(first + 2)) })())

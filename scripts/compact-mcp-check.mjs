@@ -8,6 +8,13 @@ import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ALL_OPERATIONS, ROUTER_NOTICE, toolDefinitions } from '../packages/shared/dist/index.js'
 import { mcpFixture } from './ad-variant-export-check.mjs'
+import { useBrainSource } from '../packages/shared/dist/skills/served.js'
+import { brainOrSkip } from './brain-source.mjs'
+
+// The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
+const brain = brainOrSkip('compact-mcp')
+process.env.SLATES_BRAIN_DIR = brain
+useBrainSource(brain)
 
 const serverPath = fileURLToPath(new URL('../packages/mcp/dist/server.js', import.meta.url))
 

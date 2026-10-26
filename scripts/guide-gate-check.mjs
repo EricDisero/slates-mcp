@@ -3,6 +3,13 @@
 import assert from 'node:assert/strict'
 import { generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { toolModelFor } from '../packages/shared/dist/prompts/model-facts.js'
+import { useBrainSource } from '../packages/shared/dist/skills/served.js'
+import { brainOrSkip } from './brain-source.mjs'
+
+// The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
+const brain = brainOrSkip('guide-gate')
+process.env.SLATES_BRAIN_DIR = brain
+useBrainSource(brain)
 
 // A desktop that fails loudly if a refused call ever reaches it.
 const reached = []

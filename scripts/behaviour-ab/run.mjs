@@ -3,7 +3,12 @@
 //
 //   node scripts/behaviour-ab/run.mjs --baseline <slates-mcp checkout> --candidate <slates-mcp checkout> \
 //     --out scripts/behaviour-ab/results/<date> [--cases-file <json>] [--cases id,id] [--arms baseline,candidate] [--runs 2] [--from-run 1] \
-//     [--model claude-opus-5-5] [--concurrency 3] [--desktop <slate dir>]
+//     [--model claude-opus-5-5] [--concurrency 3] [--desktop <slate dir>] [--candidate-brain <dir>] [--baseline-brain <dir>]
+//
+// A build served its brain (packages/shared/src/skills/served.ts) fetches it from the fixture's /brain/bundle, as a
+// member's server fetches it from slates-api: --candidate-brain (default scripts/brain-source.mjs, slates-api brain/)
+// for the candidate, --baseline-brain (an export of slates-api brain/ at the approved pin) for a served baseline.
+// A build that embedded its brain ignores both.
 //
 // Each arm must be built (packages/shared/dist and packages/mcp/dist). Every run
 // gets its own fixture, throwaway HOME and empty working folder; the batch shares
@@ -22,6 +27,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { brainHash } from '../brain-eval/brain-hash.mjs'
 import { fetchPriceList, startFixture, SHOT_COST_KEY } from './fixture.mjs'
+import { brainDir } from '../brain-source.mjs'
 import { armHome, realCloudToken } from './home.mjs'
 import { arg, countArg, runClaude, scrubHome } from './lib.mjs'
 import { balancesIn, pricedIn } from './score.mjs'
@@ -38,6 +44,7 @@ const concurrency = countArg('concurrency', '3')
 const desktopDir = resolve(arg('desktop', process.env.SLATES_DESKTOP_DIR ?? join(repo, '..', 'slate')))
 const armDirs = { baseline: arg('baseline') && resolve(arg('baseline')), candidate: resolve(arg('candidate', repo)) }
 const arms = arg('arms', 'baseline,candidate').split(',')
+const brainByArm = { candidate: resolve(arg('candidate-brain', brainDir())), baseline: arg('baseline-brain') && resolve(arg('baseline-brain')) }
 // Another case set in the same shape, such as the brain's craft briefs (scripts/brain-eval/craft-cases.json).
 const { cases: allCases } = JSON.parse(readFileSync(resolve(arg('cases-file', join(here, 'cases.json'))), 'utf8'))
 const wanted = arg('cases') ? arg('cases').split(',') : null
@@ -135,7 +142,7 @@ async function oneRun(job, tools, priceList) {
   let fixture = null
   let trace
   try {
-    fixture = await startFixture({ desktopDir, priceList })
+    fixture = await startFixture({ desktopDir, priceList, brain: brainByArm[job.arm] })
     const env = armHome(home, fixture.port)
     const mcpConfig = join(base, 'mcp.json')
     writeFileSync(mcpConfig, JSON.stringify({
@@ -177,7 +184,9 @@ const hashByArm = {}
 for (const arm of arms) {
   if (!armDirs[arm] || !existsSync(join(armDirs[arm], 'packages', 'mcp', 'dist', 'server.js'))) throw new Error(`Arm ${arm}: no built server under ${armDirs[arm]}`)
   toolsByArm[arm] = await armTools(armDirs[arm])
-  hashByArm[arm] = await brainHash(armDirs[arm])
+  const served = existsSync(join(armDirs[arm], 'packages', 'shared', 'dist', 'skills', 'served.js'))
+  if (served && !brainByArm[arm]) throw new Error(`Arm ${arm}: its build is served its brain; pass --${arm}-brain <dir> (slates-api brain/ at the commit this arm stands for)`)
+  hashByArm[arm] = await brainHash(armDirs[arm], { brain: brainByArm[arm] })
 }
 
 // One price list for the whole batch, so both arms quote from the same data.

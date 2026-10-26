@@ -32,7 +32,8 @@ import { join } from 'node:path'
 import { AGENT_DIR } from '../auth.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES, overlayGuide } from '../prompts/brain.js'
 import { myBrainProblems } from './brain-check.js'
-import { BRAIN_SHAPE, SKILLS } from './content.js'
+import { BRAIN_SHAPE } from './content.js'
+import { brainFiles } from './served.js'
 import { parseSkillMetadata } from './metadata.js'
 
 /** The shared brain's front door, every name that opens it, and the topic that serves this folder: no local file takes one. */
@@ -85,7 +86,7 @@ export function loadMyBrain(dir = myBrainDir()): { files: Record<string, string>
     }
   }
   const order = Object.keys(files).sort((a, b) => Number(b === MY_BRAIN_PROFILE) - Number(a === MY_BRAIN_PROFILE))
-  for (const { name, reason } of myBrainProblems(files, { shape: BRAIN_SHAPE, bundled: SKILLS, order })) {
+  for (const { name, reason } of myBrainProblems(files, { shape: BRAIN_SHAPE, bundled: brainFiles(), order })) {
     delete files[name]
     skipped.push({ file: `${name}.md`, reason })
   }
@@ -95,8 +96,10 @@ export function loadMyBrain(dir = myBrainDir()): { files: Record<string, string>
 /** The whole brain this user's agents read: bundled, then theirs on top (over a shared guide of the same name). */
 export function brainSkills(dir = myBrainDir()): Brain {
   const { files, skipped } = loadMyBrain(dir)
-  const own = Object.fromEntries(Object.entries(files).map(([name, text]) => [name, Object.hasOwn(SKILLS, name) ? overlayGuide(text, SKILLS[name]) : text]))
-  return { skills: { ...SKILLS, ...own }, mine: new Set(Object.keys(files)), skipped }
+  // The shared brain: the public card and router, then the files the account's tier opens (skills/served.ts).
+  const shared = brainFiles()
+  const own = Object.fromEntries(Object.entries(files).map(([name, text]) => [name, Object.hasOwn(shared, name) ? overlayGuide(text, shared[name]) : text]))
+  return { skills: { ...shared, ...own }, mine: new Set(Object.keys(files)), skipped }
 }
 
 /** About 3,000 tokens (plan § My brain): what an agent reads of the user's brain before the router. */
@@ -120,7 +123,7 @@ export function myBrainPreload(dir = myBrainDir()): string {
   const line = (name: string) => {
     const summary = /<!--\s*@operative:start\s*-->([\s\S]*?)<!--\s*@operative:end\s*-->/.exec(files[name])?.[1]
     const first = summary?.split('\n').map((l) => l.replace(/^\s*-\s*/, '').trim()).find((l) => l && !/^\*\*Operative summary/.test(l))
-    return `- \`${name}\`${Object.hasOwn(SKILLS, name) ? ' (adds to the shared guide of this name, and wins where they differ)' : ''}: ${first ?? parseSkillMetadata(files[name], name).description}`
+    return `- \`${name}\`${Object.hasOwn(brainFiles(), name) ? ' (adds to the shared guide of this name, and wins where they differ)' : ''}: ${first ?? parseSkillMetadata(files[name], name).description}`
   }
   // The profile is read whole here, so this is its use; the files below are only named, and date themselves when served.
   if (names.includes(MY_BRAIN_PROFILE)) noteUsed(MY_BRAIN_PROFILE, dir)

@@ -3,40 +3,40 @@
   "source": "@slatesvideo/shared",
   "sourceFiles": [
     {
-      "path": "exports/slates-prompt-builder/prompt-builder.md",
-      "sha256": "e55c76e9190388fcbdf044eaf39f6b93665caa6d1ee7037614dcaf8f2c7673b5"
-    },
-    {
-      "path": "skills/slates-character-identity.md",
+      "path": "brain/slates-character-identity.md",
       "sha256": "44219ffdb81c65029b321b8f3fc5dbf66c4d95ee131b2bb0ae658ebe4853877c"
     },
     {
-      "path": "skills/slates-content-policy.md",
+      "path": "brain/slates-content-policy.md",
       "sha256": "3a2b059210b91f07edb988f0f7b32678e87fb1d03eae6dfc2a86f17443e7ff35"
     },
     {
-      "path": "skills/slates-prompting-gpt-image-2-5.md",
+      "path": "brain/slates-prompting-gpt-image-2-5.md",
       "sha256": "70959d9c697f76af8a32920a632aae8e3aecb2092197ed3e28603f95ae44acac"
     },
     {
-      "path": "skills/slates-prompting-kling-v3.md",
+      "path": "brain/slates-prompting-kling-v3.md",
       "sha256": "120b7f805685e12c10c01d10b117e6ab78d206e141e46d1811f1981bd86f5476"
     },
     {
-      "path": "skills/slates-prompting-nano-banana-2-1.md",
+      "path": "brain/slates-prompting-nano-banana-2-1.md",
       "sha256": "8c434e2bf920511f03c7ef5b8e0a58bc190d175ee888da1080d0c50b5483cbbd"
     },
     {
-      "path": "skills/slates-prompting-omni-flash.md",
+      "path": "brain/slates-prompting-omni-flash.md",
       "sha256": "8e1108b9f579b4d44514064d74753261a1f0c0899831eae7385a66c99301b610"
     },
     {
-      "path": "skills/slates-prompting-seedance-2-5.md",
+      "path": "brain/slates-prompting-seedance-2-5.md",
       "sha256": "18ec388e5aea475d9ff0cb90bd4d3c5a2807b73631c70b970c1735da59513bd9"
     },
     {
-      "path": "skills/slates-prompting-seedance.md",
+      "path": "brain/slates-prompting-seedance.md",
       "sha256": "44bea084f668164846c3c7579d3b69ea205edafdd01ad189b813be25f65a0cdc"
+    },
+    {
+      "path": "exports/slates-prompt-builder/prompt-builder.md",
+      "sha256": "e55c76e9190388fcbdf044eaf39f6b93665caa6d1ee7037614dcaf8f2c7673b5"
     },
     {
       "path": "src/prompts/character-sheet.ts",
@@ -56,7 +56,7 @@
     },
     {
       "path": "src/prompts/partials.generated.ts",
-      "sha256": "c24bc9785b15df6de17a11b4e9e898e5106cd7230689b20f9d6678636b4a6e52"
+      "sha256": "d9a4722fc9af24c3dac0dc83b5084f7ceeee0a429d694a856ee7f5aa3bc0ae47"
     },
     {
       "path": "src/prompts/reference-rules.ts",

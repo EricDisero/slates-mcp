@@ -32,5 +32,7 @@ export function armHome(dir, port) {
     HOME: dir,
     USERPROFILE: dir,
     SLATES_CLOUD_BASE_URL: `http://127.0.0.1:${port}`,
+    // Empty, so a served build asks the fixture for its brain the way a member's asks slates-api, never a folder.
+    SLATES_BRAIN_DIR: '',
   }
 }

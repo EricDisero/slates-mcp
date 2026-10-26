@@ -2,11 +2,16 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate'
 import assert from 'node:assert/strict'
+import { join } from 'node:path'
 import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
+import { brainDir } from '../../../scripts/brain-source.mjs'
 
 const { parseSkillMetadata } = loadTypeScriptModule(new URL('../src/skills/metadata.ts', import.meta.url))
 
-const source = new URL('../skills/slates-chatgpt-images.md', import.meta.url)
+// The skill is the brain's (slates-api brain/); single-repo CI has none and skips.
+const brain = brainDir()
+if (!brain) process.exit(0)
+const source = join(brain, 'slates-chatgpt-images.md')
 const output = new URL('../exports/slates-chatgpt-images/generated/', import.meta.url)
 const markdown = readFileSync(source, 'utf8')
 parseSkillMetadata(markdown, 'slates-chatgpt-images')

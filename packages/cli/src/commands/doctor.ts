@@ -7,7 +7,7 @@ import {
   CONNECTION_FILE,
   SlatesCloudClient,
   SlatesDesktopClient,
-  SKILLS,
+  brainFiles,
   type SlatesUserInfo,
   type DesktopHealth,
   refreshLatestVersion,
@@ -206,7 +206,7 @@ export async function runDoctor(): Promise<void> {
       ok: absent || (!state.missing.length && !state.stale.length),
       detail: absent
         ? 'not installed; MCP guides remain available'
-        : `${state.installed} of ${Object.keys(SKILLS).length} installed; ${state.missing.length} missing, ${state.stale.length} outdated, ${state.duplicates.length} duplicate names`,
+        : `${state.installed} of ${Object.keys(brainFiles()).length} installed; ${state.missing.length} missing, ${state.stale.length} outdated, ${state.duplicates.length} duplicate names`,
       fix: `Run slates install-skills --client ${target.client}; also add --global if you have a global copy.`,
     })
   }

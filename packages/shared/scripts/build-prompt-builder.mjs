@@ -14,11 +14,12 @@ import {
   readdirSync,
   writeFileSync,
 } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { strToU8, unzipSync, zipSync } from 'fflate'
 import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
+import { brainDir } from '../../../scripts/brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
@@ -26,6 +27,11 @@ const exportRoot = join(pkgRoot, 'exports', 'slates-prompt-builder')
 const generatedDir = join(exportRoot, 'generated')
 const modelFactsPath = join(pkgRoot, 'src', 'prompts', 'model-facts.ts')
 const checkOnly = process.argv.includes('--check')
+// The model guides it renders are the brain's (slates-api brain/); single-repo CI has none and skips.
+const brain = brainDir()
+if (!brain) process.exit(0)
+/** A source's path in the manifest: under the package, or `brain/<file>` for the brain's. */
+const sourcePath = (path) => (path.startsWith(brain) ? `brain/${relative(brain, path)}` : relative(pkgRoot, path)).split(sep).join('/')
 const validateOnly = process.argv.includes('--validate')
 const canonicalSources = new Map()
 const onSource = (path, raw) => canonicalSources.set(path, raw)
@@ -77,42 +83,42 @@ const specs = [
   },
   {
     output: 'reference-character.md',
-    source: join(pkgRoot, 'skills', 'slates-character-identity.md'),
+    source: join(brain, 'slates-character-identity.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-seedance.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-seedance.md'),
+    source: join(brain, 'slates-prompting-seedance.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-kling.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-kling-v3.md'),
+    source: join(brain, 'slates-prompting-kling-v3.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-nano-banana.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-nano-banana-2-1.md'),
+    source: join(brain, 'slates-prompting-nano-banana-2-1.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-seedance-2-5.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-seedance-2-5.md'),
+    source: join(brain, 'slates-prompting-seedance-2-5.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-gpt-image-2-5.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-gpt-image-2-5.md'),
+    source: join(brain, 'slates-prompting-gpt-image-2-5.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-omni-flash.md',
-    source: join(pkgRoot, 'skills', 'slates-prompting-omni-flash.md'),
+    source: join(brain, 'slates-prompting-omni-flash.md'),
     kind: 'production-skill',
   },
   {
     output: 'reference-content-policy.md',
-    source: join(pkgRoot, 'skills', 'slates-content-policy.md'),
+    source: join(brain, 'slates-content-policy.md'),
     kind: 'production-skill',
   },
 ]
@@ -381,12 +387,12 @@ for (const spec of specs) {
   if (spec.output === 'reference-character.md') assertCharacterContract(output)
   rendered.set(spec.output, output)
   sources.push({
-    path: relative(pkgRoot, spec.source).replace(/\\/g, '/'),
+    path: sourcePath(spec.source),
     sha256: sha256(normalize(raw)),
   })
 }
 for (const [path, raw] of canonicalSources) sources.push({
-  path: relative(pkgRoot, path).replace(/\\/g, '/'),
+  path: sourcePath(path),
   sha256: sha256(normalize(raw)),
 })
 sources.sort((a, b) => a.path.localeCompare(b.path))

@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { SKILLS, parseSkillMetadata } from '@slatesvideo/shared'
+import { SlatesCloudClient, brainFiles, parseSkillMetadata, refreshServedBrain } from '@slatesvideo/shared'
 
 const CLIENT_DIRECTORIES = { claude: '.claude', codex: '.agents' } as const
 export type SkillClient = keyof typeof CLIENT_DIRECTORIES | 'both'
@@ -13,7 +13,7 @@ export interface InstallSkillsOptions {
 interface SkillEnvironment {
   cwd: string
   home: string
-  skills: Record<string, string>
+  skills: Readonly<Record<string, string>>
   log: (message: string) => void
 }
 /** The brain's source comments say where a lesson came from; that is for the repo and its review, not an installed copy. */
@@ -28,7 +28,7 @@ export function skillInstallTargets(client: SkillClient, base: string): Array<{ 
 }
 
 /** Check every installed copy: Codex can discover same-name skills in both scopes. */
-export function inspectSkillInstallation(roots: string[], skills: Record<string, string> = SKILLS): { installed: number; missing: string[]; stale: string[]; duplicates: string[] } {
+export function inspectSkillInstallation(roots: string[], skills: Readonly<Record<string, string>> = brainFiles()): { installed: number; missing: string[]; stale: string[]; duplicates: string[] } {
   const missing: string[] = []
   const stale: string[] = []
   const duplicates: string[] = []
@@ -42,14 +42,21 @@ export function inspectSkillInstallation(roots: string[], skills: Record<string,
   return { installed: Object.keys(skills).length - missing.length, missing, stale, duplicates }
 }
 
-/** Both clients consume the same embedded portable SKILL.md source. */
+/** The card and router ship in this package; the playbooks, rules and guides come from the connected account's brain. */
+export async function runInstallSkillsFromAccount(opts: InstallSkillsOptions): Promise<void> {
+  const brain = await refreshServedBrain(() => new SlatesCloudClient(), { force: true })
+  runInstallSkills(opts)
+  if (brain.source === 'none') console.log(`Only the Director card and the router are installed: the playbooks come from your Slates account (${brain.problem ?? 'not reached'}). Run slates login, then slates install-skills again.`)
+}
+
+/** Both clients consume the same portable SKILL.md source. */
 export function runInstallSkills(opts: InstallSkillsOptions, environment: SkillEnvironment = {
-  cwd: process.cwd(), home: homedir(), skills: SKILLS, log: console.log,
+  cwd: process.cwd(), home: homedir(), skills: brainFiles(), log: console.log,
 }): void {
   const entries = Object.entries(environment.skills).map(([key, content]) => ({
     ...parseSkillMetadata(content, key), content,
   }))
-  if (!entries.length) throw new Error('No bundled skills found in @slatesvideo/shared')
+  if (!entries.length) throw new Error('No skills found in @slatesvideo/shared or the Slates brain')
   const targets = skillInstallTargets(opts.client ?? 'both', opts.global ? environment.home : environment.cwd)
   for (const target of targets) {
     let fresh = 0

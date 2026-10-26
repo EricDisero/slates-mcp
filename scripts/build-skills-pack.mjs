@@ -38,6 +38,7 @@ import { buildZip } from './zip.mjs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve, basename } from 'node:path';
 import { loadTypeScriptModule } from './load-typescript.mjs';
+import { brainDir } from './brain-source.mjs';
 const { parseSkillMetadata } = loadTypeScriptModule(new URL('../packages/shared/src/skills/metadata.ts', import.meta.url));
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -108,7 +109,9 @@ if (!existsSync(PAID_DIR)) {
   process.exit(1);
 }
 
-const free = collect(FREE_DIR, 'free');
+// The brain's files (slates-api brain/) ride with the card and router, as before they moved there. Their chart tier
+// stays `free` until the offer change retires this pack's free/paid line (second-brain plans/2026-10-25-slates-brain.md).
+const free = [...collect(FREE_DIR, 'free'), ...collect(brainDir(), 'free')].sort((a, b) => a.key.localeCompare(b.key));
 const paid = collect(PAID_DIR, 'paid');
 
 if (paid.length === 0) {

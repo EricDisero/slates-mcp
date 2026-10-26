@@ -26,10 +26,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { brainOrSkip } from './brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, '..')
-const SKILL = join(repo, 'packages', 'shared', 'skills', 'slates-cinematic-look.md')
+// The skill is the brain's (slates-api brain/).
+const SKILL = join(brainOrSkip('cinematic-catalogue'), 'slates-cinematic-look.md')
 const RESEARCH = resolve(
   repo,
   '../../second-brain/business/projects/slates/research/cinematic-look-research.md'

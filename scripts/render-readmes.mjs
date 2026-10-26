@@ -23,6 +23,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { brainDir } from './brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
@@ -30,7 +31,12 @@ const CHECK = process.argv.includes('--check')
 
 const dist = join(repoRoot, 'packages', 'shared', 'dist', 'index.js')
 const shared = await import(pathToFileURL(dist).href)
-const { ALL_OPERATIONS, SKILLS, VIDEO_MODELS, IMAGE_MODELS, AUDIO_MODELS, CONFIRM_CREDITS, MODEL_FACTS } = shared
+const { ALL_OPERATIONS, VIDEO_MODELS, IMAGE_MODELS, AUDIO_MODELS, CONFIRM_CREDITS, MODEL_FACTS } = shared
+// The skills an account opens: the public card and router plus the brain (slates-api brain/), every tier.
+const brain = brainDir()
+if (!brain) process.exit(0) // single-repo CI: the counts need the brain
+shared.useBrainSource(brain)
+const SKILLS = shared.brainFiles()
 
 /** Human names for the roster line, from MODEL_FACTS — never hand-typed. */
 function roster(ids) {

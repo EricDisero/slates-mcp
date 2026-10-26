@@ -8,12 +8,16 @@
 // the cloud price list (GET /api/agent/models), fetched once at start with the
 // caller's cloud token and held in memory, so estimates quote real prices.
 // /members/* answers 402 (no skills entitlement), as for a user without the pack.
+// /brain and /brain/bundle serve the brain from slates-api's brain/ (scripts/brain-source.mjs) with both tiers
+// open, as slates-api answers a member: a candidate build fetches its playbooks the way a signed-in user's does.
 
+import { createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { crc32, deflateSync } from 'node:zlib'
+import { brainDir, readSkillDir } from '../brain-source.mjs'
 
 // The framing buckets, word count and speech-rate budget the desktop also imports (this checkout's shared build).
 const grammar = await import(pathToFileURL(join(import.meta.dirname, '..', '..', 'packages', 'shared', 'dist', 'prompts', 'shot-grammar.js')).href)
@@ -230,10 +234,11 @@ export async function fetchPriceList(cloudToken, cloudBase = 'https://slates-api
  * `cloudBase`; it is never logged or written anywhere.
  * Returns { port, requests, close }; `requests` is the live request log.
  */
-export async function startFixture({ desktopDir, priceList: given, cloudToken, cloudBase = 'https://slates-api.fly.dev' } = {}) {
+export async function startFixture({ desktopDir, priceList: given, cloudToken, cloudBase = 'https://slates-api.fly.dev', brain = brainDir() } = {}) {
   const health = desktopCapabilities(desktopDir)
   const priceList = given ?? await fetchPriceList(cloudToken, cloudBase)
   const requests = []
+  const bundle = brainBundle(brain)
 
   const routes = {
     'GET /agent/healthz': () => ({ ok: true, service: 'slates-agent', version: '1.6.0', ...health }),
@@ -329,6 +334,8 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
       const models = priceList.models ?? []
       return { ...priceList, models: key ? models.filter((m) => m.model === key) : models }
     },
+    'GET /brain': () => ({ version: bundle.version, tiers: bundle.tiers, files: Object.keys(bundle.files).map((name) => ({ name, open: true })) }),
+    'GET /brain/bundle': () => bundle,
   }
 
   const server = createServer(async (req, res) => {
@@ -367,6 +374,13 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
     priceListSize: (priceList.models ?? []).length,
     close: () => new Promise((resolve) => server.close(resolve)),
   }
+}
+
+/** slates-api's /brain/bundle for an account that opens every tier, from the brain folder (none: no files). */
+function brainBundle(dir) {
+  const files = dir ? readSkillDir(dir) : {}
+  const version = `fixture.${createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 12)}`
+  return { version, tiers: ['bump', 'license'], files, locked: [] }
 }
 
 function projectOf(q) {

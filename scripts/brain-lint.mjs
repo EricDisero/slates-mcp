@@ -21,7 +21,8 @@
 //   7. one home per lesson: no two files share a passage (nine-word runs, the vault's duplicate
 //      check), past the pinned known overlaps, which may shrink and never grow. Shared blocks
 //      injected from one partial (@inject) are one home and do not count;
-//   8. a source on every new block: each block of lines added since `sourcesSince` (a paragraph,
+//   8. a source on every new block: each block of lines added since `sourcesSince` here and
+//      `brainSourcesSince` in slates-api's brain/ (brain-shape.json; a paragraph,
 //      or a list with no blank line between its items; a brand-new unstaged file counts as wholly
 //      added) carries a `<!-- src: what it came from, YYYY-MM-DD -->` comment, inline or on the
 //      line right after it (agents never see comments).
@@ -40,12 +41,12 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadTypeScriptModule } from './load-typescript.mjs'
+import { brainOrSkip, readAllSkills, readSkillDir } from './brain-source.mjs'
 
 const REPO = join(import.meta.dirname, '..')
-const SKILLS_DIR = join(REPO, 'packages', 'shared', 'skills')
 export const ROUTER = 'slates-start-here'
 export const SHAPE = JSON.parse(readFileSync(join(import.meta.dirname, 'brain-shape.json'), 'utf8'))
 export const CAPS = { directorWords: 300, routerWords: SHAPE.caps.fileWords.router, operativeChars: 1200, bulletsMin: 2, bulletsMax: 7 }
@@ -268,16 +269,16 @@ function blocksOf(text) {
  * of only headings, lone comments and code carry no lesson and need no source. Null, with a warning,
  * when git or the commit is not there (a shallow clone): the rest of the lint still runs.
  */
-export function addedBlocks(skills, since = SHAPE.sourcesSince, { repo = REPO } = {}) {
+export function addedBlocks(skills, since = SHAPE.sourcesSince, { repo = REPO, path = 'packages/shared/skills' } = {}) {
   const git = (...args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 })
-  const skillPath = /^packages\/shared\/skills\/([^/]+)\.md$/
+  const skillPath = new RegExp(`^${path}/([^/]+)\\.md$`)
   let diff
   let fresh
   try {
     // Prefixes and colour are set here so a user's diff.noprefix, diff.mnemonicPrefix or color.ui cannot change what is parsed.
-    diff = git('diff', '--unified=0', '--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/', since, '--', 'packages/shared/skills')
+    diff = git('diff', '--unified=0', '--no-color', '--no-ext-diff', '--src-prefix=a/', '--dst-prefix=b/', since, '--', path)
     // `git diff <commit>` leaves untracked files out.
-    fresh = git('ls-files', '--others', '--exclude-standard', '-z', '--', 'packages/shared/skills').split('\0').filter(Boolean)
+    fresh = git('ls-files', '--others', '--exclude-standard', '-z', '--', path).split('\0').filter(Boolean)
   } catch {
     console.warn(`brain lint: no git history back to ${since}; the source check is skipped`)
     return null
@@ -340,8 +341,21 @@ export function addedBlocks(skills, since = SHAPE.sourcesSince, { repo = REPO } 
   return out
 }
 
-export function readSkills(dir = SKILLS_DIR) {
-  return Object.fromEntries(readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => [f.slice(0, -3), readFileSync(join(dir, f), 'utf8')]))
+/** One folder's skills, or with no folder the whole brain: the public card and router plus slates-api brain/. */
+export function readSkills(dir) {
+  return dir ? readSkillDir(dir) : readAllSkills({ dir: brainOrSkip('brain-lint') })
+}
+
+/**
+ * The blocks added since each home's own start: this repo's skills since `sourcesSince`, the brain's in slates-api
+ * since `brainSourcesSince` (the commit that moved it there, whose blocks this lint had checked here). Null when
+ * either history is missing.
+ */
+function addedSinceBoth(skills) {
+  const brain = brainOrSkip('brain-lint')
+  const own = addedBlocks(skills)
+  const moved = addedBlocks(skills, SHAPE.brainSourcesSince, { repo: dirname(brain), path: basename(brain) })
+  return own && moved ? { ...own, ...moved } : null
 }
 
 function selfTest(skills) {
@@ -506,7 +520,7 @@ function main() {
   }
   const skills = readSkills()
   if (process.argv.includes('--measure')) return measure(skills)
-  const added = addedBlocks(skills)
+  const added = addedSinceBoth(skills)
   const failures = lintBrain(skills, { added })
   for (const warning of pinWarnings(skills)) console.warn(`brain lint warning: ${warning}`)
   if (failures.length) {
@@ -517,7 +531,7 @@ function main() {
   const ops = Object.values(skills).filter((t) => OPERATIVE_RE.test(t)).length
   const cards = Object.values(skills).filter((t) => CARD_START_RE.test(t)).length
   const known = Object.keys(SHAPE.duplicates.known).length
-  console.log(`✓ brain lint: ${Object.keys(skills).length} files in their pinned layers; router ${words(skills[ROUTER].replace(DIRECTOR_RE, ''))} words, Director card ${words(DIRECTOR_RE.exec(skills[ROUTER])[1])}; ${ops} operative summaries, ${cards} craft cards; every file and layer under its cap; no new shared passage (${known} known overlaps pinned); ${added ? `every block added since ${SHAPE.sourcesSince} sourced` : 'sources not checked'}`)
+  console.log(`✓ brain lint: ${Object.keys(skills).length} files in their pinned layers; router ${words(skills[ROUTER].replace(DIRECTOR_RE, ''))} words, Director card ${words(DIRECTOR_RE.exec(skills[ROUTER])[1])}; ${ops} operative summaries, ${cards} craft cards; every file and layer under its cap; no new shared passage (${known} known overlaps pinned); ${added ? `every block added since ${SHAPE.sourcesSince} here and ${SHAPE.brainSourcesSince} in the brain sourced` : 'sources not checked'}`)
 }
 
 // Run as a script, not when another check imports the parser.

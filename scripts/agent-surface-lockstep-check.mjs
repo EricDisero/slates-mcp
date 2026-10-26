@@ -65,13 +65,13 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pathToFileURL } from 'node:url'
 import { desktopSource } from './desktop-source.mjs'
+import { brainDir } from './brain-source.mjs'
 import { runInNewContext } from 'node:vm'
 import ts from 'typescript'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = join(here, '..')
 const sharedRoot = join(repoRoot, 'packages', 'shared')
-const skillsDir = join(sharedRoot, 'skills')
 const mcpServerPath = join(repoRoot, 'packages', 'mcp', 'src', 'server.ts')
 const desktopRoot = desktopSource()
 const desktopContextPath = join(desktopRoot, 'src', 'main', 'studio-agent', 'context.ts')
@@ -199,8 +199,11 @@ const {
   toolDefinitions,
   craftCard,
   CRAFT_CARD_CEILING,
-  SKILLS,
 } = shared
+// The model guides checks 4 and 8 read are the brain's (slates-api brain/), held the way a member's server holds them.
+const brain = brainDir()
+if (brain) shared.useBrainSource(brain)
+const SKILLS = shared.brainFiles()
 
 console.log('agent-surface-lockstep-check')
 

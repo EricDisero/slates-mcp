@@ -27,6 +27,7 @@ import {
   MY_BRAIN_TOPIC,
   ROUTER_NOTICE,
   archiveUnusedDaily,
+  refreshServedBrain,
   myBrainPreload,
   noteUsed,
   APP_MANUAL,
@@ -613,6 +614,11 @@ async function main(): Promise<void> {
   if (updateAdvice) console.error(`[slates-mcp] ${updateAdvice}`)
   // Background refresh; the result is read by the next launch, never awaited.
   void refreshLatestVersion(PKG_NAME)
+  // The playbooks, rules and model guides by the account's tier (shared skills/served.ts): the cache serves this
+  // session at once, and the first guide answer waits for this check if it is still in flight.
+  void refreshServedBrain(() => new SlatesCloudClient()).then((brain) => {
+    console.error(`[slates-mcp] brain: ${Object.keys(brain.files).length} files from the ${brain.source}${brain.problem ? ` (${brain.problem})` : ''}`)
+  })
   // My brain files long unused move to its archive/ (skills/my-brain.ts): at most once a day, and never
   // fatal, since a server starts with every client session.
   const archived = archiveUnusedDaily()

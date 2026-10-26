@@ -2,9 +2,15 @@ import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { SKILLS, parseSkillMetadata, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
+import { brainFiles, parseSkillMetadata, ALL_OPERATIONS, useBrainSource } from '../packages/shared/dist/index.js'
 import { runInstallSkills, inspectSkillInstallation, skillInstallTargets } from '../packages/cli/dist/commands/install-skills.js'
 import { loadTypeScriptModule } from './load-typescript.mjs'
+import { PUBLIC_SKILLS_DIR, brainOrSkip, readAllSkills } from './brain-source.mjs'
+
+// Every skill an account can install: the card and router plus the brain, every tier.
+const brain = brainOrSkip('skill-install')
+useBrainSource(brain)
+const SKILLS = brainFiles()
 
 const markdown = (name, description) => `---\nname: ${name}\ndescription: ${JSON.stringify(description)}\n---\n# Fixture\n`
 const quoted = markdown('slates-fixture', 'An image: "quoted" and literal # signs.')
@@ -81,8 +87,7 @@ for (const [query, expected] of [['animate these photos', 'slates_generate_video
   for (const { op } of matches) assert.equal(op, ALL_OPERATIONS.find(candidate => candidate.id === op.id))
 }
 const { guideCatalog, discoverGuides } = loadTypeScriptModule(new URL('../packages/shared/src/prompts/guide-discovery.ts', import.meta.url))
-const skillsDirectory = new URL('../packages/shared/skills/', import.meta.url)
-const sourceSkills = Object.fromEntries(readdirSync(skillsDirectory).filter(name => name.endsWith('.md')).map(name => [name.slice(0, -3), readFileSync(new URL(name, skillsDirectory), 'utf8')]))
+const sourceSkills = readAllSkills({ dir: brain, publicDir: PUBLIC_SKILLS_DIR })
 for (const [query, expected] of [['animate these photos', 'slates-model-selection'], ['Make a 30 second movie with two friends at a rainy diner', 'slates-one-prompt-film'], ['older male voiceover', 'slates-prompting-inworld-tts'], ['skincare product ad with a human presenter', 'slates-direct-response-ad']]) {
   assert.ok(discoverGuides(guideCatalog(sourceSkills), sourceSkills, query).guides.slice(0, 3).some(guide => guide.name === expected), `${query} should discover ${expected}`)
 }

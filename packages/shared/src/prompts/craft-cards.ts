@@ -31,7 +31,7 @@
 // the card follows on the next build.
 // ============================================================
 
-import { SKILLS } from '../skills/content.js'
+import { brainFiles, servedBrain, type ServedBrain } from '../skills/served.js'
 import { splitOverlay } from './brain.js'
 
 /**
@@ -68,14 +68,33 @@ function extractCard(skill: string, content: string): string | null {
   return body
 }
 
-/** Every card, keyed by skill name. Built once at load; integrity asserted. */
-export const CRAFT_CARDS: Readonly<Record<string, string>> = Object.freeze(
-  Object.fromEntries(
-    Object.entries(SKILLS)
-      .map(([skill, content]) => [skill, extractCard(skill, content)] as const)
-      .filter((entry): entry is readonly [string, string] => entry[1] !== null)
-  )
-)
+/**
+ * Every card, keyed by skill name, from the brain this process holds (skills/served.ts): rebuilt when that brain
+ * changes, integrity asserted on each build. Model guides are served by tier, so without a brain there are none.
+ */
+let built: { brain: ServedBrain; cards: Readonly<Record<string, string>> } | undefined
+function cards(): Readonly<Record<string, string>> {
+  const brain = servedBrain()
+  if (built?.brain !== brain) {
+    const cards = Object.fromEntries(
+      Object.entries(brainFiles())
+        .map(([skill, content]) => [skill, extractCard(skill, content)] as const)
+        .filter((entry): entry is readonly [string, string] => entry[1] !== null)
+    )
+    built = { brain, cards: Object.freeze(cards) }
+  }
+  return built.cards
+}
+
+/** A live view of cards(), so `CRAFT_CARDS[name]`, `in` and `Object.keys` follow the served brain. */
+export const CRAFT_CARDS: Readonly<Record<string, string>> = new Proxy({} as Record<string, string>, {
+  get: (_, key) => (typeof key === 'string' ? cards()[key] : undefined),
+  has: (_, key) => typeof key === 'string' && Object.hasOwn(cards(), key),
+  ownKeys: () => Reflect.ownKeys(cards()),
+  getOwnPropertyDescriptor: (_, key) =>
+    typeof key === 'string' && Object.hasOwn(cards(), key) ? { value: cards()[key], enumerable: true, configurable: true, writable: false } : undefined,
+  set: () => false,
+})
 
 /** The card for a skill, or null when that skill carries none. */
 export function craftCard(skill: string): string | null {
@@ -89,7 +108,7 @@ export function craftCard(skill: string): string | null {
  * summary instead of throwing.
  */
 export function craftCardOf(skill: string, content: string): string | null {
-  if (SKILLS[skill] === content) return craftCard(skill)
+  if (brainFiles()[skill] === content) return craftCard(skill)
   const overlay = splitOverlay(content)
   if (overlay) {
     const own = craftCardOf(skill, overlay.theirs)

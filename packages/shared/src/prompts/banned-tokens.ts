@@ -13,7 +13,7 @@
  * the refusal to calls of that shape. A line whose rule depends on context the
  * call cannot show ("after the first introduction") stays a warning only.
  */
-import { SKILLS } from '../skills/content.js'
+import { brainFiles, servedBrain, type ServedBrain } from '../skills/served.js'
 
 export type BannedTokenScope = 'image' | 'video'
 /** The call shape a block's heading limits its tokens to. */
@@ -62,22 +62,31 @@ function parseBannedBlock(body: string, skill: string, scope: BannedTokenScope):
   return out
 }
 
-const bySkill = new Map<string, readonly BannedToken[]>()
-for (const [skill, content] of Object.entries(SKILLS)) {
-  const fences = [...content.matchAll(/<!--\s*@banned:start\s*-->([\s\S]*?)<!--\s*@banned:end\s*-->/g)]
-  if (!fences.length) continue
-  const scope: BannedTokenScope = /nano-banana|gpt-image|flux|seedream/.test(skill) ? 'image' : 'video'
-  const tokens = fences.flatMap((f) => parseBannedBlock(f[1], skill, scope))
-    .filter((t, i, all) => all.findIndex((o) => o.token === t.token) === i)
-  if (!tokens.length) throw new Error(`${skill}: @banned block contains no tokens`)
-  bySkill.set(skill, tokens)
+// Read from the brain this process holds (skills/served.ts) and rebuilt when it changes: the model guides that
+// carry the @banned blocks are served by the account's tier.
+let built: { brain: ServedBrain; bySkill: Map<string, readonly BannedToken[]> } | undefined
+function bannedBySkill(): Map<string, readonly BannedToken[]> {
+  const brain = servedBrain()
+  if (built?.brain === brain) return built.bySkill
+  const bySkill = new Map<string, readonly BannedToken[]>()
+  for (const [skill, content] of Object.entries(brainFiles())) {
+    const fences = [...content.matchAll(/<!--\s*@banned:start\s*-->([\s\S]*?)<!--\s*@banned:end\s*-->/g)]
+    if (!fences.length) continue
+    const scope: BannedTokenScope = /nano-banana|gpt-image|flux|seedream/.test(skill) ? 'image' : 'video'
+    const tokens = fences.flatMap((f) => parseBannedBlock(f[1], skill, scope))
+      .filter((t, i, all) => all.findIndex((o) => o.token === t.token) === i)
+    if (!tokens.length) throw new Error(`${skill}: @banned block contains no tokens`)
+    bySkill.set(skill, tokens)
+  }
+  built = { brain, bySkill }
+  return bySkill
 }
 
 /** Compatibility exports: there is no cross-model blacklist. */
 export const BANNED_PROMPT_TOKENS: readonly BannedToken[] = Object.freeze([])
 export function bannedTokensFor(_scope: BannedTokenScope): readonly BannedToken[] { return BANNED_PROMPT_TOKENS }
 export function describeBannedTokens(_scope: BannedTokenScope): string { return '' }
-export function bannedTokensForSkill(skill: string): readonly BannedToken[] { return bySkill.get(skill) ?? [] }
+export function bannedTokensForSkill(skill: string): readonly BannedToken[] { return bannedBySkill().get(skill) ?? [] }
 
 const matchers = new Map<string, RegExp>()
 function matcherFor(token: string): RegExp {

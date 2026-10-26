@@ -2,8 +2,13 @@ import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { APP_MANUAL, appManualIndex, appManualSections, ALL_OPERATIONS, SKILLS } from '../packages/shared/dist/index.js'
+import { APP_MANUAL, appManualIndex, appManualSections, ALL_OPERATIONS, brainFiles, useBrainSource } from '../packages/shared/dist/index.js'
+import { brainOrSkip } from './brain-source.mjs'
 import { desktopSource } from './desktop-source.mjs'
+
+// The guides a skill may name: the card and router plus the brain (slates-api brain/), every tier.
+useBrainSource(brainOrSkip('app-manual'))
+const SKILLS = brainFiles()
 
 // slates-web may pin the docs to a slate commit that buyers have (scripts/llm-docs/desktop-docs-ref.json,
 // SLATES_DOCS_REF overrides). Pinned, this package ships that commit's manual, so the copy to match is the

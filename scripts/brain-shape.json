@@ -89,5 +89,6 @@
     },
     "about": "Pairs of files that shared a passage when the check landed (2026-10-25), with the count of nine-word runs they shared then. Each is a lesson in two homes to merge; a count may only fall, and the lint fails on any new pair at failAt or more."
   },
-  "sourcesSince": "8da4f09"
+  "sourcesSince": "8da4f09",
+  "brainSourcesSince": "f141330"
 }

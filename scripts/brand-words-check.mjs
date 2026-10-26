@@ -13,6 +13,7 @@
 //   node scripts/brand-words-check.mjs [--self-test]     (part of npm run build)
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { readAllSkills } from './brain-source.mjs'
 
 const REPO = join(import.meta.dirname, '..')
 const PACKAGES = join(REPO, 'packages')
@@ -85,10 +86,9 @@ for (const pkg of readdirSync(PACKAGES)) {
     for (const hit of sourceHits(readFileSync(file, 'utf8'))) problems.push(`${rel(file)}:${hit.line}  ${hit.text.slice(0, 160)}`)
   }
 }
-for (const name of readdirSync(OWN_SKILLS)) {
-  const path = join(OWN_SKILLS, name)
-  if (!name.endsWith('.md')) continue
-  for (const hit of lineHits(readFileSync(path, 'utf8'), WORDS)) problems.push(`${rel(path)}:${hit.line}  ${hit.text.slice(0, 160)}`)
+// Our own skills: the card and router here and the brain in slates-api brain/ (the public half alone in single-repo CI).
+for (const [name, text] of Object.entries(readAllSkills())) {
+  for (const hit of lineHits(text, WORDS)) problems.push(`${name}.md:${hit.line}  ${hit.text.slice(0, 160)}`)
 }
 // The served corpus, as an agent receives it.
 const { whiteLabel } = await import('../packages/shared/dist/skills/hyperframes.js').catch(() => ({ whiteLabel: null }))

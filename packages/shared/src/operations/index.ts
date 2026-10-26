@@ -22,6 +22,7 @@ import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
 import { brainSkills, myBrainDir, myBrainPreload, noteUsed } from '../skills/my-brain.js'
+import { brainFiles, refreshServedBrain, servedBrain } from '../skills/served.js'
 import { HYPERFRAMES_MAPPING, findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
 import { appManualIndex, appManualSections } from '../manual/index.js'
 // Reference-capacity prose is DERIVED, never hand-typed — root CLAUDE.md:
@@ -10402,7 +10403,20 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       return { text: content, data: { topic: MY_BRAIN_TOPIC, bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }
     const hyperframes = await loadHyperframes()
-    // The bundled skills with the user's My brain laid over them; theirs wins on a conflict (skills/my-brain.ts).
+    // The playbooks, rules and model guides come from the account's tier (skills/served.ts): checked against the
+    // server at most every ten minutes, the cache when it cannot be reached.
+    if (ctx?.cloud) await refreshServedBrain(ctx.cloud)
+    const served = servedBrain()
+    // A playbook past the account's tier: the job still runs, on the general rules, and the user hears once where
+    // the playbook lives (the server's own words).
+    const locked = topic ? served.locked.find(entry => entry.name === topic || entry.name === `slates-${topic}`) : undefined
+    if (locked) {
+      const guide = locked.notice ?? `${locked.name} is not open to this account. Run the job on the general rules.`
+      // The guide gate makes an agent read what this account holds; a guide it cannot open never blocks a generation.
+      ctx?.guidesRead?.add(locked.name)
+      return { text: guide, data: { topic: locked.name, tier: locked.tier, locked: true, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+    }
+    // The shared brain with the user's My brain laid over it; theirs wins on a conflict (skills/my-brain.ts).
     const brain = brainSkills()
     // A motion skill or file by its exact name wins over an alias (`motion-audio` is not `audio`).
     const hf = topic && !Object.hasOwn(brain.skills, topic) ? findHyperframesGuide(hyperframes, topic) : null
@@ -10417,12 +10431,20 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     // the router's names are reserved in the loader, so none of them reaches here as a local file. A name missing
     // its `slates-` prefix is that guide, resolved here so it never waits on the member check.
     const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic) ?? (Object.hasOwn(brain.skills, `slates-${topic}`) ? `slates-${topic}` : null)) : null
+    if (resolved && !Object.hasOwn(brain.skills, resolved)) {
+      // An alias named a guide this process does not hold: a locked one, or no brain at all (not connected, and
+      // nothing cached yet).
+      const lockedAlias = served.locked.find(entry => entry.name === resolved)
+      const guide = lockedAlias?.notice ?? `The guide ${resolved} comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). Connect Slates (Settings → AI tools, or \`slates login\`), then ask again.`
+      ctx?.guidesRead?.add(resolved)
+      return { text: guide, data: { topic: resolved, ...(lockedAlias ? { tier: lockedAlias.tier, locked: true } : { unavailable: true }), bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+    }
     if (resolved) {
       const depth = input.depth ?? 'card'
       const mine = brain.mine.has(resolved)
       if (mine) noteUsed(resolved)
       // A file laid over a shared guide says so itself (prompts/brain.ts, overlayGuide); a new name needs the line.
-      const own = mine && !Object.hasOwn(SKILLS, resolved) ? "From the user's own brain (My brain).\n\n" : ''
+      const own = mine && !Object.hasOwn(brainFiles(), resolved) ? "From the user's own brain (My brain).\n\n" : ''
       // The router's answer carries the user's brain in front, as Director's prompt does: the MCP server sends the
       // router with the preload only to a connection that has not opened it, so this answer is the agent's one copy.
       const preload = resolved === BRAIN_ROUTER ? myBrainPreload() : ''
@@ -10447,7 +10469,9 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     }
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
     const own = guideCatalog(brain.skills).map(entry => (brain.mine.has(entry.name) ? { ...entry, source: 'my-brain' as const } : entry))
-    const catalog = [...[...own, ...member.entries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
+    // Locked playbooks stay listed, so an agent can tell the user where one lives.
+    const lockedEntries = served.locked.map(entry => ({ name: entry.name, description: `(not open to this account) ${entry.description}`, tier: 'paid' as const }))
+    const catalog = [...[...own, ...member.entries, ...lockedEntries].sort((a, b) => a.name.localeCompare(b.name)), ...hyperframesCatalog(hyperframes)]
     // A typo of one guide's name serves that guide; a name as close to two is answered with both, never a guess.
     const near = topic && topic !== 'catalog' && topic !== 'index' ? nearestGuideName(topic, catalog.map(entry => entry.name)) : null
     if (near && 'name' in near) return getPromptingGuide.run({ ...input, topic: near.name }, ctx)

@@ -22,11 +22,13 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { PUBLIC_SKILLS_DIR, brainOrSkip } from './brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const repo = resolve(here, '..')
-const SKILLS = join(repo, 'packages', 'shared', 'skills')
-const SKILL = join(SKILLS, 'slates-script-craft.md')
+// The skill is the brain's (slates-api brain/); the public folder keeps only the card and router.
+const BRAIN = brainOrSkip('script-craft-provenance')
+const SKILL = join(BRAIN, 'slates-script-craft.md')
 // The paid skills live in the private slates-api repo (moved 2026-09-27); the
 // pack build reads the same folder (`scripts/build-skills-pack.mjs`).
 const PACK = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(repo, '..', 'slates-api', 'pack-skills')
@@ -63,8 +65,8 @@ for (const preset of AD_PRESETS) {
 // 5. The free/paid boundary, and no vault path in anything that ships.
 if (!existsSync(PACK)) console.warn(`script-craft-provenance: paid skills folder not found at ${PACK}; the pack overlap check is skipped (the pack build refuses the same overlap)`)
 const pack = existsSync(PACK) ? readdirSync(PACK).filter((f) => f.endsWith('.md')) : []
-const free = readdirSync(SKILLS).filter((f) => f.endsWith('.md'))
-for (const name of pack) if (free.includes(name)) fail(`paid pack skill ${name} is also in the public skills folder`)
+const free = [PUBLIC_SKILLS_DIR, BRAIN].flatMap((dir) => readdirSync(dir).filter((f) => f.endsWith('.md')))
+for (const name of pack) if (free.includes(name)) fail(`paid pack skill ${name} is also in the public skills folder or the brain`)
 // The craft this gate covers ships with keys only; the evidence stays private.
 const vaultPath = /second-brain|ad-research\.db|business\/projects\//
 if (vaultPath.test(skill)) fail('slates-script-craft.md names a vault path')

@@ -3,7 +3,13 @@
 // GLM-5.3-Flash eval run (slate/scripts/agent-eval/evidence/2026-10-07/), driven
 // offline against fake transports: nothing reaches a desktop, the API or a provider.
 import assert from 'node:assert/strict'
-import { ALL_OPERATIONS, bannedTokensForSkill, findBannedTokens, refusableBannedTokens } from '../packages/shared/dist/index.js'
+import { ALL_OPERATIONS, bannedTokensForSkill, findBannedTokens, refusableBannedTokens, useBrainSource } from '../packages/shared/dist/index.js'
+import { brainOrSkip } from './brain-source.mjs'
+
+// The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
+const brain = brainOrSkip('agent-facts')
+process.env.SLATES_BRAIN_DIR = brain
+useBrainSource(brain)
 
 const op = (id) => ALL_OPERATIONS.find((o) => o.id === `slates_${id}`)
 const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)

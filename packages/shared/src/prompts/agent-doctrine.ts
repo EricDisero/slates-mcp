@@ -55,7 +55,7 @@
 // the whole embedded SKILLS record. Root barrel only.
 // ============================================================
 
-import { SKILLS } from '../skills/content.js'
+import { brainFiles } from '../skills/served.js'
 import { guideCatalog } from './guide-discovery.js'
 import { BRAIN_ROUTER, DIRECTOR_CARD, ROUTER_BODY } from './brain.js'
 import { VIDEO_MODELS, AUDIO_MODELS, WORKING_METHOD_TOPIC } from '../operations/index.js'
@@ -90,7 +90,7 @@ interface SkillIndexEntry {
 
 /** Generated from the same validated metadata used by discovery and installation. */
 export function buildSkillIndex(): SkillIndexEntry[] {
-  return guideCatalog(SKILLS).map(({ name, description }) => ({ name, description }))
+  return guideCatalog(brainFiles()).map(({ name, description }) => ({ name, description }))
 }
 
 // ── Preamble ───────────────────────────────────────────────────────

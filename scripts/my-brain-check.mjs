@@ -17,6 +17,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { mcpFixture } from './ad-variant-export-check.mjs'
 import { lintMyBrain, readSkills } from './brain-lint.mjs'
+import { brainOrSkip } from './brain-source.mjs'
+
+// The shared brain a file is laid over: slates-api brain/, every tier, here and in the servers this spawns.
+const sharedBrain = brainOrSkip('my-brain')
+process.env.SLATES_BRAIN_DIR = sharedBrain
 
 const dir = mkdtempSync(join(tmpdir(), 'slates-my-brain-'))
 const scratch = mkdtempSync(join(tmpdir(), 'slates-my-brain-more-'))
@@ -39,7 +44,9 @@ let server = null
 try {
   const shared = await import(pathToFileURL(join(import.meta.dirname, '..', 'packages', 'shared', 'dist', 'index.js')).href)
   const { operativeSummary, OVERLAY_LEAD } = await import(pathToFileURL(join(import.meta.dirname, '..', 'packages', 'shared', 'dist', 'prompts', 'brain.js')).href)
-  const { SKILLS, BRAIN_SHAPE } = shared
+  const { BRAIN_SHAPE } = shared
+  shared.useBrainSource(sharedBrain)
+  const SKILLS = shared.brainFiles()
   const op = shared.ALL_OPERATIONS.find((o) => o.id === 'slates_get_prompting_guide')
   const ctx = { guidesRead: new Set(), cloud: () => ({ get: async () => ({ skills: [] }) }) }
   const brain = shared.brainSkills()

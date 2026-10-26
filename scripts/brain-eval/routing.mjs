@@ -29,6 +29,7 @@ import { arg, countArg, runClaude, scrubHome } from '../behaviour-ab/lib.mjs'
 import { ROUTER, readSkills } from '../brain-lint.mjs'
 import { brainHash, unbuiltSkills } from './brain-hash.mjs'
 import { brainLayers } from './tokens.mjs'
+import { brainDir } from '../brain-source.mjs'
 
 const here = import.meta.dirname
 const model = arg('model', 'sonnet')
@@ -53,7 +54,11 @@ for (const [name, root] of Object.entries(roots)) arms[name] = await armOf(name,
 if (arms.candidate.noRouter) throw new Error(`the candidate has no router (${ROUTER}); nothing to test`)
 // Both arms resolve picks through this checkout's resolver, which the brain hash does not cover, so the
 // difference between the arms stays the brain.
-const { SKILLS, operations } = await import(pathToFileURL(join(roots.candidate, 'packages', 'shared', 'dist', 'index.js')).href)
+const candidateShared = await import(pathToFileURL(join(roots.candidate, 'packages', 'shared', 'dist', 'index.js')).href)
+const { operations } = candidateShared
+// A served build names the brain's guides once it holds the brain folder, every tier open (brain-source.mjs).
+if (candidateShared.useBrainSource) candidateShared.useBrainSource(brainDir())
+const SKILLS = candidateShared.brainFiles?.() ?? candidateShared.SKILLS
 // Checked before any model call: a build from before nearestGuideName would otherwise fail mid-batch.
 if (typeof operations?.nearestGuideName !== 'function' || typeof operations?.resolveGuideTopic !== 'function') throw new Error(`the candidate build at ${roots.candidate} has no nearestGuideName; npm run build there first`)
 const ANSWERS = ['none', 'motion-overview']

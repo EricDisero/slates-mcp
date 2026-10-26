@@ -1,10 +1,18 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { SKILLS, ALL_OPERATIONS } from '../packages/shared/dist/index.js'
+import { existsSync, readFileSync } from 'node:fs'
+import { ALL_OPERATIONS, brainFiles, useBrainSource } from '../packages/shared/dist/index.js'
 import { getPromptingGuide, nearestGuideName, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
 import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
 import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
+import { PUBLIC_SKILLS_DIR, brainOrSkip } from './brain-source.mjs'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+
+// The guides are the card and router plus the brain (slates-api brain/), held as a member's server holds them.
+const brain = brainOrSkip('guide-discovery')
+useBrainSource(brain)
+const SKILLS = brainFiles()
 
 const disconnected = { cloud: () => { throw Object.assign(new Error('no token'), { code: 'CLOUD_TOKEN_MISSING' }) }, desktop: () => { throw new Error('unexpected desktop call') } }
 // Counts its cloud calls: the member check swallows a cloud error, so only a count of zero proves no call was made.
@@ -36,9 +44,9 @@ for (;;) {
 }
 assert.deepEqual([...found].sort(), [...Object.keys(SKILLS), ...PUBLIC].sort())
 for (const name of found) {
-  const source = hf(name) ? `../packages/shared/skills/hyperframes/${upstreamOf[name]}/SKILL.md` : `../packages/shared/skills/${name}.md`
+  const source = hf(name) ? new URL(`../packages/shared/skills/hyperframes/${upstreamOf[name]}/SKILL.md`, import.meta.url) : pathToFileURL(join(existsSync(join(PUBLIC_SKILLS_DIR, `${name}.md`)) ? PUBLIC_SKILLS_DIR : brain, `${name}.md`))
   const body = hf(name) ? HYPERFRAMES_FILES[upstreamOf[name]] : SKILLS[name]
-  assert.equal(body === readFileSync(new URL(source, import.meta.url), 'utf8'), true, `${name}: embedded body differs from source`)
+  assert.equal(body === readFileSync(source, 'utf8'), true, `${name}: embedded body differs from source`)
 }
 for (const name of HYPERFRAMES_SKILL_NAMES) assert(!Object.hasOwn(SKILLS, name), `${name}: a HyperFrames guide must not enter SKILLS (prompts, install-skills)`)
 

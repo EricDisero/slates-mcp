@@ -8,7 +8,7 @@ import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
 import { runOp } from './commands/op.js'
-import { runInstallSkills, SKILL_CLIENTS } from './commands/install-skills.js'
+import { runInstallSkillsFromAccount, SKILL_CLIENTS } from './commands/install-skills.js'
 import { runMcp } from './commands/mcp.js'
 import { runSetup } from './commands/setup.js'
 import { runDoctor } from './commands/doctor.js'
@@ -98,10 +98,10 @@ program
 
 program
   .command('install-skills')
-  .description('Install bundled skills for Claude Code and Codex from one portable source.')
+  .description('Install the Slates skills your account opens for Claude Code and Codex from one portable source.')
   .option('--global', 'Install skills for every project instead of the current project', false)
   .addOption(new Option('--client <client>', 'Choose native skill clients').choices(SKILL_CLIENTS).default('both'))
-  .action((opts) => runInstallSkills(opts))
+  .action((opts) => runInstallSkillsFromAccount(opts))
 
 program
   .command('doctor')

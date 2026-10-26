@@ -78,6 +78,15 @@ for (const op of ops) {
     console.log(`  ${expected ? '..' : '!!'}  ${op.id}: ${message.slice(0, 160)}`)
   }
 }
+// A build that is served its brain (shared/src/skills/served.ts) fetches it from the fixture, as a member's does.
+if (shared.servedBrain) {
+  const guide = shared.ALL_OPERATIONS.find((op) => op.id === 'slates_get_prompting_guide')
+  const result = await guide.run(guide.input.parse({ topic: 'slates-cuts', depth: 'full' }), shared.defaultContext())
+  const brain = shared.servedBrain()
+  const served = brain.source === 'server' && Object.hasOwn(brain.files, 'slates-cuts') && result.text.length > 1000
+  if (!served) failed++
+  console.log(`  ${served ? 'ok' : '!!'}  brain: ${Object.keys(brain.files).length} files over /brain/bundle (${brain.source}${brain.problem ? `: ${brain.problem}` : ''})`)
+}
 const missing = [...new Set(fixture.requests.filter((r) => r.status === 404).map((r) => r.path))]
 console.log(`\n${ops.length} read-only ops, ${failed} unexpected errors; price list ${fixture.priceListSize} rows; routes the fixture lacks: ${missing.join(', ') || 'none'}`)
 await fixture.close()
