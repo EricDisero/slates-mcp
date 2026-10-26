@@ -28,9 +28,10 @@ const everyGuide = Object.keys(SKILLS).length + HYPERFRAMES_SKILL_NAMES.length
 // The catalog is computed from every source skill, not a hand-maintained subset: Slates' own and
 // HyperFrames' copied folders (skills/hyperframes/, its NOTICE).
 // The catalog's largest page, printed in the pass message. Measured 14,113 characters on 2026-10-25 (one page,
-// once slates-ad-variants joined); the ceiling, 14,400, sits a little above it. Raise it only by re-measuring:
+// once slates-ad-variants joined), 14,382 on 2026-10-26 and 14,543 once slates-launch-video joined; the ceiling,
+// 14,700, sits a little above it. Raise it only by re-measuring:
 // a HyperFrames guide's line is the first sentence of its upstream description, capped at 160 characters.
-const CATALOG_CEILING = 14_400
+const CATALOG_CEILING = 14_700
 let catalogChars = 0
 const found = new Set()
 let offset = 0

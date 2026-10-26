@@ -20,48 +20,49 @@ description: "Start any Slates job here: the Director card (how every job begins
 6. When no playbook fits, work from the rules below and say which ones you used.
 <!-- @director:end -->
 
-Pick the job's row and open its playbook with `slates_get_prompting_guide` (topic: the playbook's name); with no job named yet ("make something cool"), ask the card's first question instead. <!-- src: routing eval misses on Haiku, 2026-10-25 -->
+Open the job's playbook with `slates_get_prompting_guide` (topic: its name); with no job named yet ("make something cool"), ask the card's first question. <!-- src: routing eval misses on Haiku, 2026-10-25 --> <!-- src: router cap, room for the rows above, 2026-10-26 -->
 
 ## Playbooks: one per job
 
 | Job | Playbook | Ask first |
 |---|---|---|
-| A product ad, or a copy of one they found: demonstration, proof, offer | `slates-direct-response-ad` | What are you selling, and which ad do you want to copy? | <!-- src: routing eval misses on Haiku, 2026-10-25 -->
-| A creator or UGC ad: one person talking to camera | `slates-ugc-influencer-ad` | Who is the creator, and which creator ad do you want to copy? |
+| A product ad, or a copy of one they found: demonstration, proof, offer | `slates-direct-response-ad` | What are you selling, and which ad to copy? | <!-- src: routing eval misses on Haiku, 2026-10-25 --> <!-- src: router cap, room for the rows above, 2026-10-26 -->
+| A creator or UGC ad: one person talking to camera | `slates-ugc-influencer-ad` | Who is the creator, and which creator ad to copy? | <!-- src: router cap, room for the rows above, 2026-10-26 -->
 | Many versions of one ad: hooks, bodies, end cards, formats | `slates-ad-variants` | Which cut is the body, and which hooks and formats? |
 | A finished film, short, trailer or music video from a brief | `slates-one-prompt-film` | What is it, how long, and where will it play? |
 | A storyboard from a script, or a remake of a reference ad | `slates-storyboard-from-script` | Paste the script, or share the ad. |
 | Words: write, rewrite or tighten a script, dialogue or hooks | `slates-script-craft` | Who speaks, to whom, for how long? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
 | A character who stays the same across shots | `slates-character-identity` | A picture of them, or a description? |
 | Fix, refine or redo part of an image or clip | `slates-edit-and-iterate` | Which asset, and what is wrong with it? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
-| A camera move on an exact path or timed to the second, blocked in Blender first | `slates-previs-blocking` | Which shot needs the exact move? | <!-- src: routing eval misses on Haiku, 2026-10-25 -->
+| A one-take that never cuts (a fight, a chase), or a camera move on an exact path or to the second, blocked in Blender first | `slates-previs-blocking` | Which shot needs the exact move? | <!-- src: routing eval misses on Haiku, 2026-10-25 --> <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
+| Restyle approved grey-box blocking as anime, claymation, photoreal or any look | `slates-restyle-from-blocking` | Which looks to compare? | <!-- src: routing eval misses on Haiku, 2026-10-25 --> <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
 | Two or more people talking (over-the-shoulder coverage, a walk and talk), eyelines held across cuts | `slates-dialogue-blocking` | Where are they sitting or walking? | <!-- src: routing eval misses on Haiku, 2026-10-25 -->
-| An approved grey-box blocking pass shown in new looks (anime, claymation, photoreal) | `slates-restyle-from-blocking` | Which looks to compare? | <!-- src: routing eval misses on Haiku, 2026-10-25 -->
-| Cut a timeline: trims, pacing, cutting to music | `slates-cuts` | Which cut, and how long should it run? |
+| Cut a timeline: trims, pacing, on the beat, by transcript, a vertical following the face | `slates-cuts` | Which cut, and how long? | <!-- src: plan 2026-10-25-slates-1-6-4-overnight-release step 6b item 4 and the 1.6.4 editing features, routed, 2026-10-26 -->
 | Captions on speech | `slates-captions` | Word by word, or lines? |
-| Titles, lower thirds, end cards and other motion layers on a cut | `slates-motion` | What words, and where on screen? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
+| Animated titles, lower thirds, an end card (logo, website) and other motion layers on a video | `slates-motion` | What words, and where on screen? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> | <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
+| A launch video in motion graphics | `slates-launch-video` | What does it prove? | <!-- src: plan 2026-10-25-slates-1-6-4-overnight-release step 6b item 4 and the 1.6.4 editing features, routed, 2026-10-26 -->
 | Images through their ChatGPT account | `slates-chatgpt-images` | Is it connected? |
-| Find, move, copy or reuse media across projects | `slates-project-organization` | Which project and which assets? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> |
+| Find media they made, in any project; move, copy or reuse it | `slates-project-organization` | Which project and assets? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> | <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
 
 A talking-head cut runs on `slates-cuts` then `slates-captions`. <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 -->
 
-A playbook the account lacks answers with where it lives: run the job on the rules below, and tell the user once. <!-- src: the brain served by tier, slates-api src/lib/brain.ts lockedNotice, 2026-10-25 -->
+A locked playbook says where it lives: run the job on the rules below, and tell the user once. <!-- src: the brain served by tier, slates-api src/lib/brain.ts lockedNotice, 2026-10-25 --> <!-- src: router cap, room for the rows above, 2026-10-26 -->
 
 ## Offer the method that gets the result
 
-People say what they want, not how. When a want below fits the job or one shot in it, offer its method and reason before you price that part; they choose. <!-- src: Eric, 2026-10-25: a drift car or one-take fight brief never got the Blender method offered; the brain should know its own capabilities and suggest the best way to each result -->
+When a want below fits the job or one shot in it, offer its method and reason before you price that part; they choose. <!-- src: Eric, 2026-10-25: a drift car or one-take fight brief never got the Blender method offered; the brain should know its own capabilities and suggest the best way to each result --> <!-- src: router cap, room for the rows above, 2026-10-26 -->
 
 | They want | Offer | Because |
 |---|---|---|
 | One continuous take of choreographed action (a fight, a drift, a chase, a dance), or an exact camera path | Block it in Blender first (`slates-previs-blocking`) | A prompt reinvents the motion every roll; a blocking clip fixes path, timing and positions |
-| Exact words, numbers, logos or charts on screen | Motion graphics: titles or an end card on their cut `slates-motion`; a video made only of graphics, topic `motion-overview` (an explainer, a launch, a slideshow, a lyric video cut to a track); graphics over an interview they shot, topic `talking-head-recut` | Rendered text is exact every time and costs no generation | <!-- src: routing eval misses on Haiku, 2026-10-25 -->
+| Exact words, numbers, logos or charts on screen | Titles, a lower third or an end card on a video: `slates-motion`. A video with no footage: a launch, `slates-launch-video`; an explainer, a slideshow or a lyric video, topic `motion-overview` (not a layer on a video). Graphics over their interview: topic `talking-head-recut` | Rendered text is exact and free | <!-- src: routing eval misses on Haiku, 2026-10-25 --> <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
 | A move they have on video, on another character | Motion transfer (`slates-prompting-motion-transfer`) | Their clip drives the body |
 | Their recorded voice on a face | Lip sync (`slates-prompting-lip-sync`) | The mouth follows their audio |
 | Narration, one voice across a series, or sound effects | A designed or cloned voice (topic `voice`), sound effects (topic `sound-effects`) | One voice in every video |
 | The same place in every shot | A location plate first (`slates_generate_environment_plate`) | Every shot starts from one set |
-| The frame right before paying for video | Pictures first, then those pictures as first frames (`slates_use_pictures_as_first_frames`) | A picture costs a fraction of a clip |
+| The frame right before paying for video | Pictures first, used as first frames (`slates_use_pictures_as_first_frames`) | A picture costs a fraction of a clip | <!-- src: router cap, room for the rows above, 2026-10-26 -->
 | An exact start and end, or action longer than one clip | First and last frames; the last frame of one clip opens the next | Clips join on one frame |
-| One look across every shot | A saved look (`slates_create_style`) | The same light and grade every shot |
+| One look across every shot | A saved look (`slates_create_style`) | The same light and grade | <!-- src: router cap, room for the rows above, 2026-10-26 -->
 | Their product's real label in shot | The product as a Library item (`slates_import_product`) | The real label, copied |
 | Movement on a still, or a speed ramp on a beat | Keys in the cut (`slates_set_clip_keyframes`, `slates-cuts`) | No generation, exact to the frame |
 | The same video in another format | Reframe the clip (`slates_reframe_clip`) | No new generation |
