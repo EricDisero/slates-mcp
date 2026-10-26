@@ -1,11 +1,12 @@
 {
-  "version": "1.1.4",
-  "filename": "agentic-skills-pack-v1.1.4-b2fb9d58f47f3e7e.zip",
-  "sha256": "b2fb9d58f47f3e7e68ec7f34dd5498e118e3ae0d605cdcab9e613e15e70c4a79",
-  "bytes": 240603,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.4-b2fb9d58f47f3e7e.zip",
-  "skillCount": 46,
+  "version": "1.1.5",
+  "filename": "agentic-skills-pack-v1.1.5-3e9d9f4c95dba811.zip",
+  "sha256": "3e9d9f4c95dba8112624712e7c9d6614152323ac557a8652524db677fcb2aa84",
+  "bytes": 263012,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.5-3e9d9f4c95dba811.zip",
+  "skillCount": 48,
   "freeSkills": [
+    "slates-ad-variants",
     "slates-blocking-to-prompt",
     "slates-camera-language",
     "slates-captions",
@@ -38,13 +39,14 @@
     "slates-prompting-nano-banana-2-1",
     "slates-prompting-omni-flash",
     "slates-prompting-seed-audio",
-    "slates-prompting-seedance-2-5",
     "slates-prompting-seedance",
+    "slates-prompting-seedance-2-5",
     "slates-prompting-seedream-5-lite",
     "slates-prompting-wan-3",
     "slates-restyle-from-blocking",
     "slates-script-craft",
     "slates-shot-variety",
+    "slates-start-here",
     "slates-storyboard-from-script",
     "slates-style-prompting",
     "slates-transitions",
@@ -65,6 +67,11 @@
       "key": "slates-ugc-advertisement",
       "tier": "paid",
       "summary": "Directs phone-shot UGC, influencer and testimonial ads from an ordinary-language brief, with one person talking to their own camera."
+    },
+    {
+      "key": "slates-ad-variants",
+      "tier": "free",
+      "summary": "One ad into many: hook, body and end-card slots, the grid of combinations, one export."
     },
     {
       "key": "slates-blocking-to-prompt",
@@ -109,7 +116,7 @@
     {
       "key": "slates-cuts",
       "tier": "free",
-      "summary": "Tighten an edit on a Slates timeline: trim, roll, ripple, slip, split, speed, J-cuts and L-cuts."
+      "summary": "Cut a Slates timeline: trim, roll, ripple, slip, split, speed, J/L-cuts, music cut to the sample."
     },
     {
       "key": "slates-dialogue-blocking",
@@ -119,7 +126,7 @@
     {
       "key": "slates-direct-response-ad",
       "tier": "free",
-      "summary": "Make a product-led direct-response ad: demonstration, proof, argument and the next action."
+      "summary": "Make a product ad that sells: clone an ad winning now (hook, beats, pacing) for the user's product, then quote, generate, cut and export the variants."
     },
     {
       "key": "slates-edit-and-iterate",
@@ -159,7 +166,7 @@
     {
       "key": "slates-previs-blocking",
       "tier": "free",
-      "summary": "Build and render a Blender blocking pass for precise camera paths, cut timing or spatial continuity, then guide video generation with the clip."
+      "summary": "Block a shot in Blender and guide generation with the clip: an exact camera path, cut timing, spatial continuity, or a one-take of choreographed action (a fight, a drift, a chase) that prompting cannot hold."
     },
     {
       "key": "slates-project-organization",
@@ -227,14 +234,14 @@
       "summary": "Prompt Seed Audio 1.0 (seed-audio) with slates_generate_audio."
     },
     {
-      "key": "slates-prompting-seedance-2-5",
-      "tier": "free",
-      "summary": "Prompt Seedance 2.5 generation (seedance-2.5) or edits (seedance-2.5-edit)."
-    },
-    {
       "key": "slates-prompting-seedance",
       "tier": "free",
       "summary": "Prompt Seedance 2.0 (seedance-2), and retrieve the shared Seedance craft used by 2.5."
+    },
+    {
+      "key": "slates-prompting-seedance-2-5",
+      "tier": "free",
+      "summary": "Prompt Seedance 2.5 generation (seedance-2.5) or edits (seedance-2.5-edit)."
     },
     {
       "key": "slates-prompting-seedream-5-lite",
@@ -262,6 +269,11 @@
       "summary": "Shape visual rhythm across a shot sequence or diagnose unintended sameness."
     },
     {
+      "key": "slates-start-here",
+      "tier": "free",
+      "summary": "Start any Slates job here: the Director card (how every job begins) and the router that names the playbook for each job, the rules it links and the question to ask first."
+    },
+    {
       "key": "slates-storyboard-from-script",
       "tier": "free",
       "summary": "Save a supplied script or treatment as an editable Slates document and bind production passages to shots."
@@ -279,7 +291,7 @@
     {
       "key": "slates-ugc-influencer-ad",
       "tier": "free",
-      "summary": "Make a UGC or influencer-style ad with a camera-facing creator."
+      "summary": "Make a UGC or influencer ad with a camera-facing creator: clone a creator ad winning now, one person and voice across clips (performance, phone camera, speech, lip sync, sound)."
     },
     {
       "key": "slates-vision-feedback-loop",

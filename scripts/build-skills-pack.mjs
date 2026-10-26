@@ -68,7 +68,10 @@ const root = resolve(here, '..');
 // 1.1.4, 2026-10-23 (release 1.6.3): the roster cleanup's skills (Nano Banana 2.1
 // for 2, 2 Lite and Pro; FLUX 3 for FLUX.2 Max; Kling 4.0, Omni 1.1, Wan 3.0) and
 // the in-app agent named Slates Director. Uploaded, then both URLs moved.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.4';
+// 1.1.5, 2026-10-25: the approved brain (slates-api brain/ at d7bbc80): the Director
+// card and router (slates-start-here), the ad-variants playbook, and every guide as
+// the brain review approved it. Uploaded, then both URLs moved.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.5';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');
