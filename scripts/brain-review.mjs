@@ -157,10 +157,12 @@ function addedLines(diff) {
   return hidden ? [...shown, `… and ${hidden} more added lines (git show)`] : shown
 }
 
-// Every line a -U0 diff adds or removes is blank or a comment line (opening with //, a slash-star or a star).
+// Every line a -U0 diff adds or removes is blank, a // comment, or a continuation line of a /** */ block that
+// already stands (" * text"). A line that opens or closes a block (/*, */) is never comment-only: two of them
+// around a guard would switch it off with every changed line a comment.
 function commentOnly(diff) {
   const changed = diff.split('\n').filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---) /.test(l)).map((l) => l.slice(1).trim())
-  return changed.length > 0 && changed.every((l) => l === '' || /^(\/\/|\/\*|\*)/.test(l))
+  return changed.length > 0 && changed.every((l) => !l.includes('/*') && !l.includes('*/') && (l === '' || l.startsWith('//') || /^\*( |$)/.test(l)))
 }
 
 /**
@@ -411,7 +413,7 @@ const items = ranked.map((c, i) => {
     repo: c.repo,
     kind: layer,
     kind_label: `${i + 1}. ${LABEL[layer]}`,
-    tone: { router: 3, doctrine: 3, pin: 3, playbook: 2, rule: 1, motion: 1 }[layer] ?? 0,
+    tone: { router: 3, doctrine: 3, pin: 3, access: 3, playbook: 2, rule: 1, motion: 1 }[layer] ?? 0,
     title: c.subject.length > 160 ? `${c.subject.slice(0, 157)}…` : c.subject,
     meta: `${c.date} · ${c.repo === 'api' ? 'slates-api ' : ''}${c.hash} · +${c.files.reduce((n, f) => n + f.add, 0)} −${c.files.reduce((n, f) => n + f.del, 0)}`,
     src: [...new Set(c.files.map((f) => short(f.path).replace(/\.md$/, '')))].join(', '),
@@ -423,7 +425,7 @@ const items = ranked.map((c, i) => {
 })
 const head = git('rev-parse', 'HEAD')
 const spec = {
-  intro: `${items.length} changes to the brain every Slates user's agent reads, since the brain you last approved (${approved}). They are ranked by reach, so the ones that change the most jobs come first: a router, doctrine or approval pin change reaches every job an agent does (a pin edited by hand moves what is served without this page), then playbooks (one kind of job each), rules (every job that links them), motion guides, model guides (one model each), then the shape file; within a layer the bigger change comes first.${tests.length ? ` Tests of the brain with all of them, against the approved brain in the same batch: ${tests.join('; ')}.` : ''} Approve sends a change out with the next shared release; Hold keeps it out (it is reverted before anything ships).${outsideNote}`,
+  intro: `${items.length} changes to the brain every Slates user's agent reads, since the brain you last approved (${approved}). They are ranked by reach, so the ones that change the most jobs come first: a router, doctrine, approval pin or who-reads-what change (the code that decides which tier is served which file) reaches every job an agent does (a pin edited by hand moves what is served without this page), then playbooks (one kind of job each), rules (every job that links them), motion guides, model guides (one model each), then the shape file; within a layer the bigger change comes first.${tests.length ? ` Tests of the brain with all of them, against the approved brain in the same batch: ${tests.join('; ')}.` : ''} Approve sends a change out with the next shared release; Hold keeps it out (it is reverted before anything ships).${outsideNote}`,
   collection: 'review',
   choices: [{ id: 'approve', label: 'Approve' }, { id: 'hold', label: 'Hold' }],
   note_placeholder: 'What to change before it ships…',
@@ -431,6 +433,7 @@ const spec = {
     { id: 'router', label: 'Router', kind: 'router' },
     { id: 'doctrine', label: 'Doctrine', kind: 'doctrine' },
     { id: 'pin', label: 'Approval pins', kind: 'pin' },
+    { id: 'access', label: 'Who reads what', kind: 'access' },
     { id: 'playbook', label: 'Playbooks', kind: 'playbook' },
     { id: 'rule', label: 'Rules', kind: 'rule' },
     { id: 'motion', label: 'Motion guides', kind: 'motion' },
