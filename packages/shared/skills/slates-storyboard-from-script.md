@@ -1,0 +1,57 @@
+---
+name: slates-storyboard-from-script
+description: "Save a supplied script or treatment as an editable Slates document and bind production passages to shots. Use to prepare a storyboard that keeps the words, structure and scope, or to remake a reference ad."
+---
+
+# Script into editable production
+
+<!-- @operative:start -->
+**Operative summary.**
+- Read the document and its revision first, and keep supplied words, speakers, headings and explicit shot lists. (§ Save the words once)
+- Write words and structure through `slates_update_script_document`; create a board or scene only when the destination needs one. (§ Save the words once)
+- Bind passages with `slates_make_shot_from_script` and never write the dialogue a second time in a custom prompt. (§ Bind production where wanted)
+- Once the Shots exist, match each to its method in the router and offer it where it beats a prompt. (§ Bind production where wanted) <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
+- For a reference ad, read `slates_get_reference_breakdown`, then look at every keyframe with `slates_get_asset_image` before writing. (§ Start from a reference ad)
+- Keep the reference's pacing and beats, never its brand, logo or people. (§ Start from a reference ad)
+- Follow `slates-cost-discipline` for any generation, and inspect existing generation IDs before retrying a timeout. (§ Review without imposing a format)
+<!-- @operative:end -->
+
+Read the existing document and its revision before writing. Preserve supplied words, speaker context, headings, non-spoken direction and any explicit shot list. A heading formats a document; creating a production scene is a separate choice. Paragraph count does not determine shot count.
+
+## Save the words once
+
+Use `slates_get_script_document` and `slates_update_script_document` for ordered, revision-checked text and structure edits. Scene strings own spoken words. Paragraph blocks hold offsets and marks; headings/directions own only their non-spoken text. Do not keep an independently editable master body beside the document. `slates_paste_script` saves a whole script as text with no Shots, and opens a scene at every `SCENE`, `INT.`, `EXT.`, `I/E.` or `# Name` line; use it when the user wants those scenes, and write through `slates_update_script_document` when they want headings only.
+
+Create a board or scene only when the requested destination needs it: `slates_create_storyboard` comes with a first scene, and `slates_split_scene` opens a scene at a heading line, taking the text and Shots below it. Use the current project unless the user asks for another. Writing a script needs no image, character record or generation.
+
+## Bind production where wanted
+
+Read the scene's text, offsets and shot codes with `slates_get_script`, then pass the selected passage to `slates_make_shot_from_script`, which makes, attaches, extends, splits or merges according to the existing bindings. `slates_break_script_into_shots` cuts every unshot paragraph at once, for when one Shot per paragraph is wanted. Read back the resulting Shots and ranges. A silent shot is equally valid and needs no fabricated dialogue.
+
+A new document-created recipe is script-driven: its prompt compiles from the active passage. Text with no speaker and no delivery goes to the model as written (most script text is action); a speaker, VO included, or a delivery note makes it quoted speech. Keep action, delivery, framing and references in their own controls. Do not write the dialogue a second time in a custom prompt. When the creator explicitly chooses a custom prompt (`recipeMode: custom`), preserve its bytes and, after a script edit, compare the Shot's current line with `promptScriptLine`, the line the prompt was written against.
+
+A new Shot files itself into the open scene, else the board's last scene; pass `sceneId` or `frameId` to `slates_create_shot` to place it, and read codes from the result, since a deleted Shot's code can be reused. Keep recurring identities in existing Library references; a working speaker name does not require a placeholder character.
+
+With the Shots read back, go down the list against `slates-start-here` § Offer the method that gets the result. A beat of choreographed action held in one take is blocked in Blender, a card of figures or a title is a motion layer, a line they recorded goes on with lip sync; name the shot code, the method and why, and let them choose per shot. <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
+
+## Start from a reference ad
+
+A reference gives the structure (the cuts, their lengths, where the words fall); the remake puts the user's product, people and words in it. Breaking down is local and free and generates nothing. Name the reference by `assetId`, `filePath` or `url`: a url is fetched into Media first and works for a Meta Ad Library ad link or a direct link to a video file; TikTok Creative Center and post links (YouTube, TikTok, Facebook, Instagram) are refused with the reason, so download the video and pass `filePath`.
+
+<!-- @inject:reference-breakdown -->
+1. `slates_get_reference_breakdown` reads the cuts and any stored words and writes nothing.
+2. `slates_break_down_reference` with `build: false` saves each cut's keyframe and a first-and-last composite and returns their codes. Look at every one with `slates_get_asset_image` before writing.
+3. Call it again without `build: false` (the frames are reused) with `cuts` (a `description` per cut written for the user's product becomes its prompt; `onScreenText` stays a direction line), `sections` (the beats as headings) and `roles` (who or what recurs; `itemId` points a role at the user's Library item from `slates_list_library`). On a long reference, build first and write the rest a page at a time with `slates_update_shot`.
+<!-- @end:reference-breakdown -->
+
+The new board's Script page holds the reference's words, one paragraph per cut: rewrite them for the user's product with `slates_edit_script`, and each range follows its words. Each Shot is named by its seconds in the reference; a cut shorter than the model allows is reported in `timing` and trimmed on the timeline, never padded in the prompt. Keyframes are posters only, never a reference or first frame. Keep the reference's pacing and beats, never its brand, logo or people.
+
+## Review without imposing a format
+
+Read composed requests, actual reference roles and the current quote. Variety counts are suggestions: intentional repeated frames, continuing sentences and recurring cast may be exactly right. To run one sentence across a cut, split the Shot mid-sentence with `slates_split_shot` (it marks the run-on); the new Shot inherits the duration rather than halving it, so set each length. `slates-script-craft` covers passages and versions; `slates-shot-variety` covers deliberate visual rhythm.
+
+If generation is requested, follow `slates-cost-discipline` for the exact set. On an uncertain timeout inspect existing generation IDs before retrying. Preserve takes and inspect the landed results. Named cuts keep independent edits separate; writing alone does not require a cut, export or paid call.
+
+<!-- @inject:decision-log -->
+Record production choices in the editable shot fields. Explain only consequential judgments the user did not specify and no field already records: for example, why a particular light or performance register supports the brief. Do not repeat the shot list in prose or turn this explanation into an approval gate. Follow the separate generation authorization policy before spending.
+<!-- @end:decision-log -->

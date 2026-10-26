@@ -1,0 +1,3 @@
+**Inspect a start frame before animating it.** Repair a visible defect that would make the intended crop or performance unusable before spending on motion. A clean frame can be animated whenever the brief calls for movement; this check does not require an image stage for text-to-video.
+
+This is a cost rule as well as craft: a premium video call can cost many times an image correction. Broken geometry can turn to mush, oily textures can crawl and malformed objects can fall apart in motion. Fix a known source defect at the source instead of buying a more expensive copy. Judge intentional stylisation against the brief, not a universal photoreal standard. Additional image or video requests still follow the existing generation authorization.

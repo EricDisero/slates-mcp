@@ -1,0 +1,168 @@
+---
+name: slates-prompting-seed-audio
+description: "Prompt Seed Audio 1.0 (seed-audio) with slates_generate_audio. Covers scene sentences, dialogue, crowd size, spatial sound, duration in prompt text and mutually exclusive audio or image references."
+---
+
+# Seed Audio 1.0 — prompting
+
+<!-- @card:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Everything between the @card markers is extracted by
+     src/prompts/craft-cards.ts and returned on every cost estimate for this
+     model, so it is the ONE piece of positive craft guidance the agent cannot
+     skip. Measured 2026-08-30: a fact inlined where it cannot be skipped moved
+     compliance 0/8 to 30/32; the same guidance behind a fetch moved nothing.
+     Keep it under 2,400 characters (the build fails above that) and keep the
+     rationale, the receipts and the worked examples in the body below. -->
+<!-- /slates-only -->
+**Card — Seed Audio 1.0.** One plain sentence describing a SCENE, and it returns dialogue, effects and ambience together in one pass. For ONE named voice saying ONE line, `inworld-tts-2` is the seat instead; this one renders the whole room.
+
+**The five levers**
+1. **Write one sentence in plain language.** Describe the room and what is happening in it; the model casts and performs it.
+2. **Name the crowd size, the room size and the distance.** This is the highest-leverage single edit on any bed — unqualified nouns default BIG. "Tiny applause of two or three people at an open mic", not "applause".
+3. **Put the length in the prompt** and make it deliberate.
+4. **Dialogue is performed inside the scene** — write the line as spoken in the room, then re-roll until a take is right and lip-sync against it.
+5. **Describe sounds directly** — "one coffee machine hissing, cutlery somewhere behind the counter" — with the object, the action and where it is.
+
+**Examples**
+- `a diner at 2am, one coffee machine hissing, cutlery somewhere behind the counter, one man says quietly "you're late again". 15 seconds`
+- `nature soundscape, a wide open field, cicadas near, birds mid-distance, one loon far off across water. 20 seconds`
+
+**Hard constraint:** it has NO duration parameter — the length you request is written into the prompt AND is what you are billed, whatever comes back, so choose it deliberately. Kling's `SFX:` / `Ambient noise:` / `Background music:` labels have no parser here and measurably worsen the output. Shot language, camera moves and lighting are video-prompt words the model must ignore. It is not a music model and it cannot produce pixels.
+<!-- @card:end -->
+
+<!-- @banned:start -->
+<!-- slates-only -->
+<!-- MACHINE-READ. Every `backticked` token between the @banned markers is
+     extracted by src/prompts/banned-tokens.ts and returned on this model's cost
+     estimate, and every submitted prompt is matched against it. Keep entries
+     backticked and prose outside the backticks. -->
+<!-- /slates-only -->
+**Never use** — Kling video syntax has no parser here and measurably worsens the output:
+- `SFX`, `Ambient noise`, `Background music` as labels — describe the sounds directly
+- shot language: `wide shot`, `slow push in`, `warm tungsten` — camera and lighting words are video-prompt words the model has to ignore
+<!-- @banned:end -->
+
+ByteDance's one-pass audio scene model. It generates dialogue, sound effects and ambience **together**, from a single plain sentence. Use the generated duration bounds below and the current catalogue for routing; it is useful for continuity beds.
+
+<!-- @inject:thresholds -->
+<!-- GENERATED from @slatesvideo/shared — do not edit between the markers.
+     Source: CONFIRM_CREDITS, DEVIATION_FACTOR and the audio bounds in
+     packages/shared/src/operations/index.ts. Every number here is REFUSED by an
+     op when a prompt gets it wrong, which is why none of them is typed by hand
+     any more: this block replaced four claims that contradicted the code. -->
+
+**The thresholds, from the code that enforces them:**
+
+- **Confirm gate:** above **17 credits** an op returns `requires_confirm` and will not
+  proceed until you re-call with `confirm: true`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
+- **Deviation pause:** the desktop Slates Director stops and re-asks when projected generation spend
+  exceeds the approved plan by more than **20%**. You do not trigger this; the app does.
+- **Seed Audio duration:** **3–120 seconds.** There is no duration
+  parameter on the model — the number you pass is written into the prompt AND is what the user is
+  billed. Outside that range the op refuses rather than clamping.
+- **Sound Effects duration:** **1–22 seconds**, billed per second, never left for the
+  model to pick.
+
+Never quote a credit figure from memory: `slates_estimate_generation_cost` returns the real one.
+<!-- @end:thresholds -->
+
+## Where it routes
+
+- **Scene audio, room tone, ambience beds, crowd/nature soundscapes** — anything where several sounds share a space. One generation, not three layered ones.
+- **Dialogue and scratch VO inside a scene.** The line is performed in the room, by a voice the scene casts. When WHO is speaking matters — a character's own voice, a clean narrator — that is `inworld-tts-2` instead. Lock the read by re-rolling until a take is right, then lip-sync against it with `slates_generate_lip_sync`.
+- **NOT** a single effect that must land on a known frame — that is `eleven-sfx`, which takes an exact duration.
+- **NOT** music. Slates has no music model; import a track and drop it on an audio track.
+- **AUDIO-ONLY.** It cannot produce images or video.
+
+## THE RULES
+
+### 1. 🚨 There is no duration parameter — the words set the length
+
+This is the single most important fact about this model. Output length is driven by the prompt text ("… 15 seconds"), capped at 120s.
+
+**Slates handles this for you:** the `durationSeconds` param appends the duration to the prompt and **bills that number of seconds**. So:
+
+- Set `durationSeconds` to what you actually want.
+- **Do not also write a different length into your sentence.** Two numbers fight, and you pay for the one you selected, not the one you got.
+- If the returned clip is shorter than requested you still paid for the request — that is the deal that keeps the displayed price equal to the charge. Ask for what you need.
+
+<!-- slates-only -->
+The server re-derives the billed key from `durationSeconds` (a client cannot under-bill), probes the returned `audio.duration` after completion, and logs `SEED AUDIO BILLING DRIFT` if the model overshot. No auto-charge, no refund — the request is the contract.
+<!-- /slates-only -->
+
+### 2. One plain sentence. No production jargon.
+
+Field-proven (Higgsfield sprint, 2026-07-27/28). Working prompts look like this:
+
+```
+tiny applause of 2 or 3 people at an open mic. 15 seconds
+nature soundscape, wide open field cicadas and birds and a loon.
+a diner at 2am, one coffee machine hissing, cutlery somewhere behind the counter
+```
+
+Not this:
+
+```
+✗ AMBIENCE: interior diner, night. SFX: espresso machine (hiss, 2s), cutlery.
+✗ Wide shot of a diner. Slow push in. Warm tungsten. Ambient noise: ...
+```
+
+Shot language, camera moves and lighting belong to video prompts. Here they are just words the model has to ignore.
+
+### 3. Never bring Kling's audio syntax to this model
+
+`SFX:` and `Ambient noise:` prefixes and `Background music:` labels are **Kling 3.0 video** syntax. Seed Audio has no parser for them — it reads them as text in the scene and the output gets measurably worse. Describe the sounds directly instead.
+
+### 4. Name the crowd size, the room size, the distance
+
+The highest-leverage single edit on any bed. Unqualified nouns default big:
+
+| Vague | What it returns | Fixed |
+|---|---|---|
+| `applause` | a full auditorium | `tiny applause of 2 or 3 people` |
+| `traffic` | a highway | `one car passing on a wet residential street` |
+| `crowd` | a stadium | `four people talking at the next table` |
+
+Distance words (`far off`, `muffled through a wall`, `right next to the mic`) work the same way and are how you build depth in one sentence.
+
+### 5. Beds must outlast the cut
+
+Ask for a few seconds more than the clip needs so the edit has handles to fade through. A bed that ends exactly on the cut always sounds clipped. This is a product requirement, not a preference — it is why the duration control exists at all.
+
+### 6. Dialogue goes in quotes, inside the same sentence as the room
+
+```
+a tired bartender says, "we closed twenty minutes ago", glasses clinking behind him
+```
+
+Pick a preset voice when a specific speaker matters. Leave `voice` unset and the scene casts itself — which is usually right for crowd and background dialogue.
+
+Preset voices (20): `vivi_mixed_en_zh_ja_es_id`, `mindy_en_es_id_pt_zh`, `kian_en_zh`, `cedric_en_zh`, `sophie_en_zh`, `jean_en_zh`, `magnus_en_zh`, `mabel_en_zh`, `nadia_en_zh`, `opal_en_zh`, `pearl_en_zh`, `quentin_en_zh`, `corinne_mixed_en_zh`, `esther_mixed_en_zh`, `lyla_mixed_en_zh`, `tracy_es_zh`, `sandy_es_mixed_en_zh`, `felix_zh`, `celeste_zh`, `monkey_king_zh`.
+
+Set `multilingual: true` for non-English or mixed-language lines.
+
+### 7. Inputs: up to 3 audio clips **XOR** one image. Never both.
+
+- **Audio references** — up to 3 clips, each ≤30s and ≤10MB (wav/mp3/pcm/ogg_opus). Refer to them in the prompt as `@Audio1`, `@Audio2`, `@Audio3`: *"match the room tone of @Audio1"*.
+- **Image reference** — one image (jpeg/png/webp ≤10MB). The model scores what it sees.
+- Sending both is rejected by the API. Pick the one that carries the intent.
+
+### 8. The knobs, and when to touch them
+
+| Param | Range | Reach for it when |
+|---|---|---|
+| `speed` | 0.5–2.0 | Dialogue is racing or dragging against picture. |
+| `volume` | 0.5–2.0 | Rarely — normalize on the timeline instead. |
+| `pitch` | −12…+12 semitones | Ageing or shifting a voice. Small moves only; ±3 is already a lot. |
+| `multilingual` | bool | Non-English or code-switched lines. |
+
+## Iterating
+
+- A bed that came back wrong is almost always a **scale** problem (crowd/room too big) or a **jargon** problem (the sentence reads like a spec). Fix those two before touching `speed`/`pitch`.
+- Three failed takes on the same sentence means the sentence is wrong, not the seed. Rewrite it the way you would say it out loud.
+- Generations are cheap enough at short durations that auditioning two phrasings beats agonizing over one.
+
+## Content notes
+
+Provider-side moderation applies to voices and to recognizable real people. See slates-content-policy.

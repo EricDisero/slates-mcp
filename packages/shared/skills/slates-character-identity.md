@@ -1,0 +1,129 @@
+---
+name: slates-character-identity
+description: "Prepare and bind a reusable character identity sheet from an image or description. Use when creating cast or preserving the same character across shots."
+---
+
+# Character identity sheet — Slates workflow
+
+<!-- @operative:start -->
+<!-- slates-only -->
+**Operative summary.**
+- Make one identity sheet per character: a large off-frontal chest-up portrait, a full-body front with the face cropped out, and a full-body back, on a flat deep neutral grey plate. (§ The shape: ONE sheet, three panels)
+- Upload the source image, create the record with `slates_create_character`, then call `slates_generate_character_identity`; never hand-write the sheet prompt, and put extras in `userNotes`. (§ Get the reference; § Create the character record; § Generate the sheet)
+- Estimate with `slates_estimate_generation_cost` and announce the cost in credits before generating. (§ Generate the sheet)
+- Check the result against the panel list before it binds; if it is off, make one focused refinement and regenerate. (§ Generate the sheet)
+- Describe the front-panel crop as framing, never as a missing head, and keep the skin and body in view. (§ Anti-patterns)
+- Fix the sheet, not the prompt, when a flaw repeats in every shot, and mention the character with `@name`. (§ How the reference gets used at scene time; § Anti-patterns)
+<!-- /slates-only -->
+<!-- @operative:end -->
+
+A character's identity sheet is attached to **every** downstream generation that mentions it, so a flaw in the sheet becomes a flaw in every shot made from it. Building it well is the highest-leverage thing you can do for a project.
+
+<!-- @inject:references-read-literally -->
+> **The general law: the model reads a reference literally.**
+> A reference image is not a suggestion. Whatever is baked into it — lighting, medium, texture, symmetry, competing identities — is read as a **property of the subject** and reproduced downstream. A baked rim light tints every shot made from that sheet. A sheet that looks like a 3D game render gets animated like game footage. Two competing renderings of one face get averaged into a third face.
+
+Every reference rule below is a corollary of that one sentence, which is why "prep the reference" beats "prompt around the reference" every time:
+
+- **Flat, plain identity refs** — because scene lighting in the sheet becomes scene lighting in the output (Slates' own receipt: a studio-lit sheet produced a subject that looked green-screen-pasted in front of mountains).
+- **One authoritative rendering per subject** — because the model cannot tell which panel is the real one. ByteDance documents this failure directly: multi-view character assets "confuse the model's character recognition, causing it to generate duplicate characters of the same appearance."
+- **No 3D-game-render look in a reference** — the model recognizes the render mood and inherits its motion character, so the *animation* comes out looking like game footage. This is not a taste rule; it is the same literal-reading mechanism applied to the temporal layer.
+- **Break perfect symmetry** — mirrored faces and dead-square framing read as synthetic, and the model preserves that reading rather than correcting it.
+
+**What this means in practice:** when output is wrong in a way that tracks the *subject* rather than the *scene* — the lighting is wrong the same way in every shot, the face drifts, the material looks synthetic everywhere — fix the reference, not the prompt. Prompting around a baked-in property is the expensive way to lose.
+<!-- @end:references-read-literally -->
+
+## The shape: ONE sheet, three panels
+
+Slates generates **one identity sheet per character**, bound as the character's canonical reference:
+
+| Panel | What it carries |
+|---|---|
+| **Chest-up portrait, three-quarter angle, largest panel (~25–30% of the sheet)** | The face. **This is the only place the model reads facial identity from** — every detail it will ever know comes from those pixels, so it gets the resolution. Off-frontal, never dead-on: an angled head reads its volume instantly. |
+| **Full-body front, relaxed A-pose — cropped at the collarbone, just the face cropped out** | Build, proportion, wardrobe. The face is cropped off on purpose: a front-facing body panel renders a ~40px face that can't match the portrait's, so the sheet would carry two competing identities and the model averages them. **Only the face** — neck, arms and hands render as skin. |
+| **Full-body back, head and hair visible** | Hair fall and the back of the outfit — the only panel where either reads. Keeps its head because there's no face to compete with. |
+
+The rule is **kill every competing rendering of the FACE, not every head** — which is why exactly one body panel is headless.
+
+On a deep neutral-grey plate (hex `3a3a3c`, written bare; since the composer fix `#3a3a3c` reads the same — see the resolved composer hazard in Don'ts), flat and shadowless, with catchlights in the eyes, irises never crushed to black, surface texture at the medium's own natural level of detail, broken symmetry, and no over-clean 3D-game-model look. Expression is **a slight natural smile with the teeth just visible** — a closed mouth carries no dental information, so every downstream smiling shot invents teeth, and teeth are person-specific.
+
+**Two carve-outs, scoped differently on purpose.** Non-human characters get a natural neutral expression instead of a smile — that one is scoped by *having a human mouth*, so a bipedal robot or humanoid alien is covered. Quadrupeds and non-bipedal characters get a natural standing stance with the head shown on both body panels — that one is *anatomical*. **Both are conditionals the image model evaluates against your reference; neither is a code branch, because the op has no character-kind input.**
+
+**The sheet inherits the source's medium** — photo, anime, illustration, painterly, 3D render — unless the user explicitly asks for a transform. None of the craft clauses above override that: they ask for *readable* eyes and *material-looking* surfaces within whatever medium the character is in, not for photorealism.
+
+**Why one sheet.** Every `@character` mention attaches that character's canonical identity image, so each character costs one reference slot. It also reduces competing facial renderings to **one** — with the front panel headless and the back panel turned away, the portrait is the only face on the sheet, so there is nothing left to average.
+
+**Except as a GPT Image reference.** OpenAI's filter refuses any reference with a headless body panel, so a GPT Image picture of the character attaches the portrait the sheet was made from, or another head-visible picture of them, and names the character inline rather than with `@Name`, which attaches the sheet. The refusal was measured on GPT Image 2 and is not yet re-measured on 2.5; details in the GPT Image guide, § What gets you blocked. Every other model keeps taking the sheet.
+
+## Workflow
+
+### Get the reference
+The user has either:
+- Pasted/uploaded an image of the character (real person, drawing, AI render).
+- Described the character in text only.
+
+If image: upload it as a reference<!-- slates-only --> (`slates_upload_reference_image`)<!-- /slates-only -->.
+If text only: generate from prompt-only — less consistent, so warn the user.
+
+<!-- slates-only -->
+### Create the character record
+`slates_create_character` with:
+- `name` (ask if not given)
+- `description` — 1-2 sentences, *visual* only ("tall, dark hair, scar over left eye"), not personality.
+- `style` — leave as the source's own medium by default. Only name a transform if the user wants one (e.g. anime → realistic).
+<!-- /slates-only -->
+
+### Generate the sheet
+<!-- slates-only -->
+`slates_generate_character_identity` with `characterId`, `projectId`, and `baseAssetId` (the source portrait).
+
+**Do not hand-write the sheet prompt.** Slates builds it from the canonical template in `@slatesvideo/shared/prompts` (`buildCharacterIdentityPrompt`) — panels, plate, lighting and craft clauses included — and appends your `userNotes`. Use `userNotes` for what the template can't know: *"use the woman on the left"*, *"keep the scar on the right cheek"*. A hand-written prompt is a fork of the template and will drift from it.
+
+- Estimate cost first with `slates_estimate_generation_cost` and announce in **credits** — never quote a price from memory.
+<!-- /slates-only -->
+
+<!-- slates-only -->
+<!-- @inject:sheet-tool-defaults -->
+**What the sheet tools render on** (you do not pick these; omit `model`):
+
+- **Character identity sheet:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
+- **Establishing image:** `gpt-image-2-5-sunburst` at 3k, quality `high`, one 16:9 image.
+
+Price a sheet for that model at 16:9, with resolution and quality left at their defaults. **Never 4K** — no identity gain at sheet scale, wasted spend.
+<!-- @end:sheet-tool-defaults -->
+<!-- /slates-only -->
+
+- When the result returns inline, **evaluate it before binding**:
+  - Is the portrait clearly the largest panel, and is it off-frontal?
+  - **Is the front body panel cleanly headless** — an empty collar above a normally rendered body, no partial face, no floating jaw, no smeared neck stump? A botched crop is worse than no crop.
+  - **Is the body still there?** Neck, forearms and hands rendered as skin, not an empty outfit floating on nothing. A hollow garment means the invisible-mannequin genre ran unbounded.
+  - Do the body panels read as the same build, wardrobe and hair as the portrait?
+  - Catchlights present, irises readable rather than black holes?
+  - Is it in the source's medium, and does it read as *that* medium done well — or has it drifted toward the over-clean game-model look?
+  - Plate a flat deep grey, not white and not black?
+- If off: one focused refinement, then regenerate. The sheet is upstream of everything — it is worth a re-roll that a scene frame is not.
+<!-- slates-only -->
+- The op binds the result as the canonical identity automatically.
+
+### Hand back
+> "Character {name} ready — identity sheet bound. Use `@{name}` in any prompt and Slates attaches it and names it inline, so the face stays consistent."
+<!-- /slates-only -->
+
+## How the reference gets used at scene time
+
+Slates cites the sheet inline under the character's name — `{name} (image N)` — in the exact order it sends references. That **name** is the anti-averaging lever, and it is each model's own official mechanism (Nano Banana: "assign a distinct name"; Seedance: `Reference <Subject_N> in <Image_N>`; Kling: reuse a fixed label verbatim).
+
+Critically, the app injects **no** wardrobe, expression, or lighting directive. The user's scene prompt owns all of that — which is why `@{name}` dropped into a movie-still injection keeps the still's own clothing and lighting instead of dragging the sheet's.
+
+## Anti-patterns
+
+- **Don't** studio-light, white-background, or black-background the sheet. White bleeds into the video and washes out the location; black eats edge detail. Flat, even, shadowless light on a deep neutral grey.
+<!-- slates-only -->- **Don't** hand-write the sheet prompt when the op will build it — that is how the template and the shipped prompt fork.<!-- /slates-only -->
+- **Don't** create a second character image. One canonical identity is what the storyboard pipeline reads.
+<!-- slates-only -->- **Don't** skip binding. An unbound asset doesn't help downstream.<!-- /slates-only -->
+- **Don't** invent character details. Stick to what's in the reference image and the user's description.
+- **Don't** describe the front panel's crop as an absent head — in `userNotes` or any hand-written variant. The template asks for it as *framing*: **"cropped at the collarbone, an invisible-mannequin presentation with just the face cropped out"**, a standard e-commerce genre with deep training data. **"the head not shown" is a hard 422 on GPT Image** (measured on `gpt-image-2`, the model 2.5 replaced; the classifier is OpenAI's, not the version's, so the rule carries — but nobody has re-run it on Flare or Sunburst) — the request comes back `content_policy_violation` with `loc: ["body","prompt"]`, so the text is rejected before any image is read, because an anatomical absence reads as gore to OpenAI's classifier. It passed NB2, which is why the original receipt looked safe: **it was model-scoped.** State an exclusion as a framing choice, never as a missing body part.
+- **Don't** invoke the invisible-mannequin genre without bounding it to the face. **"an invisible-mannequin presentation where the clothing holds its own shape" removed all the skin** — no neck, no hands, no forearms, a garment floating on nothing — because that *is* the e-commerce genre in full: an empty outfit. **"with just the face cropped out"** keeps the anchor and bounds it. Generalises: a genre anchor imports the whole genre, so name what STAYS, not only what goes.
+**Resolved composer hazard:** on 2026-07-30, `#3a3a3c` reached the model as `background ()` because unresolved sigils were deleted. The composer now preserves unresolved `#` and `@` text byte-for-byte; a token binds a reference only when it resolves. Literal hex colours and handles are safe. The sheet template keeps its bare hex as a wording choice, not a workaround.
+- **Don't** use 4K — wastes credits, no quality gain at sheet scale.
+- **Don't** feed a multi-view sheet into a Seedance 2.0 shot that has **several characters in frame** without binding each character to its image and appending the anti-twin constraint; ByteDance documents multi-view assets as a cause of duplicate characters on 2.0. See `slates-prompting-seedance`. Seedance 2.5 supports multi-view subject references; see `slates-prompting-seedance-2-5`.
