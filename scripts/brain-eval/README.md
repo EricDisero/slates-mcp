@@ -1,6 +1,8 @@
 # Brain evals
 
-The skills are one layered brain (second-brain `plans/2026-10-25-slates-brain.md`): the Director card and the router in `slates-start-here`, a playbook per job, the rules and model guides they link. These evals check that the layers route a job, teach the craft and stay small. Run them on every change to the brain; `brain-lint.mjs` (in the build) holds the shape.
+The skills are one layered brain (second-brain `plans/2026-10-25-slates-brain.md`): the Director card and the router in `slates-start-here`, a playbook per job, the rules and model guides they link. These evals check that the layers route a job, teach the craft and stay small; `brain-lint.mjs` (in the build) holds the shape.
+
+**When to run them (Eric, 2026-10-25: a full batch is heavy plan usage, so only before a brain release).** The full batch (routing, every craft case, the behaviour A/B, both arms) runs once, right before a brain change reaches users, because `--approve` needs it. While fixing, rerun only the cases the change touches (`--cases id,id`). The weekly review job runs no evals when no brain change waits. `tokens.mjs` and the lint are free and run in every build.
 
 | File | What it does | Cost |
 |---|---|---|
