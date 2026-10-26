@@ -1,4 +1,4 @@
-import { requireCloudToken } from '../auth.js'
+import { requireCloudToken, tokenHash } from '../auth.js'
 
 import { SLATES_API_URL } from '../api-url.js'
 const FALLBACK_CLOUD_BASE_URL = SLATES_API_URL
@@ -55,6 +55,11 @@ export class SlatesCloudClient {
     private readonly token: string = requireCloudToken(),
     private readonly baseUrl: string = DEFAULT_CLOUD_BASE_URL
   ) {}
+
+  /** A hash of the token this client sends: the served brain's cache names the login it fetched with by it. */
+  get credentialKey(): string | null {
+    return tokenHash(this.token)
+  }
 
   async get<T>(path: string): Promise<T> {
     const res = await this.fetchOrFriendly(path, `${this.baseUrl}${path}`, {

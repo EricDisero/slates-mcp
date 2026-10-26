@@ -10404,6 +10404,9 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     if (topic === WORKING_METHOD_TOPIC) {
       // Imported here: agent-doctrine imports this module at load.
       const { buildAgentDoctrine } = await import('../prompts/agent-doctrine.js')
+      // Its per-model guide line reads the served brain, so the brain is checked first: a signed-in user whose brain
+      // is not cached yet is otherwise told to connect.
+      if (ctx?.cloud) await refreshServedBrain(ctx.cloud)
       const content = buildAgentDoctrine({ surface: 'mcp' })
       return { text: content, data: { topic: WORKING_METHOD_TOPIC, bytes: Buffer.byteLength(content, 'utf8'), guide: content } }
     }

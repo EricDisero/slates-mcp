@@ -23,7 +23,9 @@ repo or a plugin** (`build-plugins.mjs` refuses one).
   the process starts from `~/.slates/brain-cache.json` (written by this login, or by the desktop app when there is no
   login here; a cache another login received waits until the server names the same account), then `GET /brain` and
   `/brain/bundle` through the connected account replace it (at server start and before a guide answer, at most every
-  ten minutes). A 401 or 403, or `slates logout`, clears the brain and the cache. A guide past the account's tier
+  ten minutes). The cache names the credential that fetched it; a 401 or 403, or a sign-out (`slates logout`, the
+  desktop's), clears the brain and deletes the cache only when that login received it, so a revoked CLI key never
+  takes a signed-in desktop's brain. A guide past the account's tier
   answers with the server's notice (a model guide's carries its craft card) and counts as read, so the job runs on
   the general rules; a guide not on the machine at all (nothing connected yet) does not count, and the gate's
   refusal says how to connect.

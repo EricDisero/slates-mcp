@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -104,6 +105,11 @@ export class MissingDesktopServerError extends Error {
       'Slates desktop is not running with its local server on. Open Slates → Settings → AI tools and connect (Send link, or Connect without the email link).'
     )
   }
+}
+
+/** A short hash of a bearer token, so a file can name which login wrote it without holding the token. */
+export function tokenHash(token: string | null | undefined): string | null {
+  return token ? createHash('sha256').update(token).digest('hex').slice(0, 16) : null
 }
 
 export function requireCloudToken(): string {

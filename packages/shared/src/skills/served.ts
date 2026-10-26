@@ -11,13 +11,14 @@
 //   the server        GET /brain (version, tiers, account), then /brain/bundle when any changed, through the
 //                     connected account; it replaces what the cache gave and is written back to BRAIN_CACHE.
 //                     refreshServedBrain runs it at server start and before a guide answer, at most every
-//                     REFRESH_EVERY_MS. A 401 or 403 clears the brain and the cache, as `slates logout` does.
+//                     REFRESH_EVERY_MS. A 401 or 403 drops what that credential was served, here and in the
+//                     cache it wrote; a cache another login wrote stays (the desktop app's, which a
+//                     desktop-connected server goes on serving). Signing out does the same (clearServedBrain).
 // With none of them, only the card and the router are here, and the guide op says why.
 
-import { createHash } from 'node:crypto'
-import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { AGENT_DIR, readConnection } from '../auth.js'
+import { AGENT_DIR, readConnection, tokenHash } from '../auth.js'
 import { SKILLS } from './content.js'
 
 export interface LockedGuide {
@@ -45,7 +46,7 @@ export interface ServedBrain {
   problem?: string
 }
 
-/** What BRAIN_CACHE holds: the brain, and which cloud token received it (a hash, never the token). */
+/** What BRAIN_CACHE holds: the brain, and which credential fetched it (tokenHash, never the token). */
 interface CachedBrain extends ServedBrain {
   token?: string | null
   fetchedAt?: string
@@ -62,10 +63,15 @@ function fromDir(dir: string): ServedBrain {
   return { version: null, tiers: ['license', 'bump'], files, locked: [], source: 'dir' }
 }
 
-/** A short hash of this machine's cloud token (`slates login`), so a cache names which login received it. */
-function tokenKey(): string | null {
-  const token = readConnection().cloud.token
-  return token ? createHash('sha256').update(token).digest('hex').slice(0, 16) : null
+/** This machine's CLI login (`slates login`), as the hash a cache it received carries. */
+function cliKey(): string | null {
+  return tokenHash(readConnection().cloud.token)
+}
+
+/** The desktop app's local server is in the connection file, so the cache it writes is its signed-in account's. */
+function desktopConnected(): boolean {
+  const { desktop } = readConnection()
+  return desktop.enabled && !!desktop.port && !!desktop.token
 }
 
 function fromCache(): CachedBrain | null {
@@ -87,7 +93,7 @@ function fromCache(): CachedBrain | null {
 function startingCache(): { state: ServedBrain; held: CachedBrain | null } {
   const cached = fromCache()
   if (!cached) return { state: EMPTY, held: null }
-  const key = tokenKey()
+  const key = cliKey()
   return !key || cached.token === key ? { state: cached, held: null } : { state: EMPTY, held: cached }
 }
 
@@ -110,6 +116,24 @@ export function brainFiles(): Readonly<Record<string, string>> {
 
 interface CloudGet {
   get<T>(path: string): Promise<T>
+  /** The hash of the credential it sends (SlatesCloudClient); without one, the CLI login's is assumed. */
+  readonly credentialKey?: string | null
+}
+
+/** Write what this process holds to BRAIN_CACHE, tagged with the credential that fetched it. */
+function writeCache(key: string | null): void {
+  const tmp = `${BRAIN_CACHE}.tmp`
+  try {
+    mkdirSync(AGENT_DIR, { recursive: true })
+    writeFileSync(tmp, JSON.stringify({ ...state, token: key, fetchedAt: new Date().toISOString() }), { mode: 0o600 })
+    // Owner-only: the brain is the account's, not every user's on the machine. `mode` applies only when the file is
+    // created (a .tmp a crash left keeps its old mode), so it is set on every write. Windows has no POSIX modes;
+    // there the cache relies on the user-profile folder's ACL.
+    if (process.platform !== 'win32') chmodSync(tmp, 0o600)
+    renameSync(tmp, BRAIN_CACHE)
+  } catch {
+    // A cache that cannot be written leaves this process served; the next start fetches again.
+  }
 }
 
 /**
@@ -125,25 +149,24 @@ export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}
     const timeout = <T>(p: Promise<T>) =>
       Promise.race([p, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('the brain check timed out')), REFRESH_TIMEOUT_MS) })])
         .finally(() => clearTimeout(timer))
+    let key: string | null = null
     try {
-      const index = await timeout(cloud().get<{ version: string; tiers: string[]; account?: string | null }>('/brain'))
+      const client = cloud()
+      key = client.credentialKey ?? cliKey()
+      const index = await timeout(client.get<{ version: string; tiers: string[]; account?: string | null }>('/brain'))
       const same = (b: ServedBrain) => index.version === b.version && index.tiers.join() === b.tiers.join() && (index.account ?? null) === (b.account ?? null)
       if (held && same(held)) state = { ...held, source: 'server' }
       held = null
       if (!same(state)) {
-        const bundle = await timeout(cloud().get<{ version: string; tiers: string[]; account?: string | null; files: Record<string, string>; locked: LockedGuide[] }>('/brain/bundle'))
+        const bundle = await timeout(client.get<{ version: string; tiers: string[]; account?: string | null; files: Record<string, string>; locked: LockedGuide[] }>('/brain/bundle'))
         if (!bundle?.files || typeof bundle.files !== 'object') throw new Error('the brain bundle was malformed')
         state = { version: bundle.version, tiers: bundle.tiers, files: bundle.files, locked: bundle.locked ?? [], source: 'server', account: bundle.account ?? null }
-        try {
-          mkdirSync(AGENT_DIR, { recursive: true })
-          // Owner-only: the brain is the account's, not every user's on the machine.
-          writeFileSync(`${BRAIN_CACHE}.tmp`, JSON.stringify({ ...state, token: tokenKey(), fetchedAt: new Date().toISOString() }), { mode: 0o600 })
-          renameSync(`${BRAIN_CACHE}.tmp`, BRAIN_CACHE)
-        } catch {
-          // A cache that cannot be written leaves this process served; the next start fetches again.
-        }
+        writeCache(key)
       } else {
         state = { ...state, source: 'server', problem: undefined }
+        // A cache another login's sign-out deleted under this process is written back, so a server the desktop
+        // connected finds the brain again without waiting for the next version.
+        if (!existsSync(BRAIN_CACHE)) writeCache(key)
       }
       checkedAt = Date.now()
     } catch (error) {
@@ -151,32 +174,48 @@ export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}
       checkedAt = Date.now() - REFRESH_EVERY_MS + 60_000
       const code = (error as { code?: string; status?: number })
       if (code.status === 401 || code.status === 403) {
-        // The session or key is gone: what it was served goes with it.
-        clearServedBrain()
-      } else if (code.code === 'CLOUD_TOKEN_MISSING' && state.source !== 'dir') {
-        // No login here: the desktop app may have received this machine's brain since this process started.
+        // This credential is refused: what it was served goes, here and in the cache if it wrote it, and the
+        // minute's wait stands. A cache another login wrote stays on disk; when it is the desktop app's (not the CLI
+        // login's, with the desktop connected) this process serves it, as it does with no login here, so a revoked
+        // CLI key cannot take a signed-in desktop's brain from the agent.
+        state = EMPTY
+        held = null
         const cached = fromCache()
-        if (cached && cached.version !== state.version) state = cached
+        if (cached && key && cached.token === key) rmSync(BRAIN_CACHE, { force: true })
+        else if (cached && cached.token !== cliKey() && desktopConnected()) state = cached
+      } else if (code.code === 'CLOUD_TOKEN_MISSING') {
+        // No login here: the brain is the one the desktop app last received, which may be newer than this
+        // process's, and none once that cache is gone (`slates logout`, a desktop sign-out).
+        state = fromCache() ?? EMPTY
       }
       state = {
         ...state,
         problem: code.code === 'CLOUD_TOKEN_MISSING' ? 'not connected to a Slates account' : error instanceof Error ? error.message : String(error),
       }
-    } finally {
-      inflight = undefined
     }
     return state
-  })()
+  })().finally(() => {
+    // Cleared after the assignment: a refresh with nothing to await (no login, so `cloud()` throws at once) used to
+    // clear it inside the body, before `??=` stored the settled promise, and every later call got that first answer.
+    inflight = undefined
+  })
   return inflight
 }
 
-/** Drop the served brain and its cache: signing out (`slates logout`), or a 401/403 from the server. */
-export function clearServedBrain(): void {
+/**
+ * Signing out: drop the served brain in this process, and the cache when the login signing out received it. The
+ * cache has two writers. `slates logout` passes 'cli', before its token goes, and deletes a cache that login
+ * received. The desktop app (the default, which the published desktop already calls) deletes any cache the CLI
+ * login did not receive: its own, and one written before 2026-10-25, tagged with the CLI token's hash or none.
+ */
+export function clearServedBrain(signingOut: 'cli' | 'desktop' = 'desktop'): void {
   if (state.source === 'dir') return
   state = EMPTY
   held = null
   checkedAt = 0
-  rmSync(BRAIN_CACHE, { force: true })
+  const cli = cliKey()
+  const cliReceived = !!cli && fromCache()?.token === cli
+  if (cliReceived === (signingOut === 'cli')) rmSync(BRAIN_CACHE, { force: true })
 }
 
 /** Point this process at a folder of brain files (or back to the cache) without a restart: tests and evals. */
