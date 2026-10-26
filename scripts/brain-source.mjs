@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { loadTypeScriptModule } from './load-typescript.mjs'
 
 // Where the Slates brain's deep layers live (second-brain plans/2026-10-25-slates-brain.md step 4): the private
 // slates-api repo's `brain/`, never this public one, which keeps only the Director card and the router in
@@ -39,6 +40,23 @@ export function readAllSkills({ dir = brainDir(), publicDir = PUBLIC_SKILLS_DIR 
   const both = Object.keys(pub).filter((n) => Object.hasOwn(brain, n))
   if (both.length) throw new Error(`a skill has one home: ${both.join(', ')} is in both packages/shared/skills and the brain`)
   return { ...pub, ...brain }
+}
+
+/**
+ * How the server serves `dir` (a slates-api brain/ folder, or an export of one): its tiers.json, raw and as the bump
+ * list, and slates-api's own `lockedNotice` and `TIER_NAMES` from src/lib/brain-notice.ts beside it, so an eval or
+ * fixture says what a member's server says.
+ */
+export function servedTiers(dir) {
+  const tiersPath = join(dir, 'tiers.json')
+  const noticePath = join(dir, '..', 'src', 'lib', 'brain-notice.ts')
+  if (!existsSync(tiersPath) || !existsSync(noticePath)) {
+    throw new Error(`${dir} is not a slates-api brain/ with its src/ beside it (tiers.json and src/lib/brain-notice.ts)`)
+  }
+  const raw = readFileSync(tiersPath, 'utf8')
+  const { lockedNotice, TIER_NAMES } = loadTypeScriptModule(noticePath)
+  const bump = new Set(JSON.parse(raw).bump ?? [])
+  return { raw, bump, tierOf: (name) => (bump.has(name) ? 'bump' : 'license'), lockedNotice, TIER_NAMES }
 }
 
 /**

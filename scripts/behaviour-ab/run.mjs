@@ -4,11 +4,13 @@
 //   node scripts/behaviour-ab/run.mjs --baseline <slates-mcp checkout> --candidate <slates-mcp checkout> \
 //     --out scripts/behaviour-ab/results/<date> [--cases-file <json>] [--cases id,id] [--arms baseline,candidate] [--runs 2] [--from-run 1] \
 //     [--model claude-opus-5-5] [--concurrency 3] [--desktop <slate dir>] [--candidate-brain <dir>] [--baseline-brain <dir>]
+//     [--brain-tiers license]
 //
 // A build served its brain (packages/shared/src/skills/served.ts) fetches it from the fixture's /brain/bundle, as a
 // member's server fetches it from slates-api: --candidate-brain (default scripts/brain-source.mjs, slates-api brain/)
 // for the candidate, --baseline-brain (an export of slates-api brain/ at the approved pin) for a served baseline.
-// A build that embedded its brain ignores both.
+// A build that embedded its brain ignores both. --brain-tiers license serves a license-only account: the bump
+// playbooks come back locked with the server's notice (default: every tier open).
 //
 // Each arm must be built (packages/shared/dist and packages/mcp/dist). Every run
 // gets its own fixture, throwaway HOME and empty working folder; the batch shares
@@ -45,6 +47,7 @@ const desktopDir = resolve(arg('desktop', process.env.SLATES_DESKTOP_DIR ?? join
 const armDirs = { baseline: arg('baseline') && resolve(arg('baseline')), candidate: resolve(arg('candidate', repo)) }
 const arms = arg('arms', 'baseline,candidate').split(',')
 const brainByArm = { candidate: resolve(arg('candidate-brain', brainDir())), baseline: arg('baseline-brain') && resolve(arg('baseline-brain')) }
+const brainTiers = arg('brain-tiers', 'bump,license').split(',').map((t) => t.trim()).filter(Boolean).sort()
 // Another case set in the same shape, such as the brain's craft briefs (scripts/brain-eval/craft-cases.json).
 const { cases: allCases } = JSON.parse(readFileSync(resolve(arg('cases-file', join(here, 'cases.json'))), 'utf8'))
 const wanted = arg('cases') ? arg('cases').split(',') : null
@@ -142,7 +145,7 @@ async function oneRun(job, tools, priceList) {
   let fixture = null
   let trace
   try {
-    fixture = await startFixture({ desktopDir, priceList, brain: brainByArm[job.arm] })
+    fixture = await startFixture({ desktopDir, priceList, brain: brainByArm[job.arm], brainTiers })
     const env = armHome(home, fixture.port)
     const mcpConfig = join(base, 'mcp.json')
     writeFileSync(mcpConfig, JSON.stringify({
@@ -203,6 +206,7 @@ const priceListHash = createHash('sha256').update(JSON.stringify(priceRows)).dig
 if (before) {
   if (before.model !== model) throw new Error(`${armsFile} was run on ${before.model}; use another --out for ${model}`)
   if (before.desktop !== desktop) throw new Error(`${armsFile} was run against ${before.desktop}; use another --out for ${desktop}`)
+  if ((before.brainTiers ?? ['bump', 'license']).join() !== brainTiers.join()) throw new Error(`${armsFile} served tiers ${before.brainTiers}; use another --out for ${brainTiers}`)
   for (const a of arms) {
     const was = before.arms?.[a]?.dir
     if (was && was !== scrubHome(armDirs[a])) throw new Error(`${armsFile} ran ${a} from ${was}; use another --out for ${scrubHome(armDirs[a])}`)
@@ -213,6 +217,7 @@ writeFileSync(armsFile, scrubHome(JSON.stringify({
   model,
   runs: Math.max(runs, before?.runs ?? 0),
   desktop,
+  brainTiers,
   priceListRows: priceRows.length,
   priceListHash: before?.priceListHash ?? priceListHash,
   arms: {

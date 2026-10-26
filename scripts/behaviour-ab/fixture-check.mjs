@@ -11,6 +11,7 @@ import { pathToFileURL } from 'node:url'
 import { startFixture, FIXTURE_IDS } from './fixture.mjs'
 import { armHome, realCloudToken } from './home.mjs'
 import { arg } from './lib.mjs'
+import { brainDir, servedTiers } from '../brain-source.mjs'
 
 const repo = resolve(import.meta.dirname, '..', '..')
 const sharedDir = resolve(arg('shared', join(repo, 'packages', 'shared')))
@@ -86,6 +87,17 @@ if (shared.servedBrain) {
   const served = brain.source === 'server' && Object.hasOwn(brain.files, 'slates-cuts') && result.text.length > 1000
   if (!served) failed++
   console.log(`  ${served ? 'ok' : '!!'}  brain: ${Object.keys(brain.files).length} files over /brain/bundle (${brain.source}${brain.problem ? `: ${brain.problem}` : ''})`)
+}
+// --brain-tiers license: the bump playbooks come back locked, each with the server's own notice.
+{
+  const licenseOnly = await startFixture({ desktopDir, priceList: { models: [] }, brainTiers: ['license'] })
+  const bundle = await (await fetch(`http://127.0.0.1:${licenseOnly.port}/brain/bundle`)).json()
+  await licenseOnly.close()
+  const tiers = servedTiers(brainDir())
+  const ok = bundle.tiers.join() === 'license' && bundle.locked.map((x) => x.name).sort().join() === [...tiers.bump].sort().join() &&
+    bundle.locked.every((x) => !Object.hasOwn(bundle.files, x.name) && x.notice.includes(tiers.TIER_NAMES.bump))
+  if (!ok) failed++
+  console.log(`  ${ok ? 'ok' : '!!'}  license-only: ${bundle.locked.length} bump playbooks locked with the server's notice`)
 }
 const missing = [...new Set(fixture.requests.filter((r) => r.status === 404).map((r) => r.path))]
 console.log(`\n${ops.length} read-only ops, ${failed} unexpected errors; price list ${fixture.priceListSize} rows; routes the fixture lacks: ${missing.join(', ') || 'none'}`)

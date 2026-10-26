@@ -4,13 +4,14 @@
 // built package (packages/shared/dist), because that is what an agent receives: the skills, the doctrine
 // on both surfaces, the MCP instructions and the router notice. A build that is served its brain
 // (shared/src/skills/served.ts) is handed the brain folder first, every tier open, so it hashes exactly as a
-// build that embedded the same files did: the approved hash still names the same brain after the move.
+// build that embedded the same files did, plus tiers.json and each file's locked notice (slates-api
+// src/lib/brain-notice.ts beside the folder), which only a served build's agent receives.
 //
 //   node scripts/brain-eval/brain-hash.mjs [<slates-mcp checkout>] [--brain <dir>]   prints the hash and any skill the build is older than
 import { createHash } from 'node:crypto'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { brainDir, readAllSkills, readSkillDir } from '../brain-source.mjs'
+import { brainDir, readAllSkills, readSkillDir, servedTiers } from '../brain-source.mjs'
 
 /** The build at `root`, holding `brain` when it is served one; `skills` is every file it hands an agent. */
 async function shared(root, brain) {
@@ -23,11 +24,20 @@ async function shared(root, brain) {
 
 /** sha256 of what the build at `root` hands an agent, first 16 hex characters. */
 export async function brainHash(root, { brain = brainDir() } = {}) {
-  const { skills, buildAgentDoctrine, buildMcpInstructions, ROUTER_NOTICE } = await shared(root, brain)
+  const { skills, served, buildAgentDoctrine, buildMcpInstructions, ROUTER_NOTICE } = await shared(root, brain)
   const h = createHash('sha256')
   // Each part is named and NUL-separated, so moving text from one part to the next changes the hash.
   const part = (name, text) => h.update(`${name}\0${text}\0`)
   for (const name of Object.keys(skills).sort()) part(`skill:${name}`, skills[name])
+  if (served) {
+    // A served build's agent also receives what tiers.json decides and, past its tier, the server's notice in place
+    // of a file: both are part of the brain it tested. (An embedded build, before the move, had neither.)
+    const tiers = servedTiers(brain)
+    part('tiers', tiers.raw)
+    for (const name of Object.keys(readSkillDir(brain)).sort()) {
+      part(`notice:${name}`, tiers.lockedNotice({ name, tier: tiers.tierOf(name), body: skills[name] }))
+    }
+  }
   part('doctrine:desktop', buildAgentDoctrine({ surface: 'desktop' }))
   part('doctrine:mcp', buildAgentDoctrine({ surface: 'mcp' }))
   part('mcp-instructions', buildMcpInstructions())
