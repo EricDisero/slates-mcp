@@ -154,12 +154,18 @@ export class GuideNotReadError extends Error {
     const head = `Refused: this session has not read ${guide}, the guide for ${model}. Nothing was generated or charged. `
     const body = brainSkills().skills[guide]
     const served = servedBrain()
+    const locked = body === undefined ? served.locked.find(entry => entry.name === guide) : undefined
     super(
-      body !== undefined || served.locked.some(entry => entry.name === guide)
+      body !== undefined
         ? head +
             `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:\n\n` +
             // The card this user's brain serves, so a model guide from their My brain is the one in the refusal.
             describeCraftCard(guide, body)
+        : locked
+        ? // Past this account's tier: no body here, so the server's notice (its card included) is what it reads.
+          head +
+            `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against what it says, then call this again. What it says:\n\n` +
+            (locked.notice ?? `${guide} is not open to this account. Run the job on the general rules.`)
         : // No copy here and none locked: the brain never arrived, so asking for the guide again cannot help.
           head +
             `The guide comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ` +

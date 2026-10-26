@@ -1,7 +1,7 @@
 // The served brain's cache and its clearing (packages/shared/src/skills/served.ts), against the TS sources with HOME
 // in a temp folder: no login keeps nothing once the cache is gone, the cache names the credential that fetched it, a
 // 401 deletes only the cache its own login wrote and keeps serving the desktop's, the minute's wait holds after it,
-// and each sign-out deletes only its own login's cache. Needs tsx (slates-mcp has none of its own; slate's works):
+// each sign-out deletes only its own login's cache, and a sign-out during a refresh drops what it fetched. Needs tsx (slates-mcp has none of its own; slate's works):
 //   ../slate/node_modules/.bin/tsx scripts/served-brain-check.mjs
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -18,7 +18,7 @@ mkdirSync(agentDir, { recursive: true })
 
 const { MissingCloudTokenError, tokenHash } = await import('../packages/shared/src/auth.ts')
 const { SlatesCloudClient } = await import('../packages/shared/src/clients/cloud.ts')
-const { clearServedBrain, refreshServedBrain, servedBrain, useBrainSource } = await import('../packages/shared/src/skills/served.ts')
+const { brainFiles, clearServedBrain, refreshServedBrain, servedBrain, useBrainSource } = await import('../packages/shared/src/skills/served.ts')
 
 const CLI = 'slates_sk_cli'
 const cliKey = tokenHash(CLI)
@@ -76,6 +76,11 @@ await refreshServedBrain(serving('u5', cliKey), { force: true })
 rmSync(cacheFile)
 await refreshServedBrain(serving('u5', cliKey), { force: true })
 assert.ok(existsSync(cacheFile), 'a missing cache is written back on a current refresh')
+// One object per served file set, so what is built from it once (My brain's duplicate index) is found again.
+assert.equal(brainFiles(), brainFiles(), 'brainFiles() is the same object while the same files are served')
+const before = brainFiles()
+await refreshServedBrain(serving('u5b', cliKey), { force: true })
+assert.ok(brainFiles() !== before && brainFiles()['slates-guide'] === "u5b's guide", 'new served files give a new object')
 
 // Sign-outs delete only their own login's cache.
 writeCache('u6', 'desktop-key')
@@ -94,6 +99,26 @@ for (const tag of ['desktop-key', null]) {
   assert.ok(!existsSync(cacheFile), `a desktop sign-out deletes a cache tagged ${tag}`)
 }
 
+// A sign-out during a refresh wins: the old credential still answers, but what it fetched is neither held nor
+// cached, and a refresh after the sign-out is its own, not the one in flight.
+for (const at of ['/brain', '/brain/bundle']) {
+  connect({ desktop: true })
+  rmSync(cacheFile, { force: true })
+  useBrainSource()
+  let release
+  const gate = new Promise((resolve) => { release = resolve })
+  const slow = () => ({ credentialKey: 'desktop-key', get: async (path) => { if (path === at) await gate; return path === '/brain' ? { version: 'v9', tiers: ['license'], account: 'u9' } : brain('u9') } })
+  const racing = refreshServedBrain(slow, { force: true })
+  await new Promise((resolve) => setImmediate(resolve))
+  clearServedBrain()
+  const fresh = refreshServedBrain(noLogin, { force: true })
+  assert.notEqual(fresh, racing, `a refresh after a sign-out at ${at} does not join the one in flight`)
+  await fresh
+  release()
+  await racing
+  assert.ok(servedBrain().source === 'none' && !existsSync(cacheFile), `a sign-out while ${at} is in flight: the signed-out account's brain is neither held nor cached`)
+}
+
 // F9. Owner-only on every write, a .tmp a crash left included (POSIX; Windows relies on the user-profile ACL).
 if (process.platform !== 'win32') {
   writeFileSync(`${cacheFile}.tmp`, '{}', { mode: 0o644 })
@@ -105,4 +130,4 @@ if (process.platform !== 'win32') {
 }
 
 rmSync(home, { recursive: true, force: true })
-console.log('served-brain: no login keeps nothing without a cache; the cache names its fetching credential; a 401 or a sign-out deletes only its own login\'s cache, and the desktop\'s is served after a CLI 401.')
+console.log('served-brain: no login keeps nothing without a cache; the cache names its fetching credential; a 401 or a sign-out deletes only its own login\'s cache, and the desktop\'s is served after a CLI 401; a sign-out during a refresh drops what it fetched.')

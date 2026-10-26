@@ -76,8 +76,9 @@ export function overlaps(skills: Readonly<Record<string, string>>, n: number): M
 }
 
 /**
- * Each bundled run of words and the files that hold it, built once per bundled record: the loader checks the
- * user's files against all of them on every load, and re-reading tens of thousands of words each time is waste.
+ * Each bundled run of words and the files that hold it, built once per bundled record (`brainFiles()` returns one
+ * object per served file set) and only when a file reaches the check: the loader checks the user's files against
+ * all of them on every load, and re-reading tens of thousands of words each time is waste.
  */
 const bundledIndexes = new WeakMap<object, { n: number; index: Map<string, string[]> }>()
 function bundledIndex(bundled: Readonly<Record<string, string>>, n: number): Map<string, string[]> {
@@ -127,7 +128,7 @@ export function myBrainProblems(
   const caps = shape.caps.mine
   const n = shape.duplicates.shingleWords
   const failAt = shape.duplicates.failAt
-  const index = bundledIndex(bundled, n)
+  let index: Map<string, string[]> | undefined
   const kept: Array<{ name: string; runs: Set<string> }> = []
   let total = 0
   for (const name of order) {
@@ -141,6 +142,7 @@ export function myBrainProblems(
     // How many of this file's runs each bundled skill holds, then each of their files already kept.
     const hits: Array<{ other: string; theirs: boolean; count: number; sample: string }> = []
     const inBundled = new Map<string, { count: number; sample: string }>()
+    index ??= bundledIndex(bundled, n)
     for (const key of runs) {
       for (const other of index.get(key) ?? []) {
         const hit = inBundled.get(other) ?? { count: 0, sample: key }

@@ -103,15 +103,24 @@ if (process.env.SLATES_BRAIN_DIR) state = fromDir(process.env.SLATES_BRAIN_DIR)
 else ({ state, held } = startingCache())
 let checkedAt = 0
 let inflight: Promise<ServedBrain> | undefined
+/** Bumped by a sign-out or a source change: a refresh started before it drops what it fetched. */
+let generation = 0
 
 /** The brain this process holds now. */
 export function servedBrain(): ServedBrain {
   return state
 }
 
-/** Every skill an agent can read here: the public card and router, then the served brain. */
+let merged: { files: ServedBrain['files']; all: Readonly<Record<string, string>> } | null = null
+
+/**
+ * Every skill an agent can read here: the public card and router, then the served brain. One object per served
+ * file set, so what is built from it once (My brain's duplicate index, brain-check.ts) is found again.
+ */
 export function brainFiles(): Readonly<Record<string, string>> {
-  return state.files === EMPTY.files ? SKILLS : { ...SKILLS, ...state.files }
+  if (state.files === EMPTY.files) return SKILLS
+  if (merged?.files !== state.files) merged = { files: state.files, all: { ...SKILLS, ...state.files } }
+  return merged.all
 }
 
 interface CloudGet {
@@ -139,12 +148,16 @@ function writeCache(key: string | null): void {
 /**
  * Bring the brain up to the account's tiers and the approved version, one request in flight and at most every
  * REFRESH_EVERY_MS unless forced. A failure keeps what is held (the cache works offline) and records why; a folder
- * source never refreshes.
+ * source never refreshes. A sign-out during it wins: the credential it started with still answers the server (a
+ * sign-out deletes it locally only), so what it fetched is dropped, neither held nor written to the cache.
  */
 export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}): Promise<ServedBrain> {
   if (state.source === 'dir') return Promise.resolve(state)
   if (!force && Date.now() - checkedAt < REFRESH_EVERY_MS) return Promise.resolve(state)
-  inflight ??= (async () => {
+  if (inflight) return inflight
+  const started = generation
+  const stale = () => started !== generation
+  const run: Promise<ServedBrain> = (async () => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const timeout = <T>(p: Promise<T>) =>
       Promise.race([p, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('the brain check timed out')), REFRESH_TIMEOUT_MS) })])
@@ -154,11 +167,13 @@ export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}
       const client = cloud()
       key = client.credentialKey ?? cliKey()
       const index = await timeout(client.get<{ version: string; tiers: string[]; account?: string | null }>('/brain'))
+      if (stale()) return state
       const same = (b: ServedBrain) => index.version === b.version && index.tiers.join() === b.tiers.join() && (index.account ?? null) === (b.account ?? null)
       if (held && same(held)) state = { ...held, source: 'server' }
       held = null
       if (!same(state)) {
         const bundle = await timeout(client.get<{ version: string; tiers: string[]; account?: string | null; files: Record<string, string>; locked: LockedGuide[] }>('/brain/bundle'))
+        if (stale()) return state
         if (!bundle?.files || typeof bundle.files !== 'object') throw new Error('the brain bundle was malformed')
         state = { version: bundle.version, tiers: bundle.tiers, files: bundle.files, locked: bundle.locked ?? [], source: 'server', account: bundle.account ?? null }
         writeCache(key)
@@ -170,6 +185,8 @@ export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}
       }
       checkedAt = Date.now()
     } catch (error) {
+      // Signed out meanwhile: the sign-out already set what is held, the cache and the next check.
+      if (stale()) return state
       // Offline or signed out: the held brain stands, and the next try waits a minute, not a full interval.
       checkedAt = Date.now() - REFRESH_EVERY_MS + 60_000
       const code = (error as { code?: string; status?: number })
@@ -197,9 +214,11 @@ export function refreshServedBrain(cloud: () => CloudGet, { force = false } = {}
   })().finally(() => {
     // Cleared after the assignment: a refresh with nothing to await (no login, so `cloud()` throws at once) used to
     // clear it inside the body, before `??=` stored the settled promise, and every later call got that first answer.
-    inflight = undefined
+    // Only its own: a sign-out let a newer refresh start, which this one must not orphan.
+    if (inflight === run) inflight = undefined
   })
-  return inflight
+  inflight = run
+  return run
 }
 
 /**
@@ -213,6 +232,9 @@ export function clearServedBrain(signingOut: 'cli' | 'desktop' = 'desktop'): voi
   state = EMPTY
   held = null
   checkedAt = 0
+  // A refresh in flight belongs to the account signing out: it drops its answer, and the next one starts afresh.
+  generation++
+  inflight = undefined
   const cli = cliKey()
   const cliReceived = !!cli && fromCache()?.token === cli
   if (cliReceived === (signingOut === 'cli')) rmSync(BRAIN_CACHE, { force: true })
@@ -227,5 +249,7 @@ export function useBrainSource(dir?: string): ServedBrain {
     ;({ state, held } = startingCache())
   }
   checkedAt = 0
+  generation++
+  inflight = undefined
   return state
 }

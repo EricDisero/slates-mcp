@@ -66,7 +66,8 @@ if (emptyHome) {
   assert.ok(perModelLine().includes(seedanceGuide), 'a guide past the tier is still named in the per-model index')
   for (const topic of [seedanceGuide, 'seedance-2.5']) {
     const s = fresh()
-    await assert.rejects(generateVideo.run({ ...video }, s), (err) => err instanceof GuideNotReadError && err.message.includes(`topic "${seedanceGuide}"`))
+    await assert.rejects(generateVideo.run({ ...video }, s), (err) => err instanceof GuideNotReadError && err.message.includes(`topic "${seedanceGuide}"`) && err.message.endsWith(notice),
+      'a locked guide refusal carries the server notice, card and all')
     const answer = await getPromptingGuide.run({ topic }, s)
     assert.equal(answer.text, notice, `${topic}: a locked guide answers with its notice, card and all`)
     assert.ok(answer.data.locked && s.guidesRead.has(seedanceGuide), `${topic}: a locked guide counts as read`)
