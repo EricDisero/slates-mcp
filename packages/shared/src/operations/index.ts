@@ -1535,6 +1535,151 @@ export const cutByTranscript: Operation<{
   },
 }
 
+// A music clip's beat grid (slate 1.6.4 plan step 3): the desktop routes are /agent/timeline/beats (GET reads,
+// POST finds), /agent/timeline/beats/edit and /agent/timeline/cut-to-beats, the same core as the Inspector's
+// Beat grid section (slate `src/main/beats/service.ts`, `src/main/editor/beatCuts.ts`).
+const beatTarget = {
+  assetId: z.string().min(1).optional().describe('An audio or video asset: its code (AUD-A2) or id. Or name clipId.'),
+  clipId: z.string().uuid().optional().describe('A clip on the timeline: the grid of its file, plus where each beat lands on the cut (onTimeline, in frames).'),
+}
+type BeatTargetInput = { projectId: string; assetId?: string; clipId?: string }
+
+async function beatTargetBody(ctx: OperationContext, input: BeatTargetInput): Promise<{ projectId: string; assetId?: string; clipId?: string }> {
+  if (input.clipId) return { projectId: input.projectId, clipId: input.clipId }
+  if (!input.assetId) throw new Error('Name assetId or clipId.')
+  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id }
+}
+
+type BeatGridAnswer = {
+  assetId: string
+  beats: Array<{ sec: number; downbeat: boolean; confidence: number }> | null
+  hint?: string
+  summary?: { bpm: number | null; beatsPerBar: number | null; beats: number; tempoChanges: boolean }
+  lowConfidence?: Array<{ fromSec: number; toSec: number; reason: string }>
+  edits?: unknown[]
+  picture?: string
+  downloadedModelMB?: number
+}
+
+function beatGridWords(r: BeatGridAnswer): string {
+  if (!r.beats || !r.summary) return r.hint ?? 'No beat grid yet.'
+  const s = r.summary
+  const spans = r.lowConfidence?.length ?? 0
+  const spots = spans ? ` ${spans} span${spans === 1 ? '' : 's'} to check (lowConfidence).` : ''
+  const edits = r.edits?.length ? ` ${r.edits.length} hand edit${r.edits.length === 1 ? '' : 's'} kept.` : ''
+  return `${s.bpm ?? '?'} BPM, ${s.beatsPerBar ?? '?'} beats a bar, ${s.beats} beats${s.tempoChanges ? ', the tempo changes' : ''}.${spots}${edits}${r.picture ? ` Picture: ${r.picture}` : ''}`
+}
+
+export const getBeatGrid: Operation<BeatTargetInput & { picture?: boolean; fromSec?: number; toSec?: number }> = {
+  id: 'slates_get_beat_grid',
+  description:
+    "Read a music file's beat grid, to check it before cutting to it: every beat in the file's own seconds with its downbeat flag and a confidence from 0 to 1 (hand-placed beats read 1), a summary (BPM, beats a bar, the tempo sections, whether the tempo changes), lowConfidence (the spans to check: runs of unsure beats, and gaps where the tempo says a beat belongs) and the hand edits kept on it. With a clipId it also gives onTimeline: where each beat lands on the cut, in frames, at the clip's in point and speed. picture true saves a PNG of the grid over the waveform (downbeats bright with bar numbers, unsure beats amber) and returns its path; fromSec and toSec frame a stretch. Look at it to judge a span. Never finds beats: beats null with a hint means none yet (slates_find_beats, free). Fix a wrong beat with slates_edit_beat_grid. Requires beat-grid; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...beatTarget,
+      picture: z.boolean().optional().describe('Save a picture of the grid over the waveform and return its path.'),
+      fromSec: z.number().min(0).optional().describe("The picture's first second, in the file's own time."),
+      toSec: z.number().min(0).optional().describe("The picture's last second, in the file's own time."),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('beat-grid', 'beat grids')
+    const body = await beatTargetBody(ctx, input)
+    const r = await ctx.desktop().get<BeatGridAnswer>('/agent/timeline/beats', {
+      ...body, ...(input.picture ? { picture: true } : {}), fromSec: input.fromSec, toSec: input.toSec,
+    })
+    return ok(r, `${beatGridWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const findBeats: Operation<BeatTargetInput> = {
+  id: 'slates_find_beats',
+  billable: false,
+  description:
+    "Find a music file's beats, downbeats and tempo on the user's machine, as Find beats in the clip's Inspector does. Free: it spends no credits and nothing leaves the machine. The first run downloads the beat model once (the result's downloadedModelMB says how much) and can take a few minutes; if the call times out, the desktop keeps working, so read slates_get_beat_grid before trying again. Hand edits already on the grid are kept and applied over the new beats. Returns the grid as slates_get_beat_grid does; read its lowConfidence spans before you cut. Requires beat-grid; update Slates on capability refusal.",
+  input: z.object({ projectId: z.string().uuid(), ...beatTarget }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('beat-grid', 'finding beats')
+    const r = await ctx.desktop().post<BeatGridAnswer>('/agent/timeline/beats', await beatTargetBody(ctx, input))
+    const model = r.downloadedModelMB ? ` Downloaded the ${r.downloadedModelMB} MB beat model first.` : ''
+    return ok(r, `Found the beats.${model} ${beatGridWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+const beatEditInput = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('shift'), sec: z.number().describe('Seconds to move every beat; negative is earlier.') }).strict(),
+  z.object({
+    kind: z.literal('downbeat'),
+    at: z.number().min(0).describe('The beat nearest this second starts a bar; the bars around it follow.'),
+    beatsPerBar: z.number().int().min(1).max(16).optional().describe('Also set the meter, in beats a bar.'),
+  }).strict(),
+  z.object({
+    kind: z.literal('tempo'),
+    fromSec: z.number().min(0),
+    toSec: z.number().min(0),
+    bpm: z.number().min(30).max(300).describe('Lay beats at this tempo over the span, from the beat nearest fromSec (or fromSec itself).'),
+  }).strict(),
+  z.object({ kind: z.literal('add'), at: z.number().min(0), downbeat: z.boolean().optional() }).strict(),
+  z.object({ kind: z.literal('move'), from: z.number().min(0).describe('The beat nearest this second moves...'), to: z.number().min(0).describe('...to this second.') }).strict(),
+  z.object({ kind: z.literal('delete'), at: z.number().min(0).describe('The beat nearest this second goes.') }).strict(),
+])
+
+export const editBeatGrid: Operation<BeatTargetInput & { edits?: Array<z.infer<typeof beatEditInput>>; undo?: boolean; clearEdits?: boolean }> = {
+  id: 'slates_edit_beat_grid',
+  billable: false,
+  description:
+    "Correct a music file's beat grid by hand, as the Beat grid controls in the clip's Inspector do: shift the whole grid (sec), set the downbeat (the beat at a second starts a bar; beatsPerBar sets the meter), lay a tempo over a span (fromSec, toSec, bpm; it works with no grid yet, so a known tempo needs no detection), or add, move or delete one beat. Times are the file's own seconds, as slates_get_beat_grid gives them; a beat is named by the nearest one within 0.15 s. Edits apply in order and are kept: finding the beats again never overwrites them. undo takes back the last edit; clearEdits drops them all. The marks on the clip and the snapping follow at once. Free. Returns the grid as slates_get_beat_grid does. Requires beat-grid; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...beatTarget,
+      edits: z.array(beatEditInput).min(1).optional().describe('Edits to apply, in order.'),
+      undo: z.boolean().optional().describe('Take back the last hand edit.'),
+      clearEdits: z.boolean().optional().describe('Drop every hand edit and show the found beats.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    if (!input.edits && !input.undo && !input.clearEdits) throw new Error('Send edits, undo: true or clearEdits: true.')
+    await ctx.desktop().requireCapability('beat-grid', 'editing a beat grid')
+    const r = await ctx.desktop().post<BeatGridAnswer>('/agent/timeline/beats/edit', {
+      ...(await beatTargetBody(ctx, input)),
+      ...(input.undo ? { undo: true } : input.clearEdits ? { clearEdits: true } : { edits: input.edits }),
+    })
+    return ok(r, `Saved. ${beatGridWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const cutToBeats: Operation<{
+  projectId: string; musicClipId: string; trackId?: string; mode?: 'snap' | 'split'; on?: 'beat' | 'downbeat'
+  every?: number; fromFrame?: number; toFrame?: number; reachFrames?: number
+}> = {
+  id: 'slates_cut_to_beats',
+  billable: false,
+  description:
+    "Cut a lane to the music, so its cuts land on the beats of a music clip's grid. mode snap (default) rolls each existing cut on the lane (two clips that meet) to the nearest chosen beat within reachFrames (default half a beat), so the edit keeps its order and its length; mode split cuts the lane's clips at every chosen beat. on downbeat uses only the first beat of each bar; every 2 takes every second one; fromFrame and toFrame hold it to a stretch of the timeline. trackId names the lane (default: the first unlocked video lane with clips). Read the grid first (slates_get_beat_grid) and fix any lowConfidence span it lists, or cuts land on wrong beats. Returns the clips written, cuts (clipId, fromFrame, toFrame), skipped (each cut left where it was, and why) and beatFrames. Free. Requires beat-grid; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      musicClipId: z.string().uuid().describe('The music clip on the timeline whose beats the cuts land on.'),
+      trackId: z.string().uuid().optional().describe('The lane to cut. Default: the first unlocked video lane with clips.'),
+      mode: z.enum(['snap', 'split']).optional().describe('snap: move the existing cuts onto beats (default). split: cut the clips at every chosen beat.'),
+      on: z.enum(['beat', 'downbeat']).optional().describe('Every beat (default) or only downbeats.'),
+      every: z.number().int().min(1).max(64).optional().describe('Use every Nth chosen beat. Default 1.'),
+      fromFrame: z.number().min(0).optional().describe('Only beats from this timeline frame on.'),
+      toFrame: z.number().min(0).optional().describe('Only beats up to this timeline frame.'),
+      reachFrames: z.number().min(0).optional().describe('snap: how far a cut may move to reach a beat, in frames. Default half a beat.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('beat-grid', 'cutting to the beat')
+    const r = await ctx.desktop().post<{ cuts: Array<{ clipId: string; fromFrame: number; toFrame: number }>; skipped: Array<{ reason: string }> }>('/agent/timeline/cut-to-beats', input)
+    const split = input.mode === 'split'
+    const skipped = r.skipped.length ? ` ${r.skipped.length} left where ${r.skipped.length === 1 ? 'it was' : 'they were'}: ${r.skipped[0].reason}.` : ''
+    return ok(r, `${split ? 'Cut at' : 'Moved'} ${r.cuts.length} ${split ? 'beat' : 'cut'}${r.cuts.length === 1 ? '' : 's'}${split ? '' : ' onto the beat'}.${skipped}`)
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -10830,6 +10975,10 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getAssetTranscript as unknown as Operation<unknown>,
   editAssetTranscript as unknown as Operation<unknown>,
   cutByTranscript as unknown as Operation<unknown>,
+  getBeatGrid as unknown as Operation<unknown>,
+  findBeats as unknown as Operation<unknown>,
+  editBeatGrid as unknown as Operation<unknown>,
+  cutToBeats as unknown as Operation<unknown>,
   extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,

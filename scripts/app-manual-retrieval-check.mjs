@@ -38,6 +38,8 @@ const QUESTIONS = [
   ['set the audio bitrate of my export to 320 kbps', ['settings button', 'export an MP4']],
   ['is my mix loud enough for tiktok, what are its lufs', ['Timeline: loudness meter']],
   ['check the true peak of my mix is under -1 dBTP', ['Timeline: loudness meter']],
+  ['find the BPM and downbeats of my song', ['Timeline: beat grid']],
+  ['cut my clips to the beat of the music', ['Timeline: cut to the beat']],
   ['how do I make a video from a picture', ['make a video from a picture', 'first frame and last frame']],
   ['how do I buy more credits', ['Buy credits']],
   ['how do I delete a project', ['Home: delete a project']],
