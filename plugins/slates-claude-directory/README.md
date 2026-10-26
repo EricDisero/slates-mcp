@@ -18,6 +18,7 @@ If you connected Slates from the app's Settings before, remove that older `slate
 ## Bundled skills
 
 - **slates-connect**: Install, open, connect, or repair Slates when its slates_* tools are missing or fail to reach the desktop app. Do not use when Slates tools already work; continue with the user's request instead.
+- **slates-start-here**: Start any Slates job here: the Director card (how every job begins) and the router that names the playbook for each job, the rules it links and the question to ask first. Read it before planning an ad, a film, a cut or any other piece.
 
 ## Links
 
