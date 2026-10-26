@@ -3,7 +3,7 @@
     "slates": {
       "args": [
         "-y",
-        "@slatesvideo/mcp-server@0.6.3"
+        "@slatesvideo/mcp-server@0.6.4"
       ],
       "command": "npx"
     }
