@@ -94,6 +94,7 @@ const SERVED_CASES = [
   ['a vendor URL property leaves the rest of its example', '```json\n{\n  "$schema": "https://hyperframes.heygen.com/s.json",\n  "name": "x"\n}\n```\n', '```json\n{\n  "name": "x"\n}\n```\n'],
   ['front matter loses only its vendor sentence', '---\nname: hyperframes-cli\ndescription: >\n  Use it. Covers HeyGen cloud.\n---\n\nBody.\n', '---\nname: motion-cli\ndescription: >\n  Use it.\n---\n\nBody.\n'],
   ['a guide that was all the service becomes a stub', '# cloud — HeyGen rendering\n\nAll of it.\n', null],
+  ['a line of prose that was all the service is left empty, never the stub', 'Renders on the HeyGen cloud.', ''],
 ]
 
 function servedTest(whiteLabel) {

@@ -81,13 +81,18 @@ const endsInColon = (block?: Block): boolean => block?.kind === 'prose' && block
 /** Where a sentence, or a `;` clause, ends; `e.g.` and `vs.` do not end one. */
 const SENTENCE_END = /(?<=[.!?;])(?<!\b(?:e\.g|i\.e|vs)\.)(\s+)(?=[A-Z`*[<(])/
 
+/** Prose less its sentences and `;` clauses that name the vendor. */
+function dropVendorSentences(text: string): string {
+  const parts = text.split(SENTENCE_END)
+  let kept = ''
+  for (let i = 0; i < parts.length; i += 2) if (!VENDOR.test(parts[i])) kept += (kept ? parts[i - 1] : '') + parts[i]
+  return kept.replace(/;$/, '.')
+}
+
 /** A skill's front matter key (`description`) less its sentences and clauses that name the vendor. */
 function dropVendorClauses(key: string): string {
   const head = /^[\w-]+:\s*(?:[>|][-+]?\s*)?/.exec(key)?.[0] ?? ''
-  const parts = key.slice(head.length).split(SENTENCE_END)
-  let kept = ''
-  for (let i = 0; i < parts.length; i += 2) if (!VENDOR.test(parts[i])) kept += (kept ? parts[i - 1] : '') + parts[i]
-  return head + kept.replace(/;$/, '.')
+  return head + dropVendorSentences(key.slice(head.length))
 }
 
 /** A link to the vendor's repo or site that no link text carried; it reads as "the upstream source". */
@@ -141,7 +146,8 @@ function dropVendorService(text: string): string {
       again = true
     }
   }
-  if (!kept.some((block) => block.kind !== 'blank')) return `${header}${SERVICE_STUB}`
+  // The stub stands in for a whole guide; a line of prose with nothing left is just empty.
+  if (!kept.some((block) => block.kind !== 'blank')) return blocks.some((block) => block.kind === 'heading') ? `${header}${SERVICE_STUB}` : header
   return `${header}${kept.flatMap((block) => block.lines).join('\n')}`
 }
 
@@ -171,7 +177,7 @@ function summary(description: string, max = 160): string {
 export function hyperframesCatalog({ skills, files }: HyperframesCorpus): GuideCatalogEntry[] {
   return skills.map((name) => {
     const { description } = parseSkillMetadata(files[name], name)
-    return { name: publicGuideName(name), description: whiteLabel(SUMMARY_OVERRIDES[name] ?? summary(description)), searchText: description, tier: 'free' as const, source: 'motion' as const }
+    return { name: publicGuideName(name), description: whiteLabel(SUMMARY_OVERRIDES[name] ?? summary(dropVendorSentences(description))), searchText: description, tier: 'free' as const, source: 'motion' as const }
   })
 }
 
