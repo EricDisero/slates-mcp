@@ -45,6 +45,8 @@ Pick the job's row and open its playbook with `slates_get_prompting_guide` (topi
 
 A talking-head cut runs on `slates-cuts` then `slates-captions`. <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 -->
 
+A playbook the account lacks answers with where it lives: run the job on the rules below, and tell the user once. <!-- src: the brain served by tier, slates-api src/lib/brain.ts lockedNotice, 2026-10-25 -->
+
 ## Offer the method that gets the result
 
 People say what they want, not how. When a want below fits the job or one shot in it, offer its method and reason before you price that part; they choose. <!-- src: Eric, 2026-10-25: a drift car or one-take fight brief never got the Blender method offered; the brain should know its own capabilities and suggest the best way to each result -->
