@@ -40,13 +40,109 @@ const publicKey = (key: string): string => {
 /**
  * Upstream prose with the vendor's name turned into ours. Code an agent must write stays as the
  * runtime reads it (`__hyperframes`, `@hyperframes/*`, `data-hyperframes-*`), and so do the upstream
- * CLI's commands, which the mapping file says never to run in Slates.
+ * CLI's commands, which the mapping file says never to run in Slates. The vendor company's own
+ * name never survives: a link to its site keeps its text, and whatever else names it is its hosted
+ * service (cloud render, sign-in, catalog, voices), which Slates does not offer, so that goes.
  */
 export function whiteLabel(text: string): string {
-  return text
+  return dropVendorService(text
     .replace(/\bremotion-to-hyperframes\b/g, 'remotion-to-motion')
     .replace(/(?<![\w@/._-])hyperframes-(animation|audio|cli|core|creative|keyframes|registry|studio)\b/g, 'motion-$1')
     .replace(/\bHyper[Ff]rames\b/g, 'Slates motion')
+    .replace(/\[([^\]]*)\]\(<?https?:\/\/[^)\s>]*heygen[^)\s>]*>?\)/gi, '$1')
+    .replace(/@miguel-heygen\b/g, '@miguel-dev'))
+}
+
+/** The company's name in any spelling: prose, a command, an env var, a host or a repo path. */
+const VENDOR = /heygen/i
+
+interface Block { kind: 'blank' | 'heading' | 'fence' | 'row' | 'prose'; lines: string[]; level: number }
+
+/** Markdown cut into the units that can be dropped whole: headings, fenced code, table rows, paragraphs and list items. */
+function markdownBlocks(lines: string[]): Block[] {
+  const blocks: Block[] = []
+  let fence = ''
+  for (const line of lines) {
+    const last = blocks.at(-1)
+    const open = fence ? null : /^\s*(`{3,}|~{3,})/.exec(line)
+    if (fence) { last?.lines.push(line); if (line.trimStart().startsWith(fence)) fence = '' } else if (open) { fence = open[1]; blocks.push({ kind: 'fence', lines: [line], level: 0 }) }
+    else if (!line.trim()) blocks.push({ kind: 'blank', lines: [line], level: 0 })
+    else if (/^#{1,6}\s/.test(line)) blocks.push({ kind: 'heading', lines: [line], level: line.indexOf(' ') })
+    else if (/^\s*\|/.test(line)) blocks.push({ kind: 'row', lines: [line], level: 0 })
+    else if (last?.kind === 'prose' && !/^\s*(?:[-*+]|\d+[.)])\s/.test(line)) last.lines.push(line)
+    else blocks.push({ kind: 'prose', lines: [line], level: 0 })
+  }
+  return blocks
+}
+
+const isListItem = (block?: Block): boolean => block?.kind === 'prose' && /^\s*(?:[-*+]|\d+[.)])\s/.test(block.lines[0])
+const endsInColon = (block?: Block): boolean => block?.kind === 'prose' && block.lines.at(-1)!.trimEnd().endsWith(':')
+
+/** Where a sentence, or a `;` clause, ends; `e.g.` and `vs.` do not end one. */
+const SENTENCE_END = /(?<=[.!?;])(?<!\b(?:e\.g|i\.e|vs)\.)(\s+)(?=[A-Z`*[<(])/
+
+/** A skill's front matter key (`description`) less its sentences and clauses that name the vendor. */
+function dropVendorClauses(key: string): string {
+  const head = /^[\w-]+:\s*(?:[>|][-+]?\s*)?/.exec(key)?.[0] ?? ''
+  const parts = key.slice(head.length).split(SENTENCE_END)
+  let kept = ''
+  for (let i = 0; i < parts.length; i += 2) if (!VENDOR.test(parts[i])) kept += (kept ? parts[i - 1] : '') + parts[i]
+  return head + kept.replace(/;$/, '.')
+}
+
+/** A link to the vendor's repo or site that no link text carried; it reads as "the upstream source". */
+const VENDOR_URL = /https?:\/\/[^\s)>"'`]*heygen[^\s)>"'`]*(?<![.,;:!?])/gi
+/** A JSON property whose value is a vendor URL (`"$schema"`, `"registry"`), inside an example that is otherwise ours. */
+const VENDOR_JSON_LINE = /^\s*"[^"]+":\s*"[^"]*heygen[^"]*",?\s*$/i
+
+/** What stands where a whole guide was the vendor's service. */
+const SERVICE_STUB = `# Not offered in Slates\n\nThis guide covered a hosted service Slates does not provide; topic motion/${HYPERFRAMES_MAPPING} says what to use instead.\n`
+
+/**
+ * Drops the vendor's hosted service from markdown: a section whose heading names it, then every
+ * fenced example, table row, paragraph or list item that does (a vendor URL in prose becomes "the
+ * upstream source", and a vendor URL property in a JSON example goes alone). Front matter loses
+ * only the sentences. A heading left with nothing under it goes too, and a guide left with nothing
+ * becomes a stub.
+ */
+function dropVendorService(text: string): string {
+  if (!VENDOR.test(text)) return text
+  const fm = /^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n)/.exec(text)
+  const front = fm?.[0] ?? ''
+  const header = fm ? fm[1] + fm[2].split(/\n(?=\S)/).map((key) => (VENDOR.test(key) ? dropVendorClauses(key) : key)).join('\n') + fm[3] : ''
+  const blocks = markdownBlocks(text.slice(front.length).split('\n'))
+  const kept: Block[] = []
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i]
+    let lines: string[] | null = block.kind === 'fence' ? block.lines.filter((line) => !VENDOR_JSON_LINE.test(line)) : block.lines.map((line) => line.replace(VENDOR_URL, 'the upstream source'))
+    if (block.kind === 'heading' && VENDOR.test(lines[0])) {
+      while (blocks[i + 1] && !(blocks[i + 1].kind === 'heading' && blocks[i + 1].level <= block.level)) i++
+      lines = null
+    } else if (VENDOR.test(lines.join('\n'))) lines = null
+    if (lines) { kept.push({ ...block, lines }); continue }
+    // A lead-in ending in a colon takes the list or example it introduced, and an example takes its lead-in.
+    if (endsInColon(block)) for (let next = i + 1; ; i = next++) {
+      while (blocks[next]?.kind === 'blank') next++
+      if (blocks[next]?.kind !== 'fence' && !isListItem(blocks[next])) break
+    }
+    let lead = kept.length - 1
+    while (lead >= 0 && kept[lead].kind === 'blank') lead--
+    if (block.kind === 'fence' && endsInColon(kept[lead])) kept.length = lead
+    if (blocks[i + 1]?.kind === 'blank' && (!kept.length || kept.at(-1)!.kind === 'blank')) i++
+  }
+  for (let again = true; again;) {
+    again = false
+    for (let i = 0; i < kept.length && !again; i++) {
+      if (kept[i].kind !== 'heading') continue
+      let next = i + 1
+      while (kept[next]?.kind === 'blank') next++
+      if (kept[next] && !(kept[next].kind === 'heading' && kept[next].level <= kept[i].level)) continue
+      kept.splice(i, next - i)
+      again = true
+    }
+  }
+  if (!kept.some((block) => block.kind !== 'blank')) return `${header}${SERVICE_STUB}`
+  return `${header}${kept.flatMap((block) => block.lines).join('\n')}`
 }
 
 /** About 3 MB of markdown, so it loads on the first guide call rather than with the package. */
