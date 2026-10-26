@@ -37,8 +37,13 @@ function approvedBrain() {
   return commit
 }
 
-/** One shared skill as the approved brain holds it, or null when that brain has no such skill. */
+/**
+ * One shared skill as the approved brain holds it, or null when that brain has no such skill. Only the card and router
+ * qualify: the playbooks, rules and model guides live in the private slates-api brain/ and reach a plugin's user through
+ * its MCP server, by the account's tier, so none is ever copied into a public plugin.
+ */
 function approvedSkill(commit, name) {
+  assert(existsSync(join(root, 'packages', 'shared', 'skills', `${name}.md`)), `plugins/spec.json selects ${name}, a brain file (slates-api brain/); a public plugin carries only the skills in packages/shared/skills`)
   const path = `packages/shared/skills/${name}.md`
   const listed = execFileSync('git', ['ls-tree', '--name-only', commit, '--', path], { cwd: root, encoding: 'utf8' }).trim()
   if (!listed) return null

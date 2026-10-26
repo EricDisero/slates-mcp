@@ -53,15 +53,7 @@
       "slates-connect"
     ],
     "shared": [
-      "slates-start-here",
-      "slates-project-organization",
-      "slates-script-craft",
-      "slates-storyboard-from-script",
-      "slates-shot-variety",
-      "slates-one-prompt-film",
-      "slates-edit-and-iterate",
-      "slates-direct-response-ad",
-      "slates-ugc-influencer-ad"
+      "slates-start-here"
     ]
   },
   "liveGuideFooter": "Any other Slates guide this skill names loads live through the `slates_get_prompting_guide` tool, which always carries the current models, prices and limits."
