@@ -58,8 +58,8 @@ const shape = JSON.parse(readFileSync(join(root, SHAPE), 'utf8'))
 // Reach order: the router, the doctrine and the pins reach every job, a playbook or a motion guide one kind of job, a
 // rule what links it, a model guide one model; the shape file pins the rest.
 const LAYERS = ['router', 'playbook', 'rule', 'motion', 'model']
-const RANK = { router: 0, doctrine: 0, pin: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
-const LABEL = { router: 'Router', doctrine: 'Doctrine', pin: 'Approval pin', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
+const RANK = { router: 0, doctrine: 0, pin: 0, access: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
+const LABEL = { router: 'Router', doctrine: 'Doctrine', pin: 'Approval pin', access: 'Who reads what', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
 // The brain's deep layers: slates-api's brain/, approved by the commit brain-approved.json pins there.
 const BRAIN = brainDir({ optional: true })
 if (!BRAIN) {
@@ -70,9 +70,13 @@ if (!BRAIN) {
 const API = dirname(BRAIN)
 const BRAIN_PATH = basename(BRAIN)
 const PIN = join(API, API_PIN)
+// slates-api's code that decides who reads which brain file, what a locked file says, and what the members feed and
+// the pack's paid layer serve: a change here can open the bump playbooks to every license, so it waits on Eric too.
+const API_ACCESS = ['src/lib/brain.ts', 'src/lib/brain-notice.ts', 'src/lib/brain-served.ts', 'src/routes/brain.ts', 'src/lib/pack-skills.ts', 'src/routes/members.ts']
 const layerOf = (file) => {
   if (DOCTRINE.includes(file)) return 'doctrine'
   if (file === BOARD_PATH || file === API_PIN) return 'pin'
+  if (API_ACCESS.includes(file)) return 'access'
   const home = [`${SKILLS}/`, `${BRAIN_PATH}/`].find((p) => file.startsWith(p))
   if (!home) return 'other'
   const path = file.slice(home.length)
@@ -92,7 +96,7 @@ if (!pin.commit) throw new Error(`${PIN} has no commit`)
 const REPOS = {
   mcp: { cwd: root, watched: WATCHED, approved },
   // The files, the code that decides who reads which and what a locked file says, and the pin itself.
-  api: { cwd: API, watched: [BRAIN_PATH, 'src/lib/brain.ts', 'src/lib/brain-notice.ts', 'src/lib/brain-served.ts', API_PIN], approved: pin.commit },
+  api: { cwd: API, watched: [BRAIN_PATH, ...API_ACCESS, API_PIN], approved: pin.commit },
 }
 const gitAt = (repo, ...args) => gitRaw(args, { cwd: REPOS[repo].cwd }).trim()
 const jsonAt = (repo, rev, path) => {
