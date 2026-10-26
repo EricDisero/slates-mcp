@@ -5,6 +5,8 @@
 // markdown, cut the way the package cuts them), and the session names the playbook it would open
 // first. Scored by code: a hit is any name in the case's `expect`, once the pick is resolved as the guide op resolves
 // a topic (an alias, a missing `slates-` prefix, a small typo), since that is the guide the agent would be served.
+// The names it resolves against are the bundled guides and motion-overview, what the card and router list; member
+// and My brain names are left out, so a pick near one of those is scored as typed.
 //
 //   node scripts/brain-eval/routing.mjs --root <build of the approved commit> [--model sonnet] [--runs 1] [--cases id,id]
 //     [--concurrency 4] [--min 0.9] [--out <file>]
@@ -21,7 +23,7 @@
 // Fails when the candidate is under --min.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { arg, countArg, runClaude, scrubHome } from '../behaviour-ab/lib.mjs'
 import { ROUTER, readSkills } from '../brain-lint.mjs'
@@ -52,6 +54,8 @@ if (arms.candidate.noRouter) throw new Error(`the candidate has no router (${ROU
 // Both arms resolve picks through this checkout's resolver, which the brain hash does not cover, so the
 // difference between the arms stays the brain.
 const { SKILLS, operations } = await import(pathToFileURL(join(roots.candidate, 'packages', 'shared', 'dist', 'index.js')).href)
+// Checked before any model call: a build from before nearestGuideName would otherwise fail mid-batch.
+if (typeof operations?.nearestGuideName !== 'function' || typeof operations?.resolveGuideTopic !== 'function') throw new Error(`the candidate build at ${roots.candidate} has no nearestGuideName; npm run build there first`)
 const ANSWERS = ['none', 'motion-overview']
 function served(picked) {
   if (!picked || ANSWERS.includes(picked) || Object.hasOwn(SKILLS, picked)) return picked
@@ -107,7 +111,8 @@ async function worker() {
     const { arm, c, run } = jobs[next++]
     const r = await ask(arm, c)
     const resolved = served(r.picked)
-    const hit = !!resolved && c.expect.includes(resolved)
+    // Either name counts, so resolving can only add hits.
+    const hit = (!!r.picked && c.expect.includes(r.picked)) || (!!resolved && c.expect.includes(resolved))
     results[arm.name].push({ case: c.id, run, expect: c.expect, ...r, ...(resolved !== r.picked ? { resolved } : {}), hit })
     console.log(`${hit ? '✓' : '✗'} ${arm.name} ${c.id} #${run}: ${r.picked ?? r.error}${resolved !== r.picked ? ` → ${resolved}` : ''}${hit ? '' : ` (expected ${c.expect.join(' or ')})`}`)
   }
@@ -121,8 +126,8 @@ const summary = Object.fromEntries(Object.entries(arms).map(([name, arm]) => {
   return [name, { root: scrubHome(arm.root), brainHash: arm.brainHash, ...(arm.noRouter ? { noRouter: true } : {}), accuracy, hits: answered.filter((r) => r.hit).length, answered: answered.length, errors: rs.length - answered.length, results: rs }]
 }))
 const out = join(here, 'results')
-mkdirSync(out, { recursive: true })
 const file = arg('out') ? resolve(arg('out')) : join(out, `${new Date().toISOString().slice(0, 10)}-routing-${model}.json`)
+mkdirSync(dirname(file), { recursive: true })
 writeFileSync(file, scrubHome(JSON.stringify({ model, runs, arms: summary }, null, 2)))
 for (const [name, x] of Object.entries(summary)) console.log(`routing on ${model}, ${name}: ${x.noRouter ? 'no router in this build' : `${x.hits}/${x.answered} (${Math.round((x.accuracy ?? 0) * 100)}%), ${x.errors} errors`}`)
 console.log(`→ ${scrubHome(file)}`)
