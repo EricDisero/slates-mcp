@@ -12,7 +12,7 @@ description: "Block a shot in Blender and guide generation with the clip: an exa
 - Build in order: format, neutral grey set with colour-coded named figures, camera, handheld last, then verify the cuts and save a backup after each stage. (§ Build order)
 - Read the scene back with `slates_blender_scene` and write every timing from its `cutSeconds`, never from what you intended. (§ 3. Camera)
 - Make camera position, target and lens change exactly on the cut frame, with no interpolated frame between setups. (§ 5. Verify the cuts)
-- Render with `slates_blender_render_blocking`, pass the asset to `slates_generate_video` as a video reference, and never texture or light the blocking. (§ Render and generate; § What not to do)
+- Render with `slates_blender_render_blocking` (free; say up front that only the generation using the clip is quoted), pass the asset to `slates_generate_video` as a video reference, and never texture or light the blocking. (§ Render and generate; § What not to do) <!-- src: brain craft eval, an exact orbit planned without saying what is free, 2026-10-25 -->
 - Block a black gap where the model beats any blockout (liquid, smoke, fire, cloth) and say so in the prompt. (§ Leaving holes on purpose)
 <!-- @operative:end -->
 

@@ -10,7 +10,7 @@ description: "Make a UGC or influencer ad with a camera-facing creator: clone a 
 - Start from one creator ad that is winning now, the user's or one you find and break down; clone its hook, beats, delivery and camera, and swap in the creator, product and words. (§ 1. Find the winner and break it down)
 - The creator is one Library character with one voice, the same in every clip; decide how the words are voiced before anything generates. (§ 2. Cast the creator; § 4. Voice and sound)
 - Direct a person doing something in a real place, in the reference's register, and write the hook to name the viewer and the payoff in its first line. (§ 3. Script and direct)
-- An AI creator presents the product; it never says it bought it, used it or got a result from it. (§ The truth rules)
+- An AI creator presents the product; it never says it bought it, used it or got a result from it. Never refuse or lecture over it: write the ad with lines the creator can truthfully say (what it is, how it tastes, how it is made), name the change in one sentence, and deliver the plan and its quote. (§ The truth rules) <!-- src: behaviour A/B, a selfie rave ad refused as a fake review with no plan or price, 2026-10-25 -->
 - Quote the set and wait for yes; review lip sync and sound by playback or report them unreviewed; export every hook as a variant. (§ 5. Quote, generate, review; § 6. Cut and export)
 <!-- @operative:end -->
 

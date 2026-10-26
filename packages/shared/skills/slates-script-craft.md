@@ -12,6 +12,7 @@ description: "Write or revise script passages, openings, bridges and saved varia
 - Make openings differ by idea, not adjectives, and keep any bridge the opening needs inside the version. (§ Distinct openings and compatible bridges)
 - Preview one requested combination with `slates_preview_script_variation` before creating it; never expand every combination. (§ Distinct openings and compatible bridges)
 - Prefer a concrete actor doing something over abstract benefit language; never invent testimonials, results or offer terms. (§ Spoken flow and pacing; § Opening, argument and payoff)
+- Asked to fit a time, cut words until the script fits it with room for pauses, and propose the cut as a suggestion; never meet the time with a faster read or by changing the shots instead. (§ Spoken flow and pacing) <!-- src: brain craft eval, a fit-to-15-seconds ask got shorter shots and no cut words, 2026-10-25 -->
 <!-- @operative:end -->
 
 Work in the user's document. Read its revision, requested passage and neighboring context. Keep supplied facts, deliberate cadence and fixed sections intact. A script may be silent, a conversation, one continuous sentence, independent scenes, or any mixture. These are tools to choose from, not required stages.
@@ -45,7 +46,7 @@ Prefer a concrete actor doing something over abstract benefit language. “Seaml
 
 Preserve the user's or reference's cadence when it carries character, comedy or comprehension. A repeated sentence or triplet is not inherently an error. Personal voice preferences apply only to the person who supplied them. Never invent testimonials or measurable results.
 
-Read the fit analysis in the `slates_list_shots` result (its WORDS line and over-long-line notes). Its corpus estimate uses total ad runtime, including silence, and an opt-in register sample. It is not measured articulation speed; the observed maximum is not a universal human limit. Plan for pauses, reactions and sound. Once a voice/video take exists, its measured performance governs the cut. Model clip duration, estimated script duration and actual speech duration are separate facts.
+Read the fit analysis in the `slates_list_shots` result (its WORDS line and over-long-line notes). Its corpus estimate uses total ad runtime, including silence, and an opt-in register sample. It is not measured articulation speed; the observed maximum is not a universal human limit. Plan for pauses, reactions and sound. Once a voice/video take exists, its measured performance governs the cut. Model clip duration, estimated script duration and actual speech duration are separate facts. When they ask for a script to fit a time, the answer is the shorter script: cut words, keep the one message, and propose the cut as suggestions on their lines. A faster read or longer shots changes what they did not ask to change. <!-- src: brain craft eval, a fit-to-15-seconds ask got shorter shots and no cut words, 2026-10-25 -->
 
 ## Apply the requested scope
 

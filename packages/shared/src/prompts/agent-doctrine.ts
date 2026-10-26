@@ -311,7 +311,7 @@ const MCP_EVERY_REQUEST = [
  * in a result is read (the banned-token measurement, 13% against 94%). The desktop's Director needs none:
  * its doctrine carries the router whole.
  */
-export const ROUTER_NOTICE = `This session has not opened the router (${BRAIN_ROUTER}), so here it is, once. Find this job's row and read its playbook with slates_get_prompting_guide before you plan or build.
+export const ROUTER_NOTICE = `This session has not opened the router (${BRAIN_ROUTER}), so here it is, once. Find this job's row and read its playbook with slates_get_prompting_guide before you plan or build; a question about the app itself is answered from topic app-manual with a query, with no intake questions.
 
 ${ROUTER_BODY}`
 

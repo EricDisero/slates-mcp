@@ -14,7 +14,7 @@ description: "Make a product ad that sells: clone an ad winning now (hook, beats
 - Quote the whole set and wait for the user's yes before any generation; then cut, check and export every variant. (§ 5. Quote, then generate; § 6. Cut and export)
 <!-- @operative:end -->
 
-An ad is a test in the user's ad account, and the ads that already win in a feed are the cheapest research there is: someone paid to find the hook, the order and the words that work. So the job is to copy a winner faithfully and change only what makes it theirs. Ask the user before starting: what are you selling, who buys it, where will the ad run, and is there an ad you want to copy? Ask it all in one message. When the brief already names the job (an objection to beat, a product, their board), put a first draft in that message too, every line paired with its picture and a bracket for each fact you lack, so they react to a draft rather than a questionnaire; it stands in until the reference arrives. <!-- src: brain craft eval, dr-objection sent only questions, 2026-10-25 -->
+An ad is a test in the user's ad account, and the ads that already win in a feed are the cheapest research there is: someone paid to find the hook, the order and the words that work. So the job is to copy a winner faithfully and change only what makes it theirs. Ask the user before starting: what are you selling, who buys it, where will the ad run, and is there an ad you want to copy? Ask it all in one message. The Director card's first draft rides that message and stands in until the reference arrives. <!-- src: brain craft eval, dr-objection sent only questions, 2026-10-25 -->
 
 ## 1. Find the winner
 

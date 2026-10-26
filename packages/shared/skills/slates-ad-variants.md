@@ -18,7 +18,7 @@ An ad variant is one alternative per slot laid end to end over the cut's bed (it
 
 ## Which variants to make
 
-- **Hooks on one body.** Most viewers see only the opening, so the hook is what a variant tests. Keep the body that works and vary the opening.
+- **Hooks on one body.** Most viewers see only the opening, so the hook is what a variant tests. Keep the body that works and vary the opening, and tell the user what each hook tests (its opening picture, its claim, its emotion), so the result reads as an answer. <!-- src: brain craft eval, five hooks planned with nothing said about what each tests, 2026-10-25 -->
 - **Each hook is a whole composition** (`slates-direct-response-ad` § 3. Write the script); one that only changes the text tests nothing. Clone each one from a hook that is winning now, the way the body was cloned (`slates-direct-response-ad` § 1. Find the winner). <!-- src: brain lint, one home per lesson, 2026-10-25 -->
 - **Each hook works alone and flows into the body.** Read every join aloud.
 - **Different ideas need different ads.** Hooks on one body test openings within one idea; testing ideas against each other takes different reference ads, each its own cut.

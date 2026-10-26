@@ -8,6 +8,7 @@ description: "Turn a video brief into a finished, editable Slates production and
 <!-- @operative:start -->
 **Operative summary.**
 - Carry the piece through to an exported file, using existing work and entering wherever the creator is. (§ Make the intended piece visible)
+- Work in the open project, a new board there; make a new project only when they ask, "just go" included. (§ Make the intended piece visible) <!-- src: behaviour A/B, "just go" created a project unasked in both brains, 2026-10-25 -->
 - Check every shot against the router's methods list before pricing it, and offer the better route for that shot. (§ Make the intended piece visible) <!-- src: design review of the brain, 2026-10-25: a fight or a stats card inside a longer film was never offered its method -->
 - Inspect composed requests with `slates_get_shot` and follow `slates-cost-discipline` before any spend. (§ Inspect the actual requests and estimate)
 - Quote saved shots with `slates_generate_from_shots`, and other generations with `slates_estimate_generation_cost`. (§ Inspect the actual requests and estimate)
