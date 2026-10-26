@@ -7,7 +7,8 @@
 // source (tool descriptions, results, errors, the CLI's words; comments are free) or one of Slates'
 // own skills. The motion engine's skills (`packages/shared/skills/hyperframes/`) ship unmodified for
 // their licence and are white-labelled where they are served (`whiteLabel` in
-// `packages/shared/src/skills/hyperframes.ts`); this checks that every one of them comes out clean.
+// `packages/shared/src/skills/hyperframes.ts`: the name turned into ours, the vendor company's
+// hosted service dropped); this checks that every one of them comes out clean and tests the rules.
 // Internal strings no agent reads stay, each on the list below with its reason.
 //
 //   node scripts/brand-words-check.mjs [--self-test]     (part of npm run build)
@@ -20,16 +21,17 @@ const PACKAGES = join(REPO, 'packages')
 const OWN_SKILLS = join(PACKAGES, 'shared', 'skills')
 const CORPUS = join(OWN_SKILLS, 'hyperframes')
 
-/** The names no agent may read. */
-const WORDS = /hyper\s*-?\s*frames?/i
-/** The brand as prose; the white-labelled corpus may keep only the code forms (`__hyperframes`, `@hyperframes/core`, `npx hyperframes`). */
-const PROSE = /\bHyper[Ff]rames?\b/
+/** The names no agent may read: the engine and the company behind it. */
+const WORDS = /hyper\s*-?\s*frames?|heygen/i
+/** The brand as prose, or the company in any form; the white-labelled corpus may keep only the engine's code forms (`__hyperframes`, `@hyperframes/core`, `npx hyperframes`). */
+const PROSE = /\bHyper[Ff]rames?\b|[Hh][Ee][Yy][Gg][Ee][Nn]/
 
 /** Strings that hold a name but are never read by an agent. */
 const ALLOWED = [
   [/\bfrom\s+['"][^'"]*['"]|import\(\s*['"][^'"]*['"]\s*\)/g, 'an import path'],
   [/const OVERVIEW = 'hyperframes'/g, "the upstream overview skill's folder name, served as motion-overview"],
   [/'hyperframes-mapping'/g, "an old topic name for the mapping, still accepted"],
+  [/^const VENDOR_(?:URL|JSON_LINE) = \/.*$/g, "the patterns `whiteLabel` finds the company's name with, to drop it from upstream text"],
 ]
 
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1')
@@ -62,6 +64,7 @@ function* files(dir, test) {
 function selfTest() {
   const cases = [
     ['a description fails', "description: 'Search the HyperFrames registry'", 1],
+    ['the company in a string fails', "const hint = 'Sign in to HeyGen'", 1],
     ['a comment passes', '// HyperFrames blocks', 0],
     ['an import passes', "import { x } from '../skills/hyperframes.js'", 0],
     ['an identifier in a template passes', 'const t = `topic motion/${HYPERFRAMES_MAPPING}`', 0],
@@ -73,6 +76,35 @@ function selfTest() {
     console.log(`${got === want ? 'ok ' : 'BAD'}  ${name}${got === want ? '' : `: ${got} hit(s), expected ${want}`}`)
   }
   if (failed) { console.error(`✖ brand-words self-test: ${failed} failed`); process.exit(1) }
+}
+
+/** `whiteLabel` on small markdown: [name, input, the output it must give (null: the stub)]. */
+const SERVED_CASES = [
+  ["the engine's name becomes ours, its code forms stay", 'HyperFrames runs `npx hyperframes lint` on `__hyperframes`.\n', 'Slates motion runs `npx hyperframes lint` on `__hyperframes`.\n'],
+  ['text without the vendor is untouched', '# T\n\nPlain.\n', '# T\n\nPlain.\n'],
+  ['a link to the vendor keeps its text', 'Per [PR #1](https://github.com/heygen-com/hyperframes/pull/1), yes.\n', 'Per PR #1, yes.\n'],
+  ['a bare vendor URL reads as the upstream source', 'See https://hyperframes.heygen.com/docs. Next.\n', 'See the upstream source. Next.\n'],
+  ['a paragraph about the service goes, its neighbours stay', 'Keep.\n\nSign in to HeyGen first.\n\nAlso keep.\n', 'Keep.\n\nAlso keep.\n'],
+  ['a list item goes alone', '- one\n- HeyGen two\n- three\n', '- one\n- three\n'],
+  ['a table row goes alone', '| a | b |\n|---|---|\n| x | HeyGen |\n| y | z |\n', '| a | b |\n|---|---|\n| y | z |\n'],
+  ['a section named for the service goes with its subsections', '# T\n\n## Local\n\nok\n\n## HeyGen cloud\n\nno\n\n### Auth\n\nno\n\n## After\n\nok2\n', '# T\n\n## Local\n\nok\n\n## After\n\nok2\n'],
+  ['a heading left empty goes', '# T\n\n## Auth\n\nHeyGen only.\n\n## Next\n\nok\n', '# T\n\n## Next\n\nok\n'],
+  ['a lead-in that names the service takes its list', 'Keep.\n\nSign in to HeyGen:\n\n- web\n- key\n\nAfter.\n', 'Keep.\n\nAfter.\n'],
+  ['an example takes its lead-in', 'Keep.\n\nFetch it:\n\n```bash\ncurl https://api.heygen.com\n```\n\nAfter.\n', 'Keep.\n\nAfter.\n'],
+  ['a vendor URL property leaves the rest of its example', '```json\n{\n  "$schema": "https://hyperframes.heygen.com/s.json",\n  "name": "x"\n}\n```\n', '```json\n{\n  "name": "x"\n}\n```\n'],
+  ['front matter loses only its vendor sentence', '---\nname: hyperframes-cli\ndescription: >\n  Use it. Covers HeyGen cloud.\n---\n\nBody.\n', '---\nname: motion-cli\ndescription: >\n  Use it.\n---\n\nBody.\n'],
+  ['a guide that was all the service becomes a stub', '# cloud — HeyGen rendering\n\nAll of it.\n', null],
+]
+
+function servedTest(whiteLabel) {
+  let failed = 0
+  for (const [name, input, want] of SERVED_CASES) {
+    const got = whiteLabel(input)
+    const ok = want === null ? got.startsWith('# Not offered in Slates\n') && !WORDS.test(got) : got === want
+    if (!ok) failed++
+    console.log(`${ok ? 'ok ' : 'BAD'}  served: ${name}${ok ? '' : `\n      got  ${JSON.stringify(got)}\n      want ${JSON.stringify(want)}`}`)
+  }
+  if (failed) { console.error(`✖ brand-words served self-test: ${failed} failed`); process.exit(1) }
 }
 
 if (process.argv.includes('--self-test')) selfTest()
@@ -93,8 +125,11 @@ for (const [name, text] of Object.entries(readAllSkills())) {
 // The served corpus, as an agent receives it.
 const { whiteLabel } = await import('../packages/shared/dist/skills/hyperframes.js').catch(() => ({ whiteLabel: null }))
 if (!whiteLabel) problems.push('packages/shared/dist/skills/hyperframes.js: not built, so the served guides were not checked (run after the shared build)')
-else for (const file of files(CORPUS, (n) => n.endsWith('.md'))) {
-  for (const hit of lineHits(whiteLabel(readFileSync(file, 'utf8')), PROSE)) problems.push(`${rel(file)}:${hit.line} (served)  ${hit.text.slice(0, 160)}`)
+else {
+  if (process.argv.includes('--self-test')) servedTest(whiteLabel)
+  for (const file of files(CORPUS, (n) => n.endsWith('.md'))) {
+    for (const hit of lineHits(whiteLabel(readFileSync(file, 'utf8')), PROSE)) problems.push(`${rel(file)}:${hit.line} (served)  ${hit.text.slice(0, 160)}`)
+  }
 }
 
 if (problems.length) {

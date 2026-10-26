@@ -32,6 +32,8 @@ const everyGuide = Object.keys(SKILLS).length + HYPERFRAMES_SKILL_NAMES.length
 // 14,700, sits a little above it. Raise it only by re-measuring:
 // a HyperFrames guide's line is the first sentence of its upstream description, capped at 160 characters.
 const CATALOG_CEILING = 14_700
+// The engine's name as prose, or the company behind it in any form (the engine's code forms, `npx hyperframes`, stay).
+const VENDOR_NAMES = /\bHyper[Ff]rames\b|[Hh][Ee][Yy][Gg][Ee][Nn]/
 let catalogChars = 0
 const found = new Set()
 let offset = 0
@@ -39,6 +41,7 @@ for (;;) {
   const result = await run({ offset })
   catalogChars = Math.max(catalogChars, result.text.length)
   assert(result.text.length < CATALOG_CEILING, `the whole catalog stays bounded (${result.text.length}, ceiling ${CATALOG_CEILING})`)
+  assert(!VENDOR_NAMES.test(result.text), `a catalog page names the vendor (offset ${offset})`)
   for (const name of names(result)) { assert(!found.has(name)); found.add(name) }
   if (result.data.nextOffset === null) break
   offset = result.data.nextOffset
@@ -132,7 +135,7 @@ for (const [topic, key] of [['motion-core', 'motion-core'], ['hyperframes-core',
   assert.equal(hfOffline.calls, 0, `${topic}: a HyperFrames guide must not reach the cloud`)
   assert.equal(result.data.topic, key, topic)
   assert.equal(result.data.source, 'motion')
-  assert(!/\bHyper[Ff]rames\b/.test(result.text), `${topic}: the vendor's name is served`)
+  assert(!VENDOR_NAMES.test(result.text), `${topic}: the vendor's name is served`)
   assert(result.text.length > 0 && result.text.length < 9000, `${topic}: card is bounded (${result.text.length})`)
   if (key !== 'SLATES-MAPPING.md') assert(result.text.startsWith(`Motion guide ${key} (Apache-2.0)`), `${topic}: licence header`)
 }
