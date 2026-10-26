@@ -28,6 +28,9 @@ import { brainDir } from './brain-source.mjs'
 // from the server; this process reads the same folder to count what they should expose.
 const brain = brainDir()
 if (brain) process.env.SLATES_BRAIN_DIR = brain
+// Single-repo CI has no brain (brainDir() is null there), so the checks that read a playbook or a model guide are
+// skipped, loudly; a local run always has one.
+const skipNoBrain = (what) => console.log(`  ..  skipped (no brain in single-repo CI): ${what}`)
 
 const here = dirname(fileURLToPath(import.meta.url))
 const serverPath = join(here, '..', 'packages', 'mcp', 'dist', 'server.js')
@@ -178,7 +181,8 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
 }
 
 // ── the guide gate over the wire: no guide read on this connection, no generation ──
-{
+if (!brain) skipNoBrain('the guide gate over the wire (the model guides are in the brain)')
+else {
   const refused = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'a quiet room' } })
   const text = (refused.content ?? []).map((c) => c.text ?? '').join('\n')
   const guide = /topic "([^"]+)"/.exec(text)?.[1]
@@ -208,7 +212,8 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
 // asserted without an LLM driving the client. What it cannot cover is whether
 // the client's own model then ACTS on it; that is the honest limit of measuring
 // a surface whose model and system prompt we do not own.
-{
+if (!brain) skipNoBrain('the banned-token warning over MCP (the never-use lists are in the model guides)')
+else {
   const res = await client.callTool({
     name: 'slates_generate_image',
     arguments: {
@@ -314,10 +319,11 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
   check('the "working-method" guide serves the full MCP doctrine', methodText === buildAgentDoctrine({ surface: 'mcp' }) && methodText.includes('LOAD KNOWLEDGE ON DEMAND') && methodText.includes('## Guide index'))
   const skillCount = Object.keys(SKILLS).length
   check('every bundled skill is exposed as an MCP prompt', prompts.length === skillCount, `${prompts.length} of ${skillCount}`)
-  const got = await client.getPrompt({ name: 'slates-cost-discipline' })
+  const promptName = brain ? 'slates-cost-discipline' : 'slates-start-here'
+  const got = await client.getPrompt({ name: promptName })
   check(
     'and a prompt returns the whole skill',
-    (got.messages?.[0]?.content?.text ?? '').includes('slates-cost-discipline')
+    (got.messages?.[0]?.content?.text ?? '').includes(promptName)
   )
 
   const resources = (await client.listResources()).resources
@@ -347,7 +353,9 @@ if (generateImage) check('no cross-model blacklist in the schema', !generateImag
     name: 'slates_generate_image',
     arguments: { prompt: 'a quiet room' },
   })
-  check(
+  // With no brain the guide gate refuses this call before the clarification, so only a brain run reaches it.
+  if (!brain) skipNoBrain('structuredContent on the clarification result (the guide gate answers first)')
+  else check(
     'a tool result carries structuredContent beside the text',
     res.structuredContent?.requires_clarification === true,
     JSON.stringify(res.structuredContent ?? null).slice(0, 120)
