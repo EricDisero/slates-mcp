@@ -8179,7 +8179,7 @@ export const copyLibraryItemToProject: Operation<{ itemId: string; targetProject
 export const getTemplate: Operation<{ path?: string }> = {
   id: 'slates_get_template',
   description:
-    "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the templates in the user's templates folder, plus any starter templates the app ships.",
+    "Read a Slates template file without changing anything. With `path`: what it holds (scenes, shots, library items, the models its shots are set to) and its SWAP SLOTS — every Library item (`item:i1`, labelled with its mention, e.g. @candle, with `extras` (its count of extra pictures) and `palette`) and every directly attached reference (`asset:a3`, with its roles) that slates_import_template can point at one of the project's own assets instead. Without `path`: the templates in the user's templates folder, plus any starter templates the app ships.",
   input: z.object({ path: z.string().min(1).optional().describe('Absolute path of a .slatestemplate file. Omit to list saved templates.') }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('templates', 'templates')
@@ -8199,7 +8199,7 @@ export const exportTemplate: Operation<{
 }> = {
   id: 'slates_export_template',
   description:
-    "Save a board, a scene or one Shot as a template file someone else can start from. Give exactly one of storyboardId, sceneId or shotId. The file carries each Shot's full recipe (prompt, model, settings, reference roles, script words) plus the reference files and the Library items the Shots mention; it carries no takes. The project is untouched. A file saved outside the user's templates folder is not in the template list (slates_get_template without path); the user opens it with Open a file. Returns the path, the counts and a warning for any reference whose file is missing.",
+    "Save a board, a scene or one Shot as a template file someone else can start from. Give exactly one of storyboardId, sceneId or shotId. The file carries each Shot's full recipe (prompt, model, settings, reference roles, script words) plus the reference files and the Library items the Shots mention, each with its picture, extra pictures and colours; it carries no takes. The project is untouched. A file saved outside the user's templates folder is not in the template list (slates_get_template without path); the user opens it with Open a file. Returns the path, the counts and a warning for any reference whose file is missing.",
   input: z.object({
     projectId: z.string().uuid(),
     path: z.string().min(1).describe('Absolute path to write, ending in .slatestemplate. Its folder is created if needed.'),
@@ -8235,7 +8235,7 @@ export const importTemplate: Operation<{
     sceneIndices: z.array(z.number().int().min(0)).min(1).optional().describe('Import only these scene indices from the inspected parts, preserving their order. Omit for the whole template.'),
     storyboardId: z.string().uuid().optional(),
     sceneId: z.string().uuid().optional(),
-    swaps: z.record(z.string().min(1)).optional().describe('{ "item:i1": "IMG-A12", "asset:a3": "<asset id>" }'),
+    swaps: z.record(z.string().min(1)).optional().describe('{ "item:i1": "IMG-A12", "asset:a3": "<asset id>" }. An item swap also leaves out the template\'s extra pictures and colours for it.'),
     useTemplateCategories: z
       .boolean()
       .optional()
