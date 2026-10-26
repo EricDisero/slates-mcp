@@ -133,6 +133,12 @@ const free = collect(FREE_DIR, 'free');
 const paid = collect(PAID_DIR, 'paid');
 // The brain is charted by its tier and never zipped: the zip is public, the brain is not.
 const BRAIN_DIR = brainDir();
+if (!BRAIN_DIR) {
+  console.error(
+    '✖ build:skills-pack — the brain is needed to refuse a leak into the zip; run beside slates-api or set SLATES_BRAIN_DIR'
+  );
+  process.exit(1);
+}
 const bumpNames = new Set(JSON.parse(readFileSync(join(BRAIN_DIR, 'tiers.json'), 'utf8')).bump);
 const brain = collect(BRAIN_DIR, 'license').map((s) => (bumpNames.has(s.key) ? { ...s, tier: 'bump' } : s));
 
