@@ -7,6 +7,8 @@ import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/d
 import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
 
 const disconnected = { cloud: () => { throw Object.assign(new Error('no token'), { code: 'CLOUD_TOKEN_MISSING' }) }, desktop: () => { throw new Error('unexpected desktop call') } }
+// Counts its cloud calls: the member check swallows a cloud error, so only a count of zero proves no call was made.
+const counting = () => { const ctx = { ...disconnected, calls: 0 }; ctx.cloud = () => { ctx.calls++; return disconnected.cloud() }; return ctx }
 const run = async (input, ctx = disconnected) => getPromptingGuide.run(getPromptingGuide.input.parse(input), ctx)
 const names = result => result.data.guides.map(guide => guide.name)
 // The motion engine's guides are served under public names (`motion-core`), white-labelled (engine-test item 8).
@@ -79,10 +81,15 @@ assert.deepEqual(nearestGuideName('slates-captoins', guideNames), { name: 'slate
 assert.deepEqual(nearestGuideName('slates-cuta', ['slates-cuts', 'slates-cute']), { tied: ['slates-cute', 'slates-cuts'] })
 assert.equal(nearestGuideName('slates-cut', guideNames), null, 'a name under four letters must match exactly')
 assert.equal(nearestGuideName('slates-dirct-respons-adz', guideNames), null, 'three edits is another guide')
+// The edit budget at its boundaries: two edits from 8 letters, one from 4, none under 4 (slates-cut above).
+assert.deepEqual(nearestGuideName('slates-captoinz', guideNames), { name: 'slates-captions' }, 'two edits in 8 letters')
+assert.equal(nearestGuideName('slates-moxiox', guideNames), null, 'two edits in 6 letters')
+assert.deepEqual(nearestGuideName('slates-cutz', guideNames), { name: 'slates-cuts' }, 'one edit in 4 letters')
 assert.equal(nearestGuideName('quux flibbertigibbet', guideNames), null)
 assert.equal(resolveGuideTopic('previs-blocking'), null, 'a model id never resolves by nearness')
-const prefixOffline = { ...disconnected, cloud: () => { throw new Error('a missing prefix must not reach the cloud') } }
+const prefixOffline = counting()
 assert.equal((await run({ topic: 'previs-blocking' }, prefixOffline)).data.topic, 'slates-previs-blocking')
+assert.equal(prefixOffline.calls, 0, 'a missing prefix must not reach the cloud')
 assert.equal((await run({ topic: 'slaes-direct-response-ad' })).data.topic, 'slates-direct-response-ad')
 assert.equal((await run({ topic: 'motion-overveiw' })).data.topic, 'motion-overview')
 const twins = { ...disconnected, cloud: () => ({ get: async () => ({ skills: [{ name: 'slates-captionz', description: 'Fixture captions playbook.', tier: 'paid' }] }) }) }
@@ -105,7 +112,9 @@ assert(!names(await run({ limit: 8 })).some(hf), `a browse's first page is Slate
 // A topic retrieves a HyperFrames skill, any of its markdown files or the mapping; an exact name beats an alias.
 // The upstream names are still accepted, and answer under the public one.
 for (const [topic, key] of [['motion-core', 'motion-core'], ['hyperframes-core', 'motion-core'], ['motion/motion-animation', 'motion-animation'], ['hyperframes/hyperframes-animation', 'motion-animation'], ['MOTION-REGISTRY', 'motion-registry'], ['motion-audio', 'motion-audio'], ['motion-overview', 'motion-overview'], ['motion-animation/transitions/overview.md', 'motion-animation/transitions/overview.md'], ['motion/SLATES-MAPPING.md', 'SLATES-MAPPING.md'], ['hyperframes-mapping', 'SLATES-MAPPING.md']]) {
-  const result = await run({ topic }, { ...disconnected, cloud: () => { throw new Error('a HyperFrames guide must not reach the cloud') } })
+  const hfOffline = counting()
+  const result = await run({ topic }, hfOffline)
+  assert.equal(hfOffline.calls, 0, `${topic}: a HyperFrames guide must not reach the cloud`)
   assert.equal(result.data.topic, key, topic)
   assert.equal(result.data.source, 'motion')
   assert(!/\bHyper[Ff]rames\b/.test(result.text), `${topic}: the vendor's name is served`)
@@ -158,8 +167,9 @@ const counted = { ...disconnected, cloud: () => ({ get: async () => { manifestRe
 await run({ query: 'rainy diner' }, counted); await run({ query: 'skincare ad' }, counted)
 assert.equal(manifestReads, 1)
 // A resolved free guide never reaches the network.
-const offline = { ...disconnected, cloud: () => { throw new Error('a free guide must not reach the cloud') } }
+const offline = counting()
 assert((await run({ topic: 'seedance-2.5' }, offline)).text.length > 0)
+assert.equal(offline.calls, 0, 'a free guide must not reach the cloud')
 assert(!Object.hasOwn(SKILLS, privateName))
 assert(ALL_OPERATIONS.some(op => op.id === getPromptingGuide.id))
 console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), catalog ${catalogChars} characters (ceiling ${CATALOG_CEILING}), natural briefs, ad ranking, pagination, aliases, near-miss names, sections, manual and private access passed.`)
