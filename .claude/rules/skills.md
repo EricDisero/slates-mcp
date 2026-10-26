@@ -66,9 +66,12 @@ Two ad skills were written straight into `packages/shared/skills/` on 2026-08-16
 release commit by a `git add -A`. They never reached npm (the build ran before the files landed),
 but the near-miss is why this rule is now explicit. **Use explicit paths in `git add`, never `-A`.**
 
-Build the pack with `npm run build:skills-pack` (root). It assembles the free skills plus
-everything in `../slates-api/pack-skills/` (or `SLATES_PACK_SKILLS_DIR`) into a deterministic zip,
-refuses to build when the paid folder is missing or empty or a key is in both, and generates the
+Build the pack with `npm run build:skills-pack` (root). It assembles the card and router plus
+everything in `../slates-api/pack-skills/` (or `SLATES_PACK_SKILLS_DIR`) into a deterministic zip.
+**The zip is a public object, so no brain file ever goes in it** (1.1.5 shipped the whole brain; 1.1.6
+closed it): the brain is charted by its tier (`license`, `bump`) and reaches buyers only signed in
+(`install-skills`, `/brain`, the members feed). It refuses to build when the paid folder is missing
+or empty, a key is in two homes, or a zip entry is a brain file, and generates the
 README and the chart so the inventory is never hand-typed. After a rebuild, run
 `node scripts/check-skills-pack-lockstep.mjs --write` in slates-web to refresh the site's chart. The zip's download URL is
 hand-mirrored in **two** repos and gated by `slates-web/scripts/check-skills-pack-lockstep.mjs` —

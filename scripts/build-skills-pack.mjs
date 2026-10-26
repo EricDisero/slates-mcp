@@ -8,18 +8,30 @@
  * BACKSLASH path separators (`skills\name\SKILL.md`), which unzip warns about
  * and some extractors mishandle. Both problems are fixed here.
  *
- * CONTENTS = the paid skills PLUS the free ones, so a buyer has everything in
- * one download. The free/paid line is the FOLDER, and nothing else:
+ * CONTENTS = only what may be public to anyone holding the link. The zip sits
+ * in the PUBLIC slates-web-assets bucket and its URL is in the public web code
+ * and every receipt email, so a file in it is a public file:
  *
- *   packages/shared/skills/*.md       → FREE: npm, the MCP, the desktop agent
- *   ../slates-api/pack-skills/*.md    → PAID: this zip and the members feed only
+ *   packages/shared/skills/*.md       → FREE: the Director card and router, also on npm
+ *   ../slates-api/pack-skills/*.md    → PAID: the ad playbooks, this zip and the members feed
+ *
+ * The brain (../slates-api/brain/: playbooks, rules, model guides) NEVER goes in
+ * the zip. It is private and read by tier (brain/tiers.json): every Slates
+ * license opens its `license` files, the pack (`skills_pack`) also opens its
+ * `bump` files. A buyer gets them signed in, through `install-skills`, the app
+ * and the MCP (slates-api /brain), or the members feed (/members), both of
+ * which check the account's entitlement on every fetch. 1.1.5 shipped the whole
+ * brain in this zip; that is the leak this layout closes. The build refuses a
+ * zip entry that is a brain file.
  *
  * The paid folder lives in slates-api because that repo is private; this one
  * is public (moved 2026-09-27). Set SLATES_PACK_SKILLS_DIR to build from
  * elsewhere. What may be paid: second-brain funnel-architecture.md § Pack
  * content doctrine (capability free, outcomes paid; paid means proven ads).
  *
- * The manifest's `catalog` is THE chart of every skill and its tier. slates-web
+ * The manifest's `catalog` is THE chart of every skill and its tier (`free`,
+ * `paid`, and the brain's `license` and `bump`, which are listed but not in the
+ * zip). slates-web
  * mirrors it into src/app/lib/generated/skillsCatalog.ts for /docs/skills-pack,
  * and its lockstep check fails when the mirror is stale.
  *
@@ -71,7 +83,12 @@ const root = resolve(here, '..');
 // 1.1.5, 2026-10-25: the approved brain (slates-api brain/ at d7bbc80): the Director
 // card and router (slates-start-here), the ad-variants playbook, and every guide as
 // the brain review approved it. Uploaded, then both URLs moved.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.5';
+// 1.1.6, 2026-10-26: the brain leaves the zip. 1.1.5 carried every brain file,
+// the bump playbooks included, in a public object; 1.1.6 holds the card, the
+// router and the two ad playbooks, and the chart lists the brain by its tier.
+// The 1.1.5 key is overwritten with this content (slates-api docs/web-assets.md)
+// so links already in receipt emails stop serving the brain and still resolve.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.6';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');
@@ -112,10 +129,12 @@ if (!existsSync(PAID_DIR)) {
   process.exit(1);
 }
 
-// The brain's files (slates-api brain/) ride with the card and router, as before they moved there. Their chart tier
-// stays `free` until the offer change retires this pack's free/paid line (second-brain plans/2026-10-25-slates-brain.md).
-const free = [...collect(FREE_DIR, 'free'), ...collect(brainDir(), 'free')].sort((a, b) => a.key.localeCompare(b.key));
+const free = collect(FREE_DIR, 'free');
 const paid = collect(PAID_DIR, 'paid');
+// The brain is charted by its tier and never zipped: the zip is public, the brain is not.
+const BRAIN_DIR = brainDir();
+const bumpNames = new Set(JSON.parse(readFileSync(join(BRAIN_DIR, 'tiers.json'), 'utf8')).bump);
+const brain = collect(BRAIN_DIR, 'license').map((s) => (bumpNames.has(s.key) ? { ...s, tier: 'bump' } : s));
 
 if (paid.length === 0) {
   console.error(
@@ -127,11 +146,20 @@ if (paid.length === 0) {
 }
 
 const all = [...free, ...paid].sort((a, b) => a.key.localeCompare(b.key));
-const dupes = all.map((s) => s.key).filter((k, i, arr) => arr.indexOf(k) !== i);
+const dupes = [...all, ...brain].map((s) => s.key).filter((k, i, arr) => arr.indexOf(k) !== i);
 if (dupes.length) {
-  console.error(`✖ build:skills-pack — duplicate skill key(s) across free and paid: ${dupes.join(', ')}`);
+  console.error(`✖ build:skills-pack — duplicate skill key(s) across free, paid and the brain: ${dupes.join(', ')}`);
   process.exit(1);
 }
+// A brain body in the public zip, under any name, is the 1.1.5 leak again.
+const brainBodies = new Set(brain.map((s) => s.body.toString('utf8')));
+const leaked = all.filter((s) => brainBodies.has(s.body.toString('utf8')));
+if (leaked.length) {
+  console.error(`✖ build:skills-pack — brain file(s) in the public zip: ${leaked.map((s) => s.key).join(', ')}`);
+  process.exit(1);
+}
+const licenseCount = brain.filter((s) => s.tier === 'license').length;
+const bumpList = brain.filter((s) => s.tier === 'bump').map((s) => `- \`${s.key}\`: ${s.summary}`).join('\n');
 
 // ── README ─────────────────────────────────────────────────────────────
 // Regenerated so the skill inventory is never hand-typed (workspace rule:
@@ -139,26 +167,33 @@ if (dupes.length) {
 const paidList = paid.map((s) => `- \`${s.key}\`: ${s.summary}`).join('\n');
 const readme = `# Slates Agentic Skills Pack
 
-**Pack version ${PACK_VERSION}: ${paid.length} paid ad playbooks, plus all ${free.length} free Slates skills.**
+**Pack version ${PACK_VERSION}: ${paid.length} ad playbooks to copy in, plus the playbooks your account opens.**
 
 ---
 
-## What you paid for: the ad playbooks
+## What you paid for
 
-The playbooks behind our own ads. They are only in this download and in your members feed.
-They are not on npm and the one-command installer does not include them.
+**The ad playbooks.** The playbooks behind our own ads, in this download's \`skills/\` folder and in
+your members feed. They are not on npm and the one-command installer does not include them, so
+copy their folders in (Option B below).
 
 ${paidList}
 
-Install these by copying their folders (Option B below).
+**The playbooks past ads**, which your pack opens in your Slates account:
 
-## What's free, and already yours
+${bumpList}
 
-The other ${free.length} skills are free for everyone: per-model prompting, the production
-workflows, and craft and cost discipline. The Slates MCP already serves them to your AI, and
-one command installs them (Option A). They are in \`skills/\` too, so everything is in one place.
+These reach your AI from your account, never from this download, so they stay current as we fix
+them: the signed-in Slates MCP and the desktop agent read them, and one command installs them
+(Option A). Your members feed carries them too.
 
-The full chart of what is free and what is paid: https://slates.video/docs/skills-pack
+## What comes with every Slates license
+
+${licenseCount} more playbooks, rules and model guides: per-model prompting, the production
+workflows, and craft and cost discipline. They reach your AI the same way, from your account.
+The Director card and router (\`slates-start-here\`) are free for everyone and are in \`skills/\`.
+
+The full chart of every skill and who has it: https://slates.video/docs/skills-pack
 
 ---
 
@@ -168,15 +203,17 @@ The full chart of what is free and what is paid: https://slates.video/docs/skill
 https://slates.video/docs/connect-claude first. It's one click from inside the app
 (Settings → AI tools), or one terminal command.
 
-### Option A: one command (the free skills)
+### Option A: one command (everything your account opens)
 
 \`\`\`
+npx -y @slatesvideo/cli login
 npx -y @slatesvideo/cli install-skills --global
 \`\`\`
 
-That installs the free skills for Claude Code and Codex account-wide (drop \`--global\` for the current
-project). For Codex use \`install-skills --client codex --global\`; \`--client both\` installs
-the same sources for both clients. **It does not install the paid ad playbooks listed above**,
+That installs the card, the router and every playbook, rule and guide your account opens for
+Claude Code and Codex account-wide (drop \`--global\` for the current project). For Codex use
+\`install-skills --client codex --global\`; \`--client both\` installs the same sources for both
+clients. Run it again to pick up fixes. **It does not install the ad playbooks in this download**,
 so use Option B for those. Start a new session after installation.
 
 ### Option B: copy the folders (required for the ad playbooks)
@@ -247,15 +284,18 @@ const manifest = {
   sha256: createHash('sha256').update(zip).digest('hex'),
   bytes: zip.length,
   url: `https://slates-web-assets.t3.tigrisfiles.io/${filename}`,
+  // What is IN the zip: `freeSkills` and `paidSkills`. `brainSkills` is charted, never zipped.
   skillCount: all.length,
   freeSkills: free.map((s) => s.key),
   paidSkills: paid.map((s) => s.key),
-  // THE chart: every skill, its tier, one line on what it does. Paid first.
-  catalog: [...paid, ...free].map((s) => ({ key: s.key, tier: s.tier, summary: s.summary })),
+  brainSkills: brain.map((s) => s.key),
+  // THE chart: every skill, its tier, one line on what it does. Paid, the pack's brain files, the license's, then free.
+  catalog: [...paid, ...brain.filter((s) => s.tier === 'bump'), ...brain.filter((s) => s.tier === 'license'), ...free]
+    .map((s) => ({ key: s.key, tier: s.tier, summary: s.summary })),
 };
 writeFileSync(join(OUT_DIR, 'pack-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
 console.log(`✓ built ${filename}`);
-console.log(`   ${all.length} skills (${free.length} free + ${paid.length} pack-exclusive), ${(zip.length / 1024).toFixed(1)} KB`);
+console.log(`   ${all.length} skills in the zip (${free.length} free + ${paid.length} pack-exclusive), ${(zip.length / 1024).toFixed(1)} KB; ${brain.length} brain files charted, none zipped`);
 console.log(`   pack-exclusive: ${paid.map((s) => s.key).join(', ')}`);
 console.log(`   url: ${manifest.url}`);
