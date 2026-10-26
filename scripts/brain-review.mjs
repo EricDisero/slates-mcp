@@ -6,8 +6,11 @@
 // a brain he has not approved, and the plugins carry only the approved skills (build-plugins.mjs).
 //
 // The approved brain is `approvedCommit` and `approvedBrainHash` in brain-eval/scoreboard.json: the commit, and the
-// hash (brain-eval/brain-hash.mjs) of what its build hands an agent. A brain commit touches WATCHED below: the skills,
-// the shape that pins them, and the doctrine sources the build wraps around them. The hash catches the rest.
+// hash (brain-eval/brain-hash.mjs) of what its build hands an agent. A brain commit touches WATCHED below: the card
+// and router, the shape that pins the layers, and the doctrine sources the build wraps around them. The playbooks,
+// rules and model guides live in slates-api's brain/ (scripts/brain-source.mjs), served by tier from the commit its
+// brain-approved.json pins; a commit there is a brain commit too, and --approve moves both pins together. The hash
+// catches the rest.
 //
 //   node scripts/brain-review.mjs --spec <out.json> --notes <notes.json> [--craft <craft.json>] [--routing <routing.json>]…
 //       The review page's items (build the page with the vault's tools/review_page.py), one per brain commit since the
@@ -30,8 +33,9 @@
 //       approvedCommit (a `git archive` export will do) whose sources match the commit. --approve keeps it current.
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { compare, currentBrain, readResults } from './brain-eval/gate.mjs'
+import { brainDir } from './brain-source.mjs'
 
 const root = join(import.meta.dirname, '..')
 const SKILLS = 'packages/shared/skills'
@@ -48,20 +52,34 @@ const shape = JSON.parse(readFileSync(join(root, SHAPE), 'utf8'))
 const LAYERS = ['router', 'playbook', 'rule', 'motion', 'model']
 const RANK = { router: 0, doctrine: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
 const LABEL = { router: 'Router', doctrine: 'Doctrine', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
+// The brain's deep layers: slates-api's brain/, approved by the commit brain-approved.json pins there.
+const BRAIN = brainDir()
+const API = dirname(BRAIN)
+const BRAIN_PATH = basename(BRAIN)
+const PIN = join(API, 'brain-approved.json')
 const layerOf = (file) => {
   if (DOCTRINE.includes(file)) return 'doctrine'
-  if (!file.startsWith(`${SKILLS}/`)) return 'other'
-  const path = file.slice(SKILLS.length + 1)
+  const home = [`${SKILLS}/`, `${BRAIN_PATH}/`].find((p) => file.startsWith(p))
+  if (!home) return 'other'
+  const path = file.slice(home.length)
   if (/^(hyperframes|_partials)\//.test(path)) return path.startsWith('_partials/') ? 'rule' : 'motion'
   const name = path.replace(/\.md$/, '')
   return LAYERS.find((l) => shape.layers[l]?.includes(name)) ?? 'other'
 }
-const short = (p) => p.replace(`${SKILLS}/`, '').replace(/^hyperframes\//, 'motion/').replace('packages/shared/src/prompts/', 'doctrine: ')
+const short = (p) => p.replace(`${SKILLS}/`, '').replace(`${BRAIN_PATH}/`, '').replace(/^hyperframes\//, 'motion/').replace('packages/shared/src/prompts/', 'doctrine: ')
 const gitRaw = (args, opts = {}) => execFileSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, ...opts })
 const git = (...args) => gitRaw(args).trim()
 const board = JSON.parse(readFileSync(BOARD, 'utf8'))
 const approved = board.approvedCommit
 if (!approved) throw new Error('scoreboard.json has no approvedCommit')
+const pin = JSON.parse(readFileSync(PIN, 'utf8'))
+if (!pin.commit) throw new Error(`${PIN} has no commit`)
+/** The two homes of the brain: where each is, what it watches and the commit Eric approved there. */
+const REPOS = {
+  mcp: { cwd: root, watched: WATCHED, approved },
+  api: { cwd: API, watched: [BRAIN_PATH], approved: pin.commit },
+}
+const gitAt = (repo, ...args) => gitRaw(args, { cwd: REPOS[repo].cwd }).trim()
 const argv = process.argv
 const flag = (name) => { const k = argv.indexOf(`--${name}`); return k < 0 ? undefined : argv[k + 1] }
 const flagAll = (name) => argv.flatMap((a, k) => (a === `--${name}` ? [argv[k + 1]] : [])).filter(Boolean)
@@ -95,23 +113,32 @@ function addedLines(diff) {
   return hidden ? [...shown, `… and ${hidden} more added lines (git show)`] : shown
 }
 
-/** The brain commits in from..to, oldest first, and the brain files not committed. */
-function pending(from = approved, to = 'HEAD') {
-  const log = git('log', '--reverse', '--format=%H%x09%h%x09%ad%x09%s', '--date=short', `${from}..${to}`, '--', ...WATCHED)
-  const commits = log ? log.split('\n').map((line) => {
-    const [full, hash, date, subject] = line.split('\t')
-    const files = git('show', '--numstat', '--format=', full, '--', ...WATCHED).split('\n').filter(Boolean).map((row) => {
-      const [add, del, path] = row.split('\t')
-      return { path, add: Number(add) || 0, del: Number(del) || 0, layer: layerOf(path) }
-    })
-    const diff = gitRaw(['show', '--format=', '-U0', full, '--', ...WATCHED])
-    // The sources the commit's added lines carry (`<!-- src: … -->`, required since brain-shape.json's sourcesSince).
-    const sources = [...new Set([...diff.matchAll(/^\+.*?<!--\s*src:\s*([^>]*?)\s*-->/gm)].map((m) => m[1]))]
-    return { full, hash, date, subject, files, sources, added: addedLines(diff) }
-  }) : []
-  // Untrimmed: each porcelain line is two status letters, a space and the path, and the first letter is often
-  // a space (" M file"), which a trim eats, cutting the first name one character short. A rename keeps its new name.
-  const dirty = gitRaw(['status', '--porcelain', '--', ...WATCHED]).split('\n').filter(Boolean).map((l) => short(l.slice(3).replace(/^.* -> /, '')))
+/**
+ * The brain commits in each home, from its approved commit to HEAD unless `ranges` ({ mcp, api: { from, to } }) says
+ * otherwise, oldest first within a home, and the brain files not committed in either. Each commit names its `repo`.
+ */
+function pending(ranges = {}) {
+  const commits = []
+  const dirty = []
+  for (const [repo, { cwd, watched, approved: since }] of Object.entries(REPOS)) {
+    const { from = since, to = 'HEAD' } = ranges[repo] ?? {}
+    const at = (args) => gitRaw(args, { cwd })
+    const log = at(['log', '--reverse', '--format=%H%x09%h%x09%ad%x09%s', '--date=short', `${from}..${to}`, '--', ...watched]).trim()
+    if (log) for (const line of log.split('\n')) {
+      const [full, hash, date, subject] = line.split('\t')
+      const files = at(['show', '--numstat', '--format=', full, '--', ...watched]).trim().split('\n').filter(Boolean).map((row) => {
+        const [add, del, path] = row.split('\t')
+        return { path, add: Number(add) || 0, del: Number(del) || 0, layer: layerOf(path) }
+      })
+      const diff = at(['show', '--format=', '-U0', full, '--', ...watched])
+      // The sources the commit's added lines carry (`<!-- src: … -->`, required since brain-shape.json's sourcesSince).
+      const sources = [...new Set([...diff.matchAll(/^\+.*?<!--\s*src:\s*([^>]*?)\s*-->/gm)].map((m) => m[1]))]
+      commits.push({ repo, full, hash, date, subject, files, sources, added: addedLines(diff) })
+    }
+    // Untrimmed: each porcelain line is two status letters, a space and the path, and the first letter is often
+    // a space (" M file"), which a trim eats, cutting the first name one character short. A rename keeps its new name.
+    dirty.push(...at(['status', '--porcelain', '--', ...watched]).split('\n').filter(Boolean).map((l) => short(l.slice(3).replace(/^.* -> /, ''))))
+  }
   return { commits, dirty }
 }
 
@@ -128,7 +155,7 @@ if (argv.includes('--check')) {
   const { commits, dirty } = pending()
   const current = await builtBrain()
   const reasons = []
-  if (commits.length) reasons.push(`${commits.length} brain commits since the brain Eric approved (${approved}) wait on his review page:\n${commits.map((c) => `    ${c.hash} ${c.subject.slice(0, 100)}`).join('\n')}`)
+  if (commits.length) reasons.push(`${commits.length} brain commits since the brain Eric approved (${approved} here, ${pin.commit.slice(0, 7)} in slates-api) wait on his review page:\n${commits.map((c) => `    ${c.repo === 'api' ? 'slates-api ' : ''}${c.hash} ${c.subject.slice(0, 100)}`).join('\n')}`)
   if (dirty.length) reasons.push(`${dirty.length} brain files are not committed: ${dirty.join(', ')}`)
   if (current.error) reasons.push(current.error)
   else if (current.unbuilt.length) reasons.push(`the build is older than the skills on disk (${current.unbuilt.join(', ')}); npm run build first`)
@@ -164,12 +191,15 @@ if (argv.includes('--pin-approved-hash')) {
 }
 
 const pid = (diff) => (diff.trim() ? execFileSync('git', ['patch-id', '--stable'], { cwd: root, input: diff, encoding: 'utf8' }).trim().split(/\s+/)[0] : null)
-/** True when commit r undoes held commit h: all of it, or all of its brain files and nothing else. */
-function reverts(r, h) {
-  if (pid(gitRaw(['show', '--format=', r])) === pid(gitRaw(['diff', h, `${h}^`]))) return true
-  const touched = git('show', '--name-only', '--format=', r).split('\n').filter(Boolean)
-  const undo = pid(gitRaw(['diff', h, `${h}^`, '--', ...WATCHED]))
-  return touched.length > 0 && touched.every(watchedPath) && undo !== null && pid(gitRaw(['show', '--format=', r, '--', ...WATCHED])) === undo
+/** True when commit r undoes held commit h, both in `repo`: all of it, or all of its brain files and nothing else. */
+function reverts(r, h, repo = 'mcp') {
+  const { cwd, watched } = REPOS[repo]
+  const at = (args) => gitRaw(args, { cwd })
+  const isWatched = repo === 'mcp' ? watchedPath : (p) => p.startsWith(`${BRAIN_PATH}/`)
+  if (pid(at(['show', '--format=', r])) === pid(at(['diff', h, `${h}^`]))) return true
+  const touched = at(['show', '--name-only', '--format=', r]).trim().split('\n').filter(Boolean)
+  const undo = pid(at(['diff', h, `${h}^`, '--', ...watched]))
+  return touched.length > 0 && touched.every(isWatched) && undo !== null && pid(at(['show', '--format=', r, '--', ...watched])) === undo
 }
 
 if (argv.includes('--approve')) {
@@ -180,16 +210,22 @@ if (argv.includes('--approve')) {
   const page = spec.brain
   if (!page?.head) stop(['not approved: the spec records no head commit; rebuild the page with this script'])
   if (page.approvedCommit !== approved) refuse.push(`the page was built against the approved brain ${page.approvedCommit}, and the approved brain is ${approved}; rebuild the page`)
-  let ancestor = true
-  try { execFileSync('git', ['merge-base', '--is-ancestor', page.head, 'HEAD'], { cwd: root, stdio: 'ignore' }) } catch { ancestor = false }
-  if (!ancestor) stop([`not approved: the page's head ${page.headShort ?? page.head} is not in HEAD's history; rebuild the page`])
+  if (!page.api?.head) stop(['not approved: the spec records no slates-api head; rebuild the page with this script'])
+  if (page.api.approvedCommit !== pin.commit) refuse.push(`the page was built against slates-api's approved brain ${page.api.approvedCommit.slice(0, 7)}, and brain-approved.json pins ${pin.commit.slice(0, 7)}; rebuild the page`)
+  // Each home's page head, by repo.
+  const heads = { mcp: page.head, api: page.api.head }
+  for (const [repo, head] of Object.entries(heads)) {
+    let ancestor = true
+    try { execFileSync('git', ['merge-base', '--is-ancestor', head, 'HEAD'], { cwd: REPOS[repo].cwd, stdio: 'ignore' }) } catch { ancestor = false }
+    if (!ancestor) stop([`not approved: the page's ${repo === 'api' ? 'slates-api ' : ''}head ${head.slice(0, 10)} is not in HEAD's history; rebuild the page`])
+  }
 
   // Every commit that waits is on the page, and every item on the page waits.
-  const waiting = pending(approved, page.head).commits
+  const waiting = pending({ mcp: { to: heads.mcp }, api: { to: heads.api } }).commits
   const items = spec.items ?? []
   const itemOf = (key) => items.find((it) => it.id === key || (key.length >= 7 && (it.commit ?? '').startsWith(key)))
   for (const c of waiting) if (!items.some((it) => it.commit === c.full || it.id === c.hash)) refuse.push(`${c.hash} waits but is not on the page; rebuild the page`)
-  for (const it of items) if (!waiting.some((c) => it.commit === c.full || it.id === c.hash)) refuse.push(`${it.id} is on the page but does not wait between ${approved} and the page's head`)
+  for (const it of items) if (!waiting.some((c) => it.commit === c.full || it.id === c.hash)) refuse.push(`${it.id} is on the page but does not wait between the approved brain and the page's head`)
   const decided = new Map()
   for (const [key, choice] of Object.entries(decisions)) {
     const it = itemOf(key)
@@ -201,19 +237,29 @@ if (argv.includes('--approve')) {
   if (undecided.length) refuse.push(`Eric has not decided ${undecided.length} items: ${undecided.map((it) => it.id).join(', ')}`)
   const held = items.filter((it) => decided.get(it.id) === 'hold')
 
-  // What he held is out of HEAD, and nothing came in after the page that he did not see.
-  const since = git('rev-list', '--reverse', `${approved}..HEAD`).split('\n').filter(Boolean)
-  const after = git('rev-list', '--reverse', `${page.head}..HEAD`).split('\n').filter(Boolean)
+  // What he held is out of HEAD, and nothing came in after the page that he did not see: in each home, its own
+  // commits after the page's head there (slates-api's only those touching brain/).
+  const repoOf = (it) => it.repo ?? 'mcp'
+  const since = {}, after = {}
+  for (const repo of Object.keys(REPOS)) {
+    const scope = repo === 'api' ? ['--', BRAIN_PATH] : []
+    since[repo] = gitAt(repo, 'rev-list', '--reverse', `${REPOS[repo].approved}..HEAD`, ...scope).split('\n').filter(Boolean)
+    after[repo] = gitAt(repo, 'rev-list', '--reverse', `${heads[repo]}..HEAD`, ...scope).split('\n').filter(Boolean)
+  }
   const revertOf = new Map()
   for (const it of held) {
-    const h = it.commit ?? git('rev-parse', it.id)
-    const r = since.filter((x) => x !== h).find((x) => reverts(x, h))
+    const repo = repoOf(it)
+    const h = it.commit ?? gitAt(repo, 'rev-parse', it.id)
+    const r = since[repo].filter((x) => x !== h).find((x) => reverts(x, h, repo))
     if (r) revertOf.set(r, it.id)
-    else refuse.push(`${it.id} is held and still in HEAD: git revert ${it.id} (its brain files at least), then approve`)
+    else refuse.push(`${it.id} is held and still in ${repo === 'api' ? "slates-api's" : ''} HEAD: git revert ${it.id} (its brain files at least), then approve`)
   }
-  for (const x of after) if (!revertOf.has(x)) refuse.push(`${x.slice(0, 10)} came after the page was built (${page.headShort}) and is not the revert of a held item; rebuild the page so Eric sees it`)
+  for (const repo of Object.keys(REPOS)) for (const x of after[repo]) if (!revertOf.has(x)) refuse.push(`${repo === 'api' ? 'slates-api ' : ''}${x.slice(0, 10)} came after the page was built and is not the revert of a held item; rebuild the page so Eric sees it`)
 
-  const dirty = gitRaw(['status', '--porcelain', '--', 'packages/shared', ...WATCHED]).split('\n').filter(Boolean).map((l) => l.slice(3))
+  const dirty = [
+    ...gitRaw(['status', '--porcelain', '--', 'packages/shared', ...WATCHED]).split('\n').filter(Boolean).map((l) => l.slice(3)),
+    ...gitRaw(['status', '--porcelain', '--', BRAIN_PATH, 'brain-approved.json'], { cwd: API }).split('\n').filter(Boolean).map((l) => `slates-api/${l.slice(3)}`),
+  ]
   if (dirty.length) refuse.push(`commit or revert what is not committed under packages/shared and the brain files: ${dirty.slice(0, 8).join(', ')}${dirty.length > 8 ? ` and ${dirty.length - 8} more` : ''}`)
 
   // The gate: candidate against the approved brain, in the same batch, on exactly this build.
@@ -225,14 +271,14 @@ if (argv.includes('--approve')) {
   if (current.error) refuse.push(current.error)
   else {
     gate = compare(board, readResults(files), current)
-    if (!after.length && page.brainHash !== current.brainHash) refuse.push(`this build hands agents brain ${current.brainHash}, not the ${page.brainHash} the page was built from; rebuild the page`)
+    if (!after.mcp.length && !after.api.length && page.brainHash !== current.brainHash) refuse.push(`this build hands agents brain ${current.brainHash}, not the ${page.brainHash} the page was built from; rebuild the page`)
   }
   if (gate.lines.length) console.log(gate.lines.join('\n'))
   refuse.push(...gate.fail.map((f) => `gate: ${f}`))
   if (refuse.length) stop(['not approved', ...refuse])
 
   // The page's head, plus only the reverts of what he held: what he approved and nothing else.
-  board.approvedCommit = after.length ? git('rev-parse', '--short', 'HEAD') : page.headShort
+  board.approvedCommit = after.mcp.length ? git('rev-parse', '--short', 'HEAD') : page.headShort
   board.approvedBrainHash = current.brainHash
   board.approvedOn = new Date().toISOString().slice(0, 10)
   delete board.firstBaseline
@@ -245,7 +291,12 @@ if (argv.includes('--approve')) {
     gate: gate.lines,
   }
   writeFileSync(BOARD, JSON.stringify(board, null, 2) + '\n')
-  console.log(`✓ brain review: ${items.length - held.length} approved, ${held.length} held and reverted; the approved brain is now ${board.approvedCommit} (brain ${current.brainHash}). Next: npm run build:plugins, then commit scoreboard.json with plugins/**.`)
+  // slates-api serves the brain at this commit from its next deploy (its build exports brain/ at the pin).
+  pin.commit = after.api.length ? gitAt('api', 'rev-parse', 'HEAD') : heads.api
+  pin.approvedOn = board.approvedOn
+  pin.standsFor = `the brain Eric approved with slates-mcp ${board.approvedCommit} (brain ${current.brainHash})`
+  writeFileSync(PIN, JSON.stringify(pin, null, 2) + '\n')
+  console.log(`✓ brain review: ${items.length - held.length} approved, ${held.length} held and reverted; the approved brain is now ${board.approvedCommit} here and ${pin.commit.slice(0, 7)} in slates-api (brain ${current.brainHash}). Next: npm run build:plugins, then commit scoreboard.json with plugins/** here, and brain-approved.json in slates-api.`)
   process.exit(0)
 }
 
@@ -297,11 +348,12 @@ const items = ranked.map((c, i) => {
   return {
     id: c.hash,
     commit: c.full,
+    repo: c.repo,
     kind: layer,
     kind_label: `${i + 1}. ${LABEL[layer]}`,
     tone: { router: 3, doctrine: 3, playbook: 2, rule: 1, motion: 1 }[layer] ?? 0,
     title: c.subject.length > 160 ? `${c.subject.slice(0, 157)}…` : c.subject,
-    meta: `${c.date} · ${c.hash} · +${c.files.reduce((n, f) => n + f.add, 0)} −${c.files.reduce((n, f) => n + f.del, 0)}`,
+    meta: `${c.date} · ${c.repo === 'api' ? 'slates-api ' : ''}${c.hash} · +${c.files.reduce((n, f) => n + f.add, 0)} −${c.files.reduce((n, f) => n + f.del, 0)}`,
     src: [...new Set(c.files.map((f) => short(f.path).replace(/\.md$/, '')))].join(', '),
     callout: `<b>Recommendation:</b> ${esc(noteFor(c.hash))}`,
     flags: c.sources.length ? c.sources.map((x) => `Source: ${x}`) : ['Source: the commit message (before sources were required)'],
@@ -324,7 +376,10 @@ const spec = {
     { id: 'model', label: 'Model guides', kind: 'model' },
   ],
   // What --approve checks the decisions against: the page names these commits and this build, nothing later.
-  brain: { approvedCommit: approved, head, headShort: git('rev-parse', '--short', 'HEAD'), brainHash: current.brainHash },
+  brain: {
+    approvedCommit: approved, head, headShort: git('rev-parse', '--short', 'HEAD'), brainHash: current.brainHash,
+    api: { approvedCommit: pin.commit, head: gitAt('api', 'rev-parse', 'HEAD') },
+  },
   items,
 }
 writeFileSync(resolve(specOut), JSON.stringify(spec, null, 2) + '\n')
