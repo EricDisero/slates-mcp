@@ -8,6 +8,29 @@ paths:
 
 # Skills — free versus paid, and how to add one
 
+**🚨 The brain is served by tier (2026-10-25, second-brain `plans/2026-10-25-slates-brain.md` step 4).** This public
+repo keeps only the Director card and the router (`packages/shared/skills/slates-start-here.md`) and the partials
+TypeScript reads (`PARTIALS`). Every playbook, rule and model guide, and the partials only they inject, live in the
+private **`slates-api/brain/`**, and slates-api serves them by the account's tier (`brain/tiers.json`; who opens
+which: `slates-api/src/lib/brain.ts`): a Slates license opens everything but the bump list, the Agentic Skills Pack
+or the membership opens the bump list too. Only the brain Eric approved is served (`slates-api/brain-approved.json`
+pins its commit; `brain-review.mjs --approve` moves it with `approvedCommit`). **Never put a brain file back in this
+repo or a plugin** (`build-plugins.mjs` refuses one).
+- **Runtime:** `src/skills/served.ts`. `brainFiles()` is the card and router plus the served brain; the guide op,
+  My brain, craft cards, banned tokens, the doctrine's guide index, the MCP prompts and `install-skills` all read it.
+  Sources, first found wins: `SLATES_BRAIN_DIR` (builds, checks, evals; never a user's machine), the last bundle in
+  `~/.slates/brain-cache.json`, then `GET /brain` and `/brain/bundle` through the connected account (at server start
+  and before a guide answer, at most every ten minutes). A playbook past the account's tier answers with the server's
+  notice and the job runs on the general rules; a guide the account cannot open never trips the guide gate.
+- **Builds, checks and evals** find the folder through `scripts/brain-source.mjs` (`SLATES_BRAIN_DIR`, which a
+  worktree must set, else `../slates-api/brain`); single-repo CI has none and skips what reads it. The behaviour A/B
+  fixture answers `/brain` and `/brain/bundle` from it with every tier open, so a candidate build fetches its brain
+  the way a member's does; a served baseline needs `--baseline-brain`.
+- **A brain edit is a slates-api commit.** `brain-lint.mjs` checks sources there since `brainSourcesSince`, and
+  `brain-review.mjs` lists commits from both repos on Eric's page.
+
+**⚠️ What follows predates the move:** read "packages/shared/skills/" as the brain's two homes (this folder for
+the card and router, `slates-api/brain/` for the rest) and "free" as "served by tier".
 
 **⚠️ The bundled skills here are FREE product quality. They are NOT the paid "Agentic Skills Pack" ($29 funnel order bump).** The free/paid line is locked (Eric, 2026-07-09, restated 2026-09-27): *capability free, outcomes paid*, and anything paid has to be tied to ads with a direct return. Everything in `packages/shared/skills/` ships free to every user (CLI `install-skills`, MCP prompting-guide op, desktop Studio Agent); never gate any of it behind the bump. The paid layer is ad playbooks and **campaign blueprints harvested from our real ads** (exact prompt stacks, shot lists, workflow runs per ad, replayable as "make this for my product"). Doctrine: `second-brain/business/projects/slates/strategy/funnel-architecture.md` → "Pack content doctrine".
 
@@ -76,9 +99,9 @@ the MCP working method only points at it. `npm run check:brain` (in the build) h
   `src/skills/my-brain.ts`; `brain-lint.mjs --root <dir> --mine` runs the same checks plus the summary's
   shape and a source on every block.
 
-1. Drop a markdown file with frontmatter into `packages/shared/skills/`, with an operative summary under its title, and name it in the router (`slates-start-here`) or in a playbook the router names. Pin it in `brain-shape.json` (Eric's yes) and source it.
+1. Drop a markdown file with frontmatter into `slates-api/brain/` (only the router lives here), with an operative summary under its title, and name it in the router (`slates-start-here`) or in a playbook the router names. Pin it in `brain-shape.json` (Eric's yes), give it a tier in `brain/tiers.json` if it is not a license file, and source it.
 2. Use portable `name:` and `description:` frontmatter. The shared `src/skills/metadata.ts` parser validates it before embedding or installation. Descriptions distinguish when to use the skill; detailed craft belongs in the body.
-3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record). The CLI's `install-skills` and the `slates_get_prompting_guide` op both read from that record; never edit the generated file by hand.
+3. Rebuild — `scripts/embed-skills.mjs` runs as shared's prebuild and regenerates `src/skills/content.ts` (the `SKILLS` record: the card and router only). The CLI's `install-skills` and the `slates_get_prompting_guide` op read `brainFiles()` (`src/skills/served.ts`), which adds the served brain; never edit the generated file by hand.
 4. **🚨 A first-party prompt guide is authority on the MODEL; the ENDPOINT SCHEMA is authority on the
    REQUEST — and the skill has to serve the request** (learned on MiniMax H3, 2026-08-27). MiniMax's
    own guides document an angle-bracket tag block (`<Subject N>` / `<Picture N>` / `<Video N>` /

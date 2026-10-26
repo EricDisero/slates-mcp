@@ -11,7 +11,8 @@ slates-mcp/
 ├── smithery.yaml               ← Smithery registry config (stdio via npx)
 └── packages/
     ├── shared/                 ← @slatesvideo/shared
-    │   skills/*.md             ← bundled agent recipes (single source)
+    │   skills/*.md             ← the Director card and router only; the rest of the brain is slates-api/brain/, served by tier
+    │   src/skills/served.ts    ← where the served brain comes from (SLATES_BRAIN_DIR, the cache, the account)
     │   scripts/embed-skills.mjs← prebuild: skills/*.md → src/skills/content.ts (gitignored, generated)
     │   src/
     │     auth.ts               ← read/write ~/.slates/agent-connection.json
@@ -114,10 +115,12 @@ If the op needs new desktop endpoints, add the route in `slate/src/main/agent/ro
 
 ## Adding a new skill
 
-**Bundled skills in `packages/shared/skills/` are FREE product quality and ship inside the public
-npm tarball. Paid skills live in the private `slates-api/pack-skills/` and must never be put in
-this repo**, which is public: an entitlement filter over a public artifact protects nothing, and not
-shipping the file is the only gate. The frontmatter, the four skill categories, the `resolveGuideTopic()` alias table and the
+**Only the Director card and the router live in `packages/shared/skills/`, which ships inside the
+public npm tarball. Every playbook, rule and model guide lives in the private `slates-api/brain/`,
+served by the account's tier, and the pack skills in `slates-api/pack-skills/`; none may ever be put
+in this repo**, which is public: an entitlement filter over a public artifact protects nothing, and not
+shipping the file is the only gate. Builds and checks read the brain through `scripts/brain-source.mjs`
+(`SLATES_BRAIN_DIR`, which a worktree must set, else `../slates-api/brain`). The frontmatter, the four skill categories, the `resolveGuideTopic()` alias table and the
 endpoint-schema-beats-model-card rule: `.claude/rules/skills.md`.
 
 **Plugins are generated.** `plugins/slates/` (our Codex and Claude Code marketplace), `plugins/slates-claude-directory/` (Anthropic's directory, server pinned) and `dist-plugins/slates-openai-directory.zip` (OpenAI's directory, skills only) are built by `npm run build:plugins` from `plugins/spec.json`, the skills it selects as they stand in the brain Eric approved (`scripts/brain-eval/scoreboard.json` `approvedCommit`, read with `git show`; a skill he has not approved is held out and named) and `plugins/src/skills/`. A skill edit therefore changes no plugin until `brain-review.mjs --approve` moves the approved commit; rebuild them then, and `npm run build` fails on drift. Directory skills are frozen at submission, so the build refuses a model name, a price or a cap in any plugin skill. Push a version bump only after its npm publish lands: the directory package pins that version. State and Eric's submission steps: second-brain `plans/2026-09-21-slates-chatgpt-plugin-distribution.md`.
