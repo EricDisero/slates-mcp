@@ -13,6 +13,7 @@
       "slates-dialogue-blocking",
       "slates-direct-response-ad",
       "slates-edit-and-iterate",
+      "slates-launch-video",
       "slates-motion",
       "slates-one-prompt-film",
       "slates-previs-blocking",
@@ -64,7 +65,7 @@
       "model": 6500
     },
     "layerWords": {
-      "playbook": 22000,
+      "playbook": 23000,
       "rule": 25000,
       "model": 43000
     },
