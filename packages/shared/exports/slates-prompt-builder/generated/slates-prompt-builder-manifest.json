@@ -56,7 +56,7 @@
     },
     {
       "path": "src/prompts/partials.generated.ts",
-      "sha256": "bd1a8d49b5e7bf7248cb28fff22e5273ba9811b5bba56a790a3c783cec39a102"
+      "sha256": "c24bc9785b15df6de17a11b4e9e898e5106cd7230689b20f9d6678636b4a6e52"
     },
     {
       "path": "src/prompts/reference-rules.ts",
