@@ -83,7 +83,7 @@ Five moves the golden corpus needs were added to this skill's `../../hyperframes
 - **depth-of-field / selective-blur** — blur the off-focus subset to spotlight the focal element → `depth-of-field-blur`
 - **motion-blur streak** — directional velocity blur on a fast fly-in / camera push-through → `motion-blur-streak`
 - **3D depth scatter-assemble** — glyphs/elements scatter into a tumbling 3D cloud, then reassemble → `depth-scatter-assemble`
-- **spring-pop entrance** — the canonical entrance pop; default to a smooth long-tail settle, overshoot only when explicitly playful → `spring-pop-entrance`
+- **spring-pop entrance** — the canonical entrance pop: overshoot and settle, Slates' default arrival (Part 2, rule 1) → `spring-pop-entrance`
 - **ambient glow / bloom** — un-triggered soft glow blooming behind a static hero → `ambient-glow-bloom`
 
 ---
@@ -92,11 +92,9 @@ Five moves the golden corpus needs were added to this skill's `../../hyperframes
 
 These four rules are the difference between a clip that reads as a serious code-change explainer and one that reads as an agent-made PowerPoint. Follow them as written.
 
-## 1. Smooth beats bouncy — `power3` is the default
+## 1. Arrivals overshoot and settle; presses squash
 
-Elements should use **long-tail decel curves that let them settle smoothly. `power3` is enough in most cases.** No bouncy, no overshoot, no `back.out` / `bounce.out` / `elastic.out` as a default.
-
-Bouncy is the **#1 instant turn-off** in user-made Remotion / HyperFrames videos, and the agent almost never gets it right — it thinks bouncy adds emphasis, but it buys that emphasis at the cost of cleanliness. The serious motion-design shops feel the same. **Smooth always wins.** Overshoot is demoted to a **rare, explicitly-playful exception** (a consumer/fun logo slam, a deliberate bell-hit) — never the house style. Name the intent as a long-tail settle; the worker maps `power3` (or `expo.out` on a fast arrival). See `../../hyperframes-animation/rules/spring-pop-entrance.md` — it now leads with the smooth settle. (The exact form of that settle is a critically-damped spring; the worker has a baked, seek-safe `springEase` — ζ=1 — in `../../hyperframes-animation/adapters/gsap-easing-and-stagger.md` → Spring Eases for when the settle is the hero. Real physics, same doctrine — not a license for bounce.)
+Slates' motion doctrine, which replaces this file's earlier ban on overshoot. An arriving element passes its mark and springs back into place: a spring with a damping ratio of about 0.7–0.85 reads premium (the worker's seek-safe `springEase` in `../../hyperframes-animation/adapters/gsap-easing-and-stagger.md` → Spring Eases, or `back.out` near 1.2–1.4). Position and scale may overshoot; opacity and colour never do. A press squashes the control under the cursor and springs it back. An exit is one motion, 40–50% shorter than its entrance, accelerating away (`power3.in`). What still reads cheap is bounce sprayed on everything at once: give each element its role, and after a landing let the camera or the next element carry the motion.
 
 ## 2. Sequential reveal in the back ~50%, timed to the voiceover
 
@@ -108,14 +106,12 @@ This is the anti-PowerPoint mechanism — sharper than "put development in the m
 
 Practically: a frame's shot sequence front-loads almost nothing — the entrance carries only what the VO is saying at t=0, and the rest of the elements wait in the timeline for their spoken cue. A reveal maps onto a development-class move from Part 1 (`per-word staggered reveal`, `cluster→outward expansion`, a `count-up`, an `asr-keyword-glow` synced to the word rail).
 
-## 3. No lazy breathing, no bad pan/push — "no motion over bad motion"
+## 3. Nothing fully stops — overlap, and give every hold a motivated motion
 
-The agent's two reflexive ways to fake "aliveness" both read cheap:
+Slates' motion doctrine, which replaces this file's earlier "no motion over bad motion". Moves overlap: the next one starts when the previous is 30–50% done, so the film never comes to a dead stop between beats. One continuous camera carries the piece, every framing a key on one eased path, never a chain of moves that each stop. A hold keeps a motivated motion: the camera creeps toward what is being read, a highlight glides across the line, a total ticks up. Two kinds of motion stay banned because nothing motivates them:
 
-- **No lazy breathing.** Scaling cards/text up and down in a circular loop to look "alive" is the cheap tell. Don't reach for it.
-- **No bad slow pan / push in the back half.** A slow pan or push on elements in the later ~50% of a scene **disrupts the viewer's sightline and causes eye discomfort** — it actively makes the frame worse, not better.
-
-The fix for both is the same: **stagger element reveals in time with the script** (rule 2). And the governing principle: **"I'd rather have NO motion than BAD motion."** A held, still frame is better than a frame kept "alive" by breathing or a drifting camera. The **only sanctioned aliveness** during a hold is **subtle jitter** — a small low-amplitude jitter that keeps a frame from feeling dead without looking weak (it's in Code editorial videos now). Everything else holds.
+- **No lazy breathing.** Cards or text scaling up and down in a loop to look "alive" is the cheap tell.
+- **No drift off the subject.** A slow pan or push that wanders away from what the viewer is reading in the back half of a scene breaks their sightline. A creep toward it is the opposite move, and the right one.
 
 ## 4. Internal seams are velocity-matched cuts
 
@@ -123,7 +119,7 @@ When a frame has an internal seam — a within-scene swap, a Scene-to-Scene cut,
 
 ## One-line summary
 
-Smooth long-tail (`power3`) over bouncy; reveal sequentially in the back ~50% timed to the VO (not dumped in the first 25%); no lazy breathing and no bad slow pan/push — prefer stillness, with subtle jitter as the only aliveness; cut at peak velocity with matched direction/speed (→ `cut-catalog.md`).
+Arrivals overshoot and settle, presses squash, exits run 40–50% shorter than entrances; reveal sequentially in the back ~50% timed to the VO (not dumped in the first 25%); moves overlap so nothing fully stops, and every hold carries a motivated motion (a camera creep, a highlight), never breathing or a drift off the subject; cut at peak velocity with matched direction/speed (→ `cut-catalog.md`).
 
 ---
 
@@ -141,16 +137,16 @@ The frame is a **paused GSAP timeline seeked frame-by-frame**, so some "continuo
 
 **Slideshow (the primary failure):** everything dumped on screen in the first ~25%; content enters then freezes; nothing revealed on its VO cue. Fix with rule 2 (sequential reveal timed to the VO).
 
-**Cheap aliveness:** circular breathing as "life"; a slow pan/push in the back half disrupting the eye; many elements floating independently as "motion." Fix with rule 3 (stillness + subtle jitter only).
+**Cheap aliveness:** circular breathing as "life"; a slow pan/push that drifts off what is being read; many elements floating independently as "motion." Fix with rule 3 (motivated motion only: a camera creep, a highlight, a count).
 
-**Bouncy:** `back.out` / `bounce.out` / `elastic.out` as the default entrance; hand-keyed overshoot. Fix with rule 1 (`power3` long-tail; overshoot only when explicitly playful).
+**Rigid:** arrivals that stop dead on their mark with no settle, presses with no squash, exits as long as their entrances, moves that finish before the next begins. Fix with rules 1 and 3.
 
 **Always:** no `repeat` / `yoyo`; no `Math.random` / `Date.now`; no all-elements-entering-simultaneously (sequence or stagger).
 
 ## Naming motion in a shot — example
 
-> Scene 1 (0.0–1.0s): solid field; hero headline enters via **per-word staggered reveal** (`dynamic-content-sequencing`) on a smooth long-tail settle (`power3`); slow **push** on the root (`multi-phase-camera`) holds steady — no back-half re-push.
+> Scene 1 (0.0–1.0s): solid field; hero headline enters via **per-word staggered reveal** (`dynamic-content-sequencing`) each word overshooting and settling; the camera's slow **push** on the root (`multi-phase-camera`) keeps creeping toward the headline.
 > Scene 2 (1.0–3.0s): as the VO names each changed file, five file chips reveal **sequentially** via **cluster→outward expansion** (`center-outward-expansion`), then a **value-scaled counter** (`counting-dynamic-scale`) ticks the +/− line total up beneath them — the back-half reveal, timed to the script, not dumped at t=0.
-> Scene 3 (3.0–4.2s): hold on the result; **keyword glow** (`asr-keyword-glow`) lands on the payoff word as the VO says it; settles and holds still — at most **subtle jitter** (`sine-wave-loop`, low amplitude) keeps it alive; no breathing, no drift.
+> Scene 3 (3.0–4.2s): hold on the result; **keyword glow** (`asr-keyword-glow`) lands on the payoff word as the VO says it; the camera keeps creeping toward it; no breathing, no drift off the word.
 
-Name the move + its rule id (or `cut-catalog.md` for a seam cut) per scene; let the worker pick curves, ms, and stagger — defaulting to `power3`.
+Name the move + its rule id (or `cut-catalog.md` for a seam cut) per scene; let the worker pick curves, ms, and stagger — defaulting to an overshoot-and-settle spring on arrivals.

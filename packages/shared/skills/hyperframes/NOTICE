@@ -30,6 +30,16 @@ embedded-captions skill a `lesson` caption identity:
     archivo-latin-wdth-italic.woff2 (added: SIL Open Font License fonts from
     Fontsource)
 
+and these, changed (2026-10-26) so the motion doctrine matches Slates' own:
+arrivals overshoot and settle, presses squash, exits run shorter than
+entrances, moves overlap and every hold carries a motivated motion:
+
+  pr-to-video/references/motion-language.md,
+  product-launch-video/references/motion-language.md,
+  faceless-explainer/references/motion-language.md (changed: Part 2 rules 1
+    and 3, the spring-pop entrance line, the failure modes, the summary and
+    the worked example)
+
 Slates' other additions sit beside them and are not part
 of HyperFrames: this NOTICE, LICENSE-hyperframes (the upstream LICENSE file,
 renamed) and SLATES-MAPPING.md (how the commands and surfaces these skills name
