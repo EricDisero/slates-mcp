@@ -145,6 +145,9 @@ export class OperationCancelledError extends Error {
  * Eric, 2026-10-23, after a Seedance test was prompted before its guide was
  * read: *"That needs to be a hard blocker."* Nothing was generated or charged.
  */
+/** How a machine with no brain gets one: the desktop app signed in here writes it, or a CLI login fetches it. */
+const CONNECT_FOR_BRAIN = 'Have the user open the Slates app signed in on this machine (it brings the brain here), or run `slates login`'
+
 export class GuideNotReadError extends Error {
   code = 'GUIDE_NOT_READ'
   constructor(readonly model: string, readonly guide: string) {
@@ -160,7 +163,7 @@ export class GuideNotReadError extends Error {
         : // No copy here and none locked: the brain never arrived, so asking for the guide again cannot help.
           head +
             `The guide comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ` +
-            `Tell the user to connect Slates (Settings → AI tools, or \`slates login\`); then call slates_get_prompting_guide with topic "${guide}" and call this again.`
+            `${CONNECT_FOR_BRAIN}; then call slates_get_prompting_guide with topic "${guide}" and call this again.`
     )
   }
 }
@@ -10442,12 +10445,15 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     // The user's file by its exact name wins over an alias (their `flux-portraits` is theirs, not the FLUX guide);
     // the router's names are reserved in the loader, so none of them reaches here as a local file. A name missing
     // its `slates-` prefix is that guide, resolved here so it never waits on the member check.
-    const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic) ?? (Object.hasOwn(brain.skills, `slates-${topic}`) ? `slates-${topic}` : null)) : null
+    // With no brain on this machine, an exact `slates-*` name (the one a guide-gate refusal gives) is that guide, not
+    // an unknown topic: it answers with how to get the brain instead of the catalog, and so never loops.
+    const unheld = topic && served.source === 'none' && /^slates-[a-z0-9-]+$/.test(topic) ? topic : null
+    const resolved = topic ? (Object.hasOwn(brain.skills, topic) ? topic : resolveGuideTopic(topic) ?? (Object.hasOwn(brain.skills, `slates-${topic}`) ? `slates-${topic}` : unheld)) : null
     if (resolved && !Object.hasOwn(brain.skills, resolved)) {
       // An alias named a guide this process does not hold: a locked one, or no brain at all (not connected, and
       // nothing cached yet).
       const lockedAlias = served.locked.find(entry => entry.name === resolved)
-      const guide = lockedAlias?.notice ?? `The guide ${resolved} comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). Connect Slates (Settings → AI tools, or \`slates login\`), then ask again.`
+      const guide = lockedAlias?.notice ?? `The guide ${resolved} comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ${CONNECT_FOR_BRAIN}, then ask again.`
       // A locked guide's notice carries its craft card (slates-api lib/brain.ts lockedNotice), so it counts as read; a
       // guide that never arrived does not, so no generation runs without the card (Eric, 2026-10-23: a hard blocker).
       if (lockedAlias) ctx?.guidesRead?.add(resolved)
