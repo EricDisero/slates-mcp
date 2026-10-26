@@ -12,6 +12,7 @@ description: "One ad into many: hook, body and end-card slots, the grid of combi
 - Read the grid before exporting and tell the user the count, variants times formats; quote any missing takes and never fill one from the grid. (§ Read the grid)
 - Export every file in one `slates_export_cuts` request (`version: 2`, a new `batchId`, the same pick the grid read) and poll `slates_get_export_batch`. (§ Export every file in one request)
 - Every variant is an ordinary cut afterwards; a hand edit holds until a rebuild, and seams are set per variant. (§ After the export)
+- Each hook keeps the truth rules: no invented claim, and no price of theirs or a competitor's until the user gives it. (§ The truth rules) <!-- src: brain craft eval, a variants hook invented a coffee-shop price to compare against, 2026-10-25 -->
 <!-- @operative:end -->
 
 An ad variant is one alternative per slot laid end to end over the cut's bed (its own music and sound). The body exists once, so a fix to it shows in every variant. Nothing here generates or spends: a take the grid says is missing is shown with its price, and made only on its Shot, with the user's yes, like any other generation.
@@ -23,6 +24,15 @@ An ad variant is one alternative per slot laid end to end over the cut's bed (it
 - **Each hook works alone and flows into the body.** Read every join aloud.
 - **Different ideas need different ads.** Hooks on one body test openings within one idea; testing ideas against each other takes different reference ads, each its own cut.
 - **Formats cost nothing to add.** Every aspect comes from the same takes at export.
+
+## The truth rules
+
+<!-- @inject:ad-truth-rules -->
+- Every claim is literally true of the user's product: no invented guarantee, statistic, result or offer term, and no claim read off a reference picture.
+- Never suggest a price, discount or offer, theirs or a competitor's, even as an example ("say, about four dollars a can"): ask for theirs and leave a bracket in the line until they give it, because an example figure ends up in the ad. <!-- src: brain craft eval, dr-copy offered example prices while asking for the real one, 2026-10-25; a variants hook invented a coffee-shop price, 2026-10-25 -->
+- No fabricated testimonials or reviews. An AI person may present the product and say what it is; it never says or implies that it bought or used the product or got a result from it. Fake and AI-generated testimonials are banned outright in the United States (the FTC's rule on fake reviews, 16 CFR Part 465). Keep the reference's beat and give the line to someone who can say it truthfully, or turn it into a fact about the product.
+- A real person's likeness, a brand or a logo follows `slates-content-policy`.
+<!-- @end:ad-truth-rules -->
 
 ## Set up the slots
 
