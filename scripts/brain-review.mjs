@@ -12,6 +12,12 @@
 // brain-approved.json pins; a commit there is a brain commit too, and --approve moves both pins together. The hash
 // catches the rest.
 //
+// The two pins are watched too: scoreboard.json here and brain-approved.json there. A commit that changes either is
+// a change waiting on Eric unless it is the record of the approval --approve wrote (isApproval), so a pin moved by
+// hand, in either repo or both, shows on his page and stops the publish. That stops an agent drifting, not a
+// determined attacker: a hand-written lastApproval with gate lines passes. What the whole guard stops and does not:
+// slates-api src/lib/brain.ts.
+//
 //   node scripts/brain-review.mjs --spec <out.json> --notes <notes.json> [--craft <craft.json>] [--routing <routing.json>]…
 //       The review page's items (build the page with the vault's tools/review_page.py), one per brain commit since the
 //       approved brain, ranked by reach: router and doctrine, playbooks, rules, motion guides, model guides, then the
@@ -43,15 +49,17 @@ const SHAPE = 'scripts/brain-shape.json'
 // The doctrine the build wraps around the skills (both surfaces' doctrine, the MCP instructions, the router notice and
 // the guide index), all of which brainHash covers.
 const DOCTRINE = ['packages/shared/src/prompts/agent-doctrine.ts', 'packages/shared/src/prompts/brain.ts', 'packages/shared/src/prompts/guide-discovery.ts']
-const WATCHED = [SKILLS, SHAPE, ...DOCTRINE]
-const watchedPath = (p) => p.startsWith(`${SKILLS}/`) || p === SHAPE || DOCTRINE.includes(p)
-const BOARD = join(root, 'scripts', 'brain-eval', 'scoreboard.json')
+const BOARD_PATH = 'scripts/brain-eval/scoreboard.json'
+const API_PIN = 'brain-approved.json'
+const WATCHED = [SKILLS, SHAPE, ...DOCTRINE, BOARD_PATH]
+const watchedPath = (p) => p.startsWith(`${SKILLS}/`) || p === SHAPE || DOCTRINE.includes(p) || p === BOARD_PATH
+const BOARD = join(root, BOARD_PATH)
 const shape = JSON.parse(readFileSync(join(root, SHAPE), 'utf8'))
-// Reach order: the router and the doctrine reach every job, a playbook or a motion guide one kind of job, a rule what
-// links it, a model guide one model; the shape file pins the rest.
+// Reach order: the router, the doctrine and the pins reach every job, a playbook or a motion guide one kind of job, a
+// rule what links it, a model guide one model; the shape file pins the rest.
 const LAYERS = ['router', 'playbook', 'rule', 'motion', 'model']
-const RANK = { router: 0, doctrine: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
-const LABEL = { router: 'Router', doctrine: 'Doctrine', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
+const RANK = { router: 0, doctrine: 0, pin: 0, playbook: 1, rule: 2, motion: 3, model: 4 }
+const LABEL = { router: 'Router', doctrine: 'Doctrine', pin: 'Approval pin', playbook: 'Playbook', rule: 'Rule', motion: 'Motion guide', model: 'Model guide', other: 'Other file' }
 // The brain's deep layers: slates-api's brain/, approved by the commit brain-approved.json pins there.
 const BRAIN = brainDir({ optional: true })
 if (!BRAIN) {
@@ -61,9 +69,10 @@ if (!BRAIN) {
 }
 const API = dirname(BRAIN)
 const BRAIN_PATH = basename(BRAIN)
-const PIN = join(API, 'brain-approved.json')
+const PIN = join(API, API_PIN)
 const layerOf = (file) => {
   if (DOCTRINE.includes(file)) return 'doctrine'
+  if (file === BOARD_PATH || file === API_PIN) return 'pin'
   const home = [`${SKILLS}/`, `${BRAIN_PATH}/`].find((p) => file.startsWith(p))
   if (!home) return 'other'
   const path = file.slice(home.length)
@@ -83,17 +92,33 @@ if (!pin.commit) throw new Error(`${PIN} has no commit`)
 const REPOS = {
   mcp: { cwd: root, watched: WATCHED, approved },
   // The files, the code that decides who reads which and what a locked file says, and the pin itself.
-  api: { cwd: API, watched: [BRAIN_PATH, 'src/lib/brain.ts', 'src/lib/brain-notice.ts', 'brain-approved.json'], approved: pin.commit },
+  api: { cwd: API, watched: [BRAIN_PATH, 'src/lib/brain.ts', 'src/lib/brain-notice.ts', 'src/lib/brain-served.ts', API_PIN], approved: pin.commit },
 }
 const gitAt = (repo, ...args) => gitRaw(args, { cwd: REPOS[repo].cwd }).trim()
-/** True when a brain-approved.json text pins the approval scoreboard.json holds: its slates-api commit and hash. */
-function recordsApproval(text) {
+const jsonAt = (repo, rev, path) => {
   try {
-    const p = JSON.parse(text)
-    return p.commit === board.approvedApiCommit && p.approvedBrainHash === board.approvedBrainHash
+    return JSON.parse(gitAt(repo, 'show', `${rev}:${path}`))
   } catch {
-    return false
+    return null
   }
+}
+const APPROVAL = ['approvedCommit', 'approvedApiCommit', 'approvedBrainHash']
+/**
+ * True when commit `full` in `repo`, touching `files` of the watched set, is the record of the approval scoreboard.json
+ * holds, as --approve wrote it, and so not a change waiting on one. Only --approve writes lastApproval, with the gate's
+ * report, so the first baseline (none) has no approval commit. Here: the commit changes only scoreboard.json, to the
+ * board's approval and lastApproval, and that lastApproval starts from the approved commit the board named before it.
+ * In slates-api: the commit changes only brain-approved.json, to the board's slates-api commit and brain hash.
+ */
+function isApproval(repo, full, files) {
+  const file = repo === 'mcp' ? BOARD_PATH : API_PIN
+  if (!board.lastApproval?.gate?.length || !files.every((f) => f.path === file)) return false
+  const now = jsonAt(repo, full, file)
+  if (repo === 'api') return now?.commit === board.approvedApiCommit && now?.approvedBrainHash === board.approvedBrainHash
+  const before = jsonAt(repo, `${full}^`, file)
+  return APPROVAL.every((k) => now?.[k] === board[k]) &&
+    JSON.stringify(now.lastApproval) === JSON.stringify(board.lastApproval) &&
+    now.lastApproval.from === before?.approvedCommit
 }
 const argv = process.argv
 const flag = (name) => { const k = argv.indexOf(`--${name}`); return k < 0 ? undefined : argv[k + 1] }
@@ -145,9 +170,7 @@ function pending(ranges = {}) {
         const [add, del, path] = row.split('\t')
         return { path, add: Number(add) || 0, del: Number(del) || 0, layer: layerOf(path) }
       })
-      // The commit that records the approval scoreboard.json holds (only brain-approved.json, pinning that approval)
-      // is the approval itself, not a change waiting on one.
-      if (repo === 'api' && files.every((f) => f.path === 'brain-approved.json') && recordsApproval(at(['show', `${full}:brain-approved.json`]))) continue
+      if (isApproval(repo, full, files)) continue
       const diff = at(['show', '--format=', '-U0', full, '--', ...watched])
       // The sources the commit's added lines carry (`<!-- src: … -->`, required since brain-shape.json's sourcesSince).
       const sources = [...new Set([...diff.matchAll(/^\+.*?<!--\s*src:\s*([^>]*?)\s*-->/gm)].map((m) => m[1]))]
@@ -257,11 +280,11 @@ if (argv.includes('--approve')) {
   const held = items.filter((it) => decided.get(it.id) === 'hold')
 
   // What he held is out of HEAD, and nothing came in after the page that he did not see: in each home, its own
-  // commits after the page's head there (slates-api's only those touching brain/).
+  // commits after the page's head there (slates-api's only those touching what it watches: the brain, its code, the pin).
   const repoOf = (it) => it.repo ?? 'mcp'
   const since = {}, after = {}
   for (const repo of Object.keys(REPOS)) {
-    const scope = repo === 'api' ? ['--', BRAIN_PATH] : []
+    const scope = repo === 'api' ? ['--', ...REPOS.api.watched] : []
     since[repo] = gitAt(repo, 'rev-list', '--reverse', `${REPOS[repo].approved}..HEAD`, ...scope).split('\n').filter(Boolean)
     after[repo] = gitAt(repo, 'rev-list', '--reverse', `${heads[repo]}..HEAD`, ...scope).split('\n').filter(Boolean)
   }
@@ -277,7 +300,7 @@ if (argv.includes('--approve')) {
 
   const dirty = [
     ...gitRaw(['status', '--porcelain', '--', 'packages/shared', ...WATCHED]).split('\n').filter(Boolean).map((l) => l.slice(3)),
-    ...gitRaw(['status', '--porcelain', '--', BRAIN_PATH, 'brain-approved.json'], { cwd: API }).split('\n').filter(Boolean).map((l) => `slates-api/${l.slice(3)}`),
+    ...gitRaw(['status', '--porcelain', '--', ...REPOS.api.watched], { cwd: API }).split('\n').filter(Boolean).map((l) => `slates-api/${l.slice(3)}`),
   ]
   if (dirty.length) refuse.push(`commit or revert what is not committed under packages/shared and the brain files: ${dirty.slice(0, 8).join(', ')}${dirty.length > 8 ? ` and ${dirty.length - 8} more` : ''}`)
 
@@ -302,6 +325,8 @@ if (argv.includes('--approve')) {
   // slates-api serves the brain at this commit from its next deploy (its build exports brain/ at the pin), and its
   // snapshot refuses a pin whose commit and hash are not these (approvedApiCommit, approvedBrainHash).
   pin.commit = after.api.length ? gitAt('api', 'rev-parse', 'HEAD') : heads.api
+  // The hash of brain/ at that commit as the server serves it, which its build and its boot check the export against.
+  const servedHash = execFileSync('node', ['scripts/brain-snapshot.mjs', '--served-hash', pin.commit], { cwd: API, encoding: 'utf8' }).trim()
   board.approvedApiCommit = pin.commit
   board.approvedOn = new Date().toISOString().slice(0, 10)
   delete board.firstBaseline
@@ -316,6 +341,7 @@ if (argv.includes('--approve')) {
   writeFileSync(BOARD, JSON.stringify(board, null, 2) + '\n')
   pin.approvedOn = board.approvedOn
   pin.approvedBrainHash = current.brainHash
+  pin.servedHash = servedHash
   pin.standsFor = `the brain Eric approved with slates-mcp ${board.approvedCommit} (brain ${current.brainHash})`
   writeFileSync(PIN, JSON.stringify(pin, null, 2) + '\n')
   console.log(`✓ brain review: ${items.length - held.length} approved, ${held.length} held and reverted; the approved brain is now ${board.approvedCommit} here and ${pin.commit.slice(0, 7)} in slates-api (brain ${current.brainHash}). Next: npm run build:plugins, then commit scoreboard.json with plugins/** here, and brain-approved.json in slates-api.`)
@@ -373,7 +399,7 @@ const items = ranked.map((c, i) => {
     repo: c.repo,
     kind: layer,
     kind_label: `${i + 1}. ${LABEL[layer]}`,
-    tone: { router: 3, doctrine: 3, playbook: 2, rule: 1, motion: 1 }[layer] ?? 0,
+    tone: { router: 3, doctrine: 3, pin: 3, playbook: 2, rule: 1, motion: 1 }[layer] ?? 0,
     title: c.subject.length > 160 ? `${c.subject.slice(0, 157)}…` : c.subject,
     meta: `${c.date} · ${c.repo === 'api' ? 'slates-api ' : ''}${c.hash} · +${c.files.reduce((n, f) => n + f.add, 0)} −${c.files.reduce((n, f) => n + f.del, 0)}`,
     src: [...new Set(c.files.map((f) => short(f.path).replace(/\.md$/, '')))].join(', '),
@@ -385,13 +411,14 @@ const items = ranked.map((c, i) => {
 })
 const head = git('rev-parse', 'HEAD')
 const spec = {
-  intro: `${items.length} changes to the brain every Slates user's agent reads, since the brain you last approved (${approved}). They are ranked by reach, so the ones that change the most jobs come first: a router or doctrine change reaches every job an agent does, then playbooks (one kind of job each), rules (every job that links them), motion guides, model guides (one model each), then the shape file; within a layer the bigger change comes first.${tests.length ? ` Tests of the brain with all of them, against the approved brain in the same batch: ${tests.join('; ')}.` : ''} Approve sends a change out with the next shared release; Hold keeps it out (it is reverted before anything ships).${outsideNote}`,
+  intro: `${items.length} changes to the brain every Slates user's agent reads, since the brain you last approved (${approved}). They are ranked by reach, so the ones that change the most jobs come first: a router, doctrine or approval pin change reaches every job an agent does (a pin edited by hand moves what is served without this page), then playbooks (one kind of job each), rules (every job that links them), motion guides, model guides (one model each), then the shape file; within a layer the bigger change comes first.${tests.length ? ` Tests of the brain with all of them, against the approved brain in the same batch: ${tests.join('; ')}.` : ''} Approve sends a change out with the next shared release; Hold keeps it out (it is reverted before anything ships).${outsideNote}`,
   collection: 'review',
   choices: [{ id: 'approve', label: 'Approve' }, { id: 'hold', label: 'Hold' }],
   note_placeholder: 'What to change before it ships…',
   filters: [
     { id: 'router', label: 'Router', kind: 'router' },
     { id: 'doctrine', label: 'Doctrine', kind: 'doctrine' },
+    { id: 'pin', label: 'Approval pins', kind: 'pin' },
     { id: 'playbook', label: 'Playbooks', kind: 'playbook' },
     { id: 'rule', label: 'Rules', kind: 'rule' },
     { id: 'motion', label: 'Motion guides', kind: 'motion' },

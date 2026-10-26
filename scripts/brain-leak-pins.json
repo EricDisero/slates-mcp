@@ -1,0 +1,11 @@
+{
+  "about": "Brain lines (the first 12 hex characters of the sha256 of the trimmed line) that brain-leak-check.mjs lets a public file share, because that file is the line's home and the brain restates it: an op description, a prompting tip, a provider's own example, the manual. Every pin below was in its public file at d534f39, the commit the brain left this repo (checked 2026-10-25). Pin a line only when the public file is its home; text pasted from the brain moves to slates-api instead. The check warns on a pin that no longer matches.",
+  "pins": {
+    "packages/shared/src/manual/content.ts": ["68e06eee5233", "b64e4511995e"],
+    "packages/shared/src/operations/index.ts": ["012e40fcdd39", "0ed209a66f49", "1ee2c319d464", "326fafe538f6", "5e533b961241", "b64e4511995e"],
+    "packages/shared/src/prompts/prompting-tips.ts": [
+      "0ffebc0fc01d", "17e4f7a5cbcc", "281b3ab044eb", "57b8054c9ab0", "5e533b961241", "7cbf6f9182f5", "7e8c843473ba",
+      "84edcfa2a341", "8c92918a9a08", "9103fc8841a0", "b02b6d3a3346", "b292815b66da", "d417ad67a2e6"
+    ]
+  }
+}

@@ -7,6 +7,8 @@
 # Then: `gh workflow run publish.yml -R EricDisero/slates-mcp` publishes every package whose version in
 # packages/*/package.json is not on the registry yet, shared first (the other two depend on it).
 # Runbook: slates-api/docs/coordinated-release-runbook.md step 2.
+#
+# For now it refuses at its first step: publishing is local only, from a machine with slates-api (below).
 name: Publish to npm
 
 on:
@@ -25,6 +27,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # Shared's prepublishOnly runs brain-review.mjs --check, which reads the private slates-api checkout (the brain
+      # and its pin) and exits 1 without it, and brain-leak-check.mjs skips without it. This runner has only this
+      # repo, so every publish here would fail or ship unchecked. Publish from a terminal on a machine with slates-api
+      # beside slates-mcp (slates-api/docs/coordinated-release-runbook.md step 2). What removes this step: checking
+      # out slates-api here with a read-only deploy key, so both checks run.
+      - name: Refuse to publish without slates-api
+        run: |
+          echo "::error::Publish from a machine with slates-api checked out beside slates-mcp: the brain review (brain-review.mjs --check) and the leak check need it, and this runner has only slates-mcp."
+          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
