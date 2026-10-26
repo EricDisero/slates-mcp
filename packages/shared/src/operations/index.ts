@@ -146,7 +146,7 @@ export class OperationCancelledError extends Error {
  * read: *"That needs to be a hard blocker."* Nothing was generated or charged.
  */
 /** How a machine with no brain gets one: the desktop app signed in here writes it, or a CLI login fetches it. */
-const CONNECT_FOR_BRAIN = 'Have the user open the Slates app signed in on this machine (it brings the brain here), or run `slates login`'
+export const CONNECT_FOR_BRAIN = 'Have the user open the Slates app signed in on this machine (it brings the brain here), or run `slates login`'
 
 export class GuideNotReadError extends Error {
   code = 'GUIDE_NOT_READ'

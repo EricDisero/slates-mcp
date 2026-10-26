@@ -55,10 +55,10 @@
 // the whole embedded SKILLS record. Root barrel only.
 // ============================================================
 
-import { brainFiles } from '../skills/served.js'
+import { brainFiles, servedBrain } from '../skills/served.js'
 import { guideCatalog } from './guide-discovery.js'
 import { BRAIN_ROUTER, DIRECTOR_CARD, ROUTER_BODY } from './brain.js'
-import { VIDEO_MODELS, AUDIO_MODELS, WORKING_METHOD_TOPIC } from '../operations/index.js'
+import { VIDEO_MODELS, AUDIO_MODELS, WORKING_METHOD_TOPIC, CONNECT_FOR_BRAIN } from '../operations/index.js'
 
 /**
  * Which agent surface is being briefed.
@@ -369,9 +369,15 @@ export function buildAgentDoctrine({ surface }: { surface: AgentSurface }): stri
   // lint proves every skill is reachable from it. The Director card (L0) opens
   // the doctrine. Per-model guides stay bare names: `resolveGuideTopic()` maps
   // a model id to its guide in code, and the guide gate makes the agent read
-  // one before that model's first generation.
-  const perModel = buildSkillIndex().filter((s) => s.name.startsWith('slates-prompting-'))
-  const perModelIndex = `PER-MODEL PROMPTING GUIDES — pass the model id, or the name: ${perModel.map((s) => s.name).join(', ')}`
+  // one before that model's first generation. A guide past the account's tier is
+  // still named (it answers with its notice); with no brain on this machine yet (a
+  // first launch, before connecting) the line says so rather than listing nothing.
+  const perModel = [...new Set([...buildSkillIndex(), ...servedBrain().locked].map((s) => s.name))]
+    .filter((name) => name.startsWith('slates-prompting-'))
+    .sort()
+  const perModelIndex = perModel.length
+    ? `PER-MODEL PROMPTING GUIDES — pass the model id, or the name: ${perModel.join(', ')}`
+    : `PER-MODEL PROMPTING GUIDES load once this machine is connected to the user's Slates account. ${CONNECT_FOR_BRAIN}.`
 
   return `${PREAMBLE[surface]}
 

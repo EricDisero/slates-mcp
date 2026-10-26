@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { toolModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 import { refreshServedBrain, useBrainSource } from '../packages/shared/dist/skills/served.js'
+import { buildAgentDoctrine } from '../packages/shared/dist/prompts/agent-doctrine.js'
 import { brainOrSkip } from './brain-source.mjs'
 
 const emptyHome = process.argv[2] === '--empty-home'
@@ -40,6 +41,8 @@ if (emptyHome) {
   const fresh = () => ({ desktop: () => desktop, cloud: noLogin, guidesRead: new Set() })
   const kling = 'kling-v3-pro'
   const klingGuide = resolveGuideTopic(kling)
+  const perModelLine = () => buildAgentDoctrine({ surface: 'mcp' }).split('\n').find((l) => l.startsWith('PER-MODEL'))
+  assert.match(perModelLine(), /load once this machine is connected.*slates login/, 'a first launch names the connect step, not an empty guide list')
 
   // Unreachable: nothing cached. By exact name or alias, the answer says how to get the brain, never the catalog,
   // and does not count as read; the gate's refusal says the same, so the agent is never sent round in a loop.
@@ -60,6 +63,7 @@ if (emptyHome) {
     version: 'test.0', tiers: [], account: 'u1', files: {}, locked: [{ name: seedanceGuide, tier: 'license', description: 'Seedance', notice }],
   }))
   useBrainSource()
+  assert.ok(perModelLine().includes(seedanceGuide), 'a guide past the tier is still named in the per-model index')
   for (const topic of [seedanceGuide, 'seedance-2.5']) {
     const s = fresh()
     await assert.rejects(generateVideo.run({ ...video }, s), (err) => err instanceof GuideNotReadError && err.message.includes(`topic "${seedanceGuide}"`))
