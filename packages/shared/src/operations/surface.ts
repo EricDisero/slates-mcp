@@ -309,6 +309,26 @@ export interface ToolDefinition {
 }
 
 /**
+ * zod-to-json-schema writes a tuple the draft-07 way, `items: [a, b]`. Claude's API reads tool
+ * schemas as draft 2020-12, where `items` must be one schema, so it refuses the whole request with
+ * a 400 (and Claude Code drops the tool). 2020-12 spells a tuple `prefixItems`, with `items` taking
+ * the old `additionalItems`. Receipt: 2026-10-26, five tools (the keyframe easing's `cubicBezier`,
+ * caption `phrases`) unusable in Claude Code and the Studio Agent since 0.6.3.
+ */
+function draft2020Tuples(node: unknown): void {
+  if (Array.isArray(node)) return node.forEach(draft2020Tuples)
+  if (!node || typeof node !== 'object') return
+  const n = node as Record<string, unknown>
+  if (Array.isArray(n.items)) {
+    n.prefixItems = n.items
+    if ('additionalItems' in n) n.items = n.additionalItems
+    else delete n.items
+    delete n.additionalItems
+  }
+  Object.values(n).forEach(draft2020Tuples)
+}
+
+/**
  * Render one op's tool definition.
  *
  * `$refStrategy: 'none'` is the shape both surfaces now emit: inlined, so no
@@ -322,6 +342,7 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
     unknown
   >
   delete schema.$schema
+  draft2020Tuples(schema)
   // zod-to-json-schema 3 renders a zod 4 schema as `{}`, without an error. That
   // happens when this package resolves the consumer's zod 4 instead of its own
   // zod 3: slate's install lost `node_modules/@slatesvideo/shared/node_modules/zod`

@@ -1137,6 +1137,31 @@ function zodDescriptions(op) {
   else pass(CHECK, `${ALL_OPERATIONS.length} tools render object schemas; a zod 4 schema is refused`)
 }
 
+// ── 15. every schema is draft 2020-12, the draft Claude's API reads ─────────
+// The API refuses a whole request whose tool schema is not 2020-12 (HTTP 400), and Claude Code drops
+// the tool. zod-to-json-schema writes tuples the draft-07 way; toolDefinition() rewrites them. Five
+// tools shipped unusable that way from 0.6.3 to 0.6.5 (2026-10-26).
+{
+  const CHECK = '15 schema-draft-2020'
+  const { toolDefinition } = shared
+  const { z } = await import('zod')
+  const { default: Ajv2020 } = await import('ajv/dist/2020.js')
+  const ajv = new Ajv2020({ strict: false })
+  const invalid = []
+  for (const op of ALL_OPERATIONS) {
+    try {
+      ajv.compile(toolDefinition(op).inputSchema)
+    } catch (error) {
+      invalid.push(`${op.id} (${String(error?.message).slice(0, 120)})`)
+    }
+  }
+  const tuple = toolDefinition({ id: 'probe_tuple', description: 'probe', input: z.object({ t: z.tuple([z.number(), z.string()]) }), billable: false })
+  const probe = Array.isArray(tuple.inputSchema.properties.t.prefixItems) ? null : 'a tuple no longer renders as prefixItems'
+  if (invalid.length) fail(CHECK, `tool schemas Claude's API refuses: ${invalid.join('; ')}`)
+  else if (probe) fail(CHECK, probe)
+  else pass(CHECK, `${ALL_OPERATIONS.length} tool schemas compile as draft 2020-12; a tuple renders as prefixItems`)
+}
+
 // ── report ──────────────────────────────────────────────────────────────────
 for (const w of warnings) console.warn(`  !!  skipped: ${w}`)
 if (failures.length > 0) {
