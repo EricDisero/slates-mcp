@@ -39,6 +39,20 @@ entrances, moves overlap and every hold carries a motivated motion:
   faceless-explainer/references/motion-language.md (changed: Part 2 rules 1
     and 3, the spring-pop entrance line, the failure modes, the summary and
     the worked example)
+  pr-to-video/references/visual-design.md,
+  product-launch-video/references/visual-design.md,
+  faceless-explainer/references/visual-design.md (changed: the held-read,
+    arrival-curve and motion-grammar lines that preferred stillness and
+    smooth over bouncy)
+  hyperframes-animation/rules/spring-pop-entrance.md (changed: the
+    description, the default ease, the recipe, the variations, the values and
+    the constraints: arrivals overshoot and settle)
+  hyperframes-animation/adapters/gsap-easing-and-stagger.md (changed: the
+    ease table, the doctrine lines, the spring comments and damping table,
+    the usage example)
+  hyperframes-animation/rules/sine-wave-loop.md,
+  hyperframes/references/frame-worker-core.md (changed: one sentence each
+    that quoted "no motion over bad motion")
 
 Slates' other additions sit beside them and are not part
 of HyperFrames: this NOTICE, LICENSE-hyperframes (the upstream LICENSE file,

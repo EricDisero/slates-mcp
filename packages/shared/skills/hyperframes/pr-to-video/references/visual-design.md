@@ -12,13 +12,13 @@ Write each frame as a handful of windows cued by the spoken line:
 Scene 1 (0.0–Xs):  only what the VO is saying at t=0 enters — never the whole canvas
 Scene 2 (Xs–Ys):   the next piece reveals as the VO names it (a file chip / the hunk / a node / a stat)
   …                one window per spoken cue — as many or as few as the line calls for
-Scene N (…–end):   content has resolved; hold the read (stillness; subtle jitter at most)
+Scene N (…–end):   content has resolved; hold the read with a motivated motion (a camera creep toward it, a highlight, a count)
 ```
 
 - Each `Scene` line names **what's on screen**, **what moves in this window**, and **where it sits** (layout, inline). Times are real seconds across the frame's `duration`.
 - **Pace reveals to the voiceover; never front-load.** This is the core anti-PowerPoint mechanism (→ `motion-language.md` Part 2 Rule 2). At t=0 show only what the VO is saying then; reveal each further piece — a line, a file chip, the hunk, a stat — **when the VO names it**, spreading reveals across the shot and especially the **back ~50%**. **The window count = the number of spoken cues the line calls for.** There is **no fixed count and no mandatory "middle" act**; the only sin is dumping everything up front.
-- **End on a held read.** Once the content has resolved it holds and reads — **prefer stillness to bad motion**: no forced camera drift, no lazy breathing, no back-half pan/push; at most a subtle jitter keeps it alive (→ `motion-language.md`). Only the final frame has a real exit; every other frame's exit is the harness transition (story's `transition_in`).
-- A **deliberately held** frame — content already revealed, now reading still — is legitimate and often right (a climax, a breather). The failure is never "too still"; it is **front-loaded-then-frozen**. Place held beats deliberately for rhythm (allocate them in `## Video direction`).
+- **End on a held read.** Once the content has resolved it holds and reads — **keep a motivated motion alive**: a camera creep toward what is being read, a highlight gliding across the line, a total ticking up; never lazy breathing or a drift off the subject (→ `motion-language.md`). Only the final frame has a real exit; every other frame's exit is the harness transition (story's `transition_in`).
+- A **deliberately held** frame — content already revealed, now being read with only a motivated motion — is legitimate and often right (a climax, a breather). The failure is never "too still"; it is **front-loaded-then-frozen**. Place held beats deliberately for rhythm (allocate them in `## Video direction`).
 
 ## Pick the shape — instantiate a blueprint
 
@@ -54,7 +54,7 @@ Story-design's `## Frame N` block already carries the narrative. You append the 
 
 Scene 1 (0.0–1.0s): the navy Code Surface window seats in (scale-in + soft shadow), file header "client/request.ts" types on — Centered, ~60% of frame. Slow push-in underneath.
 Scene 2 (1.0–3.2s): the camera settles onto the hunk; the `code-diff` block runs its own before→after on its cadence (the worker fits it to the duration) — you do not re-specify the code motion.
-Scene 3 (3.2–4.5s): a coral underline draws on the changed line as the VO names it; a `+6/−2` count-up ticks beside the header; settles and holds STILL.
+Scene 3 (3.2–4.5s): a coral underline draws on the changed line as the VO names it; a `+6/−2` count-up ticks beside the header; settles, and the camera keeps creeping toward it.
 ```
 
 The lightweight tags:
@@ -64,7 +64,7 @@ The lightweight tags:
 - **`roles:`** — each element's role: `foreground subject` · `background` (full-bleed, dim 30–50%) · `supporting`. Invented elements you **design**; the only real assets are the credits `assets/<login>.png` avatars (named in story's `asset_candidates`).
 - **`sfx:`** — name the sound the beat wants; the audio script's `fetch-sfx` retrieves it and the assembler mounts it at root — you only **name** it, never embed `<audio>`.
 
-**Layout + motion are stated INLINE in each Scene line** — name the template / density / depth as part of "where it sits", and name the move from `motion-language.md`'s vocabulary; let it settle on a long-tail curve (`power3` default). Never write px / scale / ease curves / ms (the worker writes those).
+**Layout + motion are stated INLINE in each Scene line** — name the template / density / depth as part of "where it sits", and name the move from `motion-language.md`'s vocabulary; let it arrive with an overshoot-and-settle (a spring; `power3` only for what must not overshoot). Never write px / scale / ease curves / ms (the worker writes those).
 
 ## PR code beats — name a `code-*` block
 
@@ -121,7 +121,7 @@ The zones, density, hierarchy, and depth principles all still apply; the **aspec
 The whole video shares one look and one motion grammar. Write a **`## Video direction`** block ONCE at the top of `STORYBOARD.md` so every frame inherits it and per-frame Scene lines carry only the **delta**. This block is load-bearing — **keep it.**
 
 - **palette system** — from `frame.md` (code-editorial): which roles map to which hues. Never invent.
-- **motion grammar + reveal model** — long-tail eases (`power3` default, smooth over bouncy) + the **VO-paced reveal** model + what may stay alive during a hold (subtle jitter at most) (→ `motion-language.md`).
+- **motion grammar + reveal model** — arrival springs (overshoot and settle; `power3` only for what must not overshoot) + the **VO-paced reveal** model + what keeps a hold alive (a motivated motion: a camera creep, a highlight) (→ `motion-language.md`).
 - **rhythm / held-frame allocation** — name the **held / breather frames** so the video varies its energy.
 - **negative list** — off-brand textures, **plus both motion failure modes** — slideshow (front-load then freeze) and screensaver (everything floating independently) (→ `motion-language.md`).
 
@@ -142,7 +142,7 @@ The bottom ~17% of the canvas is reserved for the caption pill. Plan every frame
 | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | the proven shapes + role→blueprint menu + how to pick                           | `../../hyperframes-animation/blueprints-index.md` → `blueprints/<id>.md`          |
 | the `code-*` blocks (pick + fill for a code beat)                               | `code-vocabulary.md` (local)                                                      |
-| motion — shot model, vocabulary, holds, idle budget, stillness, seek-safe       | `motion-language.md` (local)                                                      |
+| motion — shot model, vocabulary, holds, idle budget, motivated holds, seek-safe       | `motion-language.md` (local)                                                      |
 | layout — framing, density, depth, hierarchy, inventing the visual, caption band | the **Layout** + **Inventing the visual** sections in this file                   |
 | concrete eases / ms / stagger + rule recipe bodies (Step 5)                     | local `../../hyperframes-animation/rules/` (the frame worker reads it; you don't) |
 | palette + type tokens                                                           | the project's `frame.md` (code-editorial); basics → `hyperframes-creative`        |
@@ -151,7 +151,7 @@ The bottom ~17% of the canvas is reserved for the caption pill. Plan every frame
 
 ## Before you finish — checklist
 
-- **`## Video direction`** written once at the top (palette · motion grammar + shot model + idle budget · stillness allocation · negative list incl. both failure modes); per-frame entries are deltas.
+- **`## Video direction`** written once at the top (palette · motion grammar + shot model + idle budget · hold allocation · negative list incl. both failure modes); per-frame entries are deltas.
 - Every frame is a **time-coded shot sequence** with real second windows across its `duration` — not a tag bag.
 - **No frame front-loads** — at t=0 only what the VO is saying enters; each further piece reveals on its spoken cue, across the back ~50%. Window count follows the VO.
 - Every frame names a **`blueprint:`** id (Reproduce / Adapt) or `compose`; an Adapt keeps the signature move; nothing collapses to a single front-loaded dump.
