@@ -24,13 +24,10 @@ Prompting doctrine that applies to more than one model lives **once**, in `skill
 
 ## Portable Prompt Builder export
 
-The downloadable Claude `.skill` is generated at `exports/slates-prompt-builder/generated/`. Its model, character, and content-policy references come directly from the resolved production files in `skills/`; its routing table derives from `MODEL_FACTS`; the portable wrapper owns only export-specific scope and output behavior.
+The downloadable Claude `.skill` is built into `exports/slates-prompt-builder/generated/`, which is gitignored and outside this package's `files`: its model, character and content-policy references are license-tier guides from the private brain (`slates-api/brain/`), so they never enter this public repo or the npm tarball. Its routing table derives from `MODEL_FACTS`; the portable wrapper (`prompt-builder.md`) owns only export-specific scope and output behavior.
 
 ```bash
-npm run sync-prompt-builder   # regenerate markdown, manifest, and deterministic .skill
-npm run typecheck             # fails if the committed export is stale
+npm run sync-prompt-builder   # build the markdown, manifest and deterministic .skill into generated/, and sync the vault mirror
 ```
 
-`scripts/build-prompt-builder.mjs --check` validates generated text content (normalizing LF/CRLF), keeps the archive byte-exact, opens it to verify its exact entry set, and enforces the runtime character contract (one sheet, the canonical `IDENTITY_PLATE_HEX`, flat/shadowless light, and the three-panel builder). Never edit `exports/slates-prompt-builder/generated/` directly.
-
-The repository verification workflow runs both typecheck and build on every pull request and push to `main`, so stale exports cannot merge through the normal GitHub path.
+`scripts/build-prompt-builder.mjs --check` (in build and typecheck) renders the export in memory, keeps the archive byte-exact, verifies its entry set and the runtime character contract (one sheet, the canonical `IDENTITY_PLATE_HEX`, flat/shadowless light, the three-panel builder), and fails if `generated/` could publish: tracked, not ignored, or in `files`. `scripts/brain-leak-check.mjs` (root build) fails on any tracked file holding a 90-character line of the brain. The download is served from the private slates-web repo (`public/slates-prompt-builder.skill`): refresh it by copying the built `.skill` there.

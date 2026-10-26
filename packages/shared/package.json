@@ -44,8 +44,6 @@
     "dist",
     "!dist/**/*.map",
     "skills",
-    "exports/slates-prompt-builder/generated",
-    "exports/slates-chatgpt-images/generated",
     "README.md"
   ],
   "scripts": {

@@ -3,8 +3,11 @@
 // The downloadable .skill is a BUILD, never a prompting source. Its model,
 // character, and policy references are copied from the exact production skill
 // markdown embedded into @slatesvideo/shared for MCP, CLI, and Studio Agent.
-// `--check` compares normalized text content and the deterministic ZIP bytes
-// against those sources and exits 1 on drift.
+// The references are license-tier model guides from the private brain (slates-api brain/), so `generated/` is
+// gitignored and outside the npm package: `--check` renders everything in memory and fails when that folder would
+// publish (tracked, not ignored, or in `files`). The download is served from the private slates-web repo
+// (public/slates-prompt-builder.skill, copied there from generated/ when it is refreshed); the vault's lead-magnet
+// mirror is synced from generated/ by this script.
 
 import { createHash } from 'node:crypto'
 import {
@@ -19,7 +22,7 @@ import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { strToU8, unzipSync, zipSync } from 'fflate'
 import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
-import { brainDir } from '../../../scripts/brain-source.mjs'
+import { brainDir, unpublishedProblems } from '../../../scripts/brain-source.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const pkgRoot = join(here, '..')
@@ -472,14 +475,17 @@ function checkGenerated() {
 if (validateOnly) {
   console.log(`[prompt-builder] validated ${rendered.size} portable files, current defaults, canonical character prompt and archive entries without writing`)
 } else if (checkOnly) {
-  const failures = checkGenerated()
-  if (failures.length) {
-    console.error('[prompt-builder] generated export is out of sync:')
-    for (const failure of failures) console.error(`  - ${failure}`)
-    console.error('[prompt-builder] run `npm run sync-prompt-builder` at the slates-mcp root.')
+  // The export copies license-tier model guides, so generated/ is private: gitignored, untracked and outside the npm
+  // package. That is what fails the build; a stale local copy is only named, since nothing public reads it.
+  const leaks = unpublishedProblems(generatedDir)
+  if (leaks.length) {
+    console.error('[prompt-builder] the export would publish the private brain:')
+    for (const leak of leaks) console.error(`  - ${leak}`)
     process.exit(1)
   }
-  console.log(`[prompt-builder] verified ${rendered.size} generated markdown files + deterministic .skill`)
+  const stale = existsSync(generatedDir) ? checkGenerated() : []
+  if (stale.length) console.warn(`[prompt-builder] the local export is stale (${stale.length} file(s)); \`npm run sync-prompt-builder\` rebuilds it`)
+  console.log(`[prompt-builder] verified ${rendered.size} portable files and the archive in memory; generated/ stays private`)
 } else {
   mkdirSync(generatedDir, { recursive: true })
   const extras = existsSync(generatedDir)

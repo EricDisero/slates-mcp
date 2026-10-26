@@ -67,3 +67,8 @@ token*.json
 
 # guard-claude-md.py keeps the CLAUDE.md word count it last saw here, per machine.
 .claude/hooks/.claude-md-words
+
+# Exports built from the private brain (slates-api brain/, license tier): never in this public repo or the npm
+# package. scripts/brain-leak-check.mjs and each builder's --check hold the line.
+packages/shared/exports/slates-prompt-builder/generated/
+packages/shared/exports/slates-chatgpt-images/generated/

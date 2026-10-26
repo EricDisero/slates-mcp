@@ -4,7 +4,7 @@ import { zipSync, strToU8, unzipSync, strFromU8 } from 'fflate'
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { loadTypeScriptModule } from '../../../scripts/load-typescript.mjs'
-import { brainDir } from '../../../scripts/brain-source.mjs'
+import { brainDir, unpublishedProblems } from '../../../scripts/brain-source.mjs'
 
 const { parseSkillMetadata } = loadTypeScriptModule(new URL('../src/skills/metadata.ts', import.meta.url))
 
@@ -30,7 +30,9 @@ assert.equal(strFromU8(unzipSync(archive)['slates-chatgpt-images/SKILL.md']), ma
 if (process.argv.includes('--validate')) {
   console.log('ChatGPT desktop skill source and deterministic archive validated without writing')
 } else if (process.argv.includes('--check')) {
-  for (const [name, content] of Object.entries(files)) assert.ok(readFileSync(new URL(name, output)).equals(content), `Rebuild ChatGPT skill: ${name}`)
+  // The skill is a license-tier brain file: generated/ is private (gitignored, untracked, outside the npm package).
+  const leaks = unpublishedProblems(fileURLToPath(output))
+  assert.equal(leaks.length, 0, `The ChatGPT skill export would publish the private brain: ${leaks.join('; ')}`)
 } else {
   mkdirSync(output, { recursive: true })
   for (const [name, content] of Object.entries(files)) writeFileSync(new URL(name, output), content)

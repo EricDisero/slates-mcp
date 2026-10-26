@@ -1,5 +1,6 @@
+import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // Where the Slates brain's deep layers live (second-brain plans/2026-10-25-slates-brain.md step 4): the private
@@ -38,6 +39,26 @@ export function readAllSkills({ dir = brainDir(), publicDir = PUBLIC_SKILLS_DIR 
   const both = Object.keys(pub).filter((n) => Object.hasOwn(brain, n))
   if (both.length) throw new Error(`a skill has one home: ${both.join(', ')} is in both packages/shared/skills and the brain`)
   return { ...pub, ...brain }
+}
+
+/**
+ * What is wrong with a folder a build writes brain text into, as a list (empty when it is private): it must be
+ * gitignored, hold no tracked file, and stay out of @slatesvideo/shared's published `files`. This repo and its npm
+ * package are public, so brain text written anywhere else here ships to everyone.
+ */
+export function unpublishedProblems(dir) {
+  const rel = relative(root, dir).split(sep).join('/')
+  const problems = []
+  const tracked = execFileSync('git', ['ls-files', '--', rel], { cwd: root, encoding: 'utf8' }).trim()
+  if (tracked) problems.push(`${rel} holds ${tracked.split('\n').length} tracked file(s); untrack them (git rm --cached)`)
+  if (spawnSync('git', ['check-ignore', '-q', `${rel}/probe`], { cwd: root }).status !== 0) problems.push(`${rel} is not gitignored`)
+  const pkgDir = join(root, 'packages', 'shared')
+  const inPkg = relative(pkgDir, dir).split(sep).join('/')
+  const files = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')).files ?? []
+  if (files.some((f) => inPkg === f.replace(/\/$/, '') || inPkg.startsWith(`${f.replace(/\/$/, '')}/`))) {
+    problems.push(`packages/shared/package.json "files" publishes ${inPkg}`)
+  }
+  return problems
 }
 
 /** The brain folder, or end this check cleanly where there is none (single-repo CI): `label` names what skipped. */
