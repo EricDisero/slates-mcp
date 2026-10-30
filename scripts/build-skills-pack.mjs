@@ -88,7 +88,10 @@ const root = resolve(here, '..');
 // router and the two ad playbooks, and the chart lists the brain by its tier.
 // The 1.1.5 key is overwritten with this content (slates-api docs/web-assets.md)
 // so links already in receipt emails stop serving the brain and still resolve.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.6';
+// 1.1.7, 2026-10-29: charts the launch-video playbook (slates-api brain/, license
+// tier, so not zipped); the README's license playbook count moves with it.
+// Uploaded, then both URLs moved.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.7';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');

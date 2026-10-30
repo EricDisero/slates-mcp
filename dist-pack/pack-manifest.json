@@ -1,9 +1,9 @@
 {
-  "version": "1.1.6",
-  "filename": "agentic-skills-pack-v1.1.6-b362d4c0b8abc58b.zip",
-  "sha256": "b362d4c0b8abc58bec9f2467035cb94060c2ead83a7cfd2d77ffaae315bda86e",
-  "bytes": 17296,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.6-b362d4c0b8abc58b.zip",
+  "version": "1.1.7",
+  "filename": "agentic-skills-pack-v1.1.7-30dd69a8a8c25248.zip",
+  "sha256": "30dd69a8a8c25248cd2362390ebb54e6bfe32795ec9d92e1dcbe047ff7b429ff",
+  "bytes": 17489,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.7-30dd69a8a8c25248.zip",
   "skillCount": 3,
   "freeSkills": [
     "slates-start-here"
@@ -26,6 +26,7 @@
     "slates-dialogue-blocking",
     "slates-direct-response-ad",
     "slates-edit-and-iterate",
+    "slates-launch-video",
     "slates-layer-brand-captions",
     "slates-layer-lower-third",
     "slates-layer-title",
@@ -149,6 +150,11 @@
       "key": "slates-edit-and-iterate",
       "tier": "license",
       "summary": "Refine an existing Slates image or clip with a targeted edit or revised generation."
+    },
+    {
+      "key": "slates-launch-video",
+      "tier": "license",
+      "summary": "A 20 to 40 second product launch video built from motion compositions: real UI as SVG, brand fonts, a generated background, 60 fps."
     },
     {
       "key": "slates-layer-brand-captions",
