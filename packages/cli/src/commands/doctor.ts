@@ -121,6 +121,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['beat-grid', "a music clip's beat grid and cutting to it"],
   ['subject-mask', 'subject masks on your video clips'],
   ['clip-panels', 'layers behind the subject, 3D panels, lens blur and compartments'],
+  ['panel-colour-keys', "keys on a panel's shadow and border colours"],
   ['whip-pans', 'whip pans in your footage and joining shots on them'],
   ['transcript-cut', 'cut by transcript'],
   ['proxies', "a clip's proxy and Make proxies automatically at import"],

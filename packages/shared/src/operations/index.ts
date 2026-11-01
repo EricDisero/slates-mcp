@@ -7955,9 +7955,12 @@ export const updateOverlayClip: Operation<{
 }
 
 const KEYFRAME_PROPERTY_IDS = ['positionX', 'positionY', 'scale', 'rotation', 'opacity', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom', 'focusX', 'focusY', 'zoom',
-  'saturation', 'grain', 'exposure', 'pitch', 'yaw', 'perspective', 'radius', 'shadowX', 'shadowY', 'shadowBlur', 'shadowOpacity', 'borderWidth', 'borderOpacity', 'blur'] as const
+  'saturation', 'grain', 'exposure', 'pitch', 'yaw', 'perspective', 'radius', 'shadowX', 'shadowY', 'shadowBlur', 'shadowOpacity', 'borderWidth', 'borderOpacity',
+  'shadowRed', 'shadowGreen', 'shadowBlue', 'borderRed', 'borderGreen', 'borderBlue', 'blur'] as const
 /** The keys a desktop before layers and panels refuses. */
 const PANEL_KEY_IDS = new Set<string>(KEYFRAME_PROPERTY_IDS.slice(KEYFRAME_PROPERTY_IDS.indexOf('saturation')))
+/** A panel colour's channels, which a desktop before panel colour keys refuses. */
+const PANEL_COLOUR_KEY_IDS = new Set<string>(['shadowRed', 'shadowGreen', 'shadowBlue', 'borderRed', 'borderGreen', 'borderBlue'])
 
 export const setClipKeyframes: Operation<{
   projectId: string; timelineId: string; clipId: string
@@ -7965,7 +7968,7 @@ export const setClipKeyframes: Operation<{
 }> = {
   id: 'slates_set_clip_keyframes',
   description:
-    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start and may fall between frames (110.4), read at that exact time. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. The look and the panel key too, each key replacing the clip's own value: saturation 0..2 (1 as shot), grain 0..1, exposure -4..4 stops; pitch and yaw -85..85 degrees, perspective 0..1; radius 0..0.5, shadowX and shadowY -0.5..0.5, shadowBlur 0..0.25 and borderWidth 0..0.05, all in frame heights; shadowOpacity and borderOpacity 0..1 (a key above 0 draws a shadow or border the clip has none of); blur 0..1. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
+    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start and may fall between frames (110.4), read at that exact time. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. The look and the panel key too, each key replacing the clip's own value: saturation 0..2 (1 as shot), grain 0..1, exposure -4..4 stops; pitch and yaw -85..85 degrees, perspective 0..1; radius 0..0.5, shadowX and shadowY -0.5..0.5, shadowBlur 0..0.25 and borderWidth 0..0.05, all in frame heights; shadowOpacity and borderOpacity 0..1 (a key above 0 draws a shadow or border the clip has none of); a shadow or border colour keys as its red, green and blue, each 0..1 (shadowRed, shadowGreen, shadowBlue; borderRed, borderGreen, borderBlue), keyed on the same frames so the colour eases from key to key; blur 0..1. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
   input: z.object({
     projectId: z.string().uuid(),
     timelineId: z.string().uuid(),
@@ -7980,6 +7983,7 @@ export const setClipKeyframes: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-keyframes', 'clip keyframes')
     if (Object.keys(input.properties).some((id) => PANEL_KEY_IDS.has(id))) await desktop.requireCapability('clip-panels', "keys on a clip's look, 3D, panel and blur")
+    if (Object.keys(input.properties).some((id) => PANEL_COLOUR_KEY_IDS.has(id))) await desktop.requireCapability('panel-colour-keys', "keys on a panel's shadow and border colours")
     await requireKeysBetweenFrames(desktop, ...Object.values(input.properties))
     return ok(await desktop.post('/agent/timeline/keyframes', input))
   },
