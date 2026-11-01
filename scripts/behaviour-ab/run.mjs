@@ -6,6 +6,9 @@
 //     [--model claude-opus-5-5] [--concurrency 3] [--desktop <slate dir>] [--candidate-brain <dir>] [--baseline-brain <dir>]
 //     [--brain-tiers license]
 //
+// Every case of a case file is the release batch: only scripts/brain-eval/release-batch.mjs starts one
+// (release-guard.mjs); without it, --cases names what a fix touches.
+//
 // A build served its brain (packages/shared/src/skills/served.ts) fetches it from the fixture's /brain/bundle, as a
 // member's server fetches it from slates-api: --candidate-brain (default scripts/brain-source.mjs, slates-api brain/)
 // for the candidate, --baseline-brain (an export of slates-api brain/ at the approved pin) for a served baseline.
@@ -28,6 +31,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { brainHash } from '../brain-eval/brain-hash.mjs'
+import { refuseFullRun } from '../brain-eval/release-guard.mjs'
 import { fetchPriceList, startFixture, SHOT_COST_KEY } from './fixture.mjs'
 import { brainDir } from '../brain-source.mjs'
 import { armHome, realCloudToken } from './home.mjs'
@@ -54,6 +58,7 @@ const wanted = arg('cases') ? arg('cases').split(',') : null
 const unknownCases = (wanted ?? []).filter((id) => !allCases.some((c) => c.id === id))
 if (unknownCases.length) throw new Error(`No such case: ${unknownCases.join(', ')}`)
 const cases = allCases.filter((c) => !wanted || wanted.includes(c.id))
+refuseFullRun('behaviour-ab/run.mjs', { selected: cases.length, total: allCases.length })
 const SERVER = 'slates'
 const TOOL_RESULT_CHARS = 6000
 const RUN_TIMEOUT_MS = 15 * 60_000

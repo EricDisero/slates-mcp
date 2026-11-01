@@ -23,7 +23,8 @@
 // results/<date>-routing-<model>.json with each arm's root and brain hash (brain-hash.mjs), which gate.mjs
 // needs; an arm's hash is null when its markdown differs from its build, since it would then name a brain
 // this run did not test. --out writes a rerun of a few cases elsewhere, so it never replaces the batch's file.
-// Fails when the candidate is under --min.
+// Fails when the candidate is under --min. Every ask is the release batch: only release-batch.mjs starts one
+// (release-guard.mjs); without it, --cases names what a fix touches.
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -33,6 +34,7 @@ import { ROUTER, readSkills } from '../brain-lint.mjs'
 import { brainHash, unbuiltSkills } from './brain-hash.mjs'
 import { brainLayers } from './tokens.mjs'
 import { brainDir } from '../brain-source.mjs'
+import { refuseFullRun } from './release-guard.mjs'
 
 const here = import.meta.dirname
 const model = arg('model', 'sonnet')
@@ -41,6 +43,10 @@ const concurrency = countArg('concurrency', '4')
 const min = Number(arg('min', '0.9'))
 const roots = { candidate: resolve(here, '..', '..'), ...(arg('root') ? { baseline: resolve(arg('root')) } : {}) }
 const brains = { candidate: brainDir(), baseline: arg('baseline-brain') ? resolve(arg('baseline-brain')) : brainDir() }
+const { cases: all } = JSON.parse(readFileSync(join(here, 'routing-cases.json'), 'utf8'))
+const wanted = arg('cases')?.split(',')
+const cases = all.filter((c) => !wanted || wanted.includes(c.id))
+refuseFullRun('routing.mjs', { selected: cases.length, total: all.length })
 if (!roots.baseline) console.warn('warning: no --root, so no baseline arm; gate.mjs refuses a routing file without one.')
 
 /** What one arm's agent holds: its build's hash and its markdown's card and router, cut as the package cuts them. */
@@ -71,9 +77,6 @@ function served(picked) {
   const near = operations.nearestGuideName(picked, [...Object.keys(SKILLS), ...ANSWERS.slice(1)])
   return operations.resolveGuideTopic(picked) ?? (near && 'name' in near ? near.name : picked)
 }
-const { cases: all } = JSON.parse(readFileSync(join(here, 'routing-cases.json'), 'utf8'))
-const wanted = arg('cases')?.split(',')
-const cases = all.filter((c) => !wanted || wanted.includes(c.id))
 
 const prompt = ({ card, routerBody }, ask) => [
   'You are the agent inside Slates, an AI video studio. This is what you hold at the start of every job:',

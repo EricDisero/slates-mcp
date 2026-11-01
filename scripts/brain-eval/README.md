@@ -21,14 +21,16 @@ The baseline is a build of the approved commit, exported outside the repo (an ex
 ```bash
 npm run build                                   # the candidate; routing reads the built card and router
 mkdir <dir> && git archive $(node -p "require('./scripts/brain-eval/scoreboard.json').approvedCommit") | tar -x -C <dir>
-(cd <dir> && npm install && npm run build -w packages/shared && npm run build -w packages/mcp)
+(cd <dir> && npm ci && cd packages/shared && node scripts/embed-skills.mjs && npx tsc && cd ../mcp && npm run build)   # shared's own build script also runs --check steps that read git, which an export lacks; SLATES_BRAIN_DIR=<brain-dir>/brain
+git archive <approved pin> brain src/lib/brain-notice.ts | tar -x -C <brain-dir>   # in slates-api: brain-approved.json's commit, the baseline's brain
 node scripts/brain-eval/tokens.mjs
-node scripts/brain-eval/routing.mjs --root <dir> --model sonnet --runs 2
-SLATES_DESKTOP_DIR=<slate checkout> node scripts/behaviour-ab/run.mjs --cases-file scripts/brain-eval/craft-cases.json   --baseline <dir> --arms baseline,candidate --out scripts/brain-eval/results/<date>-craft --runs 1
-node scripts/brain-eval/craft.mjs --out scripts/brain-eval/results/<date>-craft
+SLATES_DESKTOP_DIR=<slate checkout> node scripts/brain-eval/release-batch.mjs --spec <spec.json> --decisions decisions.json \
+  --root <dir> --baseline-brain <brain-dir>/brain
 ```
 
-Run the craft batch through the vault's `heavy_lock.py`, as for the behaviour A/B; `CLAUDE_BIN` names the Claude Code executable when `claude` is an npm shim. A routing miss seen in a real session becomes a case. The behaviour A/B (`../behaviour-ab/`) still gates any reorganization of the instructions or skills against the commit before it.
+**`release-batch.mjs` is the only way a full batch starts** (`release-guard.mjs`): `routing.mjs` and `behaviour-ab/run.mjs` refuse every case of their set without it, because `--approve` needs results on the exact hash it approves and a batch run before the last fix is thrown away. It refuses until the page is answered and the tree is final, with `brain-review.mjs`'s own checks (every waiting commit decided, every held one reverted, nothing uncommitted under `packages/shared` or the brain, the build current and on the page's brain), then runs routing on sonnet and haiku (2 runs each), the craft briefs in both arms (2 runs, as every release batch has: at one, a judge swing on a case both arms read alike decides its sign) and `craft.mjs`, into `results/<date>-routing-<model>.json` and `results/<date>-craft/`, and prints the `--approve` line. While fixing, run `routing.mjs` or `run.mjs` with `--cases id,id` for what the change touches.
+
+Run the batch through the vault's `heavy_lock.py`, as for the behaviour A/B; `CLAUDE_BIN` names the Claude Code executable when `claude` is an npm shim. A routing miss seen in a real session becomes a case. The behaviour A/B (`../behaviour-ab/`) still gates any reorganization of the instructions or skills against the commit before it.
 
 When `scoreboard.json` has no `approvedBrainHash` (the first time), record it once from that export: `node scripts/brain-review.mjs --pin-approved-hash <dir>`. It refuses unless every source under `packages/shared` matches `approvedCommit` byte for byte and the build there is current.
 
