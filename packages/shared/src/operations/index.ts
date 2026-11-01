@@ -6857,7 +6857,7 @@ async function requireNamedCut(desktop: SlatesDesktopClient, timelineId: string 
 export const getTimeline: Operation<{ projectId: string; timelineId?: string }> = {
   id: 'slates_get_timeline',
   description:
-    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame. A clip whose file has or needs a proxy carries proxy (needed with a reason, making, ready, failed; playsSlowly when the monitor measured it stuttering); notices, printed first, name the clips that may show no picture or play slowly: tell the user and offer the proxy, making one only on their yes.',
+    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame. A clip whose file has or needs a proxy carries proxy (needed with a reason, making, ready, failed; playsSlowly when the monitor measured it stuttering); notices, printed first, name the clips that may show no picture or play slowly: tell the user and offer the proxy, making one only on their yes. eqs reads every EQ on a clip, a lane or the master as its bands and its level in dB by octave; eq lists the bands, types, slopes, ranges and presets an EQ takes.',
   input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -7198,20 +7198,48 @@ async function requireKeysBetweenFrames(desktop: ReturnType<OperationContext['de
   if (keysBetweenFrames(...lists)) await desktop.requireCapability('keys-between-frames', 'keys between frames (a frame such as 110.4)')
 }
 
-/** An effect list as the desktop stores it (`slate/src/shared/audioEffects.ts`); slates_get_timeline's audioEffects lists each type's parameters and ranges. */
+/** One band of an eq effect's `bands` (`EqBandInput` in `slate/src/shared/audioEffects.ts`). */
+const eqBand = z
+  .object({
+    band: z.enum(['highpass', 'lowshelf', 'bell1', 'bell2', 'bell3', 'bell4', 'bell5', 'bell6', 'highshelf', 'lowpass']).optional()
+      .describe('Its slot. Left out: a cut takes its own, a shelf its own if free, anything else the next free bell.'),
+    type: z.enum(['highpass', 'lowpass', 'bell', 'lowshelf', 'highshelf', 'notch', 'bandpass'])
+      .describe('highpass and lowpass cut below or above frequency; bell boosts or cuts around it; a shelf lifts or lowers everything below or above it; notch takes out a narrow band; bandpass keeps only the sound around it.'),
+    on: z.boolean().optional().describe('Default true.'),
+    frequency: z.number().optional().describe('Hz, 20 to 20000; keys sweep by octave.'),
+    gain: z.number().optional().describe('dB, -24 to +24: a bell or a shelf.'),
+    q: z.number().optional().describe('Width, 0.1 to 30, higher is narrower (bell, notch, bandpass); a cut\'s resonance at its corner, 0.1 to 10, 0.707 flat. None on a shelf or a 6 dB cut.'),
+    slope: z.number().optional().describe('A cut\'s dB per octave: 6, 12, 24, 36 or 48. Default 12.'),
+    keyframes: z.record(keyframeKeys.max(4000)).optional().describe('Keys by frequency, gain or q, in the effect list\'s frames.'),
+  })
+  .strict()
+
+/** An effect list as the desktop stores it (`slate/src/shared/audioEffects.ts`); slates_get_timeline's audioEffects lists each type's parameters and ranges, and eq what a band list takes. */
 const audioEffectList = z
   .array(
     z
       .object({
         id: z.string().max(64).optional().describe('Kept when sent back; a new effect gets one.'),
-        type: z.enum(['volume', 'eq']).describe("volume: gain in dB (param gainDb, -60 silent to +12). eq: its low-pass (params 'lowpass.frequency' in Hz, 20 to 20000, swept by octave; 'lowpass.q', 0.1 to 10, 0.71 flat)."),
+        type: z.enum(['volume', 'eq']).describe("volume: gain in dB (param gainDb, -60 silent to +12). eq: ten bands in this order: a high-pass, a low shelf, six bells, a high shelf, a low-pass; send the ones it plays as bands. An older eq's 'lowpass.frequency' and 'lowpass.q' read as the low-pass at 12 dB."),
         bypass: z.boolean().optional(),
-        params: z.record(z.number()).optional().describe('Fixed values by parameter name.'),
+        params: z.record(z.number()).optional().describe("Fixed values by parameter name ('gainDb'; an eq's '<band>.<name>', as 'bell3.gain' or 'highpass.slope')."),
         keyframes: z.record(keyframeKeys.max(4000)).optional().describe('Keys by parameter name; a keyed parameter reads its keys instead of its fixed value.'),
+        bands: z.array(eqBand).max(10).optional().describe("An eq's bands, the ones it plays; a band not listed is off. slates_get_timeline's eq lists the presets as band lists."),
       })
       .strict()
   )
   .max(16)
+
+/** True when an effect list uses the ten-band EQ: a band list, or a parameter an older desktop does not know. */
+function usesEqBands(effects: z.infer<typeof audioEffectList> | null | undefined): boolean {
+  const legacy = new Set(['lowpass.frequency', 'lowpass.q'])
+  return (effects ?? []).some((e) => e.type === 'eq' && (e.bands !== undefined
+    || [...Object.keys(e.params ?? {}), ...Object.keys(e.keyframes ?? {})].some((name) => !legacy.has(name))))
+}
+/** An older desktop refuses every eq band but the low-pass; ask first, so the refusal names the update. */
+async function requireEqBands(desktop: ReturnType<OperationContext['desktop']>, effects: z.infer<typeof audioEffectList> | null | undefined): Promise<void> {
+  if (usesEqBands(effects)) await desktop.requireCapability('eq-bands', 'the ten-band EQ')
+}
 
 export const updateClip: Operation<{
   projectId: string; clipId: string
@@ -7225,7 +7253,7 @@ export const updateClip: Operation<{
 } & SoundEdges> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (its low-pass), each fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (up to ten bands: high- and low-pass cuts at 6 to 48 dB per octave, shelves, bells, a notch, a band-pass), each value fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -7253,6 +7281,7 @@ export const updateClip: Operation<{
     if (input.speed !== undefined && input.speedRamp !== undefined) throw new Error('Send speed (one speed) or speedRamp (keyed), not both.')
     if (input.effects !== undefined || input.speedRamp !== undefined || input.speedSound !== undefined) {
       await desktop.requireCapability('audio-effects', 'audio effects and speed ramps')
+      await requireEqBands(desktop, input.effects)
       await requireKeysBetweenFrames(desktop, input.speedRamp, input.effects)
     }
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
@@ -7806,6 +7835,7 @@ export const updateTimelineTrack: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on a lane')
+    await requireEqBands(desktop, input.effects)
     await requireKeysBetweenFrames(desktop, input.effects)
     return ok(await desktop.post('/agent/timeline/update-track', input))
   },
@@ -7852,6 +7882,7 @@ export const updateTimelineSettings: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on the master')
+    await requireEqBands(desktop, input.effects)
     await requireKeysBetweenFrames(desktop, input.effects)
     if (input.audioBitrate !== undefined) await requireSoundPrecision(desktop)
     await requireNamedCut(desktop, input.timelineId)
