@@ -12,8 +12,9 @@
 // candidate's brainHash (brain-hash.mjs) must be the working tree build's, the baseline's must be
 // scoreboard.json approvedBrainHash. It rejects
 //
-//   craft    the candidate loses more cases than it wins (a sign test on each case's judged mean, candidate
-//            against baseline), a craft mean more than CRAFT_NOISE below the baseline's, any candidate run with a forbidden action, any unfinished or unjudged run in
+//   craft    the candidate losing so many more cases than it wins that an equal brain would do it under
+//            SIGN_ALPHA of the time (a one-sided sign test on each case's judged mean, candidate against
+//            baseline, ties counting for neither), a craft mean more than CRAFT_NOISE below the baseline's, any candidate run with a forbidden action, any unfinished or unjudged run in
 //            either arm, a case one arm lacks, or a rate falling by more than one run: the router or the case's
 //            playbook read before the first build call (readFirst, craft.mjs) or the playbook loaded at all;
 //   routing  candidate accuracy below the baseline's by more than one ask, any ask that errored, none answered.
@@ -32,6 +33,24 @@ const EPS = 1e-9
 // How far the craft mean (of 2) may fall before it counts: the old gate's tolerance, chosen, not measured. Running
 // one brain twice in one batch would measure the judge's real spread and replace it.
 const CRAFT_NOISE = 0.1
+// The case count is a one-sided sign test at this level, not "more losses than wins": a brain judged against
+// itself loses more cases than it wins nearly half the time, so that rule rejected on chance. Measured
+// 2026-11-01 on one batch, each arm's run 1 against its own run 2: 10 wins and 6 losses, and 5 wins and 8
+// losses; and two batches rejected that day on means of 1.45 against 1.50 and 1.45 against 1.47, their losses
+// mostly on cases whose playbooks the round never touched. The mean floor above still catches a real drop.
+const SIGN_ALPHA = 0.1
+
+/** The chance that an equal brain loses at least `losses` of `losses + wins` decided cases (p = 0.5). */
+export function signTestP(losses, wins) {
+  const n = losses + wins
+  let ways = 0
+  let choose = 1 // C(n, 0), then C(n, k) for each k in turn
+  for (let k = 0; k <= n; k++) {
+    if (k >= losses) ways += choose
+    choose = (choose * (n - k)) / (k + 1)
+  }
+  return ways / 2 ** n
+}
 
 export const readBoard = (file = BOARD) => JSON.parse(readFileSync(file, 'utf8'))
 
@@ -136,8 +155,9 @@ export function compare(board, results, current) {
     if (lopsided.length) fail.push(`${what}: ${lopsided.length} cases ran in one arm only (${lopsided.join(', ')}); run both arms on every case`)
     const sign = signTest(rows.filter((x) => !lopsided.includes(x.case)))
     if (sign.unscored.length) fail.push(`${what}: no judged run in an arm for ${sign.unscored.map((c) => c.case).join(', ')}`)
-    lines.push(`craft ${model}: the candidate wins ${sign.wins} cases, loses ${sign.losses}, ties ${sign.ties} against the approved brain; craft ${cand.craft?.toFixed(2) ?? 'n/a'} against ${base.craft?.toFixed(2) ?? 'n/a'} of 2, read before building ${pct(cand.readFirst)} against ${pct(base.readFirst)}, playbook ${pct(cand.playbookLoaded)} against ${pct(base.playbookLoaded)}, forbidden ${cand.forbiddenRuns} against ${base.forbiddenRuns}`)
-    if (sign.losses > sign.wins) fail.push(`${what}: the candidate loses ${sign.losses} cases and wins ${sign.wins}; losses: ${sign.perCase.filter((c) => c.outcome === 'loss').map((c) => `${c.case} ${c.candidate.toFixed(2)} < ${c.baseline.toFixed(2)}`).join(', ')}`)
+    const p = signTestP(sign.losses, sign.wins)
+    lines.push(`craft ${model}: the candidate wins ${sign.wins} cases, loses ${sign.losses}, ties ${sign.ties} against the approved brain (an equal brain loses that many or more ${(p * 100).toFixed(0)}% of the time); craft ${cand.craft?.toFixed(2) ?? 'n/a'} against ${base.craft?.toFixed(2) ?? 'n/a'} of 2, read before building ${pct(cand.readFirst)} against ${pct(base.readFirst)}, playbook ${pct(cand.playbookLoaded)} against ${pct(base.playbookLoaded)}, forbidden ${cand.forbiddenRuns} against ${base.forbiddenRuns}`)
+    if (p < SIGN_ALPHA - EPS) fail.push(`${what}: the candidate loses ${sign.losses} cases and wins ${sign.wins}, which an equal brain does ${(p * 100).toFixed(1)}% of the time (under ${SIGN_ALPHA * 100}%); losses: ${sign.perCase.filter((c) => c.outcome === 'loss').map((c) => `${c.case} ${c.candidate.toFixed(2)} < ${c.baseline.toFixed(2)}`).join(', ')}`)
     // Many small wins can hide a few big losses, so the mean may not fall past the judge's noise either.
     if (cand.craft != null && base.craft != null && cand.craft < base.craft - CRAFT_NOISE - EPS) fail.push(`${what}: craft ${cand.craft.toFixed(2)} against the approved brain's ${base.craft.toFixed(2)}, more than ${CRAFT_NOISE} lower`)
     // One run either way is noise on a rate; a fall past it is not.
