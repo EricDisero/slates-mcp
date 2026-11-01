@@ -1822,7 +1822,7 @@ export const maskSubject: Operation<MaskSubjectInput> = {
       addStrokes: z.array(maskStroke).max(256).optional().describe('refine: strokes added to the ones it has.'),
       clearStrokesOn: z.array(z.number().int().min(0)).optional().describe('refine: file frames whose strokes are dropped.'),
       params: maskParams.optional().describe('The hand controls.'),
-      edges: z.boolean().optional().describe('Refine fine edges such as hair (default true); false is faster.'),
+      edges: z.boolean().optional().describe('Refine hair and soft edges (default false): for hair or fur against a plain background; it can pull in things passing in front, and takes longer.'),
       sheet: z.boolean().optional().describe('With waitSeconds: save a contact sheet PNG of the result.'),
       boxes: z.boolean().optional().describe("Add the subject's box on every frame to the answer."),
       waitSeconds: z.number().min(0).max(50).optional().describe('make, refine: wait up to this long for the mask.'),
