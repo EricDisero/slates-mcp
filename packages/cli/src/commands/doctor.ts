@@ -120,6 +120,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['spend-limits', 'spend limits for a project and an agent session'],
   ['beat-grid', "a music clip's beat grid and cutting to it"],
   ['subject-mask', 'subject masks on your video clips'],
+  ['clip-panels', 'layers behind the subject, 3D panels, lens blur and compartments'],
   ['transcript-cut', 'cut by transcript'],
   ['proxies', "a clip's proxy and Make proxies automatically at import"],
 ]

@@ -7297,22 +7297,23 @@ export const removeTransition: Operation<{ projectId: string; transitionId: stri
 
 export const editTimelineClips: Operation<{
   projectId: string
-  action: 'trim' | 'slip' | 'move' | 'split'
+  action: 'trim' | 'slip' | 'move' | 'split' | 'layout'
   clipId?: string; clipIds?: string[]
+  layout?: 'grid' | 'one-plus-three' | 'one-plus-four' | 'side-by-side'; gap?: number; margin?: number; seconds?: number; staggerSeconds?: number
   edge?: 'start' | 'end'; frame?: number; sec?: number; deltaFrames?: number; deltaSourceFrames?: number
   startFrame?: number; trackId?: string; timelineId?: string
   mode?: 'overwrite' | 'ripple' | 'roll' | 'insert'
 }> = {
   id: 'slates_edit_timeline_clips',
   description:
-    "Trim, roll, ripple, slip, move or split clips on the timeline, as the Cut's tools do; the source files are untouched (to cut a new file, use slates_trim_video). trim moves one edge (edge, then frame or deltaFrames): mode overwrite (default) covers a neighbour it grows into, ripple moves the lane's later clips by the change, roll moves the cut shared with the clip that meets this edge. A trim cuts media and never changes speed. slip changes which part of the media a clip shows without moving it (deltaFrames in timeline frames, or deltaSourceFrames in the file's). move takes clipId or clipIds, keeps their spacing, to startFrame or by deltaFrames, optionally onto trackId (a lane of the same type); mode overwrite cuts what they land on, insert pushes the lane's later clips right (a landing inside a clip moves to its nearer edge). split cuts at frame (or sec) every clip under it on the timeline, or only clipIds. Returns the clips it wrote as they now stand, the ids it deleted, the cut's durationFrames and any staleTransitions (whose clips no longer meet); a refused edit says why.",
+    "Trim, roll, ripple, slip, move or split clips on the timeline, as the Cut's tools do; the source files are untouched (to cut a new file, use slates_trim_video). trim moves one edge (edge, then frame or deltaFrames): mode overwrite (default) covers a neighbour it grows into, ripple moves the lane's later clips by the change, roll moves the cut shared with the clip that meets this edge. A trim cuts media and never changes speed. slip changes which part of the media a clip shows without moving it (deltaFrames in timeline frames, or deltaSourceFrames in the file's). move takes clipId or clipIds, keeps their spacing, to startFrame or by deltaFrames, optionally onto trackId (a lane of the same type); mode overwrite cuts what they land on, insert pushes the lane's later clips right (a landing inside a clip moves to its nearer edge). split cuts at frame (or sec) every clip under it on the timeline, or only clipIds. layout makes compartments from picture clips on different lanes: clipIds in panel order, the leading clip (the speaker) first, and layout grid (four equal), one-plus-three (one large, three small), one-plus-four (one large, four small, a bento) or side-by-side (two); from frame (default the latest start among them) the leading clip shrinks from where it is into the first panel and the others rise into theirs one after another, with rounded corners and a soft shadow, inside the frame's safe area on 16:9 and 9:16. It writes ordinary keys (position, scale, crop, opacity, radius, shadow), so slates_set_clip_keyframes can retime them, and answers each clip's panel and the frames it arrives over. Returns the clips it wrote as they now stand, the ids it deleted, the cut's durationFrames and any staleTransitions (whose clips no longer meet); a refused edit says why.",
   input: z.object({
     projectId: z.string().uuid(),
-    action: z.enum(['trim', 'slip', 'move', 'split']),
+    action: z.enum(['trim', 'slip', 'move', 'split', 'layout']),
     clipId: z.string().uuid().optional(),
-    clipIds: z.array(z.string().uuid()).min(1).optional().describe('move or split: several clips of one timeline.'),
+    clipIds: z.array(z.string().uuid()).min(1).optional().describe('move or split: several clips of one timeline. layout: the clips in panel order, the leading one first.'),
     edge: z.enum(['start', 'end']).optional().describe('trim: which edge.'),
-    frame: z.number().int().min(0).optional().describe('trim: where the edge goes. split: where to cut. Timeline frames.'),
+    frame: z.number().int().min(0).optional().describe('trim: where the edge goes. split: where to cut. layout: where the move starts. Timeline frames.'),
     sec: z.number().min(0).optional().describe('split: where to cut, in seconds.'),
     deltaFrames: z.number().int().optional().describe('trim, slip or move: how far, in timeline frames; negative is left (slip: earlier media).'),
     deltaSourceFrames: z.number().int().optional().describe("slip: how far, in the file's own frames."),
@@ -7320,6 +7321,11 @@ export const editTimelineClips: Operation<{
     trackId: z.string().uuid().optional().describe('move: another lane of the same type.'),
     timelineId: z.string().uuid().optional().describe("split without clipIds: a named cut; omit for the project's timeline."),
     mode: z.enum(['overwrite', 'ripple', 'roll', 'insert']).optional().describe('trim: overwrite, ripple or roll. move: overwrite or insert.'),
+    layout: z.enum(['grid', 'one-plus-three', 'one-plus-four', 'side-by-side']).optional().describe('layout: the arrangement; a tall frame stacks it.'),
+    gap: z.number().min(0).max(0.2).optional().describe("layout: space between panels, in fractions of the frame's shorter side. Default 0.02."),
+    margin: z.number().min(0).max(0.3).optional().describe("layout: space round the edge, past the safe area, in fractions of the frame's shorter side. Default 0.04."),
+    seconds: z.number().min(0).max(10).optional().describe('layout: how long each panel takes to arrive. Default 0.6.'),
+    staggerSeconds: z.number().min(0).max(5).optional().describe('layout: how far apart the panels arrive. Default 0.12.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -7329,6 +7335,11 @@ export const editTimelineClips: Operation<{
     if (action === 'trim' && !input.edge) throw new Error("trim needs an edge: 'start' or 'end'.")
     if (action === 'move' && !input.clipId && !input.clipIds) throw new Error('move needs clipId or clipIds.')
     if (action === 'split' && input.frame === undefined && input.sec === undefined) throw new Error('split needs a frame or sec.')
+    if (action === 'layout') {
+      if (!input.clipIds || !input.layout) throw new Error('layout needs clipIds (the leading clip first) and a layout.')
+      await desktop.requireCapability('clip-panels', 'laying clips out as panels')
+      return ok(await desktop.post('/agent/timeline/layout', body))
+    }
     if (action === 'trim') return ok(await desktop.post('/agent/timeline/trim-clip', body))
     if (action === 'slip') return ok(await desktop.post('/agent/timeline/slip-clip', body))
     if (action === 'move') return ok(await desktop.post('/agent/timeline/move-clip', body))
@@ -7404,11 +7415,32 @@ async function requireEqBands(desktop: ReturnType<OperationContext['desktop']>, 
   if (usesEqBands(effects)) await desktop.requireCapability('eq-bands', 'the ten-band EQ')
 }
 
+/** A clip's panel (slate's `src/shared/clipPanel.ts`): lengths in fractions of the frame's height. */
+const clipPanel = z.object({
+  radius: z.number().min(0).max(0.5).optional().describe('Corner radius.'),
+  shadow: z.object({
+    x: z.number().min(-0.5).max(0.5).optional().describe('Offset right; default 0.'),
+    y: z.number().min(-0.5).max(0.5).optional().describe('Offset down; default 0.02.'),
+    blur: z.number().min(0).max(0.25).optional().describe('Softness; default 0.04.'),
+    opacity: z.number().min(0).max(1).optional().describe('Default 0.5.'),
+    color: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional().describe('#rrggbb; default black.'),
+  }).strict().optional().describe('Present is on: {} is the default shadow.'),
+  border: z.object({
+    width: z.number().min(0).max(0.05).optional().describe('Drawn inside the edge; default 0.002.'),
+    opacity: z.number().min(0).max(1).optional().describe('Default 0.35.'),
+    color: z.string().regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/).optional().describe('#rrggbb; default white.'),
+  }).strict().optional().describe('Present is on: {} is the default border.'),
+}).strict()
+
 export const updateClip: Operation<{
   projectId: string; clipId: string
   speed?: number | null; volume?: number | null; audioOffsetFrames?: number | null
   fadeInFrames?: number | null; fadeOutFrames?: number | null; audioFadeInFrames?: number | null; audioFadeOutFrames?: number | null
-  look?: { blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light'; grain?: number; saturation?: number } | null
+  look?: { blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light'; grain?: number; saturation?: number; exposure?: number } | null
+  matte?: { maskId: string; mode?: 'subject' | 'background'; feather?: number } | null
+  space?: { pitch?: number; yaw?: number; perspective?: number } | null
+  panel?: z.infer<typeof clipPanel> | null
+  blur?: { amount: number; maskId?: string } | null
   effects?: z.infer<typeof audioEffectList> | null
   speedRamp?: z.infer<typeof keyframeKeys> | null
   speedSound?: 'tape' | 'keep-pitch' | null
@@ -7416,7 +7448,7 @@ export const updateClip: Operation<{
 } & SoundEdges> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain and Colour, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2; null clears the look. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (up to ten bands: high- and low-pass cuts at 6 to 48 dB per octave, shelves, bells, a notch, a band-pass), each value fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain, Colour and Exposure, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2, exposure is stops of light from -4 to 4 (1 twice as bright); null clears the look. matte draws a video clip through one of its subject masks (slates_get_subject_mask lists them): mode subject draws only the subject, background everything but it, feather softens the edge from 0 to 1; lay a matted copy over the clip and put a title on a lane between them (slates_update_timeline_track above or below) to put the title behind the subject. space turns any picture clip in 3D about its centre: pitch leans the top away (degrees, -85 to 85), yaw turns the right edge away (-85 to 85), perspective 0 flat to 1 very wide (0.5 a normal lens). panel makes it a floating panel: radius rounds the corners, shadow puts a soft shadow under it, border a line just inside its edge; lengths are fractions of the frame's height (0.02 is about 22 px at 1080p). blur is a lens blur, amount 0 sharp to 1 (a point spreads over 5% of the frame's height), with a maskId to blur only around the subject and keep it sharp. Each of matte, space, panel and blur is sent whole and null clears it; their amounts can be keyed with slates_set_clip_keyframes. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (up to ten bands: high- and low-pass cuts at 6 to 48 dB per octave, shelves, bells, a notch, a band-pass), each value fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -7431,7 +7463,23 @@ export const updateClip: Operation<{
       blend: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft-light']).optional(),
       grain: z.number().min(0).max(1).optional(),
       saturation: z.number().min(0).max(2).optional(),
-    }).strict().nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1). null clears it.'),
+      exposure: z.number().min(-4).max(4).optional().describe('Stops of light: 1 is twice as bright, -1 half.'),
+    }).strict().nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1, exposure 0). null clears it.'),
+    matte: z.object({
+      maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).describe("One of the clip's own media's subject masks."),
+      mode: z.enum(['subject', 'background']).optional().describe('subject (default) draws only the subject; background everything but it.'),
+      feather: z.number().min(0).max(1).optional().describe('How soft the edge is: 0 as made, 1 softened over about 3% of the picture height. Default 0.'),
+    }).strict().nullable().optional().describe('A video clip drawn through a subject mask; null draws the whole picture.'),
+    space: z.object({
+      pitch: z.number().min(-85).max(85).optional().describe('Degrees; positive leans the top away.'),
+      yaw: z.number().min(-85).max(85).optional().describe('Degrees; positive turns the right edge away.'),
+      perspective: z.number().min(0).max(1).optional().describe('0 flat, 0.5 a normal lens (default), 1 very wide.'),
+    }).strict().nullable().optional().describe('The clip turned in 3D about its centre; null lays it flat.'),
+    panel: clipPanel.nullable().optional().describe('Rounded corners, a soft shadow and a border; null takes them off.'),
+    blur: z.object({
+      amount: z.number().min(0).max(1).describe('0 sharp to 1 very soft: a point spreads over 5% of the frame height.'),
+      maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional().describe('A subject mask of the clip: only what is around the subject blurs.'),
+    }).strict().nullable().optional().describe('A lens blur with bright soft highlights; null takes it off.'),
     effects: audioEffectList.nullable().optional().describe("A clip with sound: its effect list, sent whole; null clears it. A split picture's go to its sound clip."),
     speedRamp: keyframeKeys.max(4000).nullable().optional().describe("Speeds (0.05 to 20) keyed in frames from the clip's start; null goes back to one speed. Its linked sound follows."),
     speedSound: z.enum(['tape', 'keep-pitch']).nullable().optional().describe("How a constant speed's sound plays: tape moves pitch with speed; keep-pitch (or null) holds it. A ramp's is always tape."),
@@ -7450,6 +7498,9 @@ export const updateClip: Operation<{
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
     if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
+    if (input.look?.exposure !== undefined || input.matte !== undefined || input.space !== undefined || input.panel !== undefined || input.blur !== undefined) {
+      await desktop.requireCapability('clip-panels', 'subject mask layers, 3D panels and lens blur')
+    }
     if (asksSoundEdges(input)) {
       if (input.speed !== undefined || input.speedRamp !== undefined) throw new Error("Set a clip's speed and its edges in seconds or samples in two calls.")
       await requireSoundPrecision(desktop)
@@ -7492,19 +7543,24 @@ export const addTimelineTrack: Operation<{
   projectId: string; timelineId?: string
   type?: 'video' | 'audio' | 'overlay'
   name?: string
+  above?: string; below?: string
 }> = {
   id: 'slates_add_timeline_track',
   description:
-    "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). A video or audio track is appended below the existing tracks; an overlay track, for text and image overlays, goes on top so it draws over every other track. Returns the new track and the full timeline.",
+    "Add a track to the project's timeline (default: an audio track, for layering voiceover + music + AI audio). A video or audio track is appended below the existing tracks; an overlay track, for text and image overlays, goes on top so it draws over every other track. above or below (a lane id) puts it just there instead: picture lanes draw in their order, the top one in front, so an overlay lane between two video lanes draws behind the upper one. Returns the new track and the full timeline.",
   input: z.object({
     projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
     type: z.enum(['video', 'audio', 'overlay']).optional().describe('Default: audio. overlay needs a desktop with text and image overlays.'),
     name: z.string().optional().describe("Default: 'Audio N', 'Video N' or 'Overlay N'."),
+    above: z.string().uuid().optional().describe('A lane of the timeline: the new one goes just above it.'),
+    below: z.string().uuid().optional().describe('A lane of the timeline: the new one goes just below it.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-tracks', 'timeline tracks + audio mixing')
     if (input.type === 'overlay') await desktop.requireCapability('timeline-overlays', 'text and image overlays')
+    if (input.above !== undefined && input.below !== undefined) throw new Error('Send above or below, not both.')
+    if (input.above !== undefined || input.below !== undefined) await desktop.requireCapability('clip-panels', 'placing a lane among the others')
     await requireNamedCut(desktop, input.timelineId)
     return ok(await desktop.post('/agent/timeline/add-track', input))
   },
@@ -7765,7 +7821,10 @@ export const updateOverlayClip: Operation<{
   },
 }
 
-const KEYFRAME_PROPERTY_IDS = ['positionX', 'positionY', 'scale', 'rotation', 'opacity', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom', 'focusX', 'focusY', 'zoom'] as const
+const KEYFRAME_PROPERTY_IDS = ['positionX', 'positionY', 'scale', 'rotation', 'opacity', 'cropLeft', 'cropTop', 'cropRight', 'cropBottom', 'focusX', 'focusY', 'zoom',
+  'saturation', 'grain', 'exposure', 'pitch', 'yaw', 'perspective', 'radius', 'shadowX', 'shadowY', 'shadowBlur', 'shadowOpacity', 'borderWidth', 'borderOpacity', 'blur'] as const
+/** The keys a desktop before layers and panels refuses. */
+const PANEL_KEY_IDS = new Set<string>(KEYFRAME_PROPERTY_IDS.slice(KEYFRAME_PROPERTY_IDS.indexOf('saturation')))
 
 export const setClipKeyframes: Operation<{
   projectId: string; timelineId: string; clipId: string
@@ -7773,7 +7832,7 @@ export const setClipKeyframes: Operation<{
 }> = {
   id: 'slates_set_clip_keyframes',
   description:
-    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start and may fall between frames (110.4), read at that exact time. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
+    "Animate or set a timeline clip's transform with keyframes: a punch-in, a slow push, a Ken Burns move, a slide, a spin, a fade, a crop. Each property you name gets exactly the keys you send ([] clears it back to its static value); properties you leave out keep theirs, and all of them land in one transaction. One key holds a value for the whole clip. Frames count from the clip's start and may fall between frames (110.4), read at that exact time. Units: positionX/positionY move the picture's centre in frame widths/heights (0.1 = a tenth of the frame right or down, -4..4); scale multiplies the framed size about the frame's centre (1 = as framed, 0.01..20); rotation is degrees clockwise; opacity 0..1; cropLeft/Top/Right/Bottom remove that fraction of the source from its side (0..0.99); focusX/focusY (0..1) and zoom (1..20) animate the clip's reframe for the aspect being exported. The look and the panel key too, each key replacing the clip's own value: saturation 0..2 (1 as shot), grain 0..1, exposure -4..4 stops; pitch and yaw -85..85 degrees, perspective 0..1; radius 0..0.5, shadowX and shadowY -0.5..0.5, shadowBlur 0..0.25 and borderWidth 0..0.05, all in frame heights; shadowOpacity and borderOpacity 0..1 (a key above 0 draws a shadow or border the clip has none of); blur 0..1. Drawn by the Cut's monitor and its export alike, both the timeline engine. Returns the clip's keys; slates_get_timeline lists every clip's keys in timeline.keyframes. Requires timeline-keyframes; update Slates on capability refusal.",
   input: z.object({
     projectId: z.string().uuid(),
     timelineId: z.string().uuid(),
@@ -7787,6 +7846,7 @@ export const setClipKeyframes: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline-keyframes', 'clip keyframes')
+    if (Object.keys(input.properties).some((id) => PANEL_KEY_IDS.has(id))) await desktop.requireCapability('clip-panels', "keys on a clip's look, 3D, panel and blur")
     await requireKeysBetweenFrames(desktop, ...Object.values(input.properties))
     return ok(await desktop.post('/agent/timeline/keyframes', input))
   },
@@ -7981,10 +8041,11 @@ export const updateTimelineTrack: Operation<{
   locked?: boolean
   volume?: number
   effects?: z.infer<typeof audioEffectList> | null
+  above?: string; below?: string
 }> = {
   id: 'slates_update_timeline_track',
   description:
-    'Update a timeline track: rename, mute/unmute, lock/unlock, or set its volume fader (linear gain, -∞ to +12 dB). Track volume applies to both preview and MP4 export — audio-track clips are mixed at this gain; a muted video track still shows video but its embedded audio is silenced. effects puts an effect list on a sound lane, heard after its clips\' own (the same shape as slates_update_clip, keys in frames from the timeline start).',
+    'Update a timeline track: rename, mute/unmute, lock/unlock, or set its volume fader (linear gain, -∞ to +12 dB). Track volume applies to both preview and MP4 export — audio-track clips are mixed at this gain; a muted video track still shows video but its embedded audio is silenced. effects puts an effect list on a sound lane, heard after its clips\' own (the same shape as slates_update_clip, keys in frames from the timeline start). above or below (another lane\'s id) moves the lane just there: picture lanes draw in their order, the top one in front, video and overlay lanes alike.',
   input: z.object({
     projectId: z.string().uuid(),
     trackId: z.string().uuid(),
@@ -7993,6 +8054,8 @@ export const updateTimelineTrack: Operation<{
     locked: z.boolean().optional(),
     volume: z.number().min(0).max(4).optional().describe('Track fader as LINEAR gain: 0 = -∞ (silent), 1 = 0 dB (unity), ~3.98 = +12 dB (max boost).'),
     effects: audioEffectList.nullable().optional().describe('A video or audio lane: its effect list, sent whole; null clears it.'),
+    above: z.string().uuid().optional().describe('Another lane of the timeline: this one moves just above it.'),
+    below: z.string().uuid().optional().describe('Another lane of the timeline: this one moves just below it.'),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -8000,6 +8063,8 @@ export const updateTimelineTrack: Operation<{
     if (input.effects !== undefined) await desktop.requireCapability('audio-effects', 'audio effects on a lane')
     await requireEqBands(desktop, input.effects)
     await requireKeysBetweenFrames(desktop, input.effects)
+    if (input.above !== undefined && input.below !== undefined) throw new Error('Send above or below, not both.')
+    if (input.above !== undefined || input.below !== undefined) await desktop.requireCapability('clip-panels', 'placing a lane among the others')
     return ok(await desktop.post('/agent/timeline/update-track', input))
   },
 }
