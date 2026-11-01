@@ -6854,17 +6854,21 @@ async function requireNamedCut(desktop: SlatesDesktopClient, timelineId: string 
   if (timelineId) await desktop.requireCapability('named-cuts', 'named cuts')
 }
 
-export const getTimeline: Operation<{ projectId: string; timelineId?: string }> = {
+export const getTimeline: Operation<{ projectId: string; timelineId?: string; objectWipes?: boolean }> = {
   id: 'slates_get_timeline',
   description:
-    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame. A clip whose file has or needs a proxy carries proxy (needed with a reason, making, ready, failed; playsSlowly when the monitor measured it stuttering); notices, printed first, name the clips that may show no picture or play slowly: tell the user and offer the proxy, making one only on their yes. eqs reads every EQ on a clip, a lane or the master as its bands and its level in dB by octave; eq lists the bands, types, slopes, ranges and presets an EQ takes.',
-  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional() }),
+    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame. A clip whose file has or needs a proxy carries proxy (needed with a reason, making, ready, failed; playsSlowly when the monitor measured it stuttering); notices, printed first, name the clips that may show no picture or play slowly: tell the user and offer the proxy, making one only on their yes. eqs reads every EQ on a clip, a lane or the master as its bands and its level in dB by octave; eq lists the bands, types, slopes, ranges and presets an EQ takes. transitionKinds lists every transition kind with its own length and its settings (params: defaults, ranges, words). objectWipes: true adds objectWipes: candidates, the cuts a subject crossing the frame could carry as an object wipe, best first, each with its confidence, the transition to add and the trim that puts the crossing on the cut (make the trim with slates_edit_timeline_clips, then slates_add_transition); and unmasked, the clips at a cut whose footage has no subject mask yet: make the mask of what moves there and ask again.',
+  input: z.object({
+    projectId: z.string().uuid(), timelineId: z.string().uuid().optional(),
+    objectWipes: z.boolean().optional().describe('Also find object wipes: cuts a moving subject could carry, read from the subject masks the clips already have.'),
+  }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('timeline', 'timeline editing')
     await requireNamedCut(desktop, input.timelineId)
+    if (input.objectWipes) await desktop.requireCapability('matte-transitions', 'object wipes')
     const r = await desktop.get<TimelineView & { success: boolean }>('/agent/timeline', {
-      projectId: input.projectId, timelineId: input.timelineId,
+      projectId: input.projectId, timelineId: input.timelineId, ...(input.objectWipes ? { objectWipes: 'true' } : {}),
     })
     const t = r.timeline ?? {}
     const clipCount =
@@ -7061,10 +7065,10 @@ export const removeClip: Operation<{ clipId: string; ripple?: boolean; projectId
 
 const transitionShape = {
   kind: z.string().optional().describe("A kind from slates_get_timeline's transitionKinds for this lane: picture kinds on video and overlay lanes, sound kinds on audio lanes. Default: a dissolve, or a crossfade on sound."),
-  durationFrames: z.number().int().positive().optional().describe('How long it lasts, in timeline frames. Default 0.5 s, shortened to what the clips allow; a length you name that is too long is refused with the longest that fits.'),
+  durationFrames: z.number().int().positive().optional().describe('How long it lasts, in timeline frames. Default the length transitionKinds gives its kind (defaultSeconds, else 0.5 s), shortened to what the clips allow; a length you name that is too long is refused with the longest that fits.'),
   durationSec: z.number().positive().optional().describe('The same, in seconds.'),
   alignment: z.enum(['center', 'start', 'end']).optional().describe('center (default) straddles the cut; start begins at the cut; end finishes at it.'),
-  params: z.record(z.string(), z.unknown()).optional().describe("The kind's settings. freeze: true holds the edge frame where the media runs short. On a picture transition, audio: false stops the clips' sound crossfading with it."),
+  params: z.record(z.string(), z.unknown()).optional().describe("The kind's settings, listed with defaults and ranges as its params in transitionKinds: luma-fade and color-range key on the picture; track-matte reveals through a matte (matte linear at angle, radial from centerX/centerY, subject: a clip's subject mask by maskClip and maskId, clip: matteClipId's brightness); object-wipe follows a subject crossing the frame and names its mask (maskId, maskClip; slates_get_timeline objectWipes finds them). A matte that is missing draws a dissolve. freeze: true holds the edge frame where the media runs short. On a picture transition, audio: false stops the clips' sound crossfading with it."),
   durationMs: z.number().min(SOUND_CROSSFADE_MS.min).max(SOUND_CROSSFADE_MS.max).optional().describe(`Audio lane: the crossfade's length in milliseconds (${SOUND_CROSSFADE_MS.min} to ${SOUND_CROSSFADE_MS.max}), placed to the sample, so it may be shorter than a frame. Instead of durationFrames or durationSec.`),
   curve: z.enum(SOUND_CURVES).optional().describe("Audio lane: 'equal-power' (default) for two different sounds, 'linear' (straight lines, a triangular crossfade) for a join inside one piece of music."),
 }
