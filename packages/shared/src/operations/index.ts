@@ -1965,7 +1965,7 @@ export const joinOnWhip: Operation<{
   id: 'slates_join_on_whip',
   billable: false,
   description:
-    "Join two shots on their whip pans, as Join on whip in the clip's menu does: the outgoing clip is trimmed to end on its whip's peak and the incoming one to start on its own, so the frame at the cut shows both peaks, then a short blend is centred on the cut and the cut hides inside the blur. The two clips must meet on one picture lane, and both files need whips (slates_find_whip_pans, or slates_edit_whip_pans to mark one). It uses the outgoing whip nearest the clip's out point and the incoming whip nearest its in point; fromPeak and toPeak (file frames) pick others. blend dissolve (default), whip (the whip-pan transition, which sweeps sideways only) or none; blendFrames 2 to 12, default 4. One edit; the trims ripple the lane. Answers the clips written, cutFrame, aligned (both peaks land on the cut), shown (the file frames at the cut), directionMatch, speedRatio, brightnessGap and warnings: a mismatch is reported, never hidden, so tell the user. whoosh.atFrame is where a whoosh's loudest moment goes; making one with Sound Effects costs credits, so ask first. Requires whip-pans; update Slates on capability refusal.",
+    "Join two shots on their whip pans, as Join on whip in the clip's menu does: the outgoing clip is trimmed to end on its whip's peak and the incoming one to start on its own, so the frame at the cut shows both peaks, then a short blend is centred on the cut and the cut hides inside the blur. The two clips must meet on one picture lane, and both files need whips (slates_find_whip_pans, or slates_edit_whip_pans to mark one). It uses the outgoing whip nearest the clip's out point and the incoming whip nearest its in point; fromPeak and toPeak (file frames) pick others. blend dissolve (default), whip (the whip-pan transition, turned to sweep the way the outgoing whip turns) or none; blendFrames 2 to 12, default 4. One edit; the trims ripple the lane. Answers the clips written, cutFrame, aligned (both peaks land on the cut), shown (the file frames at the cut), directionMatch, speedRatio, brightnessGap and warnings: a mismatch is reported, never hidden, so tell the user. whoosh.atFrame is where a whoosh's loudest moment goes; making one with Sound Effects costs credits, so ask first. Requires whip-pans; update Slates on capability refusal.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -7629,7 +7629,7 @@ export const updateClip: Operation<{
       await requireKeysBetweenFrames(desktop, input.speedRamp, input.effects)
     }
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
-    if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain or saturation; send look: null to clear it')
+    if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain, saturation or exposure; send look: null to clear it')
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
     if (input.look?.exposure !== undefined || input.matte !== undefined || input.space !== undefined || input.panel !== undefined || input.blur !== undefined) {
       await desktop.requireCapability('clip-panels', 'subject mask layers, 3D panels and lens blur')
