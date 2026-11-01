@@ -14,14 +14,18 @@
       "slates-direct-response-ad",
       "slates-edit-and-iterate",
       "slates-launch-video",
+      "slates-layered-effects",
+      "slates-matte-transitions",
       "slates-motion",
+      "slates-object-wipes",
       "slates-one-prompt-film",
       "slates-previs-blocking",
       "slates-project-organization",
       "slates-restyle-from-blocking",
       "slates-script-craft",
       "slates-storyboard-from-script",
-      "slates-ugc-influencer-ad"
+      "slates-ugc-influencer-ad",
+      "slates-whip-pans"
     ],
     "rule": [
       "slates-blocking-to-prompt",
@@ -59,13 +63,13 @@
   },
   "caps": {
     "fileWords": {
-      "router": 800,
+      "router": 870,
       "playbook": 2500,
       "rule": 6000,
       "model": 6500
     },
     "layerWords": {
-      "playbook": 23000,
+      "playbook": 29500,
       "rule": 25000,
       "model": 43000
     },
