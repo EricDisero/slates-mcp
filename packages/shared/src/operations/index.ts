@@ -1852,6 +1852,139 @@ export const maskSubject: Operation<MaskSubjectInput> = {
   },
 }
 
+// Whip pans in the user's own footage (slate subject masks plan step 5): the desktop routes are
+// /agent/timeline/whip-pans (GET reads, POST finds), /agent/timeline/whip-pans/edit and
+// /agent/timeline/join-on-whip, the same core as the clip's whip marks and its menu's Join on whip
+// (slate `src/main/whips/service.ts`, `src/main/whips/join.ts`). The asset or clip is named as for a beat grid.
+const whipTarget = {
+  assetId: z.string().min(1).optional().describe('A video asset: its code (VID-A2) or id. Or name clipId.'),
+  clipId: z.string().uuid().optional().describe("A clip on the timeline: its file's whips, plus where each lands on the cut (onTimeline, in frames)."),
+}
+
+type WhipAnswer = {
+  assetId: string
+  whips: Array<{ start: number; peak: number; end: number; direction: string; speed: number; confidence: number; sheet?: string }> | null
+  hint?: string
+  edits?: unknown[]
+}
+
+function whipWords(r: WhipAnswer): string {
+  if (!r.whips) return r.hint ?? 'Not searched yet.'
+  if (!r.whips.length) return 'No whip pans in this file.'
+  const list = r.whips.map((w) => `${w.direction} at frame ${w.peak} (${w.start}-${w.end}, ${w.speed} widths/s, confidence ${w.confidence})${w.sheet ? `, sheet ${w.sheet}` : ''}`)
+  return `${r.whips.length} whip pan${r.whips.length === 1 ? '' : 's'}: ${list.join('; ')}.`
+}
+
+export const getWhipPans: Operation<BeatTargetInput & { sheets?: boolean }> = {
+  id: 'slates_get_whip_pans',
+  description:
+    "Read the whip pans found in a video file (fast camera swings an editor can hide a cut inside): each whip's start, peak and end in the file's own frames (the peak is the fastest, blurriest frame), direction (where the camera turned: right, up-right, up, up-left, left, down-left, down, down-right), speed in frame widths a second, confidence from 0 to 1 (hand-set ones read 1) and the hand edits kept on it. With a clipId it also gives onTimeline: where each lands on the cut, in frames. sheets true saves a contact sheet PNG per whip (five frames from start to end, the peak framed, an arrow for the direction) and returns each path: look at it to judge a whip. Never searches: whips null with a hint means not searched yet (slates_find_whip_pans, free). Correct one with slates_edit_whip_pans. Requires whip-pans; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...whipTarget,
+      sheets: z.boolean().optional().describe('Save a contact sheet per whip and return its path.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('whip-pans', 'whip pans')
+    const body = await beatTargetBody(ctx, input)
+    const r = await ctx.desktop().get<WhipAnswer>('/agent/timeline/whip-pans', { ...body, ...(input.sheets ? { sheets: true } : {}) })
+    return ok(r, `${whipWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const findWhipPans: Operation<BeatTargetInput & { sheets?: boolean }> = {
+  id: 'slates_find_whip_pans',
+  billable: false,
+  description:
+    "Find the whip pans in a video file on the user's machine, as Find whip pans in the clip's menu does: fast camera swings that smear the whole picture in one direction, the moment an editor cuts inside to join two shots. Free: it spends no credits and nothing leaves the machine; a long file takes a while. Answers each whip's start, peak and end (frames of the file), direction, speed, confidence and a contact sheet PNG (sheets false skips them); look at a sheet before trusting a low-confidence whip. Slow pans, someone crossing the lens, walking and handheld shake are left alone, and a swing that rolls the camera is often missed: mark it with slates_edit_whip_pans. Hand edits already on the file are kept over the new find. Next: slates_join_on_whip. Requires whip-pans; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...whipTarget,
+      sheets: z.boolean().optional().describe('Contact sheets per whip; default true.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('whip-pans', 'finding whip pans')
+    const r = await ctx.desktop().post<WhipAnswer>('/agent/timeline/whip-pans', { ...(await beatTargetBody(ctx, input)), ...(input.sheets === false ? { sheets: false } : {}) })
+    return ok(r, `${whipWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+const whipDirection = z.enum(['right', 'up-right', 'up', 'up-left', 'left', 'down-left', 'down', 'down-right'])
+const whipEditInput = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('move'),
+    at: z.number().int().min(0).describe('A frame inside the whip, or within 12 frames of it, naming which one.'),
+    start: z.number().int().min(0).optional(),
+    peak: z.number().int().min(0).optional(),
+    end: z.number().int().min(0).optional(),
+    direction: whipDirection.optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal('add'),
+    start: z.number().int().min(0),
+    peak: z.number().int().min(0),
+    end: z.number().int().min(0),
+    direction: whipDirection.describe('Where the camera turned.'),
+  }).strict(),
+  z.object({ kind: z.literal('delete'), at: z.number().int().min(0).describe('A frame inside the whip to delete.') }).strict(),
+])
+
+export const editWhipPans: Operation<BeatTargetInput & { edits?: Array<z.infer<typeof whipEditInput>>; undo?: boolean; clearEdits?: boolean }> = {
+  id: 'slates_edit_whip_pans',
+  billable: false,
+  description:
+    "Correct a video file's whip pans by hand, as dragging the whip marks on a clip does: move a whip's start, peak or end, or set its direction; add a whip the finder missed (start, peak, end, direction); delete a false one. Frames are the file's own, as slates_get_whip_pans gives them; a whip is named by a frame inside it (at). Edits apply in order and are kept: finding again never overwrites them. undo takes back the last edit; clearEdits drops them all. The marks on the clip follow at once. Free. Returns the whips as slates_get_whip_pans does. Requires whip-pans; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...whipTarget,
+      edits: z.array(whipEditInput).min(1).optional().describe('Edits to apply, in order.'),
+      undo: z.boolean().optional().describe('Take back the last hand edit.'),
+      clearEdits: z.boolean().optional().describe('Drop every hand edit and show what was found.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    if (!input.edits && !input.undo && !input.clearEdits) throw new Error('Send edits, undo: true or clearEdits: true.')
+    await ctx.desktop().requireCapability('whip-pans', 'editing whip pans')
+    const r = await ctx.desktop().post<WhipAnswer>('/agent/timeline/whip-pans/edit', {
+      ...(await beatTargetBody(ctx, input)),
+      ...(input.undo ? { undo: true } : input.clearEdits ? { clearEdits: true } : { edits: input.edits }),
+    })
+    return ok(r, `Saved. ${whipWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+export const joinOnWhip: Operation<{
+  projectId: string; fromClipId: string; toClipId: string; fromPeak?: number; toPeak?: number
+  blend?: 'dissolve' | 'whip' | 'none'; blendFrames?: number
+}> = {
+  id: 'slates_join_on_whip',
+  billable: false,
+  description:
+    "Join two shots on their whip pans, as Join on whip in the clip's menu does: the outgoing clip is trimmed to end on its whip's peak and the incoming one to start on its own, so the frame at the cut shows both peaks, then a short blend is centred on the cut and the cut hides inside the blur. The two clips must meet on one picture lane, and both files need whips (slates_find_whip_pans, or slates_edit_whip_pans to mark one). It uses the outgoing whip nearest the clip's out point and the incoming whip nearest its in point; fromPeak and toPeak (file frames) pick others. blend dissolve (default), whip (the whip-pan transition, which sweeps sideways only) or none; blendFrames 2 to 12, default 4. One edit; the trims ripple the lane. Answers the clips written, cutFrame, aligned (both peaks land on the cut), shown (the file frames at the cut), directionMatch, speedRatio, brightnessGap and warnings: a mismatch is reported, never hidden, so tell the user. whoosh.atFrame is where a whoosh's loudest moment goes; making one with Sound Effects costs credits, so ask first. Requires whip-pans; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      fromClipId: z.string().uuid().describe('The outgoing clip.'),
+      toClipId: z.string().uuid().describe('The incoming clip; it starts where the outgoing one ends.'),
+      fromPeak: z.number().int().min(0).optional().describe('The outgoing whip, by a frame of its file inside it.'),
+      toPeak: z.number().int().min(0).optional().describe('The incoming whip, by a frame of its file inside it.'),
+      blend: z.enum(['dissolve', 'whip', 'none']).optional().describe('The blend across the cut. Default dissolve.'),
+      blendFrames: z.number().int().min(2).max(12).optional().describe('The blend in frames, centred on the cut. Default 4.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('whip-pans', 'joining on a whip')
+    const r = await ctx.desktop().post<{ cutFrame: number; aligned: boolean; directionMatch: boolean; warnings: string[] }>('/agent/timeline/join-on-whip', input)
+    const warn = r.warnings.length ? ` Tell the user: ${r.warnings.join(' ')}` : ''
+    return ok(r, `Joined on the whip at frame ${r.cutFrame}${r.aligned ? ', both peaks on the cut' : ''}.${warn}`)
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -11282,6 +11415,10 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   findBeats as unknown as Operation<unknown>,
   editBeatGrid as unknown as Operation<unknown>,
   cutToBeats as unknown as Operation<unknown>,
+  getWhipPans as unknown as Operation<unknown>,
+  findWhipPans as unknown as Operation<unknown>,
+  editWhipPans as unknown as Operation<unknown>,
+  joinOnWhip as unknown as Operation<unknown>,
   extractVideoFrame as unknown as Operation<unknown>,
   getMe as unknown as Operation<unknown>,
   getCreditBalance as unknown as Operation<unknown>,
