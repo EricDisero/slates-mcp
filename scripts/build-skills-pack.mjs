@@ -91,7 +91,10 @@ const root = resolve(here, '..');
 // 1.1.7, 2026-10-29: charts the launch-video playbook (slates-api brain/, license
 // tier, so not zipped); the README's license playbook count moves with it.
 // Uploaded, then both URLs moved.
-const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.7';
+// 1.1.8, 2026-11-01: charts the layered-effects, matte-transitions, object-wipes and
+// whip-pans playbooks (slates-api brain/, approved that day with slates-mcp 2eb38d8).
+// Uploaded, then both URLs moved.
+const PACK_VERSION = process.env.PACK_VERSION ?? '1.1.8';
 
 const FREE_DIR = join(root, 'packages', 'shared', 'skills');
 const PAID_DIR = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(root, '..', 'slates-api', 'pack-skills');

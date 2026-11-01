@@ -1,9 +1,9 @@
 {
-  "version": "1.1.7",
-  "filename": "agentic-skills-pack-v1.1.7-30dd69a8a8c25248.zip",
-  "sha256": "30dd69a8a8c25248cd2362390ebb54e6bfe32795ec9d92e1dcbe047ff7b429ff",
-  "bytes": 17489,
-  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.7-30dd69a8a8c25248.zip",
+  "version": "1.1.8",
+  "filename": "agentic-skills-pack-v1.1.8-40dc58feeec82481.zip",
+  "sha256": "40dc58feeec824814ec7b5f3b96ac21d4539cba24b137ee1c9cdb732f4a4e7b4",
+  "bytes": 17880,
+  "url": "https://slates-web-assets.t3.tigrisfiles.io/agentic-skills-pack-v1.1.8-40dc58feeec82481.zip",
   "skillCount": 3,
   "freeSkills": [
     "slates-start-here"
@@ -30,8 +30,11 @@
     "slates-layer-brand-captions",
     "slates-layer-lower-third",
     "slates-layer-title",
+    "slates-layered-effects",
+    "slates-matte-transitions",
     "slates-model-selection",
     "slates-motion",
+    "slates-object-wipes",
     "slates-one-prompt-film",
     "slates-previs-blocking",
     "slates-project-organization",
@@ -58,7 +61,8 @@
     "slates-style-prompting",
     "slates-transitions",
     "slates-ugc-influencer-ad",
-    "slates-vision-feedback-loop"
+    "slates-vision-feedback-loop",
+    "slates-whip-pans"
   ],
   "catalog": [
     {
@@ -172,6 +176,16 @@
       "summary": "Layer preset: a bold title with an optional line under it, rising or slamming in and fading out."
     },
     {
+      "key": "slates-layered-effects",
+      "tier": "license",
+      "summary": "Layer a shot in depth with its subject mask: text or a HUD behind or beside a person, a background-only effect on chosen words, 3D panels, lens blur, compartments."
+    },
+    {
+      "key": "slates-matte-transitions",
+      "tier": "license",
+      "summary": "Melt one shot into the next through its light, a colour or a matte: luma fades, colour-range wipes and track mattes, with the source and length chosen."
+    },
+    {
       "key": "slates-model-selection",
       "tier": "license",
       "summary": "Choose image, video, edit and audio models for the brief, including animating photos, making films or directing voices."
@@ -180,6 +194,11 @@
       "key": "slates-motion",
       "tier": "license",
       "summary": "Put HTML motion layers on a cut (lower thirds, end cards, animated captions, titles, plates) from the motion block library or your own composition, checked first."
+    },
+    {
+      "key": "slates-object-wipes",
+      "tier": "license",
+      "summary": "Let something crossing the frame carry the cut: find candidates, mask the object, match its travel, and say what to shoot."
     },
     {
       "key": "slates-project-organization",
@@ -300,6 +319,11 @@
       "key": "slates-vision-feedback-loop",
       "tier": "license",
       "summary": "Inspect generated media against the brief, diagnose defects and choose a targeted correction."
+    },
+    {
+      "key": "slates-whip-pans",
+      "tier": "license",
+      "summary": "Join two shots on whip pans the user shot: match direction and speed, cut at the peaks, blend, add a whoosh."
     },
     {
       "key": "slates-start-here",
