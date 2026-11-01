@@ -294,21 +294,26 @@ console.log('agent-surface-lockstep-check')
   try {
     const ast = ts.createSourceFile(mcpServerPath, server, ts.ScriptTarget.Latest, true)
     const declarations = ast.statements.filter(statement => ts.isVariableStatement(statement)
-      && statement.declarationList.declarations.some(declaration => ['doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
+      && statement.declarationList.declarations.some(declaration => ['versionLine', 'doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
     const code = declarations.map(statement => statement.getText(ast)).join('\n') + '\ninstructions'
     const javascript = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText
     const canonical = buildMcpInstructions()
     const boundary = canonical.indexOf('\n\n')
-    for (const notice of [undefined, 'UPDATE AVAILABLE: fixture notice']) {
+    // The npm copy, with and without the update notice, and the copy inside the Slates app, which
+    // names itself and never carries the notice.
+    for (const [notice, bundled] of [[undefined, false], ['UPDATE AVAILABLE: fixture notice', false], [undefined, true]]) {
       let calls = 0
       const composed = runInNewContext(javascript, {
-        pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', updateAdvice: notice,
+        pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', updateAdvice: notice, BUNDLED: bundled,
         buildMcpInstructions: () => {
           calls++
           return canonical
         },
       }, { timeout: 1000 })
-      const expected = ['Slates MCP server v0.0.0 (@slatesvideo/mcp-server).', canonical.slice(0, boundary), notice, canonical.slice(boundary + 2)].filter(Boolean).join('\n\n')
+      const versionLine = bundled
+        ? 'Slates MCP server v0.0.0 (inside the Slates app).'
+        : 'Slates MCP server v0.0.0 (@slatesvideo/mcp-server).'
+      const expected = [versionLine, canonical.slice(0, boundary), notice, canonical.slice(boundary + 2)].filter(Boolean).join('\n\n')
       if (calls !== 1 || composed !== expected) fail(CHECK, 'MCP instructions do not preserve buildMcpInstructions() with its first paragraph ahead of the optional notice.')
     }
     // The longest prefix a user's client gets: the server's own update notice, as a cache claiming a newer
@@ -319,9 +324,9 @@ console.log('agent-surface-lockstep-check')
     const OLDER_KEEPS = 2048
     // In source order: the server declares the notice before the instructions that use it.
     const withNotice = ast.statements.filter(statement => ts.isVariableStatement(statement)
-      && statement.declarationList.declarations.some(declaration => ['updateAdvice', 'doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
+      && statement.declarationList.declarations.some(declaration => ['updateAdvice', 'versionLine', 'doctrine', 'firstParagraphEnd', 'instructions'].includes(declaration.name.getText(ast))))
     const longest = runInNewContext(ts.transpileModule(withNotice.map(statement => statement.getText(ast)).join('\n') + '\ninstructions', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
-      pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', buildMcpInstructions: () => canonical,
+      pkg: { version: '0.0.0' }, PKG_NAME: '@slatesvideo/mcp-server', BUNDLED: false, buildMcpInstructions: () => canonical,
       updateNotice: shared.updateNotice, cachedLatestVersion: () => '99.0.0',
     }, { timeout: 1000 })
     const essentialsEnd = longest.indexOf('\n## ', longest.indexOf('## Essentials') + 1)

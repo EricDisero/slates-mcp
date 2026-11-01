@@ -3,7 +3,7 @@ import { Command, Option } from 'commander'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readConnection, setCloudToken, clearCloudToken, refreshLatestVersion, updateNotice } from '@slatesvideo/shared'
+import { readConnection, setCloudToken, clearCloudToken, refreshLatestVersion, updateNotice, setDesktopClientIdentity } from '@slatesvideo/shared'
 import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
@@ -42,6 +42,7 @@ import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 const pkg = JSON.parse(
   readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')
 ) as { version: string }
+setDesktopClientIdentity(`cli/${pkg.version}`)
 
 const CLI_PKG_NAME = '@slatesvideo/cli'
 
