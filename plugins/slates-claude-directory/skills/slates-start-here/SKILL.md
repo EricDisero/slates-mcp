@@ -14,48 +14,53 @@ description: "Start any Slates job here: the Director card (how every job begins
 5. Work in their current project. Scripts, Shots and cuts cost nothing; write them before anything generates.
 6. When no playbook fits, work from the rules below and say which ones you used.
 
-Pick the job's row and open its playbook with `slates_get_prompting_guide` (topic: the playbook's name); with no job named yet ("make something cool"), ask the card's first question instead.
+Open the job's playbook with `slates_get_prompting_guide` (topic: its name); with no job named yet ("make something cool"), ask the card's first question.
 
 ## Playbooks: one per job
 
 | Job | Playbook | Ask first |
 |---|---|---|
-| A product ad, or a copy of one they found: demonstration, proof, offer | `slates-direct-response-ad` | What are you selling, and which ad do you want to copy? |
-| A creator or UGC ad: one person talking to camera | `slates-ugc-influencer-ad` | Who is the creator, and which creator ad do you want to copy? |
+| A product ad, or a copy of one they found: demonstration, proof, offer | `slates-direct-response-ad` | What are you selling, and which ad to copy? |
+| A creator or UGC ad: one person talking to camera | `slates-ugc-influencer-ad` | Who is the creator, and which creator ad to copy? |
 | Many versions of one ad: hooks, bodies, end cards, formats | `slates-ad-variants` | Which cut is the body, and which hooks and formats? |
 | A finished film, short, trailer or music video from a brief | `slates-one-prompt-film` | What is it, how long, and where will it play? |
 | A storyboard from a script, or a remake of a reference ad | `slates-storyboard-from-script` | Paste the script, or share the ad. |
 | Words: write, rewrite or tighten a script, dialogue or hooks | `slates-script-craft` | Who speaks, to whom, for how long? |
 | A character who stays the same across shots | `slates-character-identity` | A picture of them, or a description? |
 | Fix, refine or redo part of an image or clip | `slates-edit-and-iterate` | Which asset, and what is wrong with it? |
-| A camera move on an exact path or timed to the second, blocked in Blender first | `slates-previs-blocking` | Which shot needs the exact move? |
+| A one-take that never cuts (a fight, a chase), or a camera move on an exact path or to the second, blocked in Blender first | `slates-previs-blocking` | Which shot needs the exact move? |
+| Restyle approved grey-box blocking as anime, claymation, photoreal or any look | `slates-restyle-from-blocking` | Which looks to compare? |
 | Two or more people talking (over-the-shoulder coverage, a walk and talk), eyelines held across cuts | `slates-dialogue-blocking` | Where are they sitting or walking? |
-| An approved grey-box blocking pass shown in new looks (anime, claymation, photoreal) | `slates-restyle-from-blocking` | Which looks to compare? |
-| Cut a timeline: trims, pacing, cutting to music | `slates-cuts` | Which cut, and how long should it run? |
+| Cut a timeline: trims, pacing, on the beat, by transcript, a vertical following the face | `slates-cuts` | Which cut, and how long? |
 | Captions on speech | `slates-captions` | Word by word, or lines? |
-| Titles, lower thirds, end cards and other motion layers on a cut | `slates-motion` | What words, and where on screen? |
+| Animated titles, lower thirds, an end card (logo, website) and other motion layers on a video | `slates-motion` | What words, and where on screen? |
+| A launch video in motion graphics | `slates-launch-video` | What does it prove? |
 | Images through their ChatGPT account | `slates-chatgpt-images` | Is it connected? |
-| Find, move, copy or reuse media across projects | `slates-project-organization` | Which project and which assets? |
+| Find media they made, in any project; move, copy or reuse it | `slates-project-organization` | Which project and assets? |
+| A person in front of big words or a HUD; their background black and white or blurred while they stay in colour; 3D panels, compartments | `slates-layered-effects` | Which clip, and which words? |
+| One shot melting into the next through its bright parts or one colour, like a sky (luma fade, colour range, track matte) | `slates-matte-transitions` | Which cut? |
+| Someone or something passing the lens wipes to the next shot (an object wipe), or what to film for one | `slates-object-wipes` | What crosses the frame? |
+| Cut two shots inside a fast camera swing they filmed (a whip or swish pan) | `slates-whip-pans` | Which two clips? |
 
 A talking-head cut runs on `slates-cuts` then `slates-captions`.
 
-A playbook the account lacks answers with where it lives: run the job on the rules below, and tell the user once.
+A locked playbook says where it lives: run the job on the rules below, and tell the user once.
 
 ## Offer the method that gets the result
 
-People say what they want, not how. When a want below fits the job or one shot in it, offer its method and reason before you price that part; they choose.
+When a want below fits the job or one shot in it, offer its method and reason before you price that part; they choose.
 
 | They want | Offer | Because |
 |---|---|---|
 | One continuous take of choreographed action (a fight, a drift, a chase, a dance), or an exact camera path | Block it in Blender first (`slates-previs-blocking`) | A prompt reinvents the motion every roll; a blocking clip fixes path, timing and positions |
-| Exact words, numbers, logos or charts on screen | Motion graphics: titles or an end card on their cut `slates-motion`; a video made only of graphics, topic `motion-overview` (an explainer, a launch, a slideshow, a lyric video cut to a track); graphics over an interview they shot, topic `talking-head-recut` | Rendered text is exact every time and costs no generation |
+| Exact words, numbers, logos or charts on screen | Titles, a lower third or an end card on a video: `slates-motion`. A video with no footage: a launch, `slates-launch-video`; an explainer, a slideshow or a lyric video, topic `motion-overview` (not a layer on a video). Graphics over their interview: topic `talking-head-recut` | Rendered text is exact and free |
 | A move they have on video, on another character | Motion transfer (`slates-prompting-motion-transfer`) | Their clip drives the body |
 | Their recorded voice on a face | Lip sync (`slates-prompting-lip-sync`) | The mouth follows their audio |
 | Narration, one voice across a series, or sound effects | A designed or cloned voice (topic `voice`), sound effects (topic `sound-effects`) | One voice in every video |
 | The same place in every shot | A location plate first (`slates_generate_environment_plate`) | Every shot starts from one set |
-| The frame right before paying for video | Pictures first, then those pictures as first frames (`slates_use_pictures_as_first_frames`) | A picture costs a fraction of a clip |
+| The frame right before paying for video | Pictures first, used as first frames (`slates_use_pictures_as_first_frames`) | A picture costs a fraction of a clip |
 | An exact start and end, or action longer than one clip | First and last frames; the last frame of one clip opens the next | Clips join on one frame |
-| One look across every shot | A saved look (`slates_create_style`) | The same light and grade every shot |
+| One look across every shot | A saved look (`slates_create_style`) | The same light and grade |
 | Their product's real label in shot | The product as a Library item (`slates_import_product`) | The real label, copied |
 | Movement on a still, or a speed ramp on a beat | Keys in the cut (`slates_set_clip_keyframes`, `slates-cuts`) | No generation, exact to the frame |
 | The same video in another format | Reframe the clip (`slates_reframe_clip`) | No new generation |
