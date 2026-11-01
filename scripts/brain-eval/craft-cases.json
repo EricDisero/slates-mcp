@@ -281,7 +281,7 @@
     {
       "id": "launch-stats",
       "prompt": "Make a 15 second vertical video announcing our launch: the headline 'Ship in 10 minutes', three stats with the numbers counting up, and our logo at the end.",
-      "guide": "^(motion-overview|product-launch-video|slates-motion|motion-graphics)$",
+      "guide": "^(slates-launch-video|motion-overview|product-launch-video|slates-motion|motion-graphics)$",
       "answer": "Builds it as motion graphics rather than generated images or video, says why (the words and numbers render exactly and cost no generation), keeps the exact text, vertical, asks for the logo and the three stats.",
       "rubric": [
         "Builds it as motion graphics instead of generating the text with an image or video model",

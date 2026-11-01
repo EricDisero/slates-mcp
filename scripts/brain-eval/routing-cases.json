@@ -308,6 +308,7 @@
       "id": "launch-stats",
       "ask": "A 15 second vertical launch video: our headline, three stats counting up and the logo at the end.",
       "expect": [
+        "slates-launch-video",
         "motion-overview",
         "slates-motion"
       ]
