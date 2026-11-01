@@ -311,6 +311,62 @@
         "motion-overview",
         "slates-motion"
       ]
+    },
+    {
+      "id": "layered-text-behind",
+      "ask": "Put the word FOCUS in huge letters behind me in my talking head clip, so my head covers part of it.",
+      "expect": [
+        "slates-layered-effects"
+      ]
+    },
+    {
+      "id": "layered-bw-background",
+      "ask": "When I say 'never' and 'always', make the background go black and white but keep me in colour.",
+      "expect": [
+        "slates-layered-effects"
+      ]
+    },
+    {
+      "id": "matte-luma-fade",
+      "ask": "Melt the sunset shot into the city at night using the bright parts of the sky, like a luma key transition.",
+      "expect": [
+        "slates-matte-transitions"
+      ]
+    },
+    {
+      "id": "matte-color-range",
+      "ask": "Can the blue sky in the first clip be what reveals the next shot, then the rest of the frame?",
+      "expect": [
+        "slates-matte-transitions"
+      ]
+    },
+    {
+      "id": "object-wipe-walker",
+      "ask": "A guy walks right past my camera at the end of this clip. Use him to wipe into the next shot.",
+      "expect": [
+        "slates-object-wipes"
+      ]
+    },
+    {
+      "id": "object-wipe-shoot",
+      "ask": "I want one of those transitions where something passes in front of the lens and it's a new scene. What should I film?",
+      "expect": [
+        "slates-object-wipes"
+      ]
+    },
+    {
+      "id": "whip-join",
+      "ask": "I swung the camera fast at the end of clip 3 and the start of clip 4. Cut them together inside the blur.",
+      "expect": [
+        "slates-whip-pans"
+      ]
+    },
+    {
+      "id": "whip-swish",
+      "ask": "Join my two travel shots on the swish pans I filmed and add a whoosh.",
+      "expect": [
+        "slates-whip-pans"
+      ]
     }
   ]
 }

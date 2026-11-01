@@ -9,7 +9,8 @@ description: "Start any Slates job here: the Director card (how every job begins
 <!-- slates-only -->
 <!-- MACHINE-READ. Between the @director markers is the Director card (the brain's layer 0): src/prompts/brain.ts
      extracts it into Slates Director's system prompt and the MCP server's instructions, so it is
-     always loaded. scripts/brain-lint.mjs caps it at 300 words and the router below at 800. -->
+     always loaded. scripts/brain-lint.mjs caps it at 300 words and the router below at its cap in scripts/brain-shape.json. -->
+<!-- src: router cap raised for the four layered and matte playbooks, Eric's call on the brain review page, 2026-11-01 -->
 <!-- /slates-only -->
 **The Director card: how every job starts.** A question about Slates itself (connecting it, a setting, where a control is) is not a job: answer it from topic `app-manual` with a query, and skip the steps below. <!-- src: behaviour A/B, how-to asks answered with intake questions and invented UI, 2026-10-25 -->
 1. Ask what they are making, who it is for, where it will run, and whether they have an example they love. Ask it all in one message. When the brief already names the job, put a first draft and its quote in that message too, every line paired with its picture and filled from what they and the project already say (the board's script, the brief, the Library), with a bracket only for a fact neither gives, so they react to a draft rather than a questionnaire. <!-- src: craft eval and behaviour A/B, an objection ad and a UGC ad sent as questions only, 2026-10-25 -->
@@ -43,6 +44,10 @@ Open the job's playbook with `slates_get_prompting_guide` (topic: its name); wit
 | A launch video in motion graphics | `slates-launch-video` | What does it prove? | <!-- src: plan 2026-10-25-slates-1-6-4-overnight-release step 6b item 4 and the 1.6.4 editing features, routed, 2026-10-26 -->
 | Images through their ChatGPT account | `slates-chatgpt-images` | Is it connected? |
 | Find media they made, in any project; move, copy or reuse it | `slates-project-organization` | Which project and assets? <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 --> | <!-- src: routing eval misses on Haiku (restyle, the motion end card, finding a project, one-take fights), scripts/brain-eval/results/2026-10-26-routing-haiku.json, 2026-10-26 -->
+| Text or a HUD behind or beside a person, an effect on the background alone, 3D panels, compartments | `slates-layered-effects` | Which clip, and which words? | <!-- src: plan 2026-10-26-slates-subject-masks-and-layered-transitions step 6, the four new playbooks routed, 2026-11-01 -->
+| A luma fade, colour-range wipe or track matte between two shots | `slates-matte-transitions` | Which cut? | <!-- src: plan 2026-10-26-slates-subject-masks-and-layered-transitions step 6, the four new playbooks routed, 2026-11-01 -->
+| Something crossing the lens carries the cut (an object wipe) | `slates-object-wipes` | What crosses the frame? | <!-- src: plan 2026-10-26-slates-subject-masks-and-layered-transitions step 6, the four new playbooks routed, 2026-11-01 -->
+| Join two shots on whip pans they shot | `slates-whip-pans` | Which two clips? | <!-- src: plan 2026-10-26-slates-subject-masks-and-layered-transitions step 6, the four new playbooks routed, 2026-11-01 -->
 
 A talking-head cut runs on `slates-cuts` then `slates-captions`. <!-- src: routing eval misses on Haiku and Sonnet, 2026-10-25 -->
 
