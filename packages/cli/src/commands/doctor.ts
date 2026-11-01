@@ -119,6 +119,7 @@ const REQUIRED_CAPABILITIES: Array<[string, string]> = [
   ['loudness', 'measuring the loudness of a mix'],
   ['spend-limits', 'spend limits for a project and an agent session'],
   ['beat-grid', "a music clip's beat grid and cutting to it"],
+  ['subject-mask', 'subject masks on your video clips'],
   ['transcript-cut', 'cut by transcript'],
   ['proxies', "a clip's proxy and Make proxies automatically at import"],
 ]

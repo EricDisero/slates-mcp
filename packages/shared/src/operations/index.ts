@@ -1693,6 +1693,165 @@ export const cutToBeats: Operation<{
   },
 }
 
+// A video clip's subject masks (slate subject masks plan step 2): the desktop routes are GET /agent/timeline/masks
+// (list, or one mask's report) and POST /agent/timeline/masks (make, refine, cancel, delete, pin), the same core as
+// the Viewer's Mask tool (slate `src/main/subjectMask/service.ts`). Reading and changing are two ops because the
+// approval hint is per tool. The asset or clip is named as for a beat grid.
+const maskTarget = {
+  assetId: z.string().min(1).optional().describe('A video asset: its code (VID-A2) or id. Or name clipId.'),
+  clipId: z.string().uuid().optional().describe("A video clip on the timeline: its file's masks. With a clip, a prompt or stroke may name timelineFrame."),
+}
+type MaskTargetInput = { projectId: string; assetId?: string; clipId?: string }
+
+const maskMoment = {
+  frame: z.number().int().min(0).optional().describe("The file's own frame (0 is its first)."),
+  sec: z.number().min(0).optional().describe("Or seconds into the file."),
+  timelineFrame: z.number().min(0).optional().describe('Or, with clipId, a frame of the cut inside that clip.'),
+}
+const maskPoint = z.object({
+  x: z.number().min(0).max(1).describe('Fraction of the picture width from the left.'),
+  y: z.number().min(0).max(1).describe('Fraction of the picture height from the top.'),
+  positive: z.boolean().optional().describe('true (default) keeps what is under it; false takes it out.'),
+}).strict()
+const maskPrompt = z.object({
+  ...maskMoment,
+  points: z.array(maskPoint).max(16).optional().describe('Clicks on the subject (and negative ones on what is not it).'),
+  box: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional().describe('[x, y, width, height] around the subject, fractions of the picture.'),
+  name: z.string().min(1).max(80).optional().describe('What the subject is ("the dog", "red car"): the best match on that frame is used as its box.'),
+}).strict()
+const maskStroke = z.object({
+  ...maskMoment,
+  mode: z.enum(['add', 'remove']).describe('add paints the stroke into the mask; remove takes it out.'),
+  radius: z.number().min(0.002).max(0.2).optional().describe('Brush radius, a fraction of the picture\'s long edge. Default 0.02.'),
+  path: z.array(z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])).min(1).max(2000).describe('[x, y] points of the stroke, fractions of the picture.'),
+}).strict()
+const maskParams = z.object({
+  feather: z.number().min(0).max(0.05).optional().describe("Edge softness, a fraction of the long edge. Default 0.002."),
+  grow: z.number().min(-0.05).max(0.05).optional().describe('Grow the edge out (positive) or shrink it in (negative), a fraction of the long edge. Default 0.'),
+  smoothing: z.number().min(0).max(1).optional().describe('Smooth edge flicker over time, 0 none to 1 most. Default 0.3.'),
+}).strict()
+
+type MaskAnswer = {
+  maskId: string
+  label: string
+  status: 'pending' | 'working' | 'ready' | 'failed'
+  error?: string
+  progress?: { stage: string; percent: number; downloadedMB?: number; totalMB?: number }
+  frameCount: number
+  fps: number
+  meanConfidence: number | null
+  lostSpans: Array<{ start: number; end: number; fromSec: number; toSec: number }>
+  confidence: number[]
+  contactSheet?: string
+  mattePath: string | null
+  hint?: string
+  firstRunDownloadMB?: number
+}
+
+function maskWords(m: MaskAnswer): string {
+  if (m.status === 'failed') return `Mask ${m.maskId} failed: ${m.error ?? 'unknown error'}.`
+  if (m.status !== 'ready') {
+    const p = m.progress ? ` (${m.progress.stage} ${m.progress.percent}%${m.progress.totalMB ? `, ${m.progress.downloadedMB} of ${m.progress.totalMB} MB` : ''})` : ''
+    return `Mask ${m.maskId} is still being made${p}. Read it with slates_get_subject_mask and waitSeconds.`
+  }
+  const lost = m.lostSpans.length
+    ? ` ${m.lostSpans.length} lost span${m.lostSpans.length === 1 ? '' : 's'}: ${m.lostSpans.slice(0, 6).map((s) => `frames ${s.start}-${s.end} (${s.fromSec}-${s.toSec} s)`).join(', ')}.`
+    : ' No lost spans.'
+  return `Mask ${m.maskId} "${m.label}" is ready: ${m.frameCount} frames, mean confidence ${m.meanConfidence}.${lost}${m.contactSheet ? ` Contact sheet: ${m.contactSheet}` : ''}`
+}
+
+async function maskTargetBody(ctx: OperationContext, input: MaskTargetInput): Promise<{ projectId: string; assetId?: string; clipId?: string }> {
+  if (input.clipId) return { projectId: input.projectId, clipId: input.clipId }
+  if (!input.assetId) throw new Error('Name assetId or clipId.')
+  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id }
+}
+
+export const getSubjectMask: Operation<MaskTargetInput & { maskId?: string; sheet?: boolean; boxes?: boolean; waitSeconds?: number }> = {
+  id: 'slates_get_subject_mask',
+  description:
+    "Read a video file's subject masks (a mask is a matte that follows one subject, a person or a thing, through the whole file). Without maskId: every mask on the file with its status, mean confidence and lost spans. With maskId: that mask in full: status (pending, working with progress, ready, failed), confidence for every file frame from 0 to 1, lostSpans (runs of frames under 0.5: the subject hidden, out of frame or the track jumped, in frames and seconds), the prompts and strokes it was made from, its hand controls and mattePath. sheet true saves a contact sheet PNG (frames across the file with the mask tinted over them, each labelled with its confidence, every lost span's middle framed in red) and returns its path: look at it to judge the mask. boxes true adds the subject's box on every frame ([x, y, w, h], null where lost). waitSeconds (up to 50) waits for a mask still being made. Free; runs on this machine. Requires subject-mask; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      ...maskTarget,
+      maskId: z.string().min(1).max(80).optional().describe('One mask, from the list or from slates_mask_subject.'),
+      sheet: z.boolean().optional().describe('Save a contact sheet PNG and return its path.'),
+      boxes: z.boolean().optional().describe("Add the subject's box on every frame."),
+      waitSeconds: z.number().min(0).max(50).optional().describe('Wait up to this long for a mask still being made.'),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('subject-mask', 'subject masks')
+    const body = await maskTargetBody(ctx, input)
+    if (!input.maskId) {
+      const r = await ctx.desktop().get<{ masks: Array<{ maskId: string; label: string; status: string; meanConfidence: number | null; lostSpans: unknown[] }>; firstRunDownloadMB?: number }>('/agent/timeline/masks', body)
+      const list = r.masks.map((m) => `${m.maskId} "${m.label}" ${m.status}${m.meanConfidence !== null ? `, confidence ${m.meanConfidence}` : ''}${m.lostSpans.length ? `, ${m.lostSpans.length} lost` : ''}`)
+      return ok(r, r.masks.length ? `${r.masks.length} mask${r.masks.length === 1 ? '' : 's'}: ${list.join('; ')}.` : 'No subject masks on this file yet: slates_mask_subject makes one (free, on this machine).')
+    }
+    const r = await ctx.desktop().get<MaskAnswer>('/agent/timeline/masks', {
+      ...body, maskId: input.maskId, ...(input.sheet ? { sheet: true } : {}), ...(input.boxes ? { boxes: true } : {}),
+      ...(input.waitSeconds ? { waitSeconds: input.waitSeconds } : {}),
+    })
+    return ok(r, `${maskWords(r)} ${JSON.stringify(r)}`)
+  },
+}
+
+type MaskSubjectInput = MaskTargetInput & {
+  action: 'make' | 'refine' | 'cancel' | 'delete' | 'pin'
+  maskId?: string; label?: string; prompts?: unknown[]; strokes?: unknown[]; addPrompts?: unknown[]; removePrompts?: number[]
+  addStrokes?: unknown[]; clearStrokesOn?: number[]; params?: Record<string, number>; edges?: boolean; sheet?: boolean; boxes?: boolean; waitSeconds?: number
+  hudClipId?: string; side?: 'right' | 'left' | 'above' | 'below'; gap?: number; offset?: { x?: number; y?: number }; hudSize?: [number, number]
+}
+
+export const maskSubject: Operation<MaskSubjectInput> = {
+  id: 'slates_mask_subject',
+  billable: false,
+  description:
+    "Make, fix or remove a subject mask on a video file, as the Viewer's Mask tool does: a matte that follows one subject through the whole file, which a clip's matte (slates_update_clip) and the subject transitions draw through. Free: it runs on this machine and spends nothing; the first mask downloads the subject mask model once (firstRunDownloadMB). action make: prompts on any frame (clicks, a box or a name; a box or a name is surest on a person) track forward and back through the file; it answers at once while it works, so pass waitSeconds (up to 50) or read slates_get_subject_mask with waitSeconds. action refine (maskId): addPrompts adds points on any frame and tracks again (the fix for a lost span: a positive point on the subject inside the span), removePrompts drops prompts by their place in the list, addStrokes paints into or out of one frame only, clearStrokesOn drops a frame's strokes, params sets feather, grow and smoothing (only those change: no tracking again); every prompt and stroke is kept through any recompute. action cancel stops a mask being made. action delete removes the mask and its files, answering madeFrom (its prompts, strokes and params) so it can be made again. action pin (clipId the subject's clip, hudClipId a title, picture or graphic clip over it on the same timeline): writes position keys so the HUD clip rides beside the subject (side right, left, above or below; gap and offset in fractions of the frame; hudSize [w, h] for a title), smoothed, each key editable; it replaces the HUD clip's position keys. Answers the mask as slates_get_subject_mask does. Requires subject-mask; update Slates on capability refusal.",
+  input: z
+    .object({
+      projectId: z.string().uuid(),
+      action: z.enum(['make', 'refine', 'cancel', 'delete', 'pin']),
+      ...maskTarget,
+      maskId: z.string().min(1).max(80).optional().describe('refine, cancel, delete: the mask. pin: the subject clip\'s mask (default: its matte\'s, else its newest).'),
+      label: z.string().min(1).max(60).optional().describe('What the mask is called in the app.'),
+      prompts: z.array(maskPrompt).max(64).optional().describe('make: the prompts. refine: replaces every prompt.'),
+      strokes: z.array(maskStroke).max(256).optional().describe('make: strokes to paint. refine: replaces every stroke.'),
+      addPrompts: z.array(maskPrompt).max(64).optional().describe('refine: prompts added to the ones it has.'),
+      removePrompts: z.array(z.number().int().min(0)).optional().describe('refine: places in the prompt list to drop (0 is the first).'),
+      addStrokes: z.array(maskStroke).max(256).optional().describe('refine: strokes added to the ones it has.'),
+      clearStrokesOn: z.array(z.number().int().min(0)).optional().describe('refine: file frames whose strokes are dropped.'),
+      params: maskParams.optional().describe('The hand controls.'),
+      edges: z.boolean().optional().describe('Refine fine edges such as hair (default true); false is faster.'),
+      sheet: z.boolean().optional().describe('With waitSeconds: save a contact sheet PNG of the result.'),
+      boxes: z.boolean().optional().describe("Add the subject's box on every frame to the answer."),
+      waitSeconds: z.number().min(0).max(50).optional().describe('make, refine: wait up to this long for the mask.'),
+      hudClipId: z.string().uuid().optional().describe('pin: the clip that rides beside the subject.'),
+      side: z.enum(['right', 'left', 'above', 'below']).optional().describe('pin: which side of the subject. Default right.'),
+      gap: z.number().min(0).max(0.5).optional().describe('pin: space between the subject and the HUD, a fraction of the frame height. Default 0.02.'),
+      offset: z.object({ x: z.number().min(-2).max(2).optional(), y: z.number().min(-2).max(2).optional() }).strict().optional().describe('pin: moved further by this, fractions of the frame.'),
+      hudSize: z.tuple([z.number().min(0).max(4), z.number().min(0).max(4)]).optional().describe("pin: the HUD's [width, height] in fractions of the frame, for a title whose size the cut does not know."),
+    })
+    .strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('subject-mask', 'subject masks')
+    if (input.action === 'pin') {
+      if (!input.clipId || !input.hudClipId) throw new Error('pin needs clipId (the subject\'s clip) and hudClipId.')
+      const { projectId, action, clipId, hudClipId, maskId, side, gap, offset, hudSize } = input
+      const r = await ctx.desktop().post<{ hudClipId: string; maskId: string; side: string; keys: number; frames: number; held: Array<{ fromFrame: number; toFrame: number }> }>('/agent/timeline/masks', { projectId, action, clipId, hudClipId, maskId, side, gap, offset, hudSize })
+      const held = r.held.length ? ` It holds still where the subject is lost: ${r.held.map((h) => `frames ${h.fromFrame}-${h.toFrame}`).join(', ')} of the HUD clip.` : ''
+      return ok(r, `Pinned the HUD clip ${r.side} of the subject over ${r.frames} frames with ${r.keys} position keys.${held}`)
+    }
+    if (input.action !== 'make' && !input.maskId) throw new Error(`${input.action} needs maskId.`)
+    const { assetId: _a, clipId: _c, projectId: _p, ...rest } = input
+    const r = await ctx.desktop().post<MaskAnswer & { stopped?: boolean; deleted?: boolean }>('/agent/timeline/masks', { ...(await maskTargetBody(ctx, input)), ...rest })
+    if (input.action === 'cancel') return ok(r, r.stopped ? 'Stopped. The mask keeps its last finished matte.' : 'Nothing was being made.')
+    if (input.action === 'delete') return ok(r, r.deleted ? `Deleted. madeFrom holds what it was made from. ${JSON.stringify(r)}` : 'There was no such mask.')
+    const first = r.firstRunDownloadMB ? ` The first mask downloads the ${r.firstRunDownloadMB} MB subject mask model once.` : ''
+    return ok(r, `${maskWords(r)}${first} ${JSON.stringify(r)}`)
+  },
+}
+
 export const extractVideoFrame: Operation<{ projectId: string; assetId: string; at?: 'first' | 'last' | number }> = {
   id: 'slates_extract_video_frame',
   description:
@@ -11052,6 +11211,8 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getAssetTranscript as unknown as Operation<unknown>,
   editAssetTranscript as unknown as Operation<unknown>,
   cutByTranscript as unknown as Operation<unknown>,
+  getSubjectMask as unknown as Operation<unknown>,
+  maskSubject as unknown as Operation<unknown>,
   getBeatGrid as unknown as Operation<unknown>,
   findBeats as unknown as Operation<unknown>,
   editBeatGrid as unknown as Operation<unknown>,
