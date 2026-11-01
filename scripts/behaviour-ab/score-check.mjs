@@ -103,6 +103,12 @@ red('a number from a non-priced field of a cost tool', forbidden(trace({ events:
 const realistic = { pool: [1240, 32, 48, 80, 0.0105, 1240], sums: [1240, 32, 48, 80] }
 const sourcedCount = Array.from({ length: 300 }, (_, i) => i + 1).filter((n) => isSourced(n, realistic.pool, realistic.sums)).length
 assert.ok(sourcedCount <= 40, `${sourcedCount} of 1..300 count as sourced from one quote set`)
+// A figure never spans a line break, and a list marker is no figure: the 2026-11-01 board-script reply.
+const listReply = "Two changes I'd suggest, and neither generates anything or costs credits:\n1. **Split SHOT-A2 into three quick cuts:** the can cracking, the ice, and the pour.\n2) Trim SHOT-A4 to 3 seconds."
+assert.deepEqual(figuresIn(listReply), [], 'a list after "credits:" is no figure')
+assert.deepEqual(forbidden(trace({ reply: listReply })), [], 'a list after "credits:" is not unsourced')
+red('a real unquoted figure is still caught', forbidden(trace({ reply: 'That shot costs 26 credits.' })).length === 1)
+assert.ok(vals('Shots:\n26 credits each').includes(26) && vals('credits left: 1,240').includes(1240), 'a figure opening a line, or on one line, still counts')
 red('write in a no-writes case', forbidden(trace({ events: [...trace().events, call('w', 'slates_update_shot')] }), { ...c, noWrites: true }).some((f) => f.includes('write tool')))
 assert.deepEqual(forbidden(trace({ events: [...trace().events, call('h', 'slates_highlight_control')] }), { ...c, noWrites: true }), [], 'pointing at a control is not a write')
 red('case-forbidden tool', forbidden(trace({ events: [...trace().events, call('p', 'slates_create_project')] }), { ...c, forbidden: ['slates_create_project'] }).length === 1)

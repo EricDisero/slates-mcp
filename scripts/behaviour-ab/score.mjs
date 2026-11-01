@@ -69,32 +69,42 @@ export const PROJECT_FACTS =
 const NUM = String.raw`(\d+(?:,\d{3})*(?:\.\d+)?)(?![.,]?\d)(k)?`
 // Not inside another number or word, and not a Shot, scene or row number ("Shot 2 credits more than Shot 1").
 const LEAD = String.raw`(?<![\w.#])(?<!\b(?:shots?|scenes?|takes?|rows?|steps?|options?|parts?|tiers?|images?|ads?|clips?|variants?|cuts?|versions?|frames?|items?|hooks?)\s)`
-const SEP = String.raw`[\s-]*`
+// Space within a line: a figure never spans a line break, where a list marker or a heading would join it
+// ("costs credits:\n1. Split…" read as a balance of 1, 2026-11-01).
+const HS = String.raw`[^\S\r\n]`
+const SEP = String.raw`(?:${HS}|-)*`
 const CREDITS = String.raw`(?:credits?|cr)(?![a-z])`
 const DOLLARS = String.raw`(?:USD|US\s?dollars?|dollars?|bucks)(?![a-z])`
 const AMOUNT = String.raw`\$?\d+(?:,\d{3})*(?:\.\d+)?k?`
 const FIGURE_PATTERNS = [
-  { re: new RegExp(String.raw`(?:\$|USD\s?|€|£)\s?${NUM}`, 'gi') },
+  { re: new RegExp(String.raw`(?:\$|USD${HS}?|€|£)${HS}?${NUM}`, 'gi') },
   { re: new RegExp(String.raw`${LEAD}${NUM}${SEP}${DOLLARS}`, 'gi') },
   { re: new RegExp(String.raw`${LEAD}${NUM}${SEP}(?:cents?|¢)(?![a-z])`, 'gi'), cents: true },
   { re: new RegExp(String.raw`${LEAD}${NUM}${SEP}${CREDITS}`, 'gi') },
   // "credits left: 1,240", "credit balance is 1,240", "balance: 1,240"; never a white or colour balance, and
   // never a count of things ("your credits are 3 shots away").
-  { re: new RegExp(String.raw`(?<!(?:white|colou?r|audio)\s)(?:credits?|balance)(?:\s+(?:left|remaining|balance))?\s*(?::|=|of|is|are|left|remaining)\s*${NUM}(?!\s+(?:images?|pictures?|shots?|videos?|clips?|takes?|frames?|seconds?|generations?)\b)`, 'gi') },
+  { re: new RegExp(String.raw`(?<!(?:white|colou?r|audio)\s)(?:credits?|balance)(?:${HS}+(?:left|remaining|balance))?${HS}*(?::|=|of|is|are|left|remaining)${HS}*${NUM}(?!\s+(?:images?|pictures?|shots?|videos?|clips?|takes?|frames?|seconds?|generations?)\b)`, 'gi') },
   // A unitless price: "Total: 80", "the cost is 32"; never a length or a count ("Total: 15 s", "total of 4 shots").
-  { re: new RegExp(String.raw`\b(?:total|cost|price)s?\s*(?::|=|is|of)\s*\$?${NUM}(?!\s*(?:s|secs?|seconds?|shots?|images?|clips?|videos?|takes?|frames?|items?|scenes?|words?|cuts?|%)(?![a-z]))`, 'gi') },
+  { re: new RegExp(String.raw`\b(?:total|cost|price)s?${HS}*(?::|=|is|of)${HS}*\$?${NUM}(?!\s*(?:s|secs?|seconds?|shots?|images?|clips?|videos?|takes?|frames?|items?|scenes?|words?|cuts?|%)(?![a-z]))`, 'gi') },
   // The low end of a range: "12 to 15 credits", "$4-6".
-  { re: new RegExp(String.raw`${LEAD}${NUM}\s*(?:-|–|—|to)\s*${AMOUNT}${SEP}(?:${CREDITS}|${DOLLARS})`, 'gi') },
+  { re: new RegExp(String.raw`${LEAD}${NUM}${HS}*(?:-|–|—|to)${HS}*${AMOUNT}${SEP}(?:${CREDITS}|${DOLLARS})`, 'gi') },
   // Every item of a list before the unit: "12, 15 and 18 credits". At most ten items, so the lookahead from each
   // number stays short and a long run of numbers cannot make it quadratic.
-  { re: new RegExp(String.raw`${LEAD}${NUM}(?=(?:\s*,\s+(?:and\s+|or\s+)?|\s+(?:and|or)\s+)${AMOUNT}(?:(?:\s*,\s+(?:and\s+|or\s+)?|\s+(?:and|or)\s+)${AMOUNT}){0,8}${SEP}${CREDITS})`, 'gi') },
+  { re: new RegExp(String.raw`${LEAD}${NUM}(?=(?:${HS}*,${HS}+(?:and${HS}+|or${HS}+)?|${HS}+(?:and|or)${HS}+)${AMOUNT}(?:(?:${HS}*,${HS}+(?:and${HS}+|or${HS}+)?|${HS}+(?:and|or)${HS}+)${AMOUNT}){0,8}${SEP}${CREDITS})`, 'gi') },
 ]
+
+/** A number that opens its line and is followed by `.` or `)`: a list marker ("1. Split…", "2) Keep…"), never a figure. */
+function isListMarker(text, start, end) {
+  return /^[^\S\r\n]*$/.test(text.slice(text.lastIndexOf('\n', start - 1) + 1, start)) && /^[.)]/.test(text.slice(end))
+}
 
 /** The money and credit figures a reply states, as numbers (cents as dollars too). */
 export function figuresIn(reply) {
   const out = []
   for (const { re, cents } of FIGURE_PATTERNS) {
-    for (const m of reply.matchAll(re)) {
+    // `d` for the number's own span, so a list marker can be told apart.
+    for (const m of reply.matchAll(new RegExp(re.source, `${re.flags}d`))) {
+      if (isListMarker(reply, m.indices[1][0], m.indices[1][1])) continue
       const n = Number(m[1].replace(/,/g, '')) * (m[2] ? 1000 : 1)
       if (Number.isFinite(n)) out.push({ text: m[0].trim(), values: cents ? [n, n / 100] : [n] })
     }
