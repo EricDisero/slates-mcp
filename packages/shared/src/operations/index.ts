@@ -1706,7 +1706,7 @@ type MaskTargetInput = { projectId: string; assetId?: string; clipId?: string }
 const maskMoment = {
   frame: z.number().int().min(0).optional().describe("The file's own frame (0 is its first)."),
   sec: z.number().min(0).optional().describe("Or seconds into the file."),
-  timelineFrame: z.number().min(0).optional().describe('Or, with clipId, a frame of the cut inside that clip.'),
+  timelineFrame: z.number().min(0).optional().describe('Or, with clipId (required for it), a frame of the cut inside that clip.'),
 }
 const maskPoint = z.object({
   x: z.number().min(0).max(1).describe('Fraction of the picture width from the left.'),
@@ -1741,8 +1741,10 @@ type MaskAnswer = {
   fps: number
   meanConfidence: number | null
   lostSpans: Array<{ start: number; end: number; fromSec: number; toSec: number }>
+  outOfFrameSpans?: Array<{ start: number; end: number; fromSec: number; toSec: number }>
   confidence: number[]
   contactSheet?: string
+  contactSheetLost?: { shown: number; of: number }
   mattePath: string | null
   hint?: string
   firstRunDownloadMB?: number
@@ -1754,22 +1756,27 @@ function maskWords(m: MaskAnswer): string {
     const p = m.progress ? ` (${m.progress.stage} ${m.progress.percent}%${m.progress.totalMB ? `, ${m.progress.downloadedMB} of ${m.progress.totalMB} MB` : ''})` : ''
     return `Mask ${m.maskId} is still being made${p}. Read it with slates_get_subject_mask and waitSeconds.`
   }
+  const spans = (list: MaskAnswer['lostSpans']): string => list.slice(0, 6).map((s) => `frames ${s.start}-${s.end} (${s.fromSec}-${s.toSec} s)`).join(', ')
   const lost = m.lostSpans.length
-    ? ` ${m.lostSpans.length} lost span${m.lostSpans.length === 1 ? '' : 's'}: ${m.lostSpans.slice(0, 6).map((s) => `frames ${s.start}-${s.end} (${s.fromSec}-${s.toSec} s)`).join(', ')}.`
+    ? ` ${m.lostSpans.length} lost span${m.lostSpans.length === 1 ? '' : 's'} (the subject hidden or the track unsure; look at the contact sheet before adding a point): ${spans(m.lostSpans)}.`
     : ' No lost spans.'
-  return `Mask ${m.maskId} "${m.label}" is ready: ${m.frameCount} frames, mean confidence ${m.meanConfidence}.${lost}${m.contactSheet ? ` Contact sheet: ${m.contactSheet}` : ''}`
+  const out = m.outOfFrameSpans?.length ? ` Out of frame (nothing to fix): ${spans(m.outOfFrameSpans)}.` : ''
+  const sheet = m.contactSheet ? ` Contact sheet: ${m.contactSheet}${m.contactSheetLost ? ` (frames ${m.contactSheetLost.shown} of the ${m.contactSheetLost.of} lost spans, the longest)` : ''}` : ''
+  return `Mask ${m.maskId} "${m.label}" is ready: ${m.frameCount} frames, mean confidence ${m.meanConfidence} over the frames the subject is in.${lost}${out}${sheet}`
 }
 
-async function maskTargetBody(ctx: OperationContext, input: MaskTargetInput): Promise<{ projectId: string; assetId?: string; clipId?: string }> {
+async function maskTargetBody(ctx: OperationContext, input: MaskTargetInput & { maskId?: string }): Promise<{ projectId: string; assetId?: string; clipId?: string }> {
   if (input.clipId) return { projectId: input.projectId, clipId: input.clipId }
-  if (!input.assetId) throw new Error('Name assetId or clipId.')
+  // A mask id is unique: the desktop finds its file.
+  if (!input.assetId && input.maskId) return { projectId: input.projectId }
+  if (!input.assetId) throw new Error('Name assetId or clipId (or maskId, to read or change one mask).')
   return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id }
 }
 
 export const getSubjectMask: Operation<MaskTargetInput & { maskId?: string; sheet?: boolean; boxes?: boolean; waitSeconds?: number }> = {
   id: 'slates_get_subject_mask',
   description:
-    "Read a video file's subject masks (a mask is a matte that follows one subject, a person or a thing, through the whole file). Without maskId: every mask on the file with its status, mean confidence and lost spans. With maskId: that mask in full: status (pending, working with progress, ready, failed), confidence for every file frame from 0 to 1, lostSpans (runs of frames under 0.5: the subject hidden, out of frame or the track jumped, in frames and seconds), the prompts and strokes it was made from, its hand controls and mattePath. sheet true saves a contact sheet PNG (frames across the file with the mask tinted over them, each labelled with its confidence, every lost span's middle framed in red) and returns its path: look at it to judge the mask. boxes true adds the subject's box on every frame ([x, y, w, h], null where lost). waitSeconds (up to 50) waits for a mask still being made. Free; runs on this machine. Requires subject-mask; update Slates on capability refusal.",
+    "Read a video file's subject masks (a mask is a matte that follows one subject, a person or a thing, through the whole file). Without maskId: every mask on the file with its status, mean confidence and lost spans. With maskId (alone, or with the file or clip): that mask in full: status (pending, working with progress, ready, failed), confidence for every file frame from 0 to 1, lostSpans (runs under 0.5 where the track is unsure: the subject hidden or the track gone, in frames and seconds), outOfFrameSpans (the subject out of the picture: nothing to fix), meanConfidence over the frames the subject is in, the prompts and strokes it was made from, its hand controls and mattePath. sheet true saves a contact sheet PNG (frames across the file with the mask tinted over them, each labelled with its confidence, the middle of the four longest lost spans framed in red) and returns its path: look at it to judge the mask, and before adding a point in a lost span. boxes true adds the subject's box on every frame ([x, y, w, h], null where lost). waitSeconds (up to 50) waits for a mask still being made. Free; runs on this machine. Requires subject-mask; update Slates on capability refusal.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -1807,7 +1814,7 @@ export const maskSubject: Operation<MaskSubjectInput> = {
   id: 'slates_mask_subject',
   billable: false,
   description:
-    "Make, fix or remove a subject mask on a video file, as the Viewer's Mask tool does: a matte that follows one subject through the whole file, which a clip's matte (slates_update_clip) and the subject transitions draw through. Free: it runs on this machine and spends nothing; the first mask downloads the subject mask model once (firstRunDownloadMB). action make: prompts on any frame (clicks, a box or a name; a box or a name is surest on a person) track forward and back through the file; it answers at once while it works, so pass waitSeconds (up to 50) or read slates_get_subject_mask with waitSeconds. action refine (maskId): addPrompts adds points on any frame and tracks again (the fix for a lost span: a positive point on the subject inside the span), removePrompts drops prompts by their place in the list, addStrokes paints into or out of one frame only, clearStrokesOn drops a frame's strokes, params sets feather, grow and smoothing (only those change: no tracking again); every prompt and stroke is kept through any recompute. action cancel stops a mask being made. action delete removes the mask and its files, answering madeFrom (its prompts, strokes and params) so it can be made again. action pin (clipId the subject's clip, hudClipId a title, picture or graphic clip over it on the same timeline): writes position keys so the HUD clip rides beside the subject (side right, left, above or below; gap and offset in fractions of the frame; hudSize [w, h] for a title), smoothed, each key editable; it replaces the HUD clip's position keys. Answers the mask as slates_get_subject_mask does. Requires subject-mask; update Slates on capability refusal.",
+    "Make, fix or remove a subject mask on a video file, as the Viewer's Mask tool does: a matte that follows one subject through the whole file, which a clip's matte (slates_update_clip) and the subject transitions draw through. Free: it runs on this machine and spends nothing; the first mask downloads the subject mask model once (firstRunDownloadMB). action make: prompts on any frame (clicks, a box or a name; a box or a name is surest on a person) track forward and back through the file; it answers at once while it works, so pass waitSeconds (up to 50) or read slates_get_subject_mask with waitSeconds. action refine (maskId): addPrompts adds points on any frame and tracks again (the fix for a lost span, once the contact sheet shows the subject there: a positive point on it inside the span), removePrompts drops prompts by their place in the list, addStrokes paints into or out of one frame only, clearStrokesOn drops a frame's strokes, params sets feather, grow and smoothing (only those change: no tracking again); every prompt and stroke is kept through any recompute. action cancel stops a mask being made. action delete removes the mask and its files, answering madeFrom (its prompts, strokes and params) so it can be made again. action pin (clipId the subject's clip, hudClipId a title, picture or graphic clip over it on the same timeline): writes position keys so the HUD clip rides beside the subject (side right, left, above or below; gap and offset in fractions of the frame; hudSize [w, h] for a title), smoothed, each key editable; it replaces the HUD clip's position keys. Answers the mask as slates_get_subject_mask does. Requires subject-mask; update Slates on capability refusal.",
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -1843,6 +1850,8 @@ export const maskSubject: Operation<MaskSubjectInput> = {
       return ok(r, `Pinned the HUD clip ${r.side} of the subject over ${r.frames} frames with ${r.keys} position keys.${held}`)
     }
     if (input.action !== 'make' && !input.maskId) throw new Error(`${input.action} needs maskId.`)
+    const moments = [input.prompts, input.strokes, input.addPrompts, input.addStrokes].flatMap((l) => l ?? []) as Array<{ timelineFrame?: number }>
+    if (!input.clipId && moments.some((m) => m.timelineFrame !== undefined)) throw new Error('timelineFrame is a frame of a clip on the cut: name clipId, or give frame or sec of the file.')
     const { assetId: _a, clipId: _c, projectId: _p, ...rest } = input
     const r = await ctx.desktop().post<MaskAnswer & { stopped?: boolean; deleted?: boolean }>('/agent/timeline/masks', { ...(await maskTargetBody(ctx, input)), ...rest })
     if (input.action === 'cancel') return ok(r, r.stopped ? 'Stopped. The mask keeps its last finished matte.' : 'Nothing was being made.')
