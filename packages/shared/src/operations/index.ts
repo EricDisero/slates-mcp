@@ -1330,7 +1330,7 @@ export const getUsage: Operation<{ period?: 'week' | 'month' | 'all' }> = {
 export const getAppSettings: Operation<Record<string, never>> = {
   id: 'slates_get_app_settings',
   description:
-    "The app's own settings an agent may read: the app version, the projects folder, which tab a never-opened project lands on (newProjectLens), whether ChatGPT images is on, and (from Slates 1.6.1) who does Slates Director's thinking (studioAgentHost: slates, codex or claude) with each host's model and thinking level ('' is its default). Never keys or sign-in.",
+    "The app's own settings an agent may read: the app version, the projects folder, which tab a never-opened project lands on (newProjectLens), whether ChatGPT images is on, (from Slates 1.6.1) who does Slates Director's thinking (studioAgentHost: slates, codex or claude) with each host's model and thinking level ('' is its default), and (newer Slates) makeProxiesAtImport (off by default) with proxies: what the clips' proxies take on disk, per project. Never keys or sign-in.",
   input: z.object({}).strict(),
   async run(_input, ctx) {
     await ctx.desktop().requireCapability('app-settings', 'app settings')
@@ -1346,6 +1346,8 @@ type AppSettingsPatch = {
   studioAgentCodexEffort?: string
   studioAgentClaudeModel?: string
   studioAgentClaudeEffort?: string
+  makeProxiesAtImport?: boolean
+  clearProxies?: string
 }
 
 const HOST_KEYS = ['studioAgentHost', 'studioAgentCodexModel', 'studioAgentCodexEffort', 'studioAgentClaudeModel', 'studioAgentClaudeEffort'] as const
@@ -1353,7 +1355,7 @@ const HOST_KEYS = ['studioAgentHost', 'studioAgentCodexModel', 'studioAgentCodex
 export const setAppSettings: Operation<AppSettingsPatch> = {
   id: 'slates_set_app_settings',
   description:
-    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does Slates Director's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default. The projects folder, keys and sign-in are the user's to change.",
+    "Change an app setting the user asked you to: newProjectLens (the tab a never-opened project lands on: media, script or board), chatGptImagesEnabled (Settings → AI tools → ChatGPT images), or who does Slates Director's thinking: studioAgentHost (slates, codex for the user's own Codex on their ChatGPT plan, claude for their own Claude Code on their Claude plan) and each host's model and thinking level, ids from the host's own list or '' for its default; makeProxiesAtImport (Settings → Storage → Make proxies automatically at import: never turn it on unless the user asked, it starts off); clearProxies ('all', or a project id) deletes those proxies, which the clips' own files replace until one is made again. The projects folder, keys and sign-in are the user's to change.",
   input: z
     .object({
       newProjectLens: z.enum(['media', 'script', 'board']).optional(),
@@ -1363,6 +1365,8 @@ export const setAppSettings: Operation<AppSettingsPatch> = {
       studioAgentCodexEffort: z.string().max(120).optional(),
       studioAgentClaudeModel: z.string().max(120).optional(),
       studioAgentClaudeEffort: z.string().max(120).optional(),
+      makeProxiesAtImport: z.boolean().optional().describe('Only when the user asked: on, every camera file that needs a proxy gets one at import.'),
+      clearProxies: z.union([z.literal('all'), z.string().uuid()]).optional().describe("'all', or one project's id: deletes its proxies."),
     })
     .strict(),
   async run(input, ctx) {
@@ -1370,6 +1374,9 @@ export const setAppSettings: Operation<AppSettingsPatch> = {
     // An older desktop has the route but not these keys: ask it by capability, so it says "update Slates".
     if (HOST_KEYS.some((key) => input[key] !== undefined)) {
       await ctx.desktop().requireCapability('agent-host', "choosing who does Slates Director's thinking")
+    }
+    if (input.makeProxiesAtImport !== undefined || input.clearProxies !== undefined) {
+      await ctx.desktop().requireCapability('proxies', 'proxies')
     }
     return ok(await ctx.desktop().post('/agent/app-settings', input))
   },
@@ -2624,7 +2631,7 @@ export const uploadReferenceImage: Operation<{
 }> = {
   id: 'slates_upload_reference_image',
   description:
-    'Add a reference image, video clip, or audio file to a Slates project from disk. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" to bring in a clip (the user\'s own footage to edit/relocate/trim) or type:"audio" for music/VO/SFX they already have; both are probed on ingest, so duration (and for video, dimensions) are available immediately, and audio gets its waveform. A camera clip the timeline cannot play smoothly (ProRes, HEVC, 4K, sparse keyframes) answers playableCopy {state:"making", percent}: the timeline plays that copy once it is made, while export and generation read the original, so nothing waits on it. Default type is "image". dataUrl is image-only. Pass label to name it and note to record what it is; without them it is "Imported file". A picture derived from a project asset (edited, masked, upscaled or converted outside Slates) belongs in slates_save_external_image with referenceAssetIds, so its source and prompt are recorded.',
+    'Add a reference image, video clip, or audio file to a Slates project from disk. Pass either filePath (absolute path to a local file) or dataUrl (base64 data: URL) — exactly one. Set type:"video" to bring in a clip (the user\'s own footage to edit/relocate/trim) or type:"audio" for music/VO/SFX they already have; both are probed on ingest, so duration (and for video, dimensions) are available immediately, and audio gets its waveform. A camera clip the timeline cannot play smoothly (ProRes, HEVC, 4K, sparse keyframes) answers proxy {state:"needed", reason}: tell the user and offer to make its proxy (slates_update_asset proxy:"make"), a lighter copy the timeline and Viewer play while export and generation read the original; make one only on their yes. With Make proxies automatically at import on, it answers proxy {state:"making", percent} instead (older Slates: playableCopy). Default type is "image". dataUrl is image-only. Pass label to name it and note to record what it is; without them it is "Imported file". A picture derived from a project asset (edited, masked, upscaled or converted outside Slates) belongs in slates_save_external_image with referenceAssetIds, so its source and prompt are recorded.',
   input: z
     .object({
       projectId: z.string().uuid(),
@@ -2673,23 +2680,50 @@ export const uploadReferenceImage: Operation<{
   },
 }
 
-export const updateAsset: Operation<{ projectId: string; assetId: string; label?: string; note?: string }> = {
+export const updateAsset: Operation<{ projectId: string; assetId: string; label?: string; note?: string; proxy?: 'make' | 'remove'; playOriginal?: boolean }> = {
   id: 'slates_update_asset',
   description:
-    "Rename an asset (its label, shown with its code on its card and in lists) and/or replace the note stored as its prompt text. UUID or badge code. A note changes only an upload or a picture saved from an external host; a generated asset keeps the prompt that made it but can still be renamed.",
+    "Rename an asset (its label, shown with its code on its card and in lists) and/or replace the note stored as its prompt text. UUID or badge code. A note changes only an upload or a picture saved from an external host; a generated asset keeps the prompt that made it but can still be renamed. " +
+    "For a clip, proxy:\"make\" makes its proxy (a lighter copy the timeline and the Viewer play; export reads the original; a failed one again) and proxy:\"remove\" deletes it; playOriginal:true plays the camera file and keeps the proxy, false goes back. Make one only when the user said yes: slates_get_timeline's notices say which clips need one. Answers the clip's proxy state.",
   input: z
-    .object({ projectId: z.string().uuid(), assetId: z.string().min(1), label: assetLabelField.optional(), note: assetNoteField.optional() })
-    .strict()
-    .refine((d) => d.label !== undefined || d.note !== undefined, { message: 'Pass a label, a note or both' }),
-  async run(input, ctx) {
-    await ctx.desktop().requireCapability('asset-naming', 'naming an asset')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
-    const { asset } = await ctx.desktop().post<{ asset: Record<string, unknown> }>('/agent/assets/update', {
-      assetId: id,
-      ...(input.label !== undefined ? { label: input.label } : {}),
-      ...(input.note !== undefined ? { note: input.note } : {}),
+    .object({
+      projectId: z.string().uuid(),
+      assetId: z.string().min(1),
+      label: assetLabelField.optional(),
+      note: assetNoteField.optional(),
+      proxy: z.enum(['make', 'remove']).optional().describe("A clip's proxy: make it (only on the user's yes) or remove it."),
+      playOriginal: z.boolean().optional().describe('A clip with a proxy: true plays the camera file instead, false the proxy again.'),
     })
-    return ok({ asset: { ...compactAsset(asset), note: asset.prompt } })
+    .strict()
+    .refine((d) => d.label !== undefined || d.note !== undefined || d.proxy !== undefined || d.playOriginal !== undefined, {
+      message: 'Pass a label, a note, proxy or playOriginal',
+    }),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    const naming = input.label !== undefined || input.note !== undefined
+    const proxying = input.proxy !== undefined || input.playOriginal !== undefined
+    if (naming) await desktop.requireCapability('asset-naming', 'naming an asset')
+    if (proxying) await desktop.requireCapability('proxies', "a clip's proxy")
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const result: Record<string, unknown> = {}
+    if (naming) {
+      const { asset } = await desktop.post<{ asset: Record<string, unknown> }>('/agent/assets/update', {
+        assetId: id,
+        ...(input.label !== undefined ? { label: input.label } : {}),
+        ...(input.note !== undefined ? { note: input.note } : {}),
+      })
+      result.asset = { ...compactAsset(asset), note: asset.prompt }
+    }
+    if (proxying) {
+      const { proxy } = await desktop.post<{ proxy: unknown }>('/agent/assets/proxy', {
+        assetId: id,
+        ...(input.proxy !== undefined ? { action: input.proxy } : {}),
+        ...(input.playOriginal !== undefined ? { playOriginal: input.playOriginal } : {}),
+      })
+      result.assetId = id
+      result.proxy = proxy
+    }
+    return ok(result)
   },
 }
 
@@ -6823,7 +6857,7 @@ async function requireNamedCut(desktop: SlatesDesktopClient, timelineId: string 
 export const getTimeline: Operation<{ projectId: string; timelineId?: string }> = {
   id: 'slates_get_timeline',
   description:
-    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame.',
+    'Get (or lazily create) a named editing timeline, or the stable legacy default when timelineId is omitted, with all tracks, clips, markers, and a flat clipIndex mapping every clip back to its source asset (assetId + code + label). Frames are the unit of time; durationSec is provided. Call this before adding, reordering, or removing clips, and before exporting — it tells you the timeline id, frame rate, resolution, and current end frame. A clip whose file has or needs a proxy carries proxy (needed with a reason, making, ready, failed; playsSlowly when the monitor measured it stuttering); notices, printed first, name the clips that may show no picture or play slowly: tell the user and offer the proxy, making one only on their yes.',
   input: z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid().optional() }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -6838,9 +6872,11 @@ export const getTimeline: Operation<{ projectId: string; timelineId?: string }> 
       (t.tracks ?? []).reduce((n, tr) => n + (tr.clips?.length ?? 0), 0)
     const durationSec = t.durationSec ?? r.durationSec
     const dims = t.width && t.height ? `${t.width}x${t.height}` : '?'
+    const notices = (r as { notices?: string[] }).notices ?? []
     return ok(
       r,
-      `Timeline for project ${input.projectId}: ${clipCount} clip(s) on ${t.tracks?.length ?? '?'} track(s), ` +
+      (notices.length ? `Notices:\n${notices.map((n) => `- ${n}`).join('\n')}\n\n` : '') +
+        `Timeline for project ${input.projectId}: ${clipCount} clip(s) on ${t.tracks?.length ?? '?'} track(s), ` +
         `${durationSec ?? '?'}s at ${t.frameRate ?? '?'} fps, ${dims}.\n\n` +
         JSON.stringify(r, null, 2)
     )
