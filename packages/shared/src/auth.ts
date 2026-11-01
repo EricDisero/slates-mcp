@@ -125,3 +125,43 @@ export function requireDesktop(): { port: number; token: string } {
   }
   return { port: c.desktop.port, token: c.desktop.token }
 }
+
+// ~/.slates/mcp-server.json — how to start the Slates server the desktop app carries inside itself
+// (`slate/src/main/agent/mcpLauncher.ts` writes it on every start of a packaged app; nothing here
+// writes it). Its own file, not a field of the connection file, because a CLI older than this one
+// rewrites the connection file with only the fields it knows and would drop it.
+//
+// Why it exists (2026-10-31): a customer's Claude Code ran an old copy of this package that lacked
+// the transition tools while his app had them. A server started from this file is the app's own
+// copy, so it is always the version that matches the app, and updates when the app does.
+export const MCP_LAUNCHER_FILE = join(AGENT_DIR, 'mcp-server.json')
+
+export interface McpLauncher {
+  /** The bundled server's package version. */
+  version: string
+  command: string
+  args: string[]
+  env: Record<string, string>
+}
+
+/** The desktop's bundled server, or null when there is none on this computer (no app, an old app,
+ *  an uninstalled one whose file was left behind, or a file this version cannot read). */
+export function readMcpLauncher(file = MCP_LAUNCHER_FILE): McpLauncher | null {
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf-8')) as Partial<McpLauncher>
+    const env = raw.env ?? {}
+    if (
+      typeof raw.version !== 'string' ||
+      typeof raw.command !== 'string' ||
+      !Array.isArray(raw.args) ||
+      !raw.args.every((a) => typeof a === 'string') ||
+      typeof env !== 'object' ||
+      !Object.values(env).every((v) => typeof v === 'string')
+    ) return null
+    // The app was moved or uninstalled since it wrote the file: nothing to start.
+    if (!existsSync(raw.command) || (raw.args[0] && !existsSync(raw.args[0]))) return null
+    return { version: raw.version, command: raw.command, args: raw.args, env }
+  } catch {
+    return null
+  }
+}

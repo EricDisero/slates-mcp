@@ -10,7 +10,8 @@ import {
   ListResourceTemplatesRequestSchema,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { readFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
@@ -36,6 +37,8 @@ import {
   cachedLatestVersion,
   refreshLatestVersion,
   updateNotice,
+  readMcpLauncher,
+  setDesktopClientIdentity,
   type Operation,
 } from '@slatesvideo/shared'
 
@@ -83,20 +86,30 @@ const pkg = JSON.parse(
 // scripts/agent-surface-lockstep-check.mjs pins the byte count so growth is a
 // review decision, not an accident.
 const PKG_NAME = '@slatesvideo/mcp-server'
+// 🚨 THE COPY INSIDE THE SLATES APP (since 0.6.7, 2026-10-31). The desktop app carries this server,
+// started by the app's own binary as Node with SLATES_MCP_BUNDLED=1 (slate
+// `src/main/agent/mcpLauncher.ts`), so it is always the version that matches the app and updates
+// with it. That copy never checks npm: the app's own update is its update. Its version line is no
+// longer than the npm one, so the instructions' ceiling (check 2) holds for both.
+const BUNDLED = process.env.SLATES_MCP_BUNDLED === '1'
+setDesktopClientIdentity(`mcp-server/${pkg.version}${BUNDLED ? ' bundled' : ''}`)
 // The first line names the running version so an agent can answer "what
 // version am I on"; the notice appears only when the on-disk cache (refreshed
 // in main(), for the NEXT launch) says a newer package is published. Read the
 // design note in @slatesvideo/shared update-check.ts before changing either.
-const updateAdvice = updateNotice(
+const updateAdvice = BUNDLED ? null : updateNotice(
   PKG_NAME,
   pkg.version,
   cachedLatestVersion(PKG_NAME),
   'Newer models are missing until it updates. Tell the user in your FIRST reply: fully quit and reopen the MCP client so npx fetches it; a global install needs `npm i -g @slatesvideo/mcp-server@latest` first.'
 )
+const versionLine = BUNDLED
+  ? `Slates MCP server v${pkg.version} (inside the Slates app).`
+  : `Slates MCP server v${pkg.version} (${PKG_NAME}).`
 const doctrine = buildMcpInstructions()
 const firstParagraphEnd = doctrine.indexOf('\n\n')
 const instructions = [
-  `Slates MCP server v${pkg.version} (${PKG_NAME}).`,
+  versionLine,
   doctrine.slice(0, firstParagraphEnd),
   updateAdvice,
   doctrine.slice(firstParagraphEnd + 2),
@@ -607,13 +620,60 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
   }
 })
 
+/**
+ * 🚨 AN npm COPY HANDS OFF TO THE APP'S OWN. Started from npm (`npx -y @slatesvideo/mcp-server`, a
+ * global install, a directory plugin pinned to an old version) on a computer whose Slates app
+ * carries this server, this process starts the app's copy on the same stdin and stdout and only
+ * relays its exit. The client then always talks to the server that matches the installed app,
+ * whatever it was configured with, which ends the drift a customer hit on 2026-10-31 (an old npm
+ * copy without the transition tools, an app that had them).
+ *
+ * Only a copy with no `src/` beside its `dist/` hands off (the npm package and the Claude Desktop
+ * `.mcpb` bundle ship none): a server built in this repo (the checks, a developer's own client
+ * config) runs as itself. SLATES_MCP_NO_HANDOFF=1 keeps any copy as itself. Resolves to
+ * the exit code to leave with, or null to run here (no app copy, or it could not start).
+ */
+function handOffToApp(): Promise<number | null> | null {
+  if (BUNDLED || process.env.SLATES_MCP_NO_HANDOFF === '1') return null
+  if (existsSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'src'))) return null
+  const launcher = readMcpLauncher()
+  if (!launcher) return null
+  console.error(`[slates-mcp] v${pkg.version}: starting the Slates app's own server, v${launcher.version}`)
+  return new Promise((resolve) => {
+    const child = spawn(launcher.command, launcher.args, {
+      stdio: 'inherit',
+      env: { ...process.env, ...launcher.env },
+      windowsHide: true,
+    })
+    let started = false
+    child.on('spawn', () => {
+      started = true
+      // Only once the app's copy runs: a copy that falls back to itself keeps Node's own exit on a signal.
+      for (const signal of ['SIGINT', 'SIGTERM'] as const) process.on(signal, () => child.kill(signal))
+    })
+    // A launch that fails before it starts (the app moved since it wrote the file) runs this copy:
+    // nothing has read stdin yet, so the client is none the wiser.
+    child.on('error', (err) => {
+      if (started) return
+      console.error(`[slates-mcp] the app's server did not start (${err.message}); running v${pkg.version} instead`)
+      resolve(null)
+    })
+    child.on('exit', (code, signal) => resolve(code ?? (signal ? 1 : 0)))
+  })
+}
+
 async function main(): Promise<void> {
+  const handoff = handOffToApp()
+  if (handoff) {
+    const code = await handoff
+    if (code !== null) process.exit(code)
+  }
   if (process.argv.includes('--tools=compact')) console.error('[slates-mcp] --tools=compact is deprecated; the server always exposes the full fixed tool list. Clients control selective loading.')
   const transport = new StdioServerTransport()
   await server.connect(transport)
   if (updateAdvice) console.error(`[slates-mcp] ${updateAdvice}`)
   // Background refresh; the result is read by the next launch, never awaited.
-  void refreshLatestVersion(PKG_NAME)
+  if (!BUNDLED) void refreshLatestVersion(PKG_NAME)
   // The playbooks, rules and model guides by the account's tier (shared skills/served.ts): the cache serves this
   // session at once, and the first guide answer waits for this check if it is still in flight.
   void refreshServedBrain(() => new SlatesCloudClient()).then((brain) => {

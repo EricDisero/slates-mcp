@@ -407,6 +407,21 @@ else {
   directorCardInCut('a behind server (the longest prefix)', stale, DIRECTOR_CARD)
   check('the current run (no stale cache) carries no notice', !(instructions ?? '').includes('v99.0.0'))
   await staleClient.close()
+
+  // The copy inside the Slates app, on the same stale cache: the app's update is its update, so it
+  // names itself and never tells the user to update npm.
+  const bundledTransport = new StdioClientTransport({
+    command: process.execPath,
+    args: staleFixture.args,
+    stderr: 'pipe',
+    env: { ...process.env, HOME: home, USERPROFILE: home, SLATES_MCP_BUNDLED: '1' },
+  })
+  const bundledClient = new Client({ name: 'slates-instructions-smoke-bundled', version: '1.0.0' })
+  await bundledClient.connect(bundledTransport)
+  const bundled = bundledClient.getInstructions() ?? ''
+  check('the app\'s own copy names itself', /^Slates MCP server v\S+ \(inside the Slates app\)\./.test(bundled))
+  check('the app\'s own copy carries no update notice, even on a stale cache', !bundled.includes('UPDATE AVAILABLE'))
+  await bundledClient.close()
   await staleFixture.close()
 }
 

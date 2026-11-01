@@ -1,6 +1,6 @@
 export * from './auth.js'
 export { SlatesCloudClient, type SlatesUserInfo, type CreditsBalance, type ModelRegistryResponse } from './clients/cloud.js'
-export { SlatesDesktopClient, type DesktopHealth } from './clients/desktop.js'
+export { SlatesDesktopClient, setDesktopClientIdentity, type DesktopHealth } from './clients/desktop.js'
 export { BRAIN_SHAPE, SKILLS } from './skills/content.js'
 export { BRAIN_CACHE, brainFiles, clearServedBrain, refreshServedBrain, servedBrain, useBrainSource, type LockedGuide, type ServedBrain } from './skills/served.js'
 export { myBrainProblems, type BrainShape, type MyBrainProblem } from './skills/brain-check.js'

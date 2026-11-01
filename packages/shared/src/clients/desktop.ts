@@ -5,6 +5,23 @@ import { requireDesktop } from '../auth.js'
 // what it spends against the person's per-session spend limit (`slates_get_spend_limits`).
 const AGENT_SESSION = randomUUID()
 
+// Which program is calling, as `name/version` (`mcp-server/0.6.7`, `mcp-server/0.6.7 bundled`), sent as
+// `X-Slates-Client` on every call so the desktop can tell a client running an older Slates server than
+// its own and say so in Settings → AI tools. Set once at startup by the entry point; a caller that
+// never sets it (the in-app Studio Agent) sends no header, and the desktop reads an outside call
+// without one as a server from before 0.6.7.
+let clientIdentity: string | null = null
+
+export function setDesktopClientIdentity(identity: string): void {
+  clientIdentity = identity
+}
+
+function sessionHeaders(): Record<string, string> {
+  return clientIdentity
+    ? { 'X-Slates-Session': AGENT_SESSION, 'X-Slates-Client': clientIdentity }
+    : { 'X-Slates-Session': AGENT_SESSION }
+}
+
 // Thin client for the local Slates desktop HTTP server (127.0.0.1:PORT).
 // All workflow/state ops (projects, characters, storyboards, frames,
 // asset slot binding) go here. Generation routes through cloud, but the
@@ -125,7 +142,7 @@ export class SlatesDesktopClient {
       }
     }
     const res = await this.fetchOrFriendly(url.toString(), {
-      headers: { Authorization: `Bearer ${this.token}`, 'X-Slates-Session': AGENT_SESSION },
+      headers: { Authorization: `Bearer ${this.token}`, ...sessionHeaders() },
     })
     return this.handle<T>(path, res)
   }
@@ -136,7 +153,7 @@ export class SlatesDesktopClient {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${this.token}`,
-        'X-Slates-Session': AGENT_SESSION,
+        ...sessionHeaders(),
       },
       body: JSON.stringify(body),
     })
