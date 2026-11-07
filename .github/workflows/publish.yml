@@ -36,8 +36,10 @@ jobs:
         run: |
           echo "::error::Publish from a machine with slates-api checked out beside slates-mcp: the brain review (brain-review.mjs --check) and the leak check need it, and this runner has only slates-mcp."
           exit 1
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
