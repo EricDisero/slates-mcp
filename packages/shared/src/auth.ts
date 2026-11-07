@@ -75,9 +75,11 @@ export function readDefaultProjectId(): string | null {
 }
 
 /**
- * Windows: strip what `path` inherits and leave the current user the only entry. The profile folder's
- * ACL is no wall: Codex's sandbox group can read it. Full paths, because Git for Windows puts its own
- * `whoami` first on PATH. A failure warns and carries on, so a locked-down machine can still sign in.
+ * Windows: leave the current user the only entry on `path`. `/reset` first, because `/inheritance:r`
+ * keeps a file's own entries, and a file made in a folder that hands nothing down starts with explicit
+ * SYSTEM and Administrators ones. The profile folder's ACL is no wall: Codex's sandbox group can read
+ * it. Full paths, because Git for Windows puts its own `whoami` first on PATH. A failure warns and
+ * carries on, so a locked-down machine can still sign in.
  */
 function restrictToCurrentUser(path: string): void {
   const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
@@ -85,6 +87,7 @@ function restrictToCurrentUser(path: string): void {
     const whoami = execFileSync(join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true })
     const sid = /"(S-1-[\d-]+)"/.exec(whoami)?.[1]
     if (!sid) throw new Error(`no SID in ${whoami}`)
+    execFileSync(join(system32, 'icacls.exe'), [path, '/reset'], { stdio: 'ignore', windowsHide: true })
     execFileSync(join(system32, 'icacls.exe'), [path, '/inheritance:r', '/grant:r', `*${sid}:F`], { stdio: 'ignore', windowsHide: true })
   } catch (error) {
     console.error(`[slates] could not limit ${path} to this user: ${error instanceof Error ? error.message : error}`)
