@@ -107,7 +107,7 @@ async function fastCheck() {
   assert.deepEqual((await invoke('slates_export_cuts', batch)).data, receipt)
   assert.deepEqual(calls.at(-1)[2], batch, 'do not rewrite names, aspects or copy')
   for (const action of ['start', 'status', 'cancel']) {
-    const legacy = { projectId, directory: 'legacy', manifestId: 'v1', action, items: [{ timelineId, format: 'xml' }] }
+    const legacy = { projectId, directory: 'C:/fixture/legacy', manifestId: 'v1', action, items: [{ timelineId, format: 'xml' }] }
     gates.length = 0
     await invoke('slates_export_cuts', legacy)
     assert.deepEqual(gates, ['named-cuts'])
