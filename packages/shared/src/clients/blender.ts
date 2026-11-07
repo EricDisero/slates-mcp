@@ -1,17 +1,43 @@
+import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import net from 'node:net'
+import { join } from 'node:path'
+import { AGENT_DIR } from '../auth.js'
 
 // Thin client for the Slates Blender add-on's localhost execution bridge.
 //
-// Wire protocol (matches the add-on's `bridge/server.py`, which is Blender
-// Lab's `blender_mcp` protocol):
+// Wire protocol (matches the add-on's `bridge_auth.py`, in front of `bridge/server.py`,
+// which is Blender Lab's `blender_mcp` protocol). Requests and responses are
+// NUL-delimited JSON over plain TCP, one request per connection:
 //
-//   -> {"type":"execute","code":"...","strict_json":false}\0
-//   <- {"status":"ok","result":{...},"stdout":"...","stderr":"..."}\0
-//   <- {"status":"error","message":"<traceback>"}\0
+//   -> {"type":"hello","nonce":"<client nonce>"}\0
+//   <- {"status":"ok","nonce":"<server nonce>","proof":"<mac>"}\0
+//   -> {"type":"execute_sealed","nonce":"<server nonce>","payload":"<json>","mac":"<mac>"}\0
+//   <- {"status":"ok","result":{"sealed":"<json>","mac":"<mac>"}}\0
 //
-// Requests and responses are NUL-delimited JSON over a plain TCP socket. The
-// add-on executes on Blender's main thread via a timer, so a request is
-// serviced within a tick rather than immediately — the socket stays open until
+// `payload` is the upstream request `{"type":"execute","code":"...","strict_json":false}`
+// and `sealed` the upstream reply `{"status":"ok","result":{...},"stdout":"...","stderr":"..."}`
+// or `{"status":"error","message":"<traceback>"}`, each as a string so both sides MAC the
+// same bytes. A mac is HMAC-SHA256 of `<label>\0<nonce>\0<body>` under the token the add-on
+// writes to ~/.slates/blender-bridge-<port>.token each time it binds:
+//
+//   hello    label "hello", the client nonce, body the server nonce
+//   request  label "request", the server nonce, body the payload
+//   reply    label "reply", the server nonce, body the sealed string
+//
+// 🚨 THE TOKEN NEVER CROSSES THE SOCKET, AND NO CODE IS SENT BEFORE THE PROOF. Anything
+// local can bind a port in this range, and on Windows it can share a port the add-on holds
+// (`__init__.py` `_port_is_free`). A listener without the token cannot answer the hello, so
+// it is sent no code, and it cannot seal a reply, so a forged `filePath` cannot reach the
+// desktop's upload route. A process sharing the add-on's port is the one exception: the hello
+// can land on the add-on and the signed request on that process, which can then read the
+// code. It still cannot change it, forge it or seal a reply. Each nonce is good for one
+// request, so a captured one replays nothing. A later incompatible change takes a new request
+// type: the older side answers "Unknown request type", which is how an old add-on is told
+// apart here.
+//
+// The add-on executes on Blender's main thread via a timer, so a request is
+// serviced within a tick rather than immediately: the socket stays open until
 // the reply lands, and long jobs (renders) hold it open for as long as they
 // take. That is why the timeout here is generous and configurable per call
 // rather than a single global value.
@@ -28,6 +54,9 @@ const DEFAULT_TIMEOUT_MS = 60_000
 export const RENDER_TIMEOUT_MS = 15 * 60_000
 
 const CONNECT_TIMEOUT_MS = 1_500
+// Bounds a listener that accepts and never answers, on each port walked. Blender answers a
+// hello on its next timer tick unless its main thread is busy.
+const HELLO_TIMEOUT_MS = 15_000
 
 /**
  * Where the add-on comes from, and how to switch it on. ONE string.
@@ -58,6 +87,33 @@ export class BlenderNotRunningError extends Error {
   }
 }
 
+/** Something answered on the bridge ports, and it is not a Blender this client may drive. */
+export class BlenderPeerError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'BlenderPeerError'
+  }
+}
+
+const ADDON_OUTDATED_MESSAGE =
+  'The Slates add-on in this Blender is too old for this version of Slates, which only ' +
+  'drives an add-on that proves itself. Update it: in Blender open Edit > Preferences > ' +
+  'Get Extensions, choose Refresh Remote, then Update on Slates, or reinstall from ' +
+  'https://slates.video/blender. Then restart Blender.'
+
+const UNVERIFIED_MESSAGE =
+  `Something is listening on ${HOST}:${BASE_PORT}-${BASE_PORT + PORT_FALLBACKS} but could not ` +
+  'prove it is the Slates add-on, so nothing was sent to it. In Blender, stop and start the ' +
+  'bridge from the Slates tab, which writes a new token to ~/.slates. If that does not clear ' +
+  'it, Blender is running as another user or another program holds the port.'
+
+const UNSIGNED_REPLY_MESSAGE =
+  'Blender did not return a signed reply, so the result was thrown away. Check the Blender ' +
+  'window and retry. If it repeats, stop and start the bridge from the Slates tab.'
+
+/** A listener took the connection and said nothing in time. */
+class BlenderSilentError extends Error {}
+
 /** Raised when Blender executed the code and Python threw. Carries the traceback. */
 export class BlenderExecError extends Error {
   readonly stdout: string
@@ -76,6 +132,38 @@ interface BridgeResponse {
   message?: string
   stdout?: string
   stderr?: string
+  /** The hello's server nonce. */
+  nonce?: unknown
+  /** The hello's proof that the listener holds this port's token. */
+  proof?: unknown
+}
+
+/** A port whose listener proved itself, and the nonce that buys one request. */
+interface BridgeSession {
+  port: number
+  token: string
+  nonce: string
+}
+
+function bridgeMac(token: string, label: string, nonce: string, body: string): string {
+  return createHmac('sha256', token).update(`${label}\0${nonce}\0${body}`, 'utf8').digest('hex')
+}
+
+function macMatches(expected: string, received: unknown): boolean {
+  if (typeof received !== 'string') return false
+  const a = Buffer.from(expected)
+  const b = Buffer.from(received)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
+
+/** The add-on rewrites this file on every bind, so it is read fresh for each handshake. */
+function readBridgeToken(port: number): string | null {
+  try {
+    const token = readFileSync(join(AGENT_DIR, `blender-bridge-${port}.token`), 'utf8').trim()
+    return /^[0-9a-f]{64}$/.test(token) ? token : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -128,18 +216,7 @@ function connect(port: number): Promise<net.Socket> {
   })
 }
 
-async function connectAny(): Promise<net.Socket> {
-  for (let port = BASE_PORT; port <= BASE_PORT + PORT_FALLBACKS; port++) {
-    try {
-      return await connect(port)
-    } catch {
-      // Try the next port in the range.
-    }
-  }
-  throw new BlenderNotRunningError()
-}
-
-function request(socket: net.Socket, payload: string, timeoutMs: number): Promise<BridgeResponse> {
+function request(socket: net.Socket, payload: string, timeoutMs: number): Promise<BridgeResponse | null> {
   return new Promise((resolve, reject) => {
     let buffer = ''
     let settled = false
@@ -156,7 +233,7 @@ function request(socket: net.Socket, payload: string, timeoutMs: number): Promis
       () =>
         finish(() =>
           reject(
-            new Error(
+            new BlenderSilentError(
               `Blender did not respond within ${Math.round(timeoutMs / 1000)}s. ` +
                 'It may be busy with a modal operator — check the Blender window.'
             )
@@ -188,6 +265,65 @@ function request(socket: net.Socket, payload: string, timeoutMs: number): Promis
   })
 }
 
+/**
+ * The session on `port`, null with no listener there, or why the listener cannot be used. Throws
+ * when the listener is silent and this port has a token: that is the add-on with its main thread
+ * busy, and walking on would run the work in whichever other .blend is open.
+ */
+async function helloOn(port: number): Promise<BridgeSession | Error | null> {
+  let socket: net.Socket
+  try {
+    socket = await connect(port)
+  } catch {
+    return null
+  }
+  const clientNonce = randomBytes(16).toString('hex')
+  let reply: BridgeResponse | null
+  try {
+    reply = await request(socket, JSON.stringify({ type: 'hello', nonce: clientNonce }), HELLO_TIMEOUT_MS)
+  } catch (err) {
+    if (err instanceof BlenderSilentError && readBridgeToken(port)) throw err
+    return err as Error
+  }
+  if (typeof reply !== 'object' || reply === null) return new BlenderPeerError(UNVERIFIED_MESSAGE)
+  if (reply.status === 'error' && typeof reply.message === 'string' && reply.message.startsWith('Unknown request type')) {
+    return new BlenderPeerError(ADDON_OUTDATED_MESSAGE)
+  }
+  const token = readBridgeToken(port)
+  if (!token || typeof reply.nonce !== 'string' || !macMatches(bridgeMac(token, 'hello', clientNonce, reply.nonce), reply.proof)) {
+    return new BlenderPeerError(UNVERIFIED_MESSAGE)
+  }
+  return { port, token, nonce: reply.nonce }
+}
+
+/**
+ * The first port whose listener proves it is the add-on. A listener that cannot does not stop
+ * the walk, because the add-on steps past a held port. When none proves itself, the failure
+ * that tells the user the most wins: an old add-on, then a silent listener, then a stranger.
+ */
+async function authenticate(): Promise<BridgeSession> {
+  const failures: Error[] = []
+  for (let port = BASE_PORT; port <= BASE_PORT + PORT_FALLBACKS; port++) {
+    const outcome = await helloOn(port)
+    if (outcome === null) continue
+    if (!(outcome instanceof Error)) return outcome
+    failures.push(outcome)
+  }
+  const outdated = failures.find((f) => f.message === ADDON_OUTDATED_MESSAGE)
+  const silent = failures.find((f) => !(f instanceof BlenderPeerError))
+  throw outdated ?? silent ?? failures[0] ?? new BlenderNotRunningError()
+}
+
+/** Open what the add-on sealed. An unsealed reply, error or not, is untrusted text and is dropped. */
+function unseal(res: BridgeResponse | null, session: BridgeSession): BridgeResponse {
+  const seal = res?.result as { sealed?: unknown; mac?: unknown } | undefined
+  if (res?.status !== 'ok' || typeof seal?.sealed !== 'string') throw new BlenderPeerError(UNSIGNED_REPLY_MESSAGE)
+  if (!macMatches(bridgeMac(session.token, 'reply', session.nonce, seal.sealed), seal.mac)) {
+    throw new BlenderPeerError(UNSIGNED_REPLY_MESSAGE)
+  }
+  return JSON.parse(seal.sealed) as BridgeResponse
+}
+
 export class BlenderBridgeClient {
   /**
    * Execute Python in Blender and return whatever the code assigned to
@@ -200,9 +336,16 @@ export class BlenderBridgeClient {
     stdout: string
     stderr: string
   }> {
-    const socket = await connectAny()
+    const session = await authenticate()
+    const socket = await connect(session.port)
     const payload = JSON.stringify({ type: 'execute', code, strict_json: false })
-    const res = await request(socket, payload, opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+    const sealed = JSON.stringify({
+      type: 'execute_sealed',
+      nonce: session.nonce,
+      payload,
+      mac: bridgeMac(session.token, 'request', session.nonce, payload),
+    })
+    const res = unseal(await request(socket, sealed, opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS), session)
 
     const stdout = res.stdout ?? ''
     const stderr = res.stderr ?? ''
@@ -222,14 +365,18 @@ export class BlenderBridgeClient {
     return result
   }
 
-  /** True when a Blender with the add-on is reachable. Never throws. */
+  /**
+   * True when a Blender this client may drive answers, false when nothing listens. Throws
+   * when a listener cannot be used: the reason is what the user needs (update the add-on,
+   * restart the bridge), and "no Blender found" would send them the wrong way.
+   */
   async isReachable(): Promise<boolean> {
     try {
-      const socket = await connectAny()
-      socket.destroy()
+      await authenticate()
       return true
-    } catch {
-      return false
+    } catch (err) {
+      if (err instanceof BlenderNotRunningError) return false
+      throw err
     }
   }
 }
