@@ -123,7 +123,7 @@ This builds everything first, then publishes shared → mcp → cli with `--acce
 
 - The desktop server is bound to `127.0.0.1` only. It rejects any non-loopback connection at the OS level.
 - Every request is rejected if it carries a cross-origin `Origin` header (kills browser-fetch attacks) or a non-loopback `Host` header (kills DNS rebinding), before the bearer token is even read.
-- The `slates_sk_` token is sent only to the configured cloud host (`slates-api.fly.dev` by default). `SLATES_CLOUD_BASE_URL` can override the host for dev/staging, but only over `https://` (or `http://localhost`) — an insecure override is ignored so the token can't be exfiltrated or sent in cleartext.
+- The `slates_sk_` token is sent only to `slates-api.fly.dev`. `SLATES_CLOUD_BASE_URL` can point it at a local API on this machine for development; any other host is ignored, so the token can't be exfiltrated or sent in cleartext.
 - Disconnect (Slates desktop → Settings → AI tools) revokes the `slates_sk_` token server-side and clears it locally. Once revoked, that token's hash never authenticates again — so a leaked copy stops working too.
 
 ## License

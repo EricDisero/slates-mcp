@@ -10,7 +10,7 @@
 // reaches them: prompts/brain.ts, overlayGuide), a new name adds one. Nothing
 // here leaves the machine.
 //
-// The folder is ~/.slates/my-brain (SLATES_MY_BRAIN_DIR overrides it), beside
+// The folder is ~/.slates/my-brain (SLATES_MY_BRAIN_DIR overrides it, with SLATES_DEV=1), beside
 // the connection file every surface on the machine already reads, so the MCP
 // server, the CLI and the desktop's Director see the same brain.
 //
@@ -43,7 +43,7 @@ const MAX_FILE_BYTES = 64 * 1024
 const NAME_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export function myBrainDir(): string {
-  return process.env.SLATES_MY_BRAIN_DIR || join(AGENT_DIR, 'my-brain')
+  return (process.env.SLATES_DEV === '1' && process.env.SLATES_MY_BRAIN_DIR) || join(AGENT_DIR, 'my-brain')
 }
 
 export interface Brain {

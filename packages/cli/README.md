@@ -14,7 +14,7 @@ Requires Node.js 18+ and the Slates desktop app ([slates.video](https://slates.v
 
 | Command | What it does |
 |---|---|
-| `slates login` | Authorize this machine via magic link (or `--token slates_sk_...`) |
+| `slates login` | Authorize this machine via magic link (or `--token-stdin` to pipe in a `slates_sk_...` key) |
 | `slates logout` | Clear the stored cloud token |
 | `slates status` | Show connection state, account, and credit balance |
 | `slates mcp` | Detect Codex, Claude and Cursor; print the Codex/Claude Code setup commands or the JSON config; `--write` merges it into Claude Desktop / Cursor configs (with a `.bak` backup) |

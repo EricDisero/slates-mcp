@@ -24,6 +24,11 @@ import { AGENT_DIR } from './auth.js'
 export const UPDATE_CACHE_FILE = join(AGENT_DIR, 'update-check.json')
 const REFRESH_AFTER_MS = 60 * 60 * 1000
 const FETCH_TIMEOUT_MS = 2500
+// The registry's answer and the cache are both outside text, and the notice lands in the MCP
+// instructions, a channel the model treats as the product's own words. So only a plain release
+// number passes, which also keeps a prerelease out of the notice.
+const VERSION_RE = /^\d+\.\d+\.\d+$/
+const MAX_VERSION_LENGTH = 32
 
 type UpdateCache = Record<string, { latest: string; checkedAt: number }>
 
@@ -113,6 +118,7 @@ export function updateNotice(
   latest: string | null,
   howToUpdate: string
 ): string | null {
-  if (!latest || compareVersions(current, latest) >= 0) return null
+  if (!latest || latest.length > MAX_VERSION_LENGTH || !VERSION_RE.test(latest)) return null
+  if (compareVersions(current, latest) >= 0) return null
   return `UPDATE AVAILABLE: ${pkgName} v${current} is running; v${latest} is published. ${howToUpdate}`
 }

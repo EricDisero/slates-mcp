@@ -17,6 +17,7 @@ const emptyHome = process.argv[2] === '--empty-home'
 // spawns. The empty-home run has none: it starts as a machine nothing has brought the brain to.
 const brain = emptyHome ? null : brainOrSkip('guide-gate')
 if (brain) {
+  process.env.SLATES_DEV = '1'
   process.env.SLATES_BRAIN_DIR = brain
   useBrainSource(brain)
 }

@@ -3,22 +3,22 @@ import { requireCloudToken, tokenHash } from '../auth.js'
 import { SLATES_API_URL } from '../api-url.js'
 const FALLBACK_CLOUD_BASE_URL = SLATES_API_URL
 
-// The slates_sk_ bearer is attached to every cloud request. SLATES_CLOUD_BASE_URL
-// may override the host for dev/staging, but ONLY over https (or http to
-// localhost) — otherwise the token could be exfiltrated to an arbitrary host
-// or sent in cleartext. An invalid/insecure override is ignored (falls back to
-// production) rather than silently leaking the token.
-function resolveCloudBaseUrl(): string {
-  const override = process.env.SLATES_CLOUD_BASE_URL
+// The slates_sk_ bearer is attached to every cloud request, and an env block in a
+// plugin or project config can reach this process. So SLATES_CLOUD_BASE_URL may
+// point only at this machine (a local slates-api) or the production host; any
+// other host, https or not, is ignored in favour of production. It is not a way
+// to reach a staging host: add one here by name if one ever exists.
+export function resolveCloudBaseUrl(override = process.env.SLATES_CLOUD_BASE_URL): string {
   if (!override) return FALLBACK_CLOUD_BASE_URL
   try {
     const u = new URL(override)
-    const isLoopback = u.hostname === 'localhost' || u.hostname === '127.0.0.1'
-    if (u.protocol === 'https:' || (u.protocol === 'http:' && isLoopback)) {
+    const isLoopback = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]'
+    const isProduction = u.protocol === 'https:' && u.hostname === new URL(FALLBACK_CLOUD_BASE_URL).hostname
+    if (isProduction || (isLoopback && (u.protocol === 'http:' || u.protocol === 'https:'))) {
       return override.replace(/\/+$/, '')
     }
     console.error(
-      `[slates] Ignoring SLATES_CLOUD_BASE_URL="${override}": must be https:// (or http://localhost). ` +
+      `[slates] Ignoring SLATES_CLOUD_BASE_URL="${override}": it must be this machine or ${FALLBACK_CLOUD_BASE_URL}. ` +
         `Falling back to ${FALLBACK_CLOUD_BASE_URL} so the auth token is not exposed.`
     )
   } catch {

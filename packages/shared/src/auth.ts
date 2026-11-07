@@ -1,7 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import {
+  chmodSync,
   existsSync,
   readFileSync,
   writeFileSync,
@@ -72,8 +74,34 @@ export function readDefaultProjectId(): string | null {
   return readConnection().defaultProjectId ?? null
 }
 
+/**
+ * Windows: strip what `path` inherits and leave the current user the only entry. The profile folder's
+ * ACL is no wall: Codex's sandbox group can read it. Full paths, because Git for Windows puts its own
+ * `whoami` first on PATH. A failure warns and carries on, so a locked-down machine can still sign in.
+ */
+function restrictToCurrentUser(path: string): void {
+  const system32 = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32')
+  try {
+    const whoami = execFileSync(join(system32, 'whoami.exe'), ['/user', '/fo', 'csv', '/nh'], { encoding: 'utf8', windowsHide: true })
+    const sid = /"(S-1-[\d-]+)"/.exec(whoami)?.[1]
+    if (!sid) throw new Error(`no SID in ${whoami}`)
+    execFileSync(join(system32, 'icacls.exe'), [path, '/inheritance:r', '/grant:r', `*${sid}:F`], { stdio: 'ignore', windowsHide: true })
+  } catch (error) {
+    console.error(`[slates] could not limit ${path} to this user: ${error instanceof Error ? error.message : error}`)
+  }
+}
+
 export function writeConnection(data: AgentConnectionFile): void {
-  if (!existsSync(AGENT_DIR)) mkdirSync(AGENT_DIR, { recursive: true })
+  mkdirSync(AGENT_DIR, { recursive: true, mode: 0o700 })
+  // Owner-only, because this file holds both tokens. `mode` applies only when a file or folder is
+  // created, and the desktop may have made them first, so the modes are set before the tokens land.
+  if (process.platform === 'win32') {
+    if (!existsSync(CONNECTION_FILE)) writeFileSync(CONNECTION_FILE, '')
+    restrictToCurrentUser(CONNECTION_FILE)
+  } else {
+    chmodSync(AGENT_DIR, 0o700)
+    if (existsSync(CONNECTION_FILE)) chmodSync(CONNECTION_FILE, 0o600)
+  }
   writeFileSync(CONNECTION_FILE, JSON.stringify(data, null, 2), { mode: 0o600 })
 }
 
@@ -144,8 +172,47 @@ export interface McpLauncher {
   env: Record<string, string>
 }
 
+/** What `slate/src/main/agent/mcpLauncher.ts` `appMcpLaunch()` writes, and all it writes. */
+const LAUNCHER_ENV = { ELECTRON_RUN_AS_NODE: '1', SLATES_MCP_BUNDLED: '1' }
+
+/**
+ * Where the app installs: `electron-builder.yml`'s one-click per-user NSIS, and a Mac app dragged to
+ * either Applications folder. Slates ships no Linux build. An app run from anywhere else, or a
+ * lookalike folder, reads as no launcher, and the copy that was started simply runs as itself.
+ */
+function appInstallRoots(): string[] {
+  const home = homedir()
+  return [
+    join(process.env.LOCALAPPDATA || join(home, 'AppData', 'Local'), 'Programs', 'slates'),
+    resolve('/Applications/Slates.app'),
+    join(home, 'Applications', 'Slates.app'),
+  ]
+}
+
+function isInstalled(command: string): boolean {
+  const fold = (path: string) => (process.platform === 'win32' ? resolve(path).toLowerCase() : resolve(path))
+  return appInstallRoots().some((root) => fold(command).startsWith(fold(root) + sep))
+}
+
+/**
+ * Whether a launch is the app's own binary starting the server packaged beside it. The file is
+ * plain JSON a write tool could reach, and this process would run what it names at every start, so
+ * `cmd.exe /c ...`, an env carrying NODE_OPTIONS or a copy planted elsewhere must read as no launcher
+ * at all.
+ */
+function isAppLaunch(command: string, args: string[], env: Record<string, string>): boolean {
+  if (!/^slates(\.exe)?$/i.test(basename(command)) || args.length !== 1 || !isInstalled(command)) return false
+  const appDir = dirname(command)
+  const serverPath = join('mcp-server', 'dist', 'server.mjs')
+  const packaged = [join(appDir, 'resources', serverPath), join(dirname(appDir), 'Resources', serverPath)]
+  const sameEnv = Object.keys(env).length === Object.keys(LAUNCHER_ENV).length &&
+    Object.entries(LAUNCHER_ENV).every(([key, value]) => env[key] === value)
+  return sameEnv && packaged.includes(resolve(args[0]))
+}
+
 /** The desktop's bundled server, or null when there is none on this computer (no app, an old app,
- *  an uninstalled one whose file was left behind, or a file this version cannot read). */
+ *  an uninstalled one whose file was left behind, a file this version cannot read, or a launch that
+ *  is not the app's). */
 export function readMcpLauncher(file = MCP_LAUNCHER_FILE): McpLauncher | null {
   try {
     const raw = JSON.parse(readFileSync(file, 'utf-8')) as Partial<McpLauncher>
@@ -160,6 +227,7 @@ export function readMcpLauncher(file = MCP_LAUNCHER_FILE): McpLauncher | null {
     ) return null
     // The app was moved or uninstalled since it wrote the file: nothing to start.
     if (!existsSync(raw.command) || (raw.args[0] && !existsSync(raw.args[0]))) return null
+    if (!isAppLaunch(raw.command, raw.args, env)) return null
     return { version: raw.version, command: raw.command, args: raw.args, env }
   } catch {
     return null

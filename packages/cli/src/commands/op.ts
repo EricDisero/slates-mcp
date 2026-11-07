@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import {

@@ -1,24 +1,28 @@
-import { setCloudToken } from '@slatesvideo/shared'
+import { DEFAULT_CLOUD_BASE_URL as CLOUD_BASE_URL, setCloudToken } from '@slatesvideo/shared'
 import { promptInput } from '../util/prompt.js'
-
-import { SLATES_API_URL } from '@slatesvideo/shared'
-const CLOUD_BASE_URL = process.env.SLATES_CLOUD_BASE_URL ?? SLATES_API_URL
 
 export interface LoginOptions {
   email?: string
   clientName?: string
-  token?: string
+  tokenStdin?: boolean
+}
+
+async function readStdin(): Promise<string> {
+  let text = ''
+  for await (const chunk of process.stdin) text += chunk
+  return text
 }
 
 export async function runLogin(opts: LoginOptions): Promise<void> {
-  // Manual paste path — power users who minted a key on the web UI
-  // (or want to bypass email entirely for CI).
-  if (opts.token) {
-    if (!opts.token.startsWith('slates_sk_')) {
+  // Manual path, for a key minted on the web UI or for CI. Read from stdin: an
+  // argument sits in the process list and the shell history.
+  if (opts.tokenStdin) {
+    const token = (await readStdin()).trim()
+    if (!token.startsWith('slates_sk_')) {
       console.error('Token must start with slates_sk_. Aborting.')
       process.exit(1)
     }
-    setCloudToken(opts.token)
+    setCloudToken(token)
     console.log('Cloud token saved. You\'re logged in.')
     return
   }
@@ -50,10 +54,10 @@ export async function runLogin(opts: LoginOptions): Promise<void> {
 
   console.log(`\nA sign-in link is on its way to ${trimmed}.`)
   // Newer slates-api versions return a short user code (e.g. XK4-P2N) that
-  // the authorization page asks the user to verify — anti-phishing pairing.
+  // the authorization page makes the user type — anti-phishing pairing.
   // Older servers omit the field; show nothing in that case.
   if (reqBody.userCode) {
-    console.log(`Confirm this code on the authorization page: ${reqBody.userCode}`)
+    console.log(`Type this code on the authorization page: ${reqBody.userCode}`)
   }
   console.log('Click the link, then return here. Waiting (10 min max)...\n')
 

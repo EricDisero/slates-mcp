@@ -8,6 +8,7 @@ import { brainOrSkip } from './brain-source.mjs'
 
 // The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
 const brain = brainOrSkip('agent-facts')
+process.env.SLATES_DEV = '1'
 process.env.SLATES_BRAIN_DIR = brain
 useBrainSource(brain)
 

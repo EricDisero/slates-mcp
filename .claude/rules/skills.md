@@ -19,7 +19,7 @@ pins its commit and the approved brain hash; `brain-review.mjs --approve` moves 
 repo or a plugin** (`build-plugins.mjs` refuses one).
 - **Runtime:** `src/skills/served.ts`. `brainFiles()` is the card and router plus the served brain; the guide op,
   My brain, craft cards, banned tokens, the doctrine's guide index, the MCP prompts and `install-skills` all read it.
-  Sources: `SLATES_BRAIN_DIR` (builds, checks, evals; never a user's machine) is the only one when set. Otherwise
+  Sources: `SLATES_BRAIN_DIR` (builds, checks, evals; read only with `SLATES_DEV=1`, never on a user's machine) is the only one when set. Otherwise
   the process starts from `~/.slates/brain-cache.json` (written by this login, or by the desktop app when there is no
   login here; a cache another login received waits until the server names the same account), then `GET /brain` and
   `/brain/bundle` through the connected account replace it (at server start and before a guide answer, at most every

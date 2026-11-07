@@ -21,6 +21,7 @@ import { brainOrSkip } from './brain-source.mjs'
 
 // The shared brain a file is laid over: slates-api brain/, every tier, here and in the servers this spawns.
 const sharedBrain = brainOrSkip('my-brain')
+process.env.SLATES_DEV = '1'
 process.env.SLATES_BRAIN_DIR = sharedBrain
 
 const dir = mkdtempSync(join(tmpdir(), 'slates-my-brain-'))

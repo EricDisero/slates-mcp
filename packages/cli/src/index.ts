@@ -3,7 +3,7 @@ import { Command, Option } from 'commander'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { readConnection, setCloudToken, clearCloudToken, refreshLatestVersion, updateNotice, setDesktopClientIdentity } from '@slatesvideo/shared'
+import { clearCloudToken, refreshLatestVersion, updateNotice, setDesktopClientIdentity } from '@slatesvideo/shared'
 import { runLogin } from './commands/login.js'
 import { runLogout } from './commands/logout.js'
 import { runStatus } from './commands/status.js'
@@ -70,7 +70,7 @@ program
   .description('Authorize this CLI to use your Slates account (magic link).')
   .option('--email <email>', 'Slates account email (otherwise prompted)')
   .option('--client-name <name>', 'Label this connection (shows in Slates Settings)', 'Slates CLI')
-  .option('--token <token>', 'Skip the magic-link flow and paste a slates_sk_ token directly.')
+  .option('--token-stdin', 'Skip the magic-link flow and read a slates_sk_ token from stdin.')
   .action((opts) => runLogin(opts))
 
 program
@@ -194,26 +194,7 @@ program
     })
   })
 
-// Hidden helper for skills that just need the cloud token.
-program
-  .command('print-cloud-token', { hidden: true })
-  .action(() => {
-    const c = readConnection()
-    if (!c.cloud.token) {
-      console.error('No cloud token. Run `slates login`.')
-      process.exit(1)
-    }
-    process.stdout.write(c.cloud.token)
-  })
-
 // Hidden helper for tests / scripting.
-program
-  .command('set-cloud-token <token>', { hidden: true })
-  .action((token: string) => {
-    setCloudToken(token)
-    console.log('Cloud token written.')
-  })
-
 program
   .command('clear-cloud-token', { hidden: true })
   .action(() => {

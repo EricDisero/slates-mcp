@@ -4,8 +4,9 @@
 // reaches an agent from the account it is connected with (slates-api src/lib/brain.ts says who reads which).
 //
 // Where this process gets them:
-//   SLATES_BRAIN_DIR  a folder of brain files with every tier open: builds, evals and checks. Never set on a
-//                     user's machine. When set it is the only source; nothing refreshes it.
+//   SLATES_BRAIN_DIR  a folder of brain files with every tier open: builds, evals and checks. Read only with
+//                     SLATES_DEV=1, so one line in an MCP config's env block cannot swap what an agent is told.
+//                     When read it is the only source; nothing refreshes it.
 //   BRAIN_CACHE       otherwise, the last bundle this machine received (by this login, or by the desktop app when
 //                     there is no login here), read at load so a cold or offline start has the brain.
 //   the server        GET /brain (version, tiers, account), then /brain/bundle when any changed, through the
@@ -99,7 +100,8 @@ function startingCache(): { state: ServedBrain; held: CachedBrain | null } {
 
 let state: ServedBrain = EMPTY
 let held: CachedBrain | null = null
-if (process.env.SLATES_BRAIN_DIR) state = fromDir(process.env.SLATES_BRAIN_DIR)
+const brainFolder = process.env.SLATES_DEV === '1' ? process.env.SLATES_BRAIN_DIR : undefined
+if (brainFolder) state = fromDir(brainFolder)
 else ({ state, held } = startingCache())
 let checkedAt = 0
 let inflight: Promise<ServedBrain> | undefined
