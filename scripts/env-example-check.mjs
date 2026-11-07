@@ -38,7 +38,7 @@ const SKIP_DIRS = new Set(['node_modules', 'dist', 'build', '.next', '.next-veri
 // slates-mcp ships HyperFrames' 21 skills verbatim, scripts included (Apache-2.0, NOTICE beside them).
 const VENDORED = new Set(['packages/shared/skills/hyperframes'])
 const EXTS = new Set(['.ts', '.tsx', '.js', '.mjs', '.mts', '.cjs', '.py', '.sh', '.ps1'])
-const PLATFORM = new Set(['NODE_ENV', 'PORT', 'VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'FLY_APP_NAME', 'FLY_REGION', 'FLY_ALLOC_ID', 'CI', 'HOME', 'PATH', 'TZ', 'APPDATA', 'LOCALAPPDATA', 'USERPROFILE', 'TEMP', 'TMP', 'ELECTRON_RENDERER_URL', 'NODE_OPTIONS', 'npm_config_user_agent', 'npm_lifecycle_event', 'CLAUDE_PROJECT_DIR', 'CUDA_VISIBLE_DEVICES', 'GITHUB_ACTIONS', 'GITHUB_TOKEN', 'RUNNER_OS'])
+const PLATFORM = new Set(['NODE_ENV', 'PORT', 'VERCEL', 'VERCEL_ENV', 'VERCEL_URL', 'FLY_APP_NAME', 'FLY_REGION', 'FLY_ALLOC_ID', 'CI', 'HOME', 'PATH', 'TZ', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'USERPROFILE', 'TEMP', 'TMP', 'ELECTRON_RENDERER_URL', 'NODE_OPTIONS', 'npm_config_user_agent', 'npm_lifecycle_event', 'CLAUDE_PROJECT_DIR', 'CUDA_VISIBLE_DEVICES', 'GITHUB_ACTIONS', 'GITHUB_TOKEN', 'RUNNER_OS'])
 
 function* walk(dir) {
   for (const name of readdirSync(dir)) {
