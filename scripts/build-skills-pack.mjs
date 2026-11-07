@@ -295,7 +295,6 @@ const manifest = {
   filename,
   sha256: createHash('sha256').update(zip).digest('hex'),
   bytes: zip.length,
-  url: `https://slates-web-assets.t3.tigrisfiles.io/${filename}`,
   // What is IN the zip: `freeSkills` and `paidSkills`. `brainSkills` is charted, never zipped.
   skillCount: all.length,
   freeSkills: free.map((s) => s.key),
@@ -310,4 +309,3 @@ writeFileSync(join(OUT_DIR, 'pack-manifest.json'), JSON.stringify(manifest, null
 console.log(`✓ built ${filename}`);
 console.log(`   ${all.length} skills in the zip (${free.length} free + ${paid.length} pack-exclusive), ${(zip.length / 1024).toFixed(1)} KB; ${brain.length} brain files charted, none zipped`);
 console.log(`   pack-exclusive: ${paid.map((s) => s.key).join(', ')}`);
-console.log(`   url: ${manifest.url}`);
