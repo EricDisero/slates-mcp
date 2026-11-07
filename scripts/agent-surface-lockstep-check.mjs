@@ -1119,9 +1119,8 @@ function zodDescriptions(op) {
 }
 
 // ── 14. a schema the renderer cannot read is refused, never sent as {} ──────
-// zod-to-json-schema 3 turns a zod 4 schema into `{}` without an error; a consumer whose
-// install hands shared the wrong zod would ship every tool with no parameters. The zod 4
-// schema here comes from zod 3's own `zod/v4` entry, the same shape that broke slate.
+// zod-to-json-schema 3 turns a zod 4 schema into `{}` without an error; an op built from
+// bare `zod` instead of `zod/v3` would ship with no parameters, the shape that broke slate.
 {
   const CHECK = '14 schema-renders'
   const { toolDefinition } = shared
@@ -1152,7 +1151,7 @@ function zodDescriptions(op) {
 {
   const CHECK = '15 schema-draft-2020'
   const { toolDefinition } = shared
-  const { z } = await import('zod')
+  const { z } = await import('zod/v3')
   const { default: Ajv2020 } = await import('ajv/dist/2020.js')
   const ajv = new Ajv2020({ strict: false })
   const invalid = []

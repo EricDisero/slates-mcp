@@ -3,18 +3,20 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
+  ErrorCode,
   ListToolsRequestSchema,
   ListPromptsRequestSchema,
   GetPromptRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
+  McpError,
   ReadResourceRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod'
+import { z } from 'zod/v3'
 import {
   ALL_OPERATIONS,
   ARCHIVE_AFTER_DAYS,
@@ -269,9 +271,12 @@ function warn(message: string): void {
  * half-supports it must not hang the call.
  */
 const ELICIT_TIMEOUT_MS = 60_000
+/** A decline or cancel back inside this came from the host's own policy, not from a person reading the question. */
+const HUMAN_ANSWER_MS = 500
 
+/** The question is a form, so a host that declares only `url` elicitation counts as a host without elicitation. */
 function clientSupportsElicitation(): boolean {
-  return !!server.getClientCapabilities()?.elicitation
+  return !!server.getClientCapabilities()?.elicitation?.form
 }
 
 /** Does this op actually have a `confirm` gate to satisfy? */
@@ -281,7 +286,15 @@ function opTakesConfirm(op: Operation<unknown>): boolean {
   return !!shape && 'confirm' in shape
 }
 
+/** The host advertised elicitation and has no such method: its text path is all this connection has. */
+let elicitationFailed = false
+
+/**
+ * The user's answer, or null when no person gave one and the text path decides this call. Anything else that
+ * goes wrong is a no: a prompt nobody answered must never leave a model's `confirm` to spend alone.
+ */
 async function elicitConfirm(message: string): Promise<boolean | null> {
+  const asked = Date.now()
   try {
     const res = await server.elicitInput(
       {
@@ -291,8 +304,8 @@ async function elicitConfirm(message: string): Promise<boolean | null> {
           properties: {
             confirm: {
               type: 'boolean',
-              title: 'Spend the credits',
-              description: 'Yes proceeds and charges the account.',
+              title: 'Go ahead',
+              description: 'Yes does what the message above says, including any charge to the account.',
             },
           },
           required: ['confirm'],
@@ -300,12 +313,16 @@ async function elicitConfirm(message: string): Promise<boolean | null> {
       },
       { timeout: ELICIT_TIMEOUT_MS }
     )
-    if (res.action !== 'accept') return false
-    return (res.content as { confirm?: boolean } | undefined)?.confirm === true
-  } catch {
-    // Declined, timed out, or a host that advertised the capability and then
-    // failed it. Fall back to the text path rather than failing the call.
-    return null
+    if (res.action === 'accept') return (res.content as { confirm?: boolean } | undefined)?.confirm === true
+    // Codex with approval policy "never" declines every form at once. Counting that as the user's no would
+    // leave its users unable to spend or delete at all.
+    return Date.now() - asked < HUMAN_ANSWER_MS ? null : false
+  } catch (err) {
+    if (err instanceof McpError && err.code === ErrorCode.MethodNotFound) {
+      elicitationFailed = true
+      return null
+    }
+    return false
   }
 }
 
@@ -363,9 +380,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       ticker.unref?.()
     }
 
+    // 🚨 A MODEL'S `confirm: true` IS NOT THE USER'S YES. A prompt-injected agent can send it on its first
+    // call, so where the host can ask the user, the op runs without it and the gate below asks. On a host
+    // with no form elicitation, the CLI among them, nobody is asked: a spend there is the model's word and
+    // no one's approval, and the desktop's checks are all that stands behind it.
+    const canAskUser = opTakesConfirm(op) && clientSupportsElicitation() && !elicitationFailed
+    const { confirm: agentConfirm, ...unconfirmed } = args as { confirm?: unknown }
+    const claimed = canAskUser && agentConfirm === true
+
+    const runOp = (input: unknown) => op.run(input as never, { ...defaultContext(), signal: extra?.signal, guidesRead })
+
     let result
     try {
-      result = await op.run(args as never, { ...defaultContext(), signal: extra?.signal, guidesRead })
+      result = await runOp(claimed ? unconfirmed : args)
     } finally {
       if (ticker) clearInterval(ticker)
     }
@@ -380,27 +407,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     // no `confirm` param at all. Eliciting there would ask the user to approve
     // a spend that is not happening, on a read-only pre-flight quote, and then
     // re-run the quote with a parameter it does not have.
-    if (data?.requires_confirm === true && opTakesConfirm(op) && clientSupportsElicitation()) {
+    //
+    // `confirm_sends_as_written` is the one clarification confirm answers: without this, a claimed confirm
+    // would come back the same clarification forever, with nobody asked.
+    if (canAskUser && (data?.requires_confirm === true || (claimed && data?.confirm_sends_as_written === true))) {
       const answer = await elicitConfirm(
         typeof data.message === 'string' ? data.message : result.text
       )
+      if (answer === false) {
+        return {
+          content: [{ type: 'text', text: 'The user declined or did not answer, so nothing ran. Do not re-call without new instructions.' }],
+        }
+      }
       if (answer === true) {
         // A quote that carries a fingerprint (`slates_generate_from_shots`) is
         // fired only with it: the user approved THAT quote, and a changed
         // recipe must still refuse.
         const fingerprint = typeof data.fingerprint === 'string' ? { fingerprint: data.fingerprint } : {}
-        result = await op.run({ ...(args as object), ...fingerprint, confirm: true } as never, {
-          ...defaultContext(),
-          signal: extra?.signal,
-          guidesRead,
-        })
+        result = await runOp({ ...unconfirmed, ...fingerprint, confirm: true })
         data = result.data as Record<string, unknown> | undefined
-      } else if (answer === false) {
-        return {
-          content: [{ type: 'text', text: 'The user declined the spend. Do not re-call without new instructions.' }],
-        }
+      } else if (claimed) {
+        // null → no person answered, so this call stands as it would on a host with no elicitation: the
+        // model's own confirm and fingerprint run, and without a confirm the quote goes back to the model.
+        result = await runOp(args)
+        data = result.data as Record<string, unknown> | undefined
       }
-      // null → the host could not answer; the text path below still applies.
     }
 
     if (typeof data?.prompt_warning === 'string' && data.prompt_warning) {

@@ -13,6 +13,7 @@ import { brainOrSkip } from './brain-source.mjs'
 
 // The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
 const brain = brainOrSkip('compact-mcp')
+process.env.SLATES_DEV = '1'
 process.env.SLATES_BRAIN_DIR = brain
 useBrainSource(brain)
 
@@ -69,7 +70,9 @@ writeFileSync(fixture, `import { ALL_OPERATIONS } from ${JSON.stringify(new URL(
 globalThis.fetch = async () => { throw Error('Network forbidden in MCP approval test') };
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_image').run = async input => input.confirm
   ? {text: 'Completed fixture generation', data: {status: 'completed', assetId: 'fixture-only'}}
-  : {text: 'Approve fixture spend', data: {requires_confirm: true}};
+  : input.prompt === 'clarify'
+    ? {text: 'Clarify fixture prompt', data: {requires_clarification: true, confirm_sends_as_written: true, message: 'Pass confirm=true to send it as written.'}}
+    : {text: 'Approve fixture spend', data: {requires_confirm: true}};
 // The batch refuses a confirm that does not carry the fingerprint of the quote the user approved.
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_from_shots').run = async input => input.confirm && input.fingerprint === 'quote-1'
   ? {text: 'Completed fixture batch', data: {results: [], total: 0}}
@@ -104,4 +107,110 @@ try {
   assert.equal(again.content.length, 1, 'the router is not sent twice')
   assert.equal(again.structuredContent.brain_router, undefined)
   console.log('MCP approval: text and structured content both describe the final operation result; an approved batch carries the fingerprint of its quote; the router skips billable results and rides the first non-billable one, once')
-} finally { await approvalClient.close(); await approvalTransport.close(); await isolatedApproval.close(); rmSync(fixtureDir, { recursive: true, force: true }) }
+} finally { await approvalClient.close(); await approvalTransport.close(); await isolatedApproval.close() }
+
+// A model's confirm: true is not the user's yes. On a host that can ask, only a person's yes spends. What a
+// person did not decide is no yes either: silence and a host error spend nothing. The exceptions are hosts
+// where nobody can be asked, and there the spend is the model's word, never an approval.
+// The real SDK timer, cut from 60s to keep this check short: no flag in the server, only the time.
+const shortTimeout = join(fixtureDir, 'short-timeout.mjs')
+writeFileSync(shortTimeout, `import { Server } from ${JSON.stringify(import.meta.resolve('@modelcontextprotocol/sdk/server/index.js'))};
+const elicitInput = Server.prototype.elicitInput;
+Server.prototype.elicitInput = function (params, options) { return elicitInput.call(this, params, {...options, timeout: 300}) };`)
+async function approvalSession(capabilities, run, preloads = []) {
+  const isolated = await mcpFixture()
+  const imports = [fixture, ...preloads].flatMap(file => ['--import', pathToFileURL(file).href])
+  const transport = new StdioClientTransport({command: process.execPath, args: ['--import', isolated.args[1], ...imports, serverPath], env: isolated.env, stderr: 'pipe'})
+  const client = new Client({name: 'claimed-confirm-check', version: '1.0.0'}, {capabilities})
+  try {
+    await client.connect(transport)
+    await run(client)
+  } finally { await client.close(); await transport.close(); await isolated.close() }
+}
+const generate = (client, prompt, confirm) => client.callTool({name: 'slates_generate_image', arguments: {prompt, ...(confirm === undefined ? {} : {confirm})}})
+const textOf = async (call) => (await call).content[0].text
+const SPENT = 'Completed fixture generation'
+const QUOTED = 'Approve fixture spend'
+const REFUSED = /declined or did not answer, so nothing ran/
+/** A person: an answer that takes longer than a host's own policy does. */
+const afterReading = (reply) => new Promise(done => setTimeout(() => done(reply), 700))
+try {
+  await approvalSession({elicitation: {}}, async (client) => {
+    let asked = 0
+    let answer = () => afterReading({action: 'decline'})
+    client.setRequestHandler(ElicitRequestSchema, async () => { asked++; return answer() })
+
+    assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, "a person's no stops a claimed confirm")
+    assert.equal(asked, 1, 'a claimed confirm still asks the user')
+
+    answer = () => afterReading({action: 'cancel'})
+    assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, "and so does a person's cancel")
+
+    answer = () => ({action: 'accept', content: {confirm: false}})
+    assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, 'an unticked yes is a no')
+
+    answer = () => ({action: 'accept', content: {confirm: true}})
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, 'and a yes runs it')
+    assert.equal(asked, 4)
+
+    assert.equal(await textOf(generate(client, 'clarify')), 'Clarify fixture prompt', 'a clarification goes to the model')
+    assert.equal(asked, 4, 'without asking the user')
+    assert.equal(await textOf(generate(client, 'clarify', true)), SPENT, 'until the model claims confirm, when the user decides')
+    assert.equal(asked, 5)
+  })
+  // D1: a prompt nobody answers. The model's confirm spends nothing, then or on the next call, and the next
+  // call still asks: one unattended prompt must not switch the gate off for the connection.
+  await approvalSession({elicitation: {}}, async (client) => {
+    let asked = 0
+    client.setRequestHandler(ElicitRequestSchema, () => { asked++; return new Promise(() => {}) })
+    for (const attempt of [1, 2]) {
+      assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, 'an unanswered prompt spends nothing')
+      assert.equal(asked, attempt, 'and the next call asks again')
+    }
+  }, [shortTimeout])
+  // A host that errors on the question has given no yes either.
+  await approvalSession({elicitation: {}}, async (client) => {
+    let asked = 0
+    client.setRequestHandler(ElicitRequestSchema, async () => { asked++; throw new Error('the host failed its own question') })
+    for (const attempt of [1, 2]) {
+      assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, 'a host error spends nothing')
+      assert.equal(asked, attempt)
+    }
+  })
+  // D2: Codex with approval policy "never" declines every form before a person could read it. Nobody was
+  // asked, so that call runs as on a host without elicitation, and only that call: the next one asks again.
+  await approvalSession({elicitation: {}}, async (client) => {
+    let asked = 0
+    let answer = () => ({action: 'decline'})
+    client.setRequestHandler(ElicitRequestSchema, async () => { asked++; return answer() })
+    assert.equal(await textOf(generate(client, 'fixture')), QUOTED, 'without a confirm the quote goes to the model')
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, "with one the model's word stands, as on a host that cannot ask")
+    answer = () => ({action: 'cancel'})
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, 'a cancel that fast is the same')
+    assert.equal(asked, 3, 'every call still asks')
+    answer = () => afterReading({action: 'decline'})
+    assert.match(await textOf(generate(client, 'fixture', true)), REFUSED, 'so a person who does answer on this connection is heard')
+    answer = () => ({action: 'decline'})
+    const batch = (args) => textOf(client.callTool({name: 'slates_generate_from_shots', arguments: {shotIds: ['SHOT-A1'], confirm: true, ...args}}))
+    assert.equal(await batch({}), 'Approve fixture batch', 'no person saw the quote, so the server does not fill in its fingerprint')
+    assert.equal(await batch({fingerprint: 'quote-1'}), 'Completed fixture batch', "the model's own fingerprint is what runs")
+  })
+  // A host that advertised elicitation and has no such method: the rest of the connection is the text path.
+  await approvalSession({elicitation: {}}, async (client) => {
+    assert.equal(await textOf(generate(client, 'fixture')), QUOTED)
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, 'a host with no handler keeps the text path')
+  })
+  await approvalSession({}, async (client) => {
+    assert.equal(await textOf(generate(client, 'fixture')), QUOTED)
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, 'a host with no elicitation keeps the text path')
+  })
+  // A url-only host is a host without elicitation: the same two answers, and nobody asked.
+  await approvalSession({elicitation: {url: {}}}, async (client) => {
+    let asked = 0
+    client.setRequestHandler(ElicitRequestSchema, async () => { asked++; return {action: 'decline'} })
+    assert.equal(await textOf(generate(client, 'fixture')), QUOTED)
+    assert.equal(await textOf(generate(client, 'fixture', true)), SPENT, 'the same as no elicitation')
+    assert.equal(asked, 0, 'no form question ever goes to it')
+  })
+  console.log("MCP approval: where a person can be asked only their yes spends, and silence, a no or a host error spend nothing; on a host that declines at once or has no form elicitation, nobody is asked and the model's confirm spends unapproved")
+} finally { rmSync(fixtureDir, { recursive: true, force: true }) }

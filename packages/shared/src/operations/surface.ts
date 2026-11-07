@@ -31,7 +31,7 @@
 
 import { searchTerms } from '../prompts/search-terms.js'
 import { zodToJsonSchema } from 'zod-to-json-schema'
-import type { z } from 'zod'
+import type { z } from 'zod/v3'
 import type { OperationAnnotations, OperationGroup, OperationTier } from './index.js'
 
 /** Structural shape of an op, declared locally so this module never imports a
@@ -68,6 +68,12 @@ const READ_ONLY_PREFIXES = [
  * disk, and an agent that guessed the wrong project has no "put it back"
  * without knowing where they came from. A rename is recoverable; a move across
  * projects, in practice, is not.
+ *
+ * `slates_blender_execute` runs arbitrary Python as the user, and on a desktop
+ * from before its guard `slates_export_template` writes over its path without
+ * asking. The other exports are not here: `slates_export_video` and
+ * `slates_export_timeline_xml` refuse an existing file unless told
+ * `overwrite: true`, and `slates_export_assets` renames on a clash.
  */
 const DESTRUCTIVE_IDS = new Set([
   'slates_delete_project',
@@ -88,6 +94,8 @@ const DESTRUCTIVE_IDS = new Set([
   'slates_merge_shots',
   'slates_split_shot',
   'slates_edit_asset_transcript',
+  'slates_blender_execute',
+  'slates_export_template',
 ])
 
 /** Same input, same end state — `update`/`set`/`reorder`/`rename` all overwrite
@@ -349,17 +357,17 @@ export function toolDefinition(op: SurfaceOp): ToolDefinition {
   >
   delete schema.$schema
   draft2020Tuples(schema)
-  // zod-to-json-schema 3 renders a zod 4 schema as `{}`, without an error. That
-  // happens when this package resolves the consumer's zod 4 instead of its own
-  // zod 3: slate's install lost `node_modules/@slatesvideo/shared/node_modules/zod`
-  // after a hand-copy of the shared build (2026-10-17), and every Studio Agent
-  // tool went to the brain with no parameters. Refuse to render a tool like that.
+  // zod-to-json-schema 3 renders a zod 4 schema as `{}`, without an error, and
+  // a bare `zod` import is a zod 4 schema now. Every op imports `zod/v3`, the old
+  // API inside the zod 4 package, so one consumer's zod serves both. Until then
+  // slate's install lost shared's nested zod 3 after a hand-copy (2026-10-17) and
+  // every Studio Agent tool went to the brain with no parameters. Refuse to render
+  // a tool like that.
   if (schema.type !== 'object') {
     throw new Error(
       `${op.id}: its input schema rendered as ${JSON.stringify(schema).slice(0, 80)}, not an object. ` +
-        "Either the op's input is not a z.object, or @slatesvideo/shared is reading a zod it cannot convert " +
-        '(zod 4 instead of its own zod 3): reinstall with `npm ci` and rebuild, or put zod 3 back at ' +
-        'node_modules/@slatesvideo/shared/node_modules/zod.'
+        "Either the op's input is not a z.object, or it was built from `zod` instead of `zod/v3`, which " +
+        'zod-to-json-schema cannot convert: import z from `zod/v3`, then rebuild.'
     )
   }
   return {

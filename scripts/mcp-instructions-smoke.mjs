@@ -27,7 +27,10 @@ import { brainDir } from './brain-source.mjs'
 // The servers spawned below hold the brain from its folder (shared/src/skills/served.ts), as a member's holds it
 // from the server; this process reads the same folder to count what they should expose.
 const brain = brainDir()
-if (brain) process.env.SLATES_BRAIN_DIR = brain
+if (brain) {
+  process.env.SLATES_DEV = '1'
+  process.env.SLATES_BRAIN_DIR = brain
+}
 // Single-repo CI has no brain (brainDir() is null there), so the checks that read a playbook or a model guide are
 // skipped, loudly; a local run always has one.
 const skipNoBrain = (what) => console.log(`  ..  skipped (no brain in single-repo CI): ${what}`)
