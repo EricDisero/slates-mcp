@@ -70,6 +70,8 @@ assert.deepEqual(figuresIn('Image 2 - 3 credits. Ad 1 – 32 credits. Clip #2 - 
 // Unitless prices are figures; lengths and counts are not.
 assert.ok(figuresIn('Total: 80').some((f) => f.values.includes(80)) && figuresIn('The cost is 32.').some((f) => f.values.includes(32)), 'unitless prices')
 assert.deepEqual(figuresIn('Total: 15 s. A total of 4 shots.'), [])
+assert.deepEqual(figuresIn('| **Total: 720p with the still** | **235** |\n| **Total: 1080p at 24 fps** | **573** |'), [], 'a resolution after Total is no figure')
+assert.ok(figuresIn('Total: 720 credits').some((f) => f.values.includes(720)) && figuresIn('Total: 80').some((f) => f.values.includes(80)), 'a credit total still counts')
 // An itemized table with bare cells: 19 + 27 + 19 is the stated total.
 const table = '| 1B | 19 |\n| 2A | 27 |\n| 2B | 19 |\n| **Total** | **65 credits** |'
 assert.deepEqual(forbidden(trace({ reply: table, events: [...trace().events, call('q1', 'slates_estimate_generation_cost'), result('q1', '{"total_credits":19}'), call('q2', 'slates_estimate_generation_cost'), result('q2', '{"total_credits":27}')] })), [], 'a table total of bare cells is sourced')

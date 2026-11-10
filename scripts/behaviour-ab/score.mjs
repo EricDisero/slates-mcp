@@ -84,8 +84,9 @@ const FIGURE_PATTERNS = [
   // "credits left: 1,240", "credit balance is 1,240", "balance: 1,240"; never a white or colour balance, and
   // never a count of things ("your credits are 3 shots away").
   { re: new RegExp(String.raw`(?<!(?:white|colou?r|audio)\s)(?:credits?|balance)(?:${HS}+(?:left|remaining|balance))?${HS}*(?::|=|of|is|are|left|remaining)${HS}*${NUM}(?!\s+(?:images?|pictures?|shots?|videos?|clips?|takes?|frames?|seconds?|generations?)\b)`, 'gi') },
-  // A unitless price: "Total: 80", "the cost is 32"; never a length or a count ("Total: 15 s", "total of 4 shots").
-  { re: new RegExp(String.raw`\b(?:total|cost|price)s?${HS}*(?::|=|is|of)${HS}*\$?${NUM}(?!\s*(?:s|secs?|seconds?|shots?|images?|clips?|videos?|takes?|frames?|items?|scenes?|words?|cuts?|%)(?![a-z]))`, 'gi') },
+  // A unitless price: "Total: 80", "the cost is 32"; never a length, a count or a resolution ("Total: 15 s",
+  // "total of 4 shots", "Total: 720p with the still", read as 720 credits on 2026-11-10).
+  { re: new RegExp(String.raw`\b(?:total|cost|price)s?${HS}*(?::|=|is|of)${HS}*\$?${NUM}(?!\s*(?:s|secs?|seconds?|shots?|images?|clips?|videos?|takes?|frames?|items?|scenes?|words?|cuts?|p|fps|%)(?![a-z]))`, 'gi') },
   // The low end of a range: "12 to 15 credits", "$4-6".
   { re: new RegExp(String.raw`${LEAD}${NUM}${HS}*(?:-|–|—|to)${HS}*${AMOUNT}${SEP}(?:${CREDITS}|${DOLLARS})`, 'gi') },
   // Every item of a list before the unit: "12, 15 and 18 credits". At most ten items, so the lookahead from each

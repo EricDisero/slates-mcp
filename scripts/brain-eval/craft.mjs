@@ -3,7 +3,10 @@
 //
 //   node scripts/behaviour-ab/run.mjs --cases-file scripts/brain-eval/craft-cases.json --baseline <build of the
 //     approved commit> --arms baseline,candidate --out scripts/brain-eval/results/<date>-craft [--runs 1]
-//   node scripts/brain-eval/craft.mjs --out scripts/brain-eval/results/<date>-craft [--no-judge]
+//   node scripts/brain-eval/craft.mjs --out scripts/brain-eval/results/<date>-craft [--no-judge | --rescore]
+//
+// --rescore keeps the judge's verdicts from --out's craft.json (same case, arm and run, so the same trace) and
+// reruns only the code scoring: a scorer fix after a batch must not re-roll the judge on replies it already scored.
 //
 // By code, per run (behaviour-ab's scoreTrace, plus two): the router reached the agent
 // (slates_get_prompting_guide served slates-start-here, or the server attached it to a result; n/a on a
@@ -28,6 +31,9 @@ import { PROJECT_FACTS, scoreTrace } from '../behaviour-ab/score.mjs'
 const here = import.meta.dirname
 const out = resolve(arg('out') ?? (() => { throw new Error('--out is required') })())
 const judge = !process.argv.includes('--no-judge')
+const rescore = process.argv.includes('--rescore')
+const keyOf = (r) => `${r.case}/${r.arm}/${r.run}`
+const kept = rescore ? new Map(JSON.parse(readFileSync(join(out, 'craft.json'), 'utf8')).rows.map((r) => [keyOf(r), r.judge])) : null
 const { cases } = JSON.parse(readFileSync(join(here, 'craft-cases.json'), 'utf8'))
 const arms = JSON.parse(readFileSync(join(out, 'arms.json'), 'utf8'))
 const traces = readdirSync(join(out, 'traces')).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(readFileSync(join(out, 'traces', f), 'utf8')))
@@ -107,7 +113,7 @@ for (const c of cases) {
     const brain = brainOf(t)
     // The router is slates-start-here, which a build from before the brain does not have.
     const musts = [{ must: 'router reached', pass: t.arm === 'baseline' ? null : brain.topics.some((x) => x.startsWith('slates-start-here')) }, ...s.musts]
-    const verdict = judge && s.ok && t.reply ? await askJudge(c, t.reply) : null
+    const verdict = !s.ok || !t.reply ? null : rescore ? kept.get(keyOf(t)) ?? null : judge ? await askJudge(c, t.reply) : null
     const craft = verdict?.scores ? verdict.scores.reduce((a, b) => a + b, 0) / verdict.scores.length : null
     const readFirst = readBeforeBuild(t, c, arms.arms[t.arm])
     rows.push({ case: c.id, arm: t.arm, run: t.run, ok: s.ok, musts, readFirst, forbidden: s.forbidden, guides: brain.topics, brainTokens: brain.tokens, tokens: s.tokens, craft, judge: verdict })
