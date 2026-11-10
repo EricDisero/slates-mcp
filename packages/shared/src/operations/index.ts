@@ -3,7 +3,7 @@ import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -1313,10 +1313,13 @@ export const setComposer: Operation<{
     if (Object.keys(input).filter((k) => k !== 'projectId').length === 0) {
       throw new Error('Name at least one change, e.g. model, prompt, attach or params. To read the box, use slates_get_composer.')
     }
-    const r = await ctx.desktop().post<{ report: ComposerReport | null; reason?: string; skipped?: string[] }>('/agent/composer', input)
+    // The box takes the model by name, so a seat this desktop lacks is staged as the one it has (`desktopModelId`).
+    const duration = typeof input.params?.duration === 'number' ? input.params.duration : undefined
+    const seat = await desktopModelId(ctx.desktop(), input.model, `staging ${input.model}`, duration)
+    const r = await ctx.desktop().post<{ report: ComposerReport | null; reason?: string; skipped?: string[] }>('/agent/composer', { ...input, ...(seat.note ? { model: seat.model } : {}) })
     if (!r.report) return { text: `Nothing was staged (${r.reason ?? 'no answer'}).`, data: { report: null } }
     const skipped = r.skipped?.length ? `\nNot applied:\n- ${r.skipped.join('\n- ')}` : ''
-    return { text: `${describeComposer(r.report)}${skipped}`, data: { report: r.report, skipped: r.skipped ?? [] } }
+    return { text: `${describeComposer(r.report)}${skipped}${seat.note ? `\n${seat.note}` : ''}`, data: { report: r.report, skipped: r.skipped ?? [] } }
   },
 }
 
@@ -2117,9 +2120,10 @@ export const VIDEO_MODELS = [
   // not here; edit models live on slates_edit_video, same as the Kling and Omni
   // Flash ones.
   'seedance-2.5',
-  // Gemini Omni Flash, version 1.1 since 2026-10-17: swapped in place, same id,
-  // fal's `google/gemini-omni-flash/v1.1/*` endpoints.
-  'omni-flash',
+  // Gemini Omni Flash 1.2 (2026-11-10), fal's `google/gemini-omni-flash/v1.2/*`.
+  // It replaced 1.1 (`omni-flash`, in RETIRED_MODELS) seat for seat; a desktop
+  // without `video-models-v2` gets the 1.1 seat (`desktopModelId`).
+  'omni-flash-1-2',
   // Wan 3.0 (Alibaba, added 2026-10-17): 2-30s at 480p-1080p, sound on or off,
   // start and end frames OR references (10 images, 5 videos, 5 audio clips).
   // Reference video seconds bill on top of output seconds, so it has a vref key.
@@ -2176,10 +2180,10 @@ const VIDEO_ASPECT_RATIOS = aspectRatioUnion(VIDEO_MODELS, AGENT_ROUTE_PROVIDER)
 const VIDEO_RESOLUTIONS = videoResolutionUnion(VIDEO_MODELS)
 /** Widest legal duration window across every video model. */
 const VIDEO_DURATION_BOUNDS = durationBounds(VIDEO_MODELS)
-/** Omni Flash's combined reference-image cap, read from the SSOT (10 on 1.1). */
-const omniFlashRefCap = getModelCapability('omni-flash')?.maxIngredientImages ?? 0
+/** Omni Flash's combined reference-image cap, read from the SSOT (6 on 1.2). */
+const omniFlashRefCap = getModelCapability('omni-flash-1-2')?.maxIngredientImages ?? 0
 /** Omni Flash's per-clip reference-video ceiling in seconds, read from the SSOT. */
-const omniFlashRefClipMax = getModelCapability('omni-flash')?.referenceVideoDuration?.max ?? 0
+const omniFlashRefClipMax = getModelCapability('omni-flash-1-2')?.referenceVideoDuration?.max ?? 0
 
 /** Every resolution token any video model speaks, for the forgiving cost-key
  *  parser. Derived, so 768p and 2k arrived with the models rather than with a
@@ -2265,7 +2269,7 @@ function minimaxRefSurchargeCount(model: string, referenceImages?: number): numb
 export const EDIT_VIDEO_MODELS = [
   'kling-v3.0-omni-edit',
   'kling-v3.0-omni-pro-edit',
-  'omni-flash-edit',
+  'omni-flash-1-2-edit',
   'seedance-2.5-edit',
 ] as const
 
@@ -2283,7 +2287,7 @@ const EDIT_VIDEO_ELEMENTS_ONLY = `Only ${EDIT_VIDEO_ELEMENT_MODELS.join(' and ')
  *
  * On an edit row the output length FOLLOWS the source clip, so the model's
  * declared duration window is exactly the legal clip window — Kling 3-15s,
- * Omni Flash 3-10s, Seedance 2.5 4-30s. These three pairs used to be typed
+ * Omni Flash 1.2 3-15s, Seedance 2.5 4-30s. These three pairs used to be typed
  * inline as `isSeedanceEdit ? 4 : 3` / `isSeedanceEdit ? 30 : isOmniFlashEdit ?
  * 10 : 15`, i.e. a fourth copy of registry data keyed on model-id comparisons.
  */
@@ -2293,9 +2297,9 @@ function editClipBounds(model: string): { min: number; max: number } {
   return { min: d.min, max: d.max }
 }
 
-/** Resolutions any edit engine exposes as a PARAM. Seedance's and Omni Flash
- *  1.1's edit prices move with resolution; the Kling rows follow the source. */
-const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit', 'omni-flash-edit'])
+/** Resolutions any edit engine exposes as a PARAM. Seedance's and Omni Flash's
+ *  edit prices move with resolution; the Kling rows follow the source. */
+const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit', 'omni-flash-1-2-edit'])
 
 export const estimateGenerationCost: Operation<{
   model: string
@@ -3784,16 +3788,75 @@ function gptImageSubstitution(asked: string, sent: string): string {
   return sent === asked ? '' : `${sent} ran in place of ${asked}, at the same price: this Slates desktop predates GPT Image 2.6. Update Slates to run 2.6.`
 }
 
+/** True for either Gemini Omni Flash 1.2 seat, generation or edit. */
+export function isOmniFlash12Model(model: string | null | undefined): boolean {
+  return model === 'omni-flash-1-2' || model === 'omni-flash-1-2-edit'
+}
+
 /**
- * A model id an op hands the desktop by name (a Shot's model, a draft's model), as this desktop knows it: a GPT
- * Image 2.6 seat goes through `gptImageSeatFor`, every other id passes untouched. A 1.6.8 desktop's `draftShot`
- * throws on an id it lacks, so every such hand-off comes through here, with the line its result says.
+ * Omni Flash 1.1's longest clip, output or edit source. Frozen here because the
+ * capability table no longer carries 1.1: fal's 1.1 `duration` stopped at 10, and
+ * Google's 1.1 doc read "Input videos for editing and extension must be 10
+ * seconds or less".
+ */
+const OMNI_FLASH_11_MAX_SECONDS = 10
+
+/**
+ * The Omni Flash id to send this desktop for a 1.2 seat: the seat itself on a
+ * desktop advertising `video-models-v2`, else the 1.1 seat it replaced, when the
+ * request fits 1.1 (`seconds` is the output length, or an edit's source length).
+ *
+ * Why not refuse: 1.6.8 and older know only the 1.1 ids. 1.2 bills the same
+ * credits per second as 1.1 at every resolution Slates sells, slates-api keeps
+ * 1.1 billable for those desktops, and every 1.2 reference limit sits inside
+ * 1.1's, so up to 10s the 1.1 seat renders what was quoted. A longer clip has
+ * no 1.1 seat and refuses with "update Slates". A desktop without
+ * `image-models-v4` predates 1.1 (both arrived in 1.6.3) and would bill 1.0's
+ * keys, so it refuses too.
+ */
+async function omniFlashSeatFor(
+  desktop: Pick<SlatesDesktopClient, 'requireCapability'>,
+  model: string,
+  feature: string,
+  seconds?: number
+): Promise<string> {
+  try {
+    await desktop.requireCapability('video-models-v2', feature)
+    return model
+  } catch {
+    // A real failure (desktop not running), or a desktop before 1.1, throws again here.
+    await desktop.requireCapability('image-models-v4', feature)
+    if (seconds != null && seconds > OMNI_FLASH_11_MAX_SECONDS + 0.05) {
+      throw new Error(
+        `This Slates desktop runs Gemini Omni Flash 1.1, which stops at ${OMNI_FLASH_11_MAX_SECONDS}s, so ${feature} at ${seconds}s needs 1.2. ` +
+          `Update Slates (Settings → Check for Updates) and retry, or keep it to ${OMNI_FLASH_11_MAX_SECONDS}s or less.`
+      )
+    }
+    return Object.keys(RETIRED_MODELS).find((id) => id.startsWith('omni-flash') && RETIRED_MODELS[id] === model) ?? model
+  }
+}
+
+/** The line a result carries when `omniFlashSeatFor` sent the 1.1 seat. */
+function omniFlashSubstitution(asked: string, sent: string): string {
+  return sent === asked ? '' : `${sent} ran in place of ${asked}, at the same price: this Slates desktop predates Gemini Omni Flash 1.2. Update Slates to run 1.2.`
+}
+
+/**
+ * A model id an op hands the desktop by name (a generation's, a Shot's or a draft's model), as this desktop knows
+ * it: a GPT Image 2.6 seat goes through `gptImageSeatFor`, an Omni Flash 1.2 seat through `omniFlashSeatFor`
+ * (`seconds` as it takes them), every other id passes untouched. A 1.6.8 desktop's `draftShot` throws on an id it
+ * lacks, so every such hand-off comes through here, with the line its result says.
  */
 async function desktopModelId<M extends string | null | undefined>(
   desktop: Pick<SlatesDesktopClient, 'requireCapability'>,
   model: M,
-  feature: string
+  feature: string,
+  seconds?: number
 ): Promise<{ model: M; note: string }> {
+  if (model && isOmniFlash12Model(model)) {
+    const sent = (await omniFlashSeatFor(desktop, model, feature, seconds)) as M & string
+    return { model: sent, note: omniFlashSubstitution(model, sent) }
+  }
   if (!model || !isGptImageModel(model)) return { model, note: '' }
   const sent = (await gptImageSeatFor(desktop, model, feature)) as M & string
   return { model: sent, note: gptImageSubstitution(model, sent) }
@@ -4908,14 +4971,14 @@ export function videoCostKey(input: {
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
     return `kling-v4-${res}-${input.duration}s`
   }
-  if (input.model === 'omni-flash') {
+  if (input.model === 'omni-flash-1-2') {
     // Mirrors omniFlashCreditKey() in slate/src/shared/pricing.ts. Omni Flash
-    // 1.1 prices each output second by resolution, so the key carries it. Audio
-    // is native and included, and references do not move fal's 1.1 price.
-    // 1.0's flat `omni-flash-{N}s` keys are legacy: only desktops released
-    // before the swap send them.
+    // prices each output second by resolution, so the key carries it. Audio is
+    // native and included, and references do not move fal's 1.2 listed price.
+    // 1.1's `omni-flash-{res}-{N}s` and 1.0's `omni-flash-{N}s` keys stay
+    // billable for the desktops released before each swap.
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
-    return `omni-flash-${res}-${input.duration}s`
+    return `omni-flash-1-2-${res}-${input.duration}s`
   }
   if (input.model === 'wan-3.0') {
     // Mirrors wanCreditKey() in slate/src/shared/pricing.ts. Output seconds at
@@ -4950,10 +5013,10 @@ export function klingEditCostKey(
 // Omni Flash video-edit cost key — mirrors omniFlashCreditKey() in
 // slate/src/shared/pricing.ts (must byte-match; checked by the slates-api
 // pricing-consistency script). Duration is the CEILED source-clip length. The
-// resolution is the output's, because Omni Flash 1.1 prices edit seconds by it.
+// resolution is the output's, because Omni Flash prices edit seconds by it.
 export function omniFlashEditCostKey(duration: number, videoResolution?: VideoResolution): string {
-  const res = videoResolution ?? defaultVideoResolutionFor('omni-flash-edit')
-  return `omni-flash-edit-${res}-${duration}s`
+  const res = videoResolution ?? defaultVideoResolutionFor('omni-flash-1-2-edit')
+  return `omni-flash-1-2-edit-${res}-${duration}s`
 }
 
 /** Max billed (input + output) seconds on a Seedance video-reference gen.
@@ -5154,12 +5217,19 @@ function resolveVideoModel(raw: string): {
     'seedance-2-5': 'seedance-2.5',
     'seedance2.5': 'seedance-2.5',
     seedance: 'seedance-2',
-    'gemini-omni-flash': 'omni-flash',
-    'gemini-omni-flash-preview': 'omni-flash',
-    'omni-flash-preview': 'omni-flash',
-    'gemini-omni-1.1-flash': 'omni-flash',
-    'gemini-omni-flash-1.1': 'omni-flash',
-    'omni-flash-1.1': 'omni-flash',
+    // Every Omni Flash spelling lands on 1.2, the retired 1.1 id and its cost
+    // keys (`omni-flash-720p-8s`) included: RETIRED_MODELS moves 1.1 to 1.2.
+    'omni-flash': 'omni-flash-1-2',
+    'gemini-omni-flash': 'omni-flash-1-2',
+    'gemini-omni-flash-preview': 'omni-flash-1-2',
+    'omni-flash-preview': 'omni-flash-1-2',
+    'gemini-omni-1.1-flash': 'omni-flash-1-2',
+    'gemini-omni-flash-1.1': 'omni-flash-1-2',
+    'omni-flash-1.1': 'omni-flash-1-2',
+    'gemini-omni-1.2-flash': 'omni-flash-1-2',
+    'gemini-omni-flash-1.2': 'omni-flash-1-2',
+    'omni-flash-1.2': 'omni-flash-1-2',
+    'omni-flash-12': 'omni-flash-1-2',
     'wan-3': 'wan-3.0',
     'wan-3-0': 'wan-3.0',
     'wan3': 'wan-3.0',
@@ -5448,17 +5518,17 @@ export const generateVideo: Operation<{
     const capErr = assertVideoCapabilities(input)
     if (capErr) return ok(capErr)
 
-    // Omni Flash 1.1's SHAPE constraints. Frames ride image-to-video (a start
-    // frame and an optional end frame); references ride reference-to-video (up
-    // to 10 images and 3 videos, each within the per-clip cap). With references, the desktop
-    // sends a start frame as reference image 1 (as it did on 1.0), so it counts
-    // toward the image cap; a last frame has no slot there and is refused. There
-    // is no audio reference at all (Google: "Uploading audio references is
-    // unsupported"). Counts are read from the capability SSOT; duration and
-    // resolution are covered by the capability gate above.
-    if (input.model === 'omni-flash') {
-      const cap = getModelCapability('omni-flash')
-      const maxVideos = cap?.maxReferenceVideos ?? 0
+    // Omni Flash 1.2's SHAPE constraints. Frames ride image-to-video (a start
+    // frame and an optional end frame, 10s or less with the end frame);
+    // references ride reference-to-video (Google's limits: 6 images, reference
+    // videos of 3s or less, three on a clip of 10s or less and one above). With
+    // references, the desktop sends a start frame as reference image 1, so it
+    // counts toward the image cap; a last frame has no slot there and is
+    // refused. No audio reference at all (Google: "Uploading audio inputs or
+    // audio references is unsupported"). Counts come from the capability SSOT
+    // through `checkReferenceShape`, the function the desktop's composer runs;
+    // duration and resolution are covered by the capability gate above.
+    if (input.model === 'omni-flash-1-2') {
       const videoRefs = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
       const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
       const imageRefs =
@@ -5468,6 +5538,11 @@ export const generateVideo: Operation<{
         (input.styleAssetIds?.length ?? 0)
       const hasRefs = imageRefs + videoRefs > 0
       const refCount = imageRefs + (hasRefs && input.firstFrameAssetId ? 1 : 0)
+      // Only the lengths given; a missing one is asked for below, before the quote.
+      const refSeconds = [
+        ...(input.videoReferenceAssetId && input.videoReferenceSeconds != null ? [input.videoReferenceSeconds] : []),
+        ...(input.videoReferenceSecondsEach ?? []),
+      ]
       const shapeError =
         audioRefs > 0
           ? 'Omni Flash takes no audio references. Drop them, or switch to seedance-2.5 or wan-3.0, which read reference audio.'
@@ -5476,12 +5551,14 @@ export const generateVideo: Operation<{
             : input.lastFrameAssetId && !input.firstFrameAssetId
               ? 'Omni Flash needs a start frame (firstFrameAssetId) with a last frame.'
               : refCount > omniFlashRefCap
-                ? `Omni Flash takes at most ${omniFlashRefCap} reference images combined, a start frame included (you passed ${refCount}). Trim the list.`
-                : videoRefs > maxVideos
-                  ? `Omni Flash takes at most ${maxVideos} reference videos (you passed ${videoRefs}).`
-                  : [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].some((d) => d > omniFlashRefClipMax + 0.05)
-                    ? `Each Omni Flash reference video must be ${omniFlashRefClipMax}s or shorter. Trim it first with slates_trim_video.`
-                    : null
+                ? `Omni Flash takes at most ${omniFlashRefCap} reference images combined (at most 3 of one character, 2 characters), a start frame included (you passed ${refCount}). Trim the list.`
+                : checkReferenceShape(input.model, {
+                    duration: input.duration,
+                    lastFrame: !!input.lastFrameAssetId,
+                    referenceVideoCount: videoRefs,
+                    referenceVideoSeconds: refSeconds,
+                    label: 'Omni Flash',
+                  })?.replace('Trim it first.', 'Trim it first with slates_trim_video.') ?? null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
       }
@@ -5757,7 +5834,7 @@ export const generateVideo: Operation<{
     // Wan 3.0 bills reference video seconds on top of output seconds too, and
     // Omni Flash's per-clip cap needs every length to check.
     const isSeedance = input.model.startsWith('seedance')
-    const needsRefSeconds = isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash'
+    const needsRefSeconds = isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash-1-2'
     if (input.videoReferenceAssetId && needsRefSeconds && !input.videoReferenceSeconds) {
       return ok({
         requires_clarification: true,
@@ -5909,6 +5986,8 @@ export const generateVideo: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
+    // A desktop without Omni Flash 1.2 gets the 1.1 seat at the same price (`desktopModelId`).
+    const seat = await desktopModelId(desktop, input.model as string, `${input.model} generation`, input.duration)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -5918,7 +5997,7 @@ export const generateVideo: Operation<{
       error?: string
     }>('/agent/generation/video', {
       projectId: input.projectId,
-      model: input.model,
+      model: seat.model,
       prompt: input.prompt,
       aspectRatio: input.aspectRatio,
       duration: input.duration,
@@ -5966,6 +6045,7 @@ export const generateVideo: Operation<{
         ids,
         {
           model: input.model,
+          ...(seat.note ? { ranOn: seat.model } : {}),
           variant: costKey,
           projectId: input.projectId,
           cost_cents: totalCents,
@@ -5975,7 +6055,7 @@ export const generateVideo: Operation<{
             ...(resolvedRefs.get(ref) ?? { id: ref, code: null, label: null }),
           })),
         },
-        refEcho
+        [refEcho, seat.note].filter(Boolean).join(' ')
       )
     }
     return {
@@ -5987,9 +6067,11 @@ export const generateVideo: Operation<{
         `Generated ${input.duration}s ${input.model} video into project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)}. ` +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
-        (refEcho ? ` ${refEcho}` : ''),
+        (refEcho ? ` ${refEcho}` : '') +
+        (seat.note ? ` ${seat.note}` : ''),
       data: {
         model: input.model,
+        ...(seat.note ? { ranOn: seat.model } : {}),
         variant: costKey,
         projectId: input.projectId,
         aspectRatio: input.aspectRatio,
@@ -6717,7 +6799,7 @@ export const editVideo: Operation<{
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Clip-length windows per engine are on `model`.'),
-    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-edit keep it simple and add "Keep everything else the same."'),
+    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-1-2-edit keep it simple and add "Keep everything else the same."'),
     // Clip windows and resolutions GENERATED from MODEL_CAPABILITIES.
     model: zEnum(EDIT_VIDEO_MODELS).optional().describe(
       // Routing GENERATED from MODEL_FACTS; the paragraph that stood here was
@@ -6729,9 +6811,9 @@ export const editVideo: Operation<{
     ),
     characterAssetIds: z.array(z.string()).max(EDIT_VIDEO_ELEMENT_CAP).optional().describe('Subject/element image assets to swap IN (UUIDs or badge codes). Each becomes an element (@ElementN). ' + EDIT_VIDEO_ELEMENTS_ONLY),
     styleAssetIds: z.array(z.string()).max(EDIT_VIDEO_ELEMENT_CAP).optional().describe(`Style/appearance reference images (@ImageN). Max ${EDIT_VIDEO_ELEMENT_CAP} combined with characterAssetIds. ` + EDIT_VIDEO_ELEMENTS_ONLY),
-    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-edit and seedance-2.5-edit output carry their own audio).'),
+    keepAudio: z.boolean().optional().describe('Preserve the original audio track (default true; Kling models only — omni-flash-1-2-edit and seedance-2.5-edit output carry their own audio).'),
     videoResolution: zEnum(EDIT_VIDEO_RESOLUTIONS).optional().describe(
-      `seedance-2.5-edit (default ${defaultVideoResolutionFor('seedance-2.5-edit')}) and omni-flash-edit (default ${defaultVideoResolutionFor('omni-flash-edit')}; its 1080p and 4K are upscales). Ignored by the Kling engines, whose output follows the source clip.`
+      `seedance-2.5-edit (default ${defaultVideoResolutionFor('seedance-2.5-edit')}) and omni-flash-1-2-edit (default ${defaultVideoResolutionFor('omni-flash-1-2-edit')}; its 1080p and 4K are upscales). Ignored by the Kling engines, whose output follows the source clip.`
     ),
     seedanceFace: z.boolean().optional().describe(`seedance-2.5-edit ONLY: set true when a CHARACTER FACE is visible in the clip. Without it a face is blocked outright; with it the edit is priced higher: quote it with slates_estimate_generation_cost by its cost key as model (${seedanceEditCostKey({ duration: SEEDANCE_25_EDIT_MIN_SECONDS, videoResolution: defaultVideoResolutionFor('seedance-2.5-edit') as VideoResolution, seedanceFace: true })} for ${SEEDANCE_25_EDIT_MIN_SECONDS}s at ${defaultVideoResolutionFor('seedance-2.5-edit')}). A face edit submitted without this flag is rejected, not silently downgraded.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -6748,10 +6830,10 @@ export const editVideo: Operation<{
     }
     const model = input.model ?? EDIT_VIDEO_DEFAULT
     requireGuideRead(ctx, model)
-    const isOmniFlashEdit = model === 'omni-flash-edit'
+    const isOmniFlashEdit = model === 'omni-flash-1-2-edit'
     const isSeedanceEdit = model === 'seedance-2.5-edit'
     // Source-clip window, read from the capability SSOT per engine — never a
-    // model-id ternary. (Kling 3–15s, Omni Flash 3–10s, Seedance 2.5 4–30s.)
+    // model-id ternary. (Kling 3–15s, Omni Flash 1.2 3–15s, Seedance 2.5 4–30s.)
     const { min: minClipSeconds, max: maxClipSeconds } = editClipBounds(model)
 
     if (!EDIT_VIDEO_ELEMENT_MODELS.includes(model) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
@@ -6811,7 +6893,7 @@ export const editVideo: Operation<{
           seedanceFace: input.seedanceFace === true,
         })
       : isOmniFlashEdit
-        ? omniFlashEditCostKey(billedSeconds, (input.videoResolution ?? defaultVideoResolutionFor('omni-flash-edit')) as VideoResolution)
+        ? omniFlashEditCostKey(billedSeconds, (input.videoResolution ?? defaultVideoResolutionFor('omni-flash-1-2-edit')) as VideoResolution)
         : klingEditCostKey(model as 'kling-v3.0-omni-edit' | 'kling-v3.0-omni-pro-edit', billedSeconds)
 
     const cloud = ctx.cloud()
@@ -6847,6 +6929,8 @@ export const editVideo: Operation<{
       }
     }
 
+    // A desktop without Omni Flash 1.2 gets the 1.1 edit seat at the same price, on a clip 1.1 takes (`desktopModelId`).
+    const seat = await desktopModelId(desktop, model as string, `${model} editing`, clipSeconds)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -6855,7 +6939,7 @@ export const editVideo: Operation<{
       error?: string
     }>('/agent/generation/edit-video', {
       projectId: input.projectId,
-      model,
+      model: seat.model,
       prompt: input.prompt,
       sourceVideoAssetId: sourceId,
       characterAssetIds,
@@ -6871,12 +6955,13 @@ export const editVideo: Operation<{
       const ids = result.generationId ? [result.generationId] : []
       return backgroundSubmitted(`${billedSeconds}s video edit (${model})`, ids, {
         model,
+        ...(seat.note ? { ranOn: seat.model } : {}),
         variant: costKey,
         projectId: input.projectId,
         sourceVideoAssetId: sourceId,
         cost_cents: totalCents,
         cost_credits: totalCents,
-      }, refEcho)
+      }, [refEcho, seat.note].filter(Boolean).join(' '))
     }
 
     return {
@@ -6884,9 +6969,11 @@ export const editVideo: Operation<{
         `Edited ${billedSeconds}s clip saved as a new asset in project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)} via ${model}. ` +
         `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
-        (refEcho ? ` ${refEcho}` : ''),
+        (refEcho ? ` ${refEcho}` : '') +
+        (seat.note ? ` ${seat.note}` : ''),
       data: {
         model,
+        ...(seat.note ? { ranOn: seat.model } : {}),
         variant: costKey,
         projectId: input.projectId,
         sourceVideoAssetId: sourceId,
@@ -9732,7 +9819,7 @@ async function buildShotSpecInput(
   input: ShotOpRefs & { prompt?: string; model?: string; params?: ShotOpParams }
 ): Promise<{ spec: Record<string, unknown>; refEcho: string; seatNote: string }> {
   // The Shot is stored and drafted on the desktop under this id (`desktopModelId`).
-  const seat = await desktopModelId(ctx.desktop(), input.model, `a Shot on ${input.model}`)
+  const seat = await desktopModelId(ctx.desktop(), input.model, `a Shot on ${input.model}`, input.params?.duration)
   const refInputs = shotRefInputs(input)
   const resolvedRefs = await resolveAssetRefs(ctx, projectId, refInputs.map((r) => r.ref))
   const rid = (v: string | undefined): string | null => (v ? (resolvedRefs.get(v)?.id ?? v) : null)
@@ -10153,7 +10240,7 @@ export const duplicateShot: Operation<{
     // omitted param on the copy keeps the original's value rather than clearing it.
     const spec: Record<string, unknown> = {}
     if (input.prompt !== undefined) spec.prompt = input.prompt
-    const seat = await desktopModelId(desktop, input.model, `a Shot on ${input.model}`)
+    const seat = await desktopModelId(desktop, input.model, `a Shot on ${input.model}`, input.params?.duration)
     if (input.model !== undefined) spec.model = seat.model
     if (input.params !== undefined) {
       const voiceRef = input.params.voiceReferenceAssetId

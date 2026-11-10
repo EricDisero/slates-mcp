@@ -106,7 +106,7 @@ const KLING_FAL_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1']
 const KLING_V4_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16', '1:1', '21:9']
 
 
-/** Gemini Omni Flash (fal schema, 16:9 default): two. Unchanged on 1.1. */
+/** Gemini Omni Flash 1.2: two, 16:9 default (fal's v1.2 schemas, all four endpoints, read 2026-11-10). */
 const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
 
 /**
@@ -386,6 +386,12 @@ export interface ModelCapability {
   maxReferenceVideoSeconds?: number
   /** Combined seconds across every reference audio clip. */
   maxReferenceAudioSeconds?: number
+  /** Fewer reference videos on a longer output: above `aboveSeconds` of output,
+   *  at most `max` (`maxReferenceVideosFor`). Absent = `maxReferenceVideos` at every length. */
+  longOutputReferenceVideos?: { aboveSeconds: number; max: number }
+  /** The longest output with a last frame, when shorter than `duration.max`
+   *  (`lastFrameMaxSecondsFor`). Absent = the model's whole window. */
+  lastFrameMaxSeconds?: number
 
   // ── Text-to-speech ──
   /**
@@ -595,46 +601,61 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     duration: { min: 3, max: 30, mode: 'continuous' },
   },
 
-  // ── Gemini Omni Flash 1.1 ──────────────────────────────────────────────────
+  // ── Gemini Omni Flash 1.2 ──────────────────────────────────────────────────
   //
-  // These two ids carry Gemini Omni Flash 1.1 since 2026-10-17 (1.0 swapped out
-  // in place: same ids, new endpoints `google/gemini-omni-flash/v1.1/*`). Every
-  // value READ OFF fal's live OpenAPI for the four 1.1 endpoints, 2026-10-17.
-  // Harvest and ledger: second-brain/business/projects/slates/research/
-  // 2026-10-17-omni-flash-1-1-and-wan-3-0.md.
+  // fal `google/gemini-omni-flash/v1.2/{text-to-video,image-to-video,
+  // reference-to-video,edit}`, replacing 1.1 on 2026-11-10 (Eric: "Yes, same
+  // release"). The 1.1 ids `omni-flash` / `omni-flash-edit` are in
+  // RETIRED_MODELS below. Rips, read 2026-11-10: second-brain/business/projects/
+  // slates/provider-docs/fal-gemini-omni-flash-1-2-openapi-schemas.md (fal) and
+  // google-gemini-omni-1-2-flash-docs.md (Google, the higher rung: where the two
+  // differ, Google's narrower limit is the one sold). `v1.2/extend` and
+  // `v1.2/upscale` are not sold.
   //
   // Resolution: fal's enum is 360p / 720p / 1080p / 4k, default 720p, on all
   // four endpoints. Google: "1080p output (upscaled)", "4K output (upscaled)".
   // 360p is NOT offered: it sits below every other row's floor and would need
-  // a new resolution token in every exhaustive map. Add it if drafts are wanted.
+  // a new resolution token in every exhaustive map.
 
-  'omni-flash': {
+  'omni-flash-1-2': {
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
     videoResolution: { options: ['720p', '1080p', '4k'], default: '720p' },
-    duration: { min: 3, max: 10, mode: 'continuous' },
-    // fal's reference-to-video `image_urls`: maxItems 10 on 1.1 (and on 1.0,
-    // where we capped at 7 off a July reading of Google's limit).
-    maxIngredientImages: 10,
-    // `reference_video_urls`: maxItems 3, "Each video must be at most ten
-    // seconds long" (fal's live OpenAPI, re-read 2026-10-23; it said three on
-    // 2026-10-17). Google: "Video references work best with likenesses; any
-    // audio in a video reference is ignored." No minimum and no combined
-    // limit are published, so the total is three clips at the per-clip max.
+    // fal: `duration` integer, minimum 3, maximum 15. Google: "any whole second
+    // from 3 to 15 seconds".
+    duration: { min: 3, max: 15, mode: 'continuous' },
+    // Google: "First and last frame interpolation supports video durations from
+    // 3 to 10 seconds" (fal's `end_image_url`: "the duration is capped at 10
+    // seconds").
+    lastFrameMaxSeconds: 10,
+    // Google: "up to 6 reference images per request (up to 3 images per
+    // character for up to 2 characters)". fal's `image_urls` says 10; Google's
+    // six is sold. The per-character split cannot be checked (nothing says which
+    // character an image shows), so the guide carries it as craft.
+    maxIngredientImages: 6,
+    // Google: "Videos from 11 to 15 seconds support 1 reference video (up to 3
+    // seconds long), while videos from 3 to 10 seconds support up to 3 reference
+    // videos (up to 3 seconds each)". fal's `reference_video_urls` says three of
+    // up to 15 seconds; Google's bounds are sold. The 1-second floor is ours.
     maxReferenceVideos: 3,
-    referenceVideoDuration: { min: 1, max: 10 },
-    maxReferenceVideoSeconds: 30,
-    // Neither fal nor Google publishes a combined ceiling, so the total is the
-    // two arms summed; it never binds below them. No audio references.
-    maxReferenceFilesTotal: 13,
+    longOutputReferenceVideos: { aboveSeconds: 10, max: 1 },
+    referenceVideoDuration: { min: 1, max: 3 },
+    maxReferenceVideoSeconds: 9,
+    // No combined ceiling is published, so the total is the two arms summed.
+    // Google: "Uploading audio inputs or audio references is unsupported".
+    maxReferenceFilesTotal: 9,
   },
 
-  'omni-flash-edit': {
+  'omni-flash-1-2-edit': {
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
-    // The 1.1 edit endpoint takes `resolution` too (same enum and default).
+    // fal's v1.2 edit takes `resolution`, same enum and default; no duration
+    // parameter, so the output follows the source clip.
     videoResolution: { options: ['720p', '1080p', '4k'], default: '720p' },
-    // Source clip: Google, "Input videos for editing and extension must be 10
-    // seconds or less when uploading". fal's 1.1 edit schema states no bound.
-    duration: { min: 3, max: 10, mode: 'continuous' },
+    // Source clip: fal, "Must be at most 15 seconds long"; Google, "input videos
+    // for editing must be 15 seconds or less". The 3-second floor is Google's
+    // output minimum ("Output video 3s-15s").
+    duration: { min: 3, max: 15, mode: 'continuous' },
+    // fal's v1.2 edit has no reference field. Google: reference videos "are only
+    // supported when generating a new video, not when editing".
     maxIngredientImages: 0,
   },
 
@@ -1003,12 +1024,12 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 // ── Retired seats ────────────────────────────────────────────────────────────
 
 /**
- * Image seats that left the roster, each with the seat that replaced it. The
- * desktop moves a stored or sent id onto its replacement (slate
- * `migrateRetiredModel`, which reads this map and adds the retired video seats
- * this repo does not name). The server keeps their cost keys so desktops
- * released before a retirement still bill; the list and estimate ops hide those
- * keys and name the replacement instead.
+ * Seats that left the roster, each with the seat that replaced it. The desktop
+ * moves a stored or sent id onto its replacement (slate `migrateRetiredModel`,
+ * which reads this map and adds the retired video seats this repo does not name).
+ * The server keeps their cost keys so desktops released before a retirement
+ * still bill; the list and estimate ops hide those keys and name the replacement
+ * instead.
  */
 export const RETIRED_MODELS: Readonly<Record<string, string>> = {
   // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not
@@ -1021,6 +1042,9 @@ export const RETIRED_MODELS: Readonly<Record<string, string>> = {
   'nano-banana-2-lite': 'nano-banana-2-1',
   'nano-banana-pro': 'nano-banana-2-1',
   'flux-2-max': 'flux-3',
+  // 2026-11-10 (Eric, "Yes, same release"): Gemini Omni Flash 1.2 replaced 1.1, seat for seat.
+  'omni-flash': 'omni-flash-1-2',
+  'omni-flash-edit': 'omni-flash-1-2-edit',
 }
 
 /**
@@ -1105,6 +1129,67 @@ export function durationsFor(
     return { ...base, ...base.resolutionOverrides[opts.videoResolution] }
   }
   return base
+}
+
+/**
+ * Reference videos a request may carry at `duration` seconds of output: fewer
+ * above the row's `longOutputReferenceVideos` threshold, else `maxReferenceVideos`.
+ * Without a duration the threshold cannot apply, so the row's full cap is returned.
+ */
+export function maxReferenceVideosFor(model: string, duration?: number): number {
+  const cap = MODEL_CAPABILITIES[model]
+  const max = cap?.maxReferenceVideos ?? 0
+  const long = cap?.longOutputReferenceVideos
+  return long && duration != null && duration > long.aboveSeconds ? Math.min(max, long.max) : max
+}
+
+/** The longest output a request with a last frame may ask for: the row's
+ *  `lastFrameMaxSeconds`, else its duration maximum. */
+export function lastFrameMaxSecondsFor(model: string): number | undefined {
+  const cap = MODEL_CAPABILITIES[model]
+  return cap?.lastFrameMaxSeconds ?? cap?.duration?.max
+}
+
+/**
+ * The limits that move with the request rather than with the model alone: the
+ * output length a last frame allows, how many reference videos that length
+ * allows, and each reference video's length. `referenceVideoCount` defaults to
+ * the number of lengths given. A plain message naming `label`, or null. One
+ * function for the desktop's composer and the agent ops, so both refuse the same
+ * request before anything uploads or bills.
+ */
+export function checkReferenceShape(
+  model: string,
+  opts: {
+    duration?: number
+    lastFrame?: boolean
+    referenceVideoCount?: number
+    referenceVideoSeconds?: readonly number[]
+    label?: string
+  }
+): string | null {
+  const cap = MODEL_CAPABILITIES[model]
+  if (!cap) return null
+  const name = opts.label ?? model
+  const lastMax = cap.lastFrameMaxSeconds
+  if (opts.lastFrame && lastMax != null && opts.duration != null && opts.duration > lastMax) {
+    return `${name} takes ${cap.duration?.min ?? 3}-${lastMax}s with a last frame, and ${opts.duration}s is longer. Set ${lastMax}s or less, or drop the last frame.`
+  }
+  const clips = opts.referenceVideoSeconds ?? []
+  const count = opts.referenceVideoCount ?? clips.length
+  const maxClips = maxReferenceVideosFor(model, opts.duration)
+  if (count > maxClips) {
+    const long = cap.longOutputReferenceVideos
+    const s = (n: number) => `${n} reference video${n === 1 ? '' : 's'}`
+    return long && opts.duration != null && opts.duration > long.aboveSeconds && count <= (cap.maxReferenceVideos ?? 0)
+      ? `${name} takes ${s(long.max)} on a clip over ${long.aboveSeconds}s (up to ${cap.maxReferenceVideos} at ${long.aboveSeconds}s or less), and this has ${count}. Set ${long.aboveSeconds}s or less, or remove ${count - maxClips}.`
+      : `${name} takes at most ${s(maxClips)}, and this has ${count}.`
+  }
+  const bounds = cap.referenceVideoDuration
+  if (bounds && clips.some((sec) => !Number.isFinite(sec) || sec > bounds.max + 0.05 || sec < bounds.min)) {
+    return `Each ${name} reference video must be ${bounds.min}-${bounds.max}s long. Trim it first.`
+  }
+  return null
 }
 
 /** Every legal whole-second duration. Mirrors `getAvailableDurations`. */

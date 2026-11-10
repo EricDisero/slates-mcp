@@ -208,7 +208,7 @@ const SEEDANCE_25_EDIT: PromptingTipsEntry = {
   ...SEEDANCE_25,
   label: 'Seedance 2.5 Edit',
   intro: [
-    'Seedance 2.5 Edit changes an existing clip: attach the clip, describe only what should be different, and the original motion, framing and timing are kept. It is the only editor in Slates that takes a clip longer than 15 seconds — 4 to 30s, against Kling O3 Edit\'s 3-15s and Omni Flash Edit\'s 3-10s.',
+    'Seedance 2.5 Edit changes an existing clip: attach the clip, describe only what should be different, and the original motion, framing and timing are kept. It is the only editor in Slates that takes a clip longer than 15 seconds — 4 to 30s, against 3-15s on Kling O3 Edit and Omni Flash Edit.',
     'Output length and aspect ratio follow the SOURCE clip, so there is no duration or ratio control — the clip you attach is the quote. Output is 480p, 720p or 1080p with native audio.',
   ],
   columns: [
@@ -327,9 +327,9 @@ const KLING_EDIT: PromptingTipsEntry = {
 }
 
 const OMNI_FLASH: PromptingTipsEntry = {
-  label: 'Gemini Omni Flash 1.1',
+  label: 'Gemini Omni Flash 1.2',
   intro: [
-    'Gemini Omni Flash 1.1 renders 720p natively, with 1080p and 4K as upscales, and native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-10s, 16:9 or 9:16. Text-to-video, a start frame with an optional last frame, or references: up to 10 images and 3 videos of 10s or less. A last frame never mixes with references, and there are no audio references.',
+    'Gemini Omni Flash 1.2 renders 720p natively, with 1080p and 4K as upscales, and native synced audio included — dialogue, SFX, and ambient generate WITH the video at no extra cost. 3-15s, 16:9 or 9:16. Text-to-video, a start frame with an optional last frame (10s or less with a last frame), or references: up to 6 images, and reference videos of 3s or less, three on a clip of 10s or less and one on 11-15s. A last frame never mixes with references, and there are no audio references.',
   ],
   columns: [
     [
@@ -354,12 +354,17 @@ const OMNI_FLASH: PromptingTipsEntry = {
         example: 'rain patters on the tin roof · distant traffic hum',
         note: 'Describe sounds directly in the prose — no SFX: prefix needed.',
       },
+      {
+        heading: 'Time the beats',
+        example: 'After 3 seconds, a woman enters the scene.',
+        note: 'Plain words place an event in time, which matters more on a 15s clip; a timecode form ([0-5s] ..., [5-10s] ...) works too.',
+      },
     ],
     [
       {
-        heading: 'Name references inline',
-        example: 'Marcus (image 1) walks into the cafe...',
-        note: 'Up to 10 reference images merge into one list — refer to them by number. A reference video carries a likeness only; its sound is ignored.',
+        heading: 'Say what each input is for',
+        example: 'The man in image 1 walks into the cafe from image 2...',
+        note: 'Describe each image\'s or video\'s role in plain words: it reads no bracket tags. Up to 6 reference images, at most 3 per character and 2 characters. A reference video carries a likeness only; its sound is ignored.',
       },
       {
         heading: 'Negatives as plain instructions',
@@ -375,9 +380,9 @@ const OMNI_FLASH: PromptingTipsEntry = {
 }
 
 const OMNI_FLASH_EDIT: PromptingTipsEntry = {
-  label: 'Omni Flash Edit',
+  label: 'Omni Flash 1.2 Edit',
   intro: [
-    'Omni Flash Edit changes what the prompt names in an existing 3-10s clip, footage-synced — prop, effect, environment, and lighting swaps. Prompt + source clip only: no reference images (identity swaps that need refs → Kling O3 Edit). 720p output by default, 1080p and 4K as upscales; voice editing unsupported.',
+    'Omni Flash 1.2 Edit changes what the prompt names in an existing 3-15s clip, footage-synced — prop, effect, environment, and lighting swaps. Prompt + source clip only: no reference images (identity swaps that need refs → Kling O3 Edit). 720p output by default, 1080p and 4K as upscales; voice editing unsupported.',
   ],
   columns: [
     [

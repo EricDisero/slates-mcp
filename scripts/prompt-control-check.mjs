@@ -261,6 +261,93 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   console.log('prompt-control: Shots and drafts name GPT Image 2.6 as 2.5 to a desktop without image-models-v5 and say so')
 }
 
+// Gemini Omni Flash 1.2 on a desktop that predates it (no video-models-v2, 1.6.8 and older): the 1.1 seat it
+// replaced runs at the quoted price when the request fits 1.1 (10s or less) and the result says so, on every op
+// that hands the desktop a model id; a longer clip, or a desktop before 1.1 (no image-models-v4), refuses before
+// any request. Google's request-shaped reference limits refuse before any request on every desktop.
+{
+  const projectId = '11111111-1111-4111-8111-111111111111', shotId = '77777777-7777-4777-8777-777777777777'
+  const sourceId = '88888888-8888-4888-8888-888888888888', frameA = '99999999-9999-4999-8999-999999999991', frameB = '99999999-9999-4999-8999-999999999992'
+  const clips = ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3']
+  const pics = Array.from({ length: 7 }, (_, i) => `bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb${i}`)
+  const keys = [3, 8, 10, 12, 15].flatMap((n) => [`omni-flash-1-2-720p-${n}s`, `omni-flash-1-2-edit-720p-${n}s`])
+  const omniRegistry = { models: keys.map((model) => ({ model, cost_credits: 5 * Number(/-(\d+)s$/.exec(model)[1]) })) }
+  const omniDesktop = (missing, clipSeconds = 8) => {
+    const sent = []
+    const shot = { id: shotId, projectId, code: 'SHOT-A', name: 'A' }
+    return { sent, ctx: { cloud: () => ({ get: async () => omniRegistry }), desktop: () => ({
+      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      get: async (path) => {
+        if (path === '/agent/assets') return { assets: [{ id: sourceId, type: 'video', duration: clipSeconds }] }
+        if (path === '/agent/shots/get') return { shot }
+        return { storyboards: [], shots: [], variety: null }
+      },
+      post: async (path, body) => {
+        sent.push({ path, body })
+        if (path === '/agent/composer') return { report: null, reason: 'mock' }
+        return path.startsWith('/agent/generation') ? { success: true, background: true, generationId: 'mock-generation' } : { shot }
+      },
+    }) } }
+  }
+  const gen = (extra) => ({ projectId, model: 'omni-flash-1-2', prompt: 'A lighthouse at dusk, one continuous shot.', aspectRatio: '16:9', duration: 8, confirm: true, background: true, ...extra })
+  const edit = { projectId, sourceVideoAssetId: sourceId, model: 'omni-flash-1-2-edit', prompt: 'Make it snow. Keep everything else the same.', confirm: true, background: true }
+  for (const [missing, genSeat, editSeat] of [[['video-models-v2'], 'omni-flash', 'omni-flash-edit'], [[], 'omni-flash-1-2', 'omni-flash-1-2-edit']]) {
+    const said = (text, seat, asked) => missing.length
+      ? assert.match(text, new RegExp(`${seat} ran in place of ${asked}, at the same price: this Slates desktop predates Gemini Omni Flash 1\\.2`))
+      : assert.doesNotMatch(text, /ran in place of/)
+    const d = omniDesktop(missing)
+    const made = await call('generate_video', gen(), d.ctx)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.model], ['/agent/generation/video', genSeat])
+    assert.equal(made.data.variant, 'omni-flash-1-2-720p-8s', 'the quote is the 1.2 key whichever seat runs')
+    said(made.text, genSeat, 'omni-flash-1-2')
+    const edited = await call('edit_video', edit, d.ctx)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.model], ['/agent/generation/edit-video', editSeat])
+    assert.equal(edited.data.variant, 'omni-flash-1-2-edit-720p-8s')
+    said(edited.text, editSeat, 'omni-flash-1-2-edit')
+    said((await call('create_shot', { projectId, prompt: 'Room', model: 'omni-flash-1-2', params: { duration: 8 } }, d.ctx)).text, genSeat, 'omni-flash-1-2')
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.spec.model], ['/agent/shots', genSeat])
+    said((await call('update_shot', { projectId, shotId, model: 'omni-flash-1-2' }, d.ctx)).text, genSeat, 'omni-flash-1-2')
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.data.spec.model], ['/agent/shots/update', genSeat])
+    said((await call('duplicate_shot', { shotId, model: 'omni-flash-1-2' }, d.ctx)).text, genSeat, 'omni-flash-1-2')
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.spec.model], ['/agent/shots/duplicate', genSeat])
+    await call('set_composer', { model: 'omni-flash-1-2' }, d.ctx)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.model], ['/agent/composer', genSeat])
+  }
+  // Past 1.1's 10 seconds a desktop without 1.2 refuses before any request, generation, edit and Shot alike.
+  const longer = omniDesktop(['video-models-v2'], 12)
+  await assert.rejects(() => call('generate_video', gen({ duration: 12 }), longer.ctx), /runs Gemini Omni Flash 1\.1, which stops at 10s/)
+  await assert.rejects(() => call('edit_video', edit, longer.ctx), /stops at 10s/)
+  await assert.rejects(() => call('create_shot', { projectId, prompt: 'Room', model: 'omni-flash-1-2', params: { duration: 12 } }, longer.ctx), /stops at 10s/)
+  assert.deepEqual(longer.sent, [], 'nothing reaches the desktop')
+  // A desktop current with 1.2 runs 12s.
+  const current = omniDesktop([], 12)
+  await call('generate_video', gen({ duration: 12 }), current.ctx)
+  assert.equal(current.sent.at(-1).body.duration, 12)
+  // A desktop before 1.1 would bill 1.0's keys: it refuses.
+  const ancient = omniDesktop(['video-models-v2', 'image-models-v4'])
+  await assert.rejects(() => call('generate_video', gen(), ancient.ctx), /Update Slates: image-models-v4/)
+  assert.deepEqual(ancient.sent, [])
+  // Google's request-shaped limits, refused before any request on a current desktop.
+  const shape = async (extra) => {
+    const d = omniDesktop([])
+    const r = await call('generate_video', gen(extra), d.ctx)
+    return { message: r.data?.requires_clarification ? r.data.message : null, sent: d.sent.length }
+  }
+  const frames = await shape({ duration: 12, firstFrameAssetId: frameA, lastFrameAssetId: frameB })
+  assert.match(frames.message, /takes 3-10s with a last frame, and 12s is longer/)
+  assert.equal(frames.sent, 0)
+  assert.equal((await shape({ duration: 10, firstFrameAssetId: frameA, lastFrameAssetId: frameB })).message, null)
+  const longRefs = await shape({ duration: 12, videoReferenceAssetIds: clips.slice(0, 2), videoReferenceSecondsEach: [2, 2] })
+  assert.match(longRefs.message, /takes 1 reference video on a clip over 10s \(up to 3 at 10s or less\), and this has 2/)
+  assert.equal((await shape({ duration: 12, videoReferenceAssetIds: clips.slice(0, 1), videoReferenceSecondsEach: [3] })).message, null)
+  assert.equal((await shape({ duration: 10, videoReferenceAssetIds: clips, videoReferenceSecondsEach: [2, 3, 2.5] })).message, null)
+  assert.match((await shape({ duration: 8, videoReferenceAssetIds: clips.slice(0, 1), videoReferenceSecondsEach: [4] })).message, /must be 1-3s long\. Trim it first with slates_trim_video/)
+  assert.match((await shape({ duration: 8, ingredientAssetIds: pics })).message, /at most 6 reference images combined/)
+  assert.equal((await shape({ duration: 8, ingredientAssetIds: pics.slice(0, 6) })).message, null)
+  assert.match((await shape({ duration: 8, firstFrameAssetId: frameA, ingredientAssetIds: pics.slice(0, 6) })).message, /a start frame included \(you passed 7\)/)
+  console.log('prompt-control: Omni Flash 1.2 runs as 1.1 on a desktop without video-models-v2 up to 10s and says so; Google\'s reference limits refuse before any request')
+}
+
 // The plain text style came with text-fonts: alone it still asks for the token, so a desktop without it
 // refuses in words before any request, on add, update and captions; another style asks for nothing new.
 {

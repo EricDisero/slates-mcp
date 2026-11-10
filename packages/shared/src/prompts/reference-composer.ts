@@ -244,6 +244,10 @@ export interface ComposeOptions {
   startImageNumber?: number
   startVideoNumber?: number
   startAudioNumber?: number
+  /** What the images numbered ahead of the groups are ("the opening frame"), said as the first key
+   *  line when something is numbered after them and the prompt does not cite them itself
+   *  (the desktop's `firstFrameReferenceRole`: Omni Flash's first frame rides as reference image 1). */
+  leadImageRole?: string
 }
 
 export function composeReferences(
@@ -388,7 +392,20 @@ export function composeReferences(
   // own prompt supplies the intent ("this exact frame", "the man becomes…").
   const topKeys: string[] = []
 
-  // Video sources first ("Video 1 is the motion source.").
+  // The images numbered ahead of the groups, when they carry a role ("Image 1 is the opening
+  // frame."). Gemini Omni Flash 1.2 reads each input's role from plain words, and Google retired
+  // the tags that used to declare a frame ("Describe how each image or video should be used in
+  // natural language instead"); beside references the first frame is just image 1 on the wire,
+  // so without this line nothing says which picture it starts from. Only when something is
+  // numbered after it: alone, a first frame rides its own field. Not when the prompt already
+  // cites those images itself, the same rule the subject lines below follow.
+  const leadCount = opts.startImageNumber ?? 0
+  if (opts.leadImageRole && leadCount > 0 && orderedImagePaths.length + orderedVideoPaths.length > 0) {
+    const lead = Array.from({ length: leadCount }, (_, i) => i + 1).filter((n) => !citedImages.has(n))
+    if (lead.length > 0) topKeys.push(`${lead.length === 1 ? 'Image' : 'Images'} ${joinNums(lead)} ${lead.length === 1 ? 'is' : 'are'} ${opts.leadImageRole}.`)
+  }
+
+  // Video sources ("Video 1 is the motion source.").
   for (const g of numbered) {
     if (g.kind === 'video' && g.videoNums.length > 0) {
       const noun = g.videoNums.length === 1 ? 'Video' : 'Videos'

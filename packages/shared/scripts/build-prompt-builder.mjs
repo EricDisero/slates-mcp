@@ -133,8 +133,8 @@ const portableModels = [
   { id: 'seedance-2.5', guide: 'reference-seedance-2-5.md' },
   { id: 'seedance-2', guide: 'reference-seedance.md' },
   { id: 'kling-v3', guide: 'reference-kling.md' },
-  { id: 'omni-flash', guide: 'reference-omni-flash.md' },
-  { id: 'omni-flash-edit', guide: 'reference-omni-flash.md' },
+  { id: 'omni-flash-1-2', guide: 'reference-omni-flash.md' },
+  { id: 'omni-flash-1-2-edit', guide: 'reference-omni-flash.md' },
   { id: 'kling-v3-edit', guide: 'reference-kling.md' },
   { id: 'seedance-2.5-edit', guide: 'reference-seedance-2-5.md' },
 ]

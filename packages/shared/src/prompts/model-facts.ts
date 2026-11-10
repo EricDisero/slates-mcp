@@ -167,7 +167,7 @@ export function multimodalRefSummary(id: string): string {
   if (v > 0) parts.push(`${v} video${v === 1 ? '' : 's'} (${f.maxReferenceVideoSeconds}s total)`)
   if (a > 0) parts.push(`${a} audio clip${a === 1 ? '' : 's'} (${f.maxReferenceAudioSeconds}s total)`)
   const total = f.maxReferenceFilesTotal ? `, ${f.maxReferenceFilesTotal} files max` : ''
-  // A model with no audio slot says nothing about audio (Omni Flash 1.1 reads
+  // A model with no audio slot says nothing about audio (Omni Flash 1.2 reads
   // reference videos but no audio).
   const companion = a === 0
     ? '; no audio references.'
@@ -325,7 +325,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // Family-level fact; 4 = combined subject elements + style refs per edit.
     ...caps('kling-v3.0-omni-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keepAudio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, omni-flash-edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
+    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keepAudio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, Omni Flash edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
   },
   {
     id: 'kling-v4.0',
@@ -341,24 +341,26 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'The newest Kling, for single takes longer than Kling 3.0 reaches. Dearer per second and slower than 3.0, and on the same start frame 3.0 Pro won on camera and feel, so Kling 3.0 stays the Kling seat for everything else. Sound is always on at no extra cost. Start frame with an optional last frame, multi-shot sequences, or text alone; no reference images. VIDEO-ONLY.',
   },
   {
-    id: 'omni-flash',
+    id: 'omni-flash-1-2',
     route: 'generate',
     tier: 'specialist',
-    label: 'Gemini Omni Flash 1.1',
+    // Gemini Omni Flash 1.2 replaced 1.1 on 2026-11-10 (Eric), seat for seat;
+    // stored 1.1 ids migrate through RETIRED_MODELS. Caps are Google's (the
+    // narrower rung): 6 reference images, reference videos by output length.
+    label: 'Gemini Omni Flash 1.2',
     kind: 'video',
-    // 10 ref2v image_urls + 3 reference videos of <=10s (fal 1.1 schema, 2026-10-23).
-    ...caps('omni-flash'),
-    notes: 'Google\'s video model, version 1.1 since 2026-10-17, with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
+    ...caps('omni-flash-1-2'),
+    notes: 'Google\'s video model with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. Describe each input\'s role in plain words; it reads no tags. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
   },
   {
-    id: 'omni-flash-edit',
+    id: 'omni-flash-1-2-edit',
     route: 'edit',
     tier: 'default',
-    label: 'Omni Flash 1.1 Edit',
+    label: 'Omni Flash 1.2 Edit',
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
-    ...caps('omni-flash-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only, on Omni Flash 1.1 since 2026-10-17. The 1.0 edit won the head-to-head against Kling edit on real talking footage (lips held, audio near-identical, both action beats landed); 1.1 has not been re-measured against it yet. Footage-synced prop, effect, environment and lighting swaps; 1080p and 4K output are upscales. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
+    ...caps('omni-flash-1-2-edit'),
+    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only. The 1.0 edit won the head-to-head against Kling edit on real talking footage (lips held, audio near-identical, both action beats landed); 1.2 has not been re-measured against it. Footage-synced prop, effect, environment and lighting swaps; 1080p and 4K output are upscales; it does not edit voices. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
   },
   {
     id: 'minimax-h3',
