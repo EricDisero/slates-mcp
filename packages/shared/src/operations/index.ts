@@ -9246,18 +9246,20 @@ export const breakDownReference: Operation<{
       throw new Error('Give exactly one of assetId (a video or picture in the project), filePath or url.')
     }
     const assetId = input.assetId ? (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id : input.assetId
+    // Every Shot is stored under this id, as the desktop knows it (`desktopModelId`).
+    const seat = await desktopModelId(ctx.desktop(), input.model, `a breakdown's Shots on ${input.model}`)
     const r = await ctx.desktop().post<{
       breakdown: { segments: unknown[]; sourceCode?: string | null }
       board: { storyboardId: string; shotCodes: string[]; timing: string[]; warnings: string[] } | null
       reused: boolean
       source: { url: string; kind: string; videoUrl: string } | null
-    }>('/agent/reference/breakdown', { ...input, assetId, cancel: undefined })
+    }>('/agent/reference/breakdown', { ...input, assetId, model: seat.model, cancel: undefined })
     const cuts = r.breakdown.segments.length
     const fetched = r.source ? `Fetched the ${r.source.kind === 'meta' ? 'Meta Ad Library ad' : 'video link'} into Media as ${r.breakdown.sourceCode ?? 'a video'}. ` : ''
     const head = r.board
       ? `Board ${r.board.storyboardId} built: ${r.board.shotCodes.length} Shot${r.board.shotCodes.length === 1 ? '' : 's'} (${r.board.shotCodes.join(', ')}), nothing generated.${r.board.timing.length ? ` Timing: ${r.board.timing.join(' ')}` : ''}`
       : `${cuts} cut${cuts === 1 ? '' : 's'} found in ${r.breakdown.sourceCode ?? 'the reference'}; frames saved, no board yet.`
-    return ok(r, `${fetched}${head} ${JSON.stringify(r)}`)
+    return ok(r, `${seat.note ? `${seat.note} ` : ''}${fetched}${head} ${JSON.stringify(r)}`)
   },
 }
 

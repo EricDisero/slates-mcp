@@ -285,6 +285,7 @@ assert.equal(posts.at(-1).body.resolution, '2k')
       post: async (path, body) => {
         sent.push({ path, body })
         if (path === '/agent/composer') return { report: null, reason: 'mock' }
+        if (path === '/agent/reference/breakdown') return { breakdown: { segments: [] }, board: null, reused: false, source: null }
         return path.startsWith('/agent/generation') ? { success: true, background: true, generationId: 'mock-generation' } : { shot }
       },
     }) } }
@@ -312,6 +313,9 @@ assert.equal(posts.at(-1).body.resolution, '2k')
     assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.spec.model], ['/agent/shots/duplicate', genSeat])
     await call('set_composer', { model: 'omni-flash-1-2' }, d.ctx)
     assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.model], ['/agent/composer', genSeat])
+    // A breakdown writes its model into every Shot it builds.
+    said((await call('break_down_reference', { projectId, url: 'https://example.com/ad.mp4', model: 'omni-flash-1-2' }, d.ctx)).text, genSeat, 'omni-flash-1-2')
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.model], ['/agent/reference/breakdown', genSeat])
   }
   // Past 1.1's 10 seconds a desktop without 1.2 refuses before any request, generation, edit and Shot alike.
   const longer = omniDesktop(['video-models-v2'], 12)
