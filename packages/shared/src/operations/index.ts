@@ -1314,7 +1314,9 @@ export const setComposer: Operation<{
       throw new Error('Name at least one change, e.g. model, prompt, attach or params. To read the box, use slates_get_composer.')
     }
     // The box takes the model by name, so a seat this desktop lacks is staged as the one it has (`desktopModelId`).
-    const duration = typeof input.params?.duration === 'number' ? input.params.duration : undefined
+    // A length given as text ("15", "15s") is the same length: the 10-second check must see it.
+    const asked = input.params?.duration
+    const duration = typeof asked === 'number' ? asked : typeof asked === 'string' && Number.isFinite(Number.parseFloat(asked)) ? Number.parseFloat(asked) : undefined
     const seat = await desktopModelId(ctx.desktop(), input.model, `staging ${input.model}`, duration)
     const r = await ctx.desktop().post<{ report: ComposerReport | null; reason?: string; skipped?: string[] }>('/agent/composer', { ...input, ...(seat.note ? { model: seat.model } : {}) })
     if (!r.report) return { text: `Nothing was staged (${r.reason ?? 'no answer'}).`, data: { report: null } }
