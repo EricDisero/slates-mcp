@@ -3785,6 +3785,31 @@ function gptImageSubstitution(asked: string, sent: string): string {
 }
 
 /**
+ * A model id an op hands the desktop by name (a Shot's model, a draft's model), as this desktop knows it: a GPT
+ * Image 2.6 seat goes through `gptImageSeatFor`, every other id passes untouched. A 1.6.8 desktop's `draftShot`
+ * throws on an id it lacks, so every such hand-off comes through here, with the line its result says.
+ */
+async function desktopModelId<M extends string | null | undefined>(
+  desktop: Pick<SlatesDesktopClient, 'requireCapability'>,
+  model: M,
+  feature: string
+): Promise<{ model: M; note: string }> {
+  if (!model || !isGptImageModel(model)) return { model, note: '' }
+  const sent = (await gptImageSeatFor(desktop, model, feature)) as M & string
+  return { model: sent, note: gptImageSubstitution(model, sent) }
+}
+
+/** `draft` with its model as this desktop knows it (`desktopModelId`). */
+async function desktopDraft(
+  desktop: Pick<SlatesDesktopClient, 'requireCapability'>,
+  draft: { model?: ImageModelId } | undefined
+): Promise<{ draft: { model?: string } | undefined; note: string }> {
+  if (!draft?.model) return { draft, note: '' }
+  const { model, note } = await desktopModelId(desktop, draft.model, `previews on ${draft.model}`)
+  return { draft: { ...draft, model }, note }
+}
+
+/**
  * The seats that arrived 2026-10-23, which only a desktop advertising
  * `image-models-v4` knows. 🚨 A NEW TOKEN, as v3 was for GPT Image 2.5: an older
  * desktop has neither id in its registry and would fall back to its Nano Banana
@@ -9705,7 +9730,9 @@ async function buildShotSpecInput(
   ctx: OperationContext,
   projectId: string,
   input: ShotOpRefs & { prompt?: string; model?: string; params?: ShotOpParams }
-): Promise<{ spec: Record<string, unknown>; refEcho: string }> {
+): Promise<{ spec: Record<string, unknown>; refEcho: string; seatNote: string }> {
+  // The Shot is stored and drafted on the desktop under this id (`desktopModelId`).
+  const seat = await desktopModelId(ctx.desktop(), input.model, `a Shot on ${input.model}`)
   const refInputs = shotRefInputs(input)
   const resolvedRefs = await resolveAssetRefs(ctx, projectId, refInputs.map((r) => r.ref))
   const rid = (v: string | undefined): string | null => (v ? (resolvedRefs.get(v)?.id ?? v) : null)
@@ -9725,11 +9752,11 @@ async function buildShotSpecInput(
   return {
     spec: {
       prompt: input.prompt,
-      model: input.model ?? null,
+      model: seat.model ?? null,
       // The prompt is recorded as written FOR this model. Swapping the model
       // later diverges from it and the desktop card says so — the prompt is
       // never rewritten (that is prompt enhancement, deleted 2026-08-01).
-      authoredFor: input.model ?? null,
+      authoredFor: seat.model ?? null,
       params: {
         ...shotParamsPatch(input.params),
         ...(input.params?.voiceReferenceAssetId ? { voiceReferenceAssetId: rid(input.params.voiceReferenceAssetId) } : {}),
@@ -9745,6 +9772,7 @@ async function buildShotSpecInput(
       audioRefSpokenText: spoken,
     },
     refEcho: describeResolvedRefs(refInputs, resolvedRefs),
+    seatNote: seat.note,
   }
 }
 
@@ -9760,7 +9788,8 @@ function namedSpecPatch(
   const patch: Record<string, unknown> = {}
   if (input.prompt !== undefined) patch.prompt = input.prompt
   if (input.model !== undefined) {
-    patch.model = input.model
+    // The built id: the one this desktop knows (`desktopModelId`).
+    patch.model = spec.model
     // 🚨 `authoredFor` is NOT re-stamped on a model swap. The whole point of
     // recording it is that the prompt stays written for the model it was
     // written for — the grammars genuinely differ — so the card can say so.
@@ -9964,7 +9993,7 @@ export const createShot: Operation<
     if (input.fromAssetId) await desktop.requireCapability('shot-from-asset', 'saving a result as a Shot')
     // 1.5.8 ignores `position` and files the Shot last.
     if (input.position !== undefined) await desktop.requireCapability('shot-position', 'placing a new Shot at a slot')
-    const { spec, refEcho } = await buildShotSpecInput(ctx, input.projectId, input)
+    const { spec, refEcho, seatNote } = await buildShotSpecInput(ctx, input.projectId, input)
     const r = await desktop.post<{ shot: Record<string, unknown>; unsavedPaths?: string[] }>('/agent/shots', {
       projectId: input.projectId,
       name: input.name,
@@ -9996,7 +10025,7 @@ export const createShot: Operation<
     // next call, and the next sentence to the user, can point at it.
     return ok(
       r.shot,
-      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}`.trim() + varietyNote
+      `${(r.shot?.code as string) || 'Shot'} — "${(r.shot?.name as string) || 'Untitled'}". ${refEcho}${fromNote}${seatNote ? ` ${seatNote}` : ''}`.trim() + varietyNote
     )
   },
 }
@@ -10075,7 +10104,7 @@ export const updateShot: Operation<
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    const { spec } = await buildShotSpecInput(ctx, input.projectId, input)
+    const { spec, seatNote } = await buildShotSpecInput(ctx, input.projectId, input)
     // Only send the halves the caller actually named; the route merges a PARTIAL
     // spec over the stored one, so an omitted field is never silently cleared.
     const patch = namedSpecPatch(input, spec)
@@ -10092,7 +10121,7 @@ export const updateShot: Operation<
     // An edit to framing changes the counts, and the agent read them BEFORE it
     // (agent eval round 11: two runs fixed a repeat and never saw the new counts).
     const varietyNote = await boardSoFar(desktop, { projectId: input.projectId, shotId: r.shot?.id as string | undefined })
-    return ok(r.shot, JSON.stringify(r.shot) + varietyNote)
+    return ok(r.shot, JSON.stringify(r.shot) + (seatNote ? `\n${seatNote}` : '') + varietyNote)
   },
 }
 
@@ -10124,7 +10153,8 @@ export const duplicateShot: Operation<{
     // omitted param on the copy keeps the original's value rather than clearing it.
     const spec: Record<string, unknown> = {}
     if (input.prompt !== undefined) spec.prompt = input.prompt
-    if (input.model !== undefined) spec.model = input.model
+    const seat = await desktopModelId(desktop, input.model, `a Shot on ${input.model}`)
+    if (input.model !== undefined) spec.model = seat.model
     if (input.params !== undefined) {
       const voiceRef = input.params.voiceReferenceAssetId
       if (voiceRef && !UUID_RE.test(voiceRef)) {
@@ -10141,7 +10171,7 @@ export const duplicateShot: Operation<{
       ...(Object.keys(spec).length > 0 ? { spec } : {}),
       frameId: input.frameId,
     })
-    return ok(r.shot, `Forked into "${(r.shot?.name as string) || 'Untitled'}".`)
+    return ok(r.shot, `Forked into "${(r.shot?.name as string) || 'Untitled'}".${seat.note ? ` ${seat.note}` : ''}`)
   },
 }
 
@@ -10801,8 +10831,9 @@ export const generateFromShots: Operation<{
     await desktop.requireCapability('board-quote', 'Shot prices')
     // Resolved first so a SHOT-A code fails here, not halfway through a billed run.
     const details = await Promise.all(input.shotIds.map((id) => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
+    const { draft, note: seatNote } = await desktopDraft(desktop, input.draft)
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
-      input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft: input.draft }),
+      input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft }),
     })
     for (const model of new Set(quote.items.map((i) => i.model))) requireGuideRead(ctx, model)
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
@@ -10819,16 +10850,16 @@ export const generateFromShots: Operation<{
           // Printed, not only in `data`: a client without elicitation reads this text
           // alone, and the confirm step refuses without the fingerprint (agent eval, round 9).
           `\nfingerprint: ${quote.fingerprint}` +
-          '\nGet approval for these prices, then pass this fingerprint with confirm: true.'
+          '\nGet approval for these prices, then pass this fingerprint with confirm: true.' +
+          (seatNote ? `\n${seatNote}` : '')
       )
     }
-    return ok(
-      await desktop.post('/agent/shots/batch-generate', {
-        shotIds: quote.items.map((i) => i.shotId),
-        fingerprint: quote.fingerprint,
-        draft: input.draft,
-      })
-    )
+    const ran = await desktop.post('/agent/shots/batch-generate', {
+      shotIds: quote.items.map((i) => i.shotId),
+      fingerprint: quote.fingerprint,
+      draft,
+    })
+    return seatNote ? ok(ran, `${JSON.stringify(ran)}\n${seatNote}`) : ok(ran)
   },
 }
 
@@ -10852,8 +10883,11 @@ export const quoteBoard: Operation<{
     draft: DRAFT_INPUT.describe('Generate previews: pass {} to price one picture for each Shot in scope with no picture, instead of each Shot recipe.'),
   }),
   async run(input, ctx) {
-    await ctx.desktop().requireCapability('board-quote', 'the board prices')
-    return ok(await ctx.desktop().get('/agent/shots/quote', { input: JSON.stringify(input) }))
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('board-quote', 'the board prices')
+    const { draft, note } = await desktopDraft(desktop, input.draft)
+    const quote = await desktop.get('/agent/shots/quote', { input: JSON.stringify({ ...input, draft }) })
+    return note ? ok(quote, `${JSON.stringify(quote)}\n${note}`) : ok(quote)
   },
 }
 

@@ -215,6 +215,52 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   console.log('prompt-control: GPT Image 2.6 runs as 2.5 on a desktop without image-models-v5 and says so; without v3 it refuses')
 }
 
+// Every other op that hands the desktop a GPT Image id by name (a Shot's model, a draft's model) makes the same
+// substitution: a 1.6.8 desktop's draftShot throws on a 2.6 id. Each says so in its result; a current desktop gets 2.6.
+{
+  const projectId = '11111111-1111-4111-8111-111111111111', shotId = '77777777-7777-4777-8777-777777777777'
+  const shotDesktop = (missing) => {
+    const sent = []
+    const shot = { id: shotId, projectId, code: 'SHOT-A', name: 'A' }
+    const quote = { fingerprint: 'fp', items: [{ shotId, name: 'A', code: 'SHOT-A', model: 'gpt-image-2-5-sunburst', prompt: 'Room', cost: 0.1, credits: 3, blocked: null }], total: 3, largest: 3, unpriced: 0 }
+    return { sent, ctx: { cloud: () => ({ get: async () => registry }), desktop: () => ({
+      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      get: async (path, query) => {
+        if (path === '/agent/shots/quote') { sent.push({ path, body: JSON.parse(query.input) }); return quote }
+        if (path === '/agent/shots/get') return { shot }
+        return { storyboards: [], shots: [], variety: null }
+      },
+      post: async (path, body) => { sent.push({ path, body }); return path === '/agent/shots/batch-generate' ? { started: 1 } : { shot } },
+    }) } }
+  }
+  for (const [missing, sentModel] of [[['image-models-v5'], 'gpt-image-2-5-sunburst'], [[], 'gpt-image-2-6-sunburst']]) {
+    const said = (text) => missing.length
+      ? assert.match(text, /gpt-image-2-5-sunburst ran in place of gpt-image-2-6-sunburst, at the same price/)
+      : assert.doesNotMatch(text, /ran in place of/)
+    const d = shotDesktop(missing)
+    said((await call('create_shot', { projectId, prompt: 'Room', model: 'gpt-image-2-6-sunburst' }, d.ctx)).text)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.spec.model, d.sent.at(-1).body.spec.authoredFor], ['/agent/shots', sentModel, sentModel])
+    said((await call('update_shot', { projectId, shotId, model: 'gpt-image-2-6-sunburst' }, d.ctx)).text)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.data.spec.model], ['/agent/shots/update', sentModel])
+    said((await call('duplicate_shot', { shotId, model: 'gpt-image-2-6-sunburst' }, d.ctx)).text)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.spec.model], ['/agent/shots/duplicate', sentModel])
+    said((await call('get_board_quote', { projectId, shotIds: [shotId], draft: { model: 'gpt-image-2-6-sunburst' } }, d.ctx)).text)
+    assert.equal(d.sent.at(-1).body.draft.model, sentModel)
+    said((await call('generate_from_shots', { shotIds: [shotId], draft: { model: 'gpt-image-2-6-sunburst' } }, d.ctx)).text)
+    assert.equal(d.sent.at(-1).body.draft.model, sentModel)
+    said((await call('generate_from_shots', { shotIds: [shotId], draft: { model: 'gpt-image-2-6-sunburst' }, confirm: true, fingerprint: 'fp' }, d.ctx)).text)
+    assert.deepEqual([d.sent.at(-1).path, d.sent.at(-1).body.draft.model], ['/agent/shots/batch-generate', sentModel])
+  }
+  // Another model passes untouched and asks for no GPT Image token.
+  const d = shotDesktop(['image-models-v5', 'image-models-v3'])
+  await call('create_shot', { projectId, prompt: 'Room', model: 'nano-banana-2-1' }, d.ctx)
+  assert.equal(d.sent.at(-1).body.spec.model, 'nano-banana-2-1')
+  await call('get_board_quote', { projectId, shotIds: [shotId], draft: {} }, d.ctx)
+  assert.deepEqual(d.sent.at(-1).body.draft, {})
+  await assert.rejects(() => call('create_shot', { projectId, prompt: 'Room', model: 'gpt-image-2-6-flare' }, d.ctx), /Update Slates: image-models-v3/)
+  console.log('prompt-control: Shots and drafts name GPT Image 2.6 as 2.5 to a desktop without image-models-v5 and say so')
+}
+
 // The plain text style came with text-fonts: alone it still asks for the token, so a desktop without it
 // refuses in words before any request, on add, update and captions; another style asks for nothing new.
 {
