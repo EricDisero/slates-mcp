@@ -23,7 +23,7 @@ const prices = new Map([
   ['flux-3-1k', 3], ['flux-3-2k', 4], ['flux-3-4k', 5],
   ['seedance-2-1080p-8s', 148],
 ])
-for (const seat of ['gpt-image-2-5-flare', 'gpt-image-2-5-sunburst']) {
+for (const seat of ['gpt-image-2-6-flare', 'gpt-image-2-6-sunburst']) {
   for (const [tier, row] of Object.entries({ low: [1, 1, 1], med: [1, 1, 2], high: [2, 3, 5], xhigh: [4, 5, 9], max: [8, 11, 20] })) {
     ;['2k', '3k', '4k'].forEach((res, i) => prices.set(`${seat}-${tier}-${res}`, row[i]))
   }
@@ -41,20 +41,20 @@ const quoteCtx = { cloud: () => cloud, desktop: () => { throw new Error('an esti
 const nb2 = await call('estimate_generation_cost', { model: 'nano-banana-2-1' }, quoteCtx)
 // The quoted seat's own cheaper setting first (Nano Banana 2.1 at 1k), then the cheapest others.
 assert.deepEqual(nb2.data.cheaper_options.map((o) => [o.model, o.credits]), [
-  ['nano-banana-2-1', 3], ['gpt-image-2-5-flare', 1], ['gpt-image-2-5-sunburst', 1], ['seedream-5-lite', 2],
+  ['nano-banana-2-1', 3], ['gpt-image-2-6-flare', 1], ['gpt-image-2-6-sunburst', 1], ['seedream-5-lite', 2],
 ])
 // Ties go to the seat's default resolution, then the higher tier: medium costs what low does.
-assert.deepEqual(nb2.data.cheaper_options[2], { model: 'gpt-image-2-5-sunburst', credits: 1, resolution: '3k', quality: 'medium' })
-assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 5): nano-banana-2-1 3 credits (1k); gpt-image-2-5-flare 1 credits (quality medium); gpt-image-2-5-sunburst 1 credits (quality medium); seedream-5-lite 2 credits.')
+assert.deepEqual(nb2.data.cheaper_options[2], { model: 'gpt-image-2-6-sunburst', credits: 1, resolution: '3k', quality: 'medium' })
+assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 5): nano-banana-2-1 3 credits (1k); gpt-image-2-6-flare 1 credits (quality medium); gpt-image-2-6-sunburst 1 credits (quality medium); seedream-5-lite 2 credits.')
 // It survives the desktop's repeated-card strip (loop.ts cuts at the card header).
 assert.match(nb2.text.split('\n\n--- HOW TO PROMPT')[0], /Cheaper per image/)
 // Priced at the asked framing: GPT Image prices a square frame higher, and a key the list
 // lacks is named as unpriced, never quoted at the 16:9 rate.
 const square = await call('estimate_generation_cost', { model: 'nano-banana-2-1', aspectRatio: '1:1' }, quoteCtx)
 assert.deepEqual(square.data.cheaper_options.map((o) => o.model), ['nano-banana-2-1', 'seedream-5-lite', 'flux-3'])
-assert.match(square.text.split('\n')[1], /^Cheaper per image on the price list at 1:1: .*\. Not on the price list at 1:1: gpt-image-2-5-flare, gpt-image-2-5-sunburst; estimate one directly to price it\.$/)
+assert.match(square.text.split('\n')[1], /^Cheaper per image on the price list at 1:1: .*\. Not on the price list at 1:1: gpt-image-2-6-flare, gpt-image-2-6-sunburst; estimate one directly to price it\.$/)
 // Nothing cheaper, nothing said; and video estimates never carry the line.
-const cheapest = await call('estimate_generation_cost', { model: 'gpt-image-2-5-flare', quality: 'low' }, quoteCtx)
+const cheapest = await call('estimate_generation_cost', { model: 'gpt-image-2-6-flare', quality: 'low' }, quoteCtx)
 assert.equal(cheapest.data.cheaper_options, undefined)
 assert.doesNotMatch(cheapest.text, /Cheaper per image|Not on the price list/)
 const video = await call('estimate_generation_cost', { model: 'seedance-2', duration: 8, videoResolution: '1080p' }, quoteCtx)

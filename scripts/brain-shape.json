@@ -45,7 +45,7 @@
     "model": [
       "slates-prompting-elevenlabs",
       "slates-prompting-flux-3",
-      "slates-prompting-gpt-image-2-5",
+      "slates-prompting-gpt-image-2-6",
       "slates-prompting-inworld-tts",
       "slates-prompting-kling-v3",
       "slates-prompting-lip-sync",

@@ -29,15 +29,15 @@ assert.equal(h3Max, h3MaxSix, 'a pasted H3 Max key with two paid references pric
 
 console.log(`cost-key: Kling quotes omitted sound with audio; MiniMax paid references follow each row's free allowance (${h3}, ${h3Max})`)
 
-// Retired seats (2026-10-23 swap and GPT Image 2). The server keeps their keys so older desktops bill;
+// Retired seats (2026-10-23 swap, GPT Image 2, and GPT Image 2.5 on 2026-11-10). The server keeps their keys so older desktops bill;
 // the ops never offer or quote them. `nano-banana-2-1k` is the retired Nano Banana 2 at 1K (4 credits),
 // `nano-banana-2-1-1k` is Nano Banana 2.1 at 1K (3): an agent meaning the second must never get the first.
 const REGISTRY = {
   'nano-banana-2-1k': 4, 'nano-banana-2-2k': 4, 'nano-banana-2-lite': 2, 'nano-banana-pro-4k': 15,
-  'flux-2-max-4k-edit': 8, 'gpt-image-2-med-4k': 9,
-  'nano-banana-2-1-1k': 3, 'nano-banana-2-1-2k': 4, 'flux-3-1k': 3, 'gpt-image-2-5-flare-high-2k': 2,
+  'flux-2-max-4k-edit': 8, 'gpt-image-2-med-4k': 9, 'gpt-image-2-5-flare-high-2k': 2, 'gpt-image-2-5-sunburst-high-3k-sq': 5,
+  'nano-banana-2-1-1k': 3, 'nano-banana-2-1-2k': 4, 'flux-3-1k': 3, 'gpt-image-2-6-flare-high-2k': 2, 'gpt-image-2-6-sunburst-high-3k-sq': 5,
 }
-const RETIRED_KEYS = ['nano-banana-2-1k', 'nano-banana-2-2k', 'nano-banana-2-lite', 'nano-banana-pro-4k', 'flux-2-max-4k-edit', 'gpt-image-2-med-4k']
+const RETIRED_KEYS = ['nano-banana-2-1k', 'nano-banana-2-2k', 'nano-banana-2-lite', 'nano-banana-pro-4k', 'flux-2-max-4k-edit', 'gpt-image-2-med-4k', 'gpt-image-2-5-flare-high-2k', 'gpt-image-2-5-sunburst-high-3k-sq']
 const full = {
   desktop: ctx.desktop,
   cloud: () => ({ get: async path => {
@@ -49,8 +49,8 @@ const full = {
 const quote = async input => (await estimate.run(estimate.input.parse(input), full)).data
 assert.deepEqual([(await quote({ model: 'nano-banana-2-1-1k' })).cost_key, (await quote({ model: 'nano-banana-2-1-1k' })).total_credits], ['nano-banana-2-1-1k', 3])
 assert.equal((await quote({ model: 'nano-banana-2-1', resolution: '1k' })).cost_key, 'nano-banana-2-1-1k')
-const REPLACED = { 'nano-banana-2': 'nano-banana-2-1', 'nano-banana-2-lite': 'nano-banana-2-1', 'nano-banana-pro': 'nano-banana-2-1', 'flux-2-max': 'flux-3', 'gpt-image-2': 'gpt-image-2-5-sunburst' }
-for (const [id, replacement] of Object.entries({ ...REPLACED, 'nano-banana-2-1k': 'nano-banana-2-1', 'nano-banana-pro-4k': 'nano-banana-2-1', 'flux-2-max-4k-edit': 'flux-3', 'gpt-image-2-med-4k': 'gpt-image-2-5-sunburst' })) {
+const REPLACED = { 'nano-banana-2': 'nano-banana-2-1', 'nano-banana-2-lite': 'nano-banana-2-1', 'nano-banana-pro': 'nano-banana-2-1', 'flux-2-max': 'flux-3', 'gpt-image-2': 'gpt-image-2-6-sunburst', 'gpt-image-2-5-flare': 'gpt-image-2-6-flare', 'gpt-image-2-5-sunburst': 'gpt-image-2-6-sunburst' }
+for (const [id, replacement] of Object.entries({ ...REPLACED, 'nano-banana-2-1k': 'nano-banana-2-1', 'nano-banana-pro-4k': 'nano-banana-2-1', 'flux-2-max-4k-edit': 'flux-3', 'gpt-image-2-med-4k': 'gpt-image-2-6-sunburst', 'gpt-image-2-5-flare-high-2k': 'gpt-image-2-6-flare', 'gpt-image-2-5-sunburst-high-3k-sq': 'gpt-image-2-6-sunburst' })) {
   await assert.rejects(quote({ model: id, resolution: '2k' }), new RegExp(`was retired and ${replacement} replaced it`), `${id} is refused and names ${replacement}`)
 }
 const list = ALL_OPERATIONS.find(op => op.id === 'slates_list_available_models')
@@ -59,4 +59,5 @@ const all = await listed()
 for (const key of RETIRED_KEYS) assert.ok(!all.includes(key), `${key} is not listed`)
 assert.deepEqual(all, Object.keys(REGISTRY).filter(k => !RETIRED_KEYS.includes(k)), 'every current key is listed')
 assert.deepEqual(await listed('nano-banana-2-1'), ['nano-banana-2-1-1k', 'nano-banana-2-1-2k'], 'the 2.1 filter lists 2.1 alone')
+assert.deepEqual(await listed('gpt-image'), ['gpt-image-2-6-flare-high-2k', 'gpt-image-2-6-sunburst-high-3k-sq'], 'the GPT Image filter lists 2.6 alone')
 console.log(`cost-key: retired seats are never listed or quoted (${RETIRED_KEYS.length} keys hidden); an estimate for one names its replacement; nano-banana-2-1-1k quotes 2.1 at 1K`)

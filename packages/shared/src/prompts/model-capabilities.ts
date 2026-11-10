@@ -225,6 +225,8 @@ export type GptBackground = (typeof GPT_BACKGROUNDS)[number]
 export type ImageResolution = '1k' | '2k' | '3k' | '4k'
 
 // Product output sizes; schema bounds and metering receipt live in the GPT harvest.
+// GPT Image 2.6 keeps 2.5's size bounds (fal schema, 2026-11-10), so the table
+// and its exported name carry over: slate and slates-api import it by that name.
 export const GPT_IMAGE_25_SIZES: Record<string, Record<string, { width: number; height: number }>> = {
   '1k': {
     '1:1': { width: 1024, height: 1024 },
@@ -464,11 +466,15 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // comes back FIREABLE on a live model, rather than merely openable on a dead
   // one. Do not re-add this row to make a stale id resolve; migrate it.
 
-  // GPT Image 2.5 — 16 references, which IS fal's documented ceiling rather
-  // than a number of ours: `image_urls` carries `maxItems: 16` on both 2.5
-  // endpoints AND on both gpt-image-2 endpoints (schema, read 2026-09-09,
-  // ripped verbatim to second-brain/business/projects/slates/research/
-  // fal-gpt-image-2-5-openapi-schemas.md).
+  // GPT Image 2.6 (fal `openai/gpt-image-2.6/{flare|sunburst}/{text-to-image|edit}`),
+  // replacing 2.5 on 2026-11-10 (Eric). Every field Slates sends has the same
+  // type, bounds and default as on 2.5 (fal OpenAPI, ripped verbatim to
+  // second-brain/business/projects/slates/provider-docs/fal-gpt-image-2-6-openapi-schemas.md;
+  // the diff is in second-brain plans/2026-11-10-slates-gpt-image-2-6-swap.md).
+  // The 2.5 ids are in RETIRED_MODELS below.
+  //
+  // 16 references IS fal's documented ceiling rather than a number of ours:
+  // `image_urls` carries `maxItems: 16` on both edit endpoints.
   //
   // 🚨 IT WAS 10 UNTIL 2026-09-09, AND 10 WAS NEVER ANYBODY'S LIMIT. The
   // comment here used to call it "the 10-reference ceiling ... unchanged by the
@@ -483,14 +489,14 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // pricing.ts). Two SLATES caps sit outside this file and are not model
   // limits either: the MCP's 4,000-character prompt against fal's 32,000, and
   // image quantity, which is a fan-out and has no provider ceiling at all.
-  'gpt-image-2-5-flare': {
+  'gpt-image-2-6-flare': {
     defaultImageResolution: '2k',
     imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
     maxRefImages: 16,
   },
 
-  'gpt-image-2-5-sunburst': {
+  'gpt-image-2-6-sunburst': {
     defaultImageResolution: '3k',
     imageResolutions: ['2k', '3k', '4k'],
     aspectRatios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
@@ -1005,8 +1011,11 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
  * keys and name the replacement instead.
  */
 export const RETIRED_MODELS: Readonly<Record<string, string>> = {
-  // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not downgrade.
-  'gpt-image-2': 'gpt-image-2-5-sunburst',
+  // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not
+  // downgrade. 2026-11-10 (Eric): GPT Image 2.6 replaced 2.5, seat for seat.
+  'gpt-image-2': 'gpt-image-2-6-sunburst',
+  'gpt-image-2-5-flare': 'gpt-image-2-6-flare',
+  'gpt-image-2-5-sunburst': 'gpt-image-2-6-sunburst',
   // 2026-10-23 (Eric): Nano Banana 2.1 replaced every Nano Banana row, FLUX 3 Image replaced FLUX.2 Max.
   'nano-banana-2': 'nano-banana-2-1',
   'nano-banana-2-lite': 'nano-banana-2-1',

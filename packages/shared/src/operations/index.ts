@@ -2365,7 +2365,7 @@ export const estimateGenerationCost: Operation<{
 
     // 1) exact registry cost key
     let key: string | null = byKey.has(input.model) ? input.model : null
-    // 2) image base id + resolution (+ quality for GPT Image 2.5)
+    // 2) image base id + resolution (+ quality for GPT Image)
     if (!key) {
       // IMAGE_MODELS, never a second hand-typed copy: this list is declared
       // below (a runtime read, so no temporal-dead-zone hazard) and is the same
@@ -3362,7 +3362,7 @@ export const generateCharacterIdentity: Operation<{
   projectId: string
   baseAssetId: string
   userNotes?: string
-  model?: 'nano-banana-2-1' | 'gpt-image-2-5-flare' | 'gpt-image-2-5-sunburst'
+  model?: 'nano-banana-2-1' | 'gpt-image-2-6-flare' | 'gpt-image-2-6-sunburst'
   confirm?: boolean
 }> = {
   id: 'slates_generate_character_identity',
@@ -3376,7 +3376,7 @@ export const generateCharacterIdentity: Operation<{
     baseAssetId: z.string().uuid().describe('The base portrait asset the identity is generated from. ' + ASSET_UUID_ONLY),
     userNotes: z.string().optional().describe('Extra instruction, e.g. "use the woman on the left".'),
     model: z
-      .enum(['nano-banana-2-1', 'gpt-image-2-5-flare', 'gpt-image-2-5-sunburst'])
+      .enum(['nano-banana-2-1', 'gpt-image-2-6-flare', 'gpt-image-2-6-sunburst'])
       .optional()
       .describe(`Image model for the sheet. Omit for the sheet tool's seat (${toolModelFor('character-sheet')}), which is what the app's own button uses. Pass another only to compare seats side by side.`),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
@@ -3389,8 +3389,9 @@ export const generateCharacterIdentity: Operation<{
     // and `editImage` gate against; this op was simply missed when the gate was
     // introduced, and the 2.5 swap is what makes it reachable in practice.
     requireGuideRead(ctx, input.model ?? toolModelFor('character-sheet'))
-    if (isGptImageModel(input.model)) {
-      await ctx.desktop().requireCapability('image-models-v3', `${input.model} character identity`)
+    let sentModel: string | undefined = input.model
+    if (input.model && isGptImageModel(input.model)) {
+      sentModel = await gptImageSeatFor(ctx.desktop(), input.model, `${input.model} character identity`)
     } else if (isImageModelV4(input.model)) {
       await ctx.desktop().requireCapability('image-models-v4', `${input.model} character identity`)
     }
@@ -3401,15 +3402,15 @@ export const generateCharacterIdentity: Operation<{
     }
     const quote = await sheetConfirmGate(ctx, input, (input.model ?? toolModelFor('character-sheet')) as ImageModelId)
     if (quote) return quote
-    return ok(
-      await ctx.desktop().post('/agent/characters/generate-identity', {
-        characterId: input.characterId,
-        projectId: input.projectId,
-        baseAssetIds: [input.baseAssetId],
-        userNotes: input.userNotes,
-        model: input.model,
-      })
-    )
+    const made = await ctx.desktop().post('/agent/characters/generate-identity', {
+      characterId: input.characterId,
+      projectId: input.projectId,
+      baseAssetIds: [input.baseAssetId],
+      userNotes: input.userNotes,
+      model: sentModel,
+    })
+    const substitution = input.model && sentModel ? gptImageSubstitution(input.model, sentModel) : ''
+    return ok(made, substitution ? `${substitution} ${JSON.stringify(made)}` : undefined)
   },
 }
 
@@ -3725,8 +3726,8 @@ async function previewAssets(
 // through slate `migrateRetiredModel` before anything reads it.
 export type ImageModelId =
   | 'nano-banana-2-1'
-  | 'gpt-image-2-5-flare'
-  | 'gpt-image-2-5-sunburst'
+  | 'gpt-image-2-6-flare'
+  | 'gpt-image-2-6-sunburst'
   | 'flux-3'
   | 'seedream-5-lite'
 
@@ -3738,16 +3739,49 @@ export const THREE_K_IMAGE_MODELS = Object.keys(MODEL_CAPABILITIES).filter(
 
 export const IMAGE_MODELS = [
   'nano-banana-2-1',
-  'gpt-image-2-5-flare',
-  'gpt-image-2-5-sunburst',
+  'gpt-image-2-6-flare',
+  'gpt-image-2-6-sunburst',
   'flux-3',
   'seedream-5-lite',
 ] as const satisfies readonly ImageModelId[]
 
-/** True for either GPT Image 2.5 seat. Flare and Sunburst differ in latency
+/** True for either GPT Image seat. Flare and Sunburst differ in latency
  *  and routing advice, never in pricing shape or param surface. */
 export function isGptImageModel(model: string | undefined): boolean {
-  return model === 'gpt-image-2-5-flare' || model === 'gpt-image-2-5-sunburst'
+  return model === 'gpt-image-2-6-flare' || model === 'gpt-image-2-6-sunburst'
+}
+
+/**
+ * The GPT Image id to send this desktop for a 2.6 seat: the seat itself on a
+ * desktop advertising `image-models-v5`, else the 2.5 seat it replaced.
+ *
+ * Why not refuse, as v3 and v4 do: 2.6 Sunburst is the default image seat, so a
+ * refusal would stop every plain image call and edit on an installed desktop
+ * (1.6.8 and older know only the 2.5 ids). 2.6 takes 2.5's fields, sizes and
+ * tiers at the same price per cell (metered 2026-11-10, second-brain
+ * plans/2026-11-10-slates-gpt-image-2-6-swap.md), and slates-api keeps 2.5
+ * billable for those desktops, so the 2.5 seat renders what was quoted. The
+ * result names the substitution. A desktop without v3 knows no GPT Image seat
+ * and would render its Nano Banana path at a GPT price, so it still refuses.
+ */
+async function gptImageSeatFor(
+  desktop: Pick<SlatesDesktopClient, 'requireCapability'>,
+  model: string,
+  feature: string
+): Promise<string> {
+  try {
+    await desktop.requireCapability('image-models-v5', feature)
+    return model
+  } catch {
+    // A real failure (desktop not running) throws again here.
+    await desktop.requireCapability('image-models-v3', feature)
+    return Object.keys(RETIRED_MODELS).find((id) => id.startsWith('gpt-image-2-5-') && RETIRED_MODELS[id] === model) ?? model
+  }
+}
+
+/** The line a result carries when `gptImageSeatFor` sent the 2.5 seat. */
+function gptImageSubstitution(asked: string, sent: string): string {
+  return sent === asked ? '' : `${sent} ran in place of ${asked}, at the same price: this Slates desktop predates GPT Image 2.6. Update Slates to run 2.6.`
 }
 
 /**
@@ -3764,8 +3798,8 @@ export function isImageModelV4(model: string | undefined): boolean {
 const HEADLESS_IMAGE_MODEL = 'nano-banana-2-1' satisfies ImageModelId
 
 /**
- * GPT Image 2.5's quality ladder — the full enum fal accepts, all five rungs
- * exposed (Eric, 2026-09-09).
+ * GPT Image's quality ladder (2.5, and 2.6 unchanged) — the full enum fal
+ * accepts, all five rungs exposed (Eric, 2026-09-09).
  *
  * 🚨 THE NAMES MOVED BETWEEN VERSIONS AND THE STRINGS DID NOT. GPT Image 2's
  * `medium` is this model's `high`, and its `high` is this model's `max` — same
@@ -3795,7 +3829,7 @@ export type GptBackgroundId = GptBackground
  * value no model accepts. It used to be a hand-typed eleven-value list whose
  * `9:21` exists in ZERO models; that phantom is gone by construction.
  *
- * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. GPT Image 2.5 takes five of these
+ * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. GPT Image takes five of these
  * ten and the other five would be accepted here. The image param surface has
  * not been audited (aspect ratios, resolution classes, per-model reference
  * caps) — that audit is the named follow-up in
@@ -3808,7 +3842,7 @@ const IMAGE_ASPECT_RATIOS = aspectRatioUnion(IMAGE_MODELS)
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
 // in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
 // videoCostKey): Nano Banana 2.1 and FLUX 3 price per resolution, Seedream is
-// flat, GPT Image 2.5 is quality × resolution-class over ALL FIVE exposed tiers.
+// flat, GPT Image is quality × resolution-class over ALL FIVE exposed tiers.
 //
 // 🚨 THE KEY SUFFIX IS `med` WHILE THE WIRE VALUE IS `medium` — the one
 // tier name that differs between fal's enum and our cost keys, inherited from
@@ -4058,12 +4092,11 @@ export const generateImage: Operation<{
     // New-roster models need a desktop that knows them — an older desktop's
     // allowlist would silently fall back to its Nano Banana path while we quote
     // the new model's price.
+    let sentModel: string = imageModel
     if (input.projectId && isGptImageModel(imageModel)) {
-      // 🚨 v3, NOT v2. GPT Image 2.5 landed 2026-09-09 with new ids and a
-      // five-rung ladder; a desktop that only knows v2 has neither, so it would
-      // fall back to its Nano Banana path while this op quotes a 2.5 price — precisely
-      // the failure the gate was built to stop. Reusing v2 reintroduces it.
-      await ctx.desktop().requireCapability('image-models-v3', `${imageModel} generation`)
+      // A desktop that knows 2.5 and not 2.6 gets the 2.5 seat; one that knows
+      // neither refuses (gptImageSeatFor says why).
+      sentModel = await gptImageSeatFor(ctx.desktop(), imageModel, `${imageModel} generation`)
     } else if (input.projectId && isImageModelV4(imageModel)) {
       await ctx.desktop().requireCapability('image-models-v4', `${imageModel} generation`)
     }
@@ -4150,7 +4183,7 @@ export const generateImage: Operation<{
       }>('/agent/generation/image', {
         projectId: input.projectId,
         prompt: input.prompt,
-        model: imageModel,
+        model: sentModel,
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
@@ -4168,6 +4201,7 @@ export const generateImage: Operation<{
       if (!result.success && !partialFailure) {
         throw new Error(result.error ?? 'Generation failed')
       }
+      const substitution = gptImageSubstitution(imageModel, sentModel)
       if (result.background) {
         const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
         return backgroundSubmitted(
@@ -4175,12 +4209,13 @@ export const generateImage: Operation<{
           ids,
           {
             model: imageModel,
+            ...(substitution ? { ranOn: sentModel } : {}),
             costKey,
             projectId: input.projectId,
             cost_cents: totalCents,
             cost_credits: totalCents,
           },
-          refEcho
+          [refEcho, substitution].filter(Boolean).join(' ')
         )
       }
       const assetList: Array<Record<string, unknown>> = result.assets
@@ -4216,10 +4251,12 @@ export const generateImage: Operation<{
           : `Generated ${assetList.length} image(s) into project ${input.projectId} ` +
             `for ${fmtCredits(totalCents)}. ` +
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
-            (refEcho ? ` ${refEcho}` : '')),
+            (refEcho ? ` ${refEcho}` : '')) +
+          (substitution ? ` ${substitution}` : ''),
         images,
         data: {
           model: imageModel,
+          ...(substitution ? { ranOn: sentModel } : {}),
           costKey,
           projectId: input.projectId,
           aspectRatio: input.aspectRatio,
@@ -4411,13 +4448,12 @@ export const editImage: Operation<{
     const editModel = input.editModel ?? (toolModelFor('image-edit') as NonNullable<typeof input.editModel>)
     requireGuideRead(ctx, editModel)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
+    let sentModel: string = editModel
     if (isGptImageModel(editModel)) {
-      // 🚨 v3, LIKE generateImage — this site was missed once already.
-      // A pre-2.5 desktop advertises v2, so gating the 2.5 seats on v2 lets it
-      // through; `isFalImageModel` is then false for these ids on that build and
-      // handleEditImage falls through to the nano-banana path — NB2 output billed
-      // at a quoted 2.5 price. Exactly the bug the gate exists to stop.
-      await desktop.requireCapability('image-models-v3', `${editModel} editing`)
+      // Like generateImage; this site was missed once already. A desktop that
+      // knows no GPT Image seat falls through to its Nano Banana path at a quoted
+      // GPT price, so it refuses; one that knows 2.5 and not 2.6 gets the 2.5 seat.
+      sentModel = await gptImageSeatFor(desktop, editModel, `${editModel} editing`)
     } else if (isImageModelV4(editModel)) {
       await desktop.requireCapability('image-models-v4', `${editModel} editing`)
     }
@@ -4426,7 +4462,7 @@ export const editImage: Operation<{
     }
     // Past the model's cap the desktop sends the first ones and says so in its reply (`note`).
     const referencesOver = (input.referenceAssetIds?.length ?? 0) - editReferenceCap(editModel)
-    // Nano-Banana family + GPT Image 2.5 edits charge the same key as gen;
+    // Nano Banana and GPT Image edits charge the same key as gen;
     // FLUX / Seedream route to dedicated edit endpoints priced under '-edit' keys.
     // Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts, which
     // this package cannot import: change both together.
@@ -4470,7 +4506,7 @@ export const editImage: Operation<{
       projectId: input.projectId,
       sourceAssetId: input.sourceAssetId,
       prompt: input.prompt,
-      editModel,
+      editModel: sentModel,
       referenceAssetIds: input.referenceAssetIds,
       resolution,
       ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
@@ -4478,6 +4514,7 @@ export const editImage: Operation<{
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Image edit failed')
+    const substitution = gptImageSubstitution(editModel, sentModel)
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
       return backgroundSubmitted(`${editModel} image edit`, ids, {
@@ -4488,7 +4525,8 @@ export const editImage: Operation<{
         cost_cents: totalCents,
         cost_credits: totalCents,
         ...(result.note ? { note: result.note } : {}),
-      }, result.note ? `${result.note}.` : undefined)
+        ...(substitution ? { ranOn: sentModel } : {}),
+      }, [result.note ? `${result.note}.` : '', substitution].filter(Boolean).join(' ') || undefined)
     }
 
     // Inline the edited result so the LLM sees whether the surgery landed —
@@ -4511,10 +4549,12 @@ export const editImage: Operation<{
         `Edited image saved as a new asset in project ${input.projectId} ` +
         `for ${fmtCredits(totalCents)} via ${editModel}. ` +
         `Edit: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` +
-        (result.note ? ` ${result.note}.` : ''),
+        (result.note ? ` ${result.note}.` : '') +
+        (substitution ? ` ${substitution}` : ''),
       images,
       data: {
         editModel,
+        ...(substitution ? { ranOn: sentModel } : {}),
         variant: costKey,
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
@@ -10964,7 +11004,7 @@ export function resolveGuideTopic(topic: string): string | null {
     return 'slates-model-selection'
   }
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2-1'
-  if (t === 'sunburst' || t === 'flare' || t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-5'
+  if (t === 'sunburst' || t === 'flare' || t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-6'
   if (t.startsWith('flux')) return 'slates-prompting-flux-3'
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
@@ -11066,6 +11106,22 @@ function editDistance(a: string, b: string): number {
     }
   }
   return d[a.length][b.length]
+}
+
+/**
+ * The seat that replaced a retired model a topic names, or null. The topic is a model id or a guide name
+ * (`gpt-image-2-5-sunburst`, `gpt-image-2-5`, `slates-prompting-gpt-image-2-5`); it names a retired model
+ * when it is a retired id, or a stem of retired ids that no current id shares (`gpt-image-2-5`, never
+ * `flux` or `nano-banana`). The guide op serves the replacement's guide and says so first, as it does for
+ * a typo: an agent asking for the 2.5 guide learns 2.5 is gone, not that 2.6 is what it asked for.
+ */
+export function retiredModelOfTopic(topic: string): { retired: string; replacement: string } | null {
+  const core = topic.trim().toLowerCase().replace(/^(slates-)?prompting-/, '')
+  if (Object.hasOwn(RETIRED_MODELS, core)) return { retired: core, replacement: RETIRED_MODELS[core] }
+  const under = (id: string) => id === core || id.startsWith(`${core}-`)
+  if (Object.keys(MODEL_CAPABILITIES).some(under)) return null
+  const retired = Object.keys(RETIRED_MODELS).find(under)
+  return retired ? { retired: core, replacement: RETIRED_MODELS[retired] } : null
 }
 
 /**
@@ -11193,6 +11249,13 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const others = (depth === 'card' || depth === 'index') && !input.query ? hyperframesFilesOf(hyperframes, hf.key) : []
       const guide = `${hyperframesGuideHeader(hf.key)}${body}${others.length ? `\n\nIts other files (request each as a topic): ${others.join(', ')}` : ''}`
       return { text: guide, data: { topic: hf.key, tier: 'free', source: 'motion', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+    }
+    // A retired model serves its replacement's guide, said first (retiredModelOfTopic).
+    const retiredTopic = topic && !Object.hasOwn(brain.skills, topic) ? retiredModelOfTopic(topic) : null
+    const replacementGuide = retiredTopic ? resolveGuideTopic(retiredTopic.replacement) : null
+    if (retiredTopic && replacementGuide) {
+      const served = await getPromptingGuide.run({ ...input, topic: replacementGuide }, ctx)
+      return { ...served, text: `${retiredTopic.retired} is retired and ${retiredTopic.replacement} replaced it: served ${replacementGuide}.\n\n${served.text}` }
     }
     // The user's file by its exact name wins over an alias (their `flux-portraits` is theirs, not the FLUX guide);
     // the router's names are reserved in the loader, so none of them reaches here as a local file. A name missing

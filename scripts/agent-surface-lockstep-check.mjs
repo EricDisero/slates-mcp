@@ -453,7 +453,7 @@ console.log('agent-surface-lockstep-check')
 {
   const CHECK = '4 banned-tokens'
   const { findBannedTokens } = await import('../packages/shared/dist/prompts/banned-tokens.js')
-  if (findBannedTokens('photorealistic cinematic', 'image', 'slates-prompting-gpt-image-2-5').length) fail(CHECK, 'Sunburst inherited another model’s warnings')
+  if (findBannedTokens('photorealistic cinematic', 'image', 'slates-prompting-gpt-image-2-6').length) fail(CHECK, 'Sunburst inherited another model’s warnings')
   // The never-use lists live in the model guides, which are the brain's (slates-api brain/). Single-repo CI has
   // no brain, so the Nano Banana list is absent there and this half is skipped, loudly; a local run always has one.
   if (!brain) warn(`${CHECK}: the model guides are in slates-api brain/, absent in single-repo CI; Nano Banana's own warnings skipped`)

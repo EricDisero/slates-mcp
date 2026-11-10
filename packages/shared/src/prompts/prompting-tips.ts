@@ -64,7 +64,7 @@ export type PromptingTipsKey =
   | 'ltx-2-5'
   | 'wan-3'
   | 'nano-banana'
-  | 'gpt-image-2-5'
+  | 'gpt-image-2-6'
   | 'seed-audio'
   | 'eleven-sfx'
   | 'inworld-tts-2'
@@ -420,8 +420,8 @@ const OMNI_FLASH_EDIT: PromptingTipsEntry = {
   ],
 }
 
-const GPT_IMAGE_25: PromptingTipsEntry = {
-  label: 'GPT Image 2.5',
+const GPT_IMAGE_26: PromptingTipsEntry = {
+  label: 'GPT Image 2.6',
   intro: [
     'Two tiers at the same price: Flare is the faster one; Sunburst is the better-quality one, and slower. Explore on Flare, finish on Sunburst.',
     'The photoreal front-runner for people, and the most reliable model for readable text, ordered panels and exact placement.',
@@ -885,7 +885,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'ltx-2-5': LTX_2_5,
   'wan-3': WAN_3,
   'nano-banana': NANO_BANANA,
-  'gpt-image-2-5': GPT_IMAGE_25,
+  'gpt-image-2-6': GPT_IMAGE_26,
 
   'seed-audio': SEED_AUDIO,
   'eleven-sfx': ELEVEN_SFX,

@@ -94,7 +94,7 @@ export interface ShotParams {
   imageResolution?: string
   videoResolution?: string
   quality?: string
-  /** GPT Image 2.5's tier. Always sent explicitly: fal's own default is
+  /** GPT Image's tier. Always sent explicitly: fal's own default is
    *  `high`, which is the third of five rungs, not the top of two. */
   gptQuality?: GptQuality
   /** GPT Image's alpha switch. `auto` is fal's default and ours; `transparent`

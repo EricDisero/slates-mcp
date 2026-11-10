@@ -110,8 +110,8 @@ const specs = [
     kind: 'production-skill',
   },
   {
-    output: 'reference-gpt-image-2-5.md',
-    source: join(brain, 'slates-prompting-gpt-image-2-5.md'),
+    output: 'reference-gpt-image-2-6.md',
+    source: join(brain, 'slates-prompting-gpt-image-2-6.md'),
     kind: 'production-skill',
   },
   {
@@ -127,8 +127,8 @@ const specs = [
 ]
 
 const portableModels = [
-  { id: 'gpt-image-2-5-sunburst', guide: 'reference-gpt-image-2-5.md' },
-  { id: 'gpt-image-2-5-flare', guide: 'reference-gpt-image-2-5.md' },
+  { id: 'gpt-image-2-6-sunburst', guide: 'reference-gpt-image-2-6.md' },
+  { id: 'gpt-image-2-6-flare', guide: 'reference-gpt-image-2-6.md' },
   { id: 'nano-banana-2-1', guide: 'reference-nano-banana.md' },
   { id: 'seedance-2.5', guide: 'reference-seedance-2-5.md' },
   { id: 'seedance-2', guide: 'reference-seedance.md' },
@@ -157,7 +157,7 @@ function sha256(value) {
 // Longest-first so `slates-prompting-kling-v3` cannot be partly eaten.
 const crossRefs = [
   ['slates-prompting-seedance-2-5', 'reference-seedance-2-5.md'],
-  ['slates-prompting-gpt-image-2-5', 'reference-gpt-image-2-5.md'],
+  ['slates-prompting-gpt-image-2-6', 'reference-gpt-image-2-6.md'],
   ['slates-prompting-omni-flash', 'reference-omni-flash.md'],
   ['slates-model-selection', 'SKILL.md'],
   ['slates-prompting-nano-banana-2-1', 'reference-nano-banana.md'],

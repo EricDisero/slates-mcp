@@ -286,7 +286,7 @@ for (const [id, input, route] of sheets) {
 }
 {
   // Only a GPT seat's key moves with the framing and tier, so the wrong ones show here.
-  const model = 'gpt-image-2-5-sunburst'
+  const model = 'gpt-image-2-6-sunburst'
   const host = fakeHost(10)
   await op(sheets[0][0]).run({ ...sheets[0][1], model }, host.ctx)
   assert.deepEqual(host.quoted, [operations.imageCostKey(model, defaultImageResolutionFor(model), SHEET_TOOL_GPT_QUALITY, SHEET_TOOL_ASPECT_RATIO)], 'a GPT seat is quoted at the sheet framing and tier')

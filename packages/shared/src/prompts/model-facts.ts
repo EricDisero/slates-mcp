@@ -37,7 +37,7 @@ import { MODEL_CAPABILITIES } from './model-capabilities.js'
 import { DEFAULT_IMAGE_SEAT, TOOL_SEAT, type BuiltInTool } from './generation-policy.js'
 
 /** Authoring presets only: these do not claim hosted ChatGPT API capabilities. */
-export const CHATGPT_FRAMING_RATIOS = MODEL_CAPABILITIES['gpt-image-2-5-sunburst'].aspectRatios
+export const CHATGPT_FRAMING_RATIOS = MODEL_CAPABILITIES['gpt-image-2-6-sunburst'].aspectRatios
 export function composeChatGptFraming(prompt: string, aspectRatio?: string): string {
   if (aspectRatio === undefined) return prompt
   if (!CHATGPT_FRAMING_RATIOS.includes(aspectRatio as typeof CHATGPT_FRAMING_RATIOS[number])) {
@@ -84,7 +84,7 @@ export interface ModelFact {
    * performance and lip-sync work and the only engine behind Motion Transfer and
    * Lip Sync. Recorded in the vault's prompting-ssot.md the same day.
    *
-   * IMAGE (Eric, 2026-09-15): GPT IMAGE 2.5 SUNBURST IS THE DEFAULT IMAGE MODEL, at
+   * IMAGE (Eric, 2026-09-15; 2.6 since 2026-11-10): GPT IMAGE SUNBURST IS THE DEFAULT IMAGE MODEL, at
    * `high` and 3k, in agent routing as it has been in the app picker since
    * 2026-09-09. Nano Banana 2.1 keeps the only headless path, so an image call
    * with no project still runs there. Changing the
@@ -237,22 +237,25 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'The all-rounder and the only image seat with a headless path: holds many subjects coherently in one frame, keeps what an edit leaves alone, and is the start-frame for legible in-scene text. It reasons before it draws, so dense compositions and hero frames land without a premium tier.',
   },
   {
-    id: 'gpt-image-2-5-flare',
+    id: 'gpt-image-2-6-flare',
     route: 'generate',
     tier: 'specialist',
-    label: 'GPT Image 2.5 Flare',
+    // GPT Image 2.6 replaced 2.5 on 2026-11-10 (Eric), seat for seat; stored
+    // 2.5 ids migrate through RETIRED_MODELS. The 2.5 notes' comparisons with
+    // GPT Image 2 were OpenAI's for 2.5 and are not carried over.
+    label: 'GPT Image 2.6 Flare',
     kind: 'image',
-    ...caps('gpt-image-2-5-flare'),
-    notes: 'THE FAST GPT IMAGE SEAT — OpenAI\'s small model, optimized for SPEED, quality COMPARABLE to GPT Image 2 (not better) at roughly half the latency. Route here when speed matters: drafts, exploration, volume. TEXT / DIAGRAM / PANEL work — character sheets, shot grids, text-bearing panels. When quality outranks speed, escalate to Sunburst. Own content filter, distinct from Gemini\'s. Killed by a head-to-head at the intended crop going the other way.',
+    ...caps('gpt-image-2-6-flare'),
+    notes: 'THE FAST GPT IMAGE SEAT — OpenAI\'s small model, optimized for SPEED. Route here when speed matters: drafts, exploration, volume. TEXT / DIAGRAM / PANEL work — character sheets, shot grids, text-bearing panels. When quality outranks speed, escalate to Sunburst. Own content filter, distinct from Gemini\'s. Killed by a head-to-head at the intended crop going the other way.',
   },
   {
-    id: 'gpt-image-2-5-sunburst',
+    id: 'gpt-image-2-6-sunburst',
     route: 'generate',
     tier: 'default',
-    label: 'GPT Image 2.5 Sunburst',
+    label: 'GPT Image 2.6 Sunburst',
     kind: 'image',
-    ...caps('gpt-image-2-5-sunburst'),
-    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, higher quality than GPT Image 2, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame — its widest lead. Explore on Flare, finish on Sunburst.',
+    ...caps('gpt-image-2-6-sunburst'),
+    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame. Explore on Flare, finish on Sunburst.',
   },
   {
     id: 'flux-3',
@@ -271,7 +274,7 @@ export const MODEL_FACTS: ModelFact[] = [
     label: 'Seedream 5 Lite',
     kind: 'image',
     ...caps('seedream-5-lite'),
-    notes: 'Cheapest flat-priced image seat (GPT Image 2.5 at low quality costs less per image). Less filtered, though it can still reject a prompt. Routes to its edit endpoint when references are present.',
+    notes: 'Cheapest flat-priced image seat (GPT Image at low quality costs less per image). Less filtered, though it can still reject a prompt. Routes to its edit endpoint when references are present.',
   },
   {
     id: 'seedance-2',

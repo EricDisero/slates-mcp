@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { ALL_OPERATIONS, brainFiles, useBrainSource } from '../packages/shared/dist/index.js'
-import { getPromptingGuide, nearestGuideName, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
+import { getPromptingGuide, nearestGuideName, resolveGuideTopic, retiredModelOfTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
 import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
 import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
@@ -99,8 +99,20 @@ assert.deepEqual(nearestGuideName('slates-captoinz', guideNames), { name: 'slate
 assert.equal(nearestGuideName('slates-moxiox', guideNames), null, 'two edits in 6 letters')
 assert.deepEqual(nearestGuideName('slates-cutz', guideNames), { name: 'slates-cuts' }, 'one edit in 4 letters')
 // A version digit is never a typo: another version is another model's guide.
-for (const other of ['slates-prompting-seedance-2-0', 'slates-prompting-gpt-image-2', 'slates-prompting-kling-v2', 'slates-prompting-flux-2']) assert.equal(nearestGuideName(other, guideNames), null, other)
-assert.deepEqual(nearestGuideName('slates-prompting-gpt-imgae-2-5', guideNames), { name: 'slates-prompting-gpt-image-2-5' })
+for (const other of ['slates-prompting-seedance-2-0', 'slates-prompting-gpt-image-2', 'slates-prompting-gpt-image-2-5', 'slates-prompting-kling-v2', 'slates-prompting-flux-2']) assert.equal(nearestGuideName(other, guideNames), null, other)
+assert.deepEqual(nearestGuideName('slates-prompting-gpt-imgae-2-6', guideNames), { name: 'slates-prompting-gpt-image-2-6' })
+// A retired model, by id or by its old guide's name, serves its replacement's guide and says so first.
+assert.deepEqual(retiredModelOfTopic('gpt-image-2-5'), { retired: 'gpt-image-2-5', replacement: 'gpt-image-2-6-flare' })
+for (const current of ['gpt-image-2-6-sunburst', 'gpt-image', 'nano-banana', 'flux', 'nano-banana-2-1', 'slates-captions']) assert.equal(retiredModelOfTopic(current), null, current)
+const gpt26 = 'slates-prompting-gpt-image-2-6'
+for (const [asked, retired, guide] of [['gpt-image-2-5', 'gpt-image-2-5', gpt26], ['slates-prompting-gpt-image-2-5', 'gpt-image-2-5', gpt26], ['gpt-image-2-5-sunburst', 'gpt-image-2-5-sunburst', gpt26], ['gpt-image-2', 'gpt-image-2', gpt26], ['nano-banana-2', 'nano-banana-2', 'slates-prompting-nano-banana-2-1']]) {
+  const served = await run({ topic: asked })
+  assert(served.text.startsWith(`${retired} is retired and `), `${asked}: ${served.text.slice(0, 120)}`)
+  assert.equal(served.data.topic, guide, asked)
+}
+const currentGuide = await run({ topic: 'gpt-image-2-6-sunburst' })
+assert.equal(currentGuide.data.topic, 'slates-prompting-gpt-image-2-6')
+assert(!currentGuide.text.includes('is retired'), 'a current seat is served without a retirement note')
 assert.equal(nearestGuideName(`slates-captions${'s'.repeat(120)}`, guideNames), null, 'a topic past 128 characters is not compared')
 assert.equal(nearestGuideName('quux flibbertigibbet', guideNames), null)
 assert.equal(resolveGuideTopic('previs-blocking'), null, 'a model id never resolves by nearness')

@@ -48,8 +48,8 @@ for (const flags of [[], ['--tools=compact'], ['--tools=flat']]) {
     assert.equal(invalid.isError, true)
     assert.deepEqual((await client.listTools()).tools, initial, 'an invalid load preserves the list')
     // Missing required settings returns before any transport or generation, once the model's guide is read.
-    await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: 'gpt-image-2-5-sunburst' } })
-    const call = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'photorealistic cinematic room', model: 'gpt-image-2-5-sunburst' } })
+    await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: 'gpt-image-2-6-sunburst' } })
+    const call = await client.callTool({ name: 'slates_generate_image', arguments: { prompt: 'photorealistic cinematic room', model: 'gpt-image-2-6-sunburst' } })
     assert.equal(call.structuredContent.requires_clarification, true)
     assert.equal(call.structuredContent.prompt_warning, undefined)
     for (const args of [{ topic: 'sunburst' }, { topic: 'cinematic', query: 'near-silhouette' }, { topic: 'cinematic', depth: 'full' }]) {

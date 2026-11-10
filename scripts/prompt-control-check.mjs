@@ -185,6 +185,36 @@ await call('generate_image', {...override, projectId: '11111111-1111-4111-8111-1
 assert.equal(posts.at(-1).body.gptQuality, 'max')
 assert.equal(posts.at(-1).body.resolution, '2k')
 
+// GPT Image 2.6 on a desktop that predates it (no image-models-v5, 1.6.8 and older): the 2.5 seat it
+// replaced runs at the quoted price and the result says so; a desktop with no GPT Image at all (no v3) refuses.
+{
+  const projectId = '11111111-1111-4111-8111-111111111111', sourceAssetId = '66666666-6666-4666-8666-666666666666'
+  const desktopWithout = (missing) => {
+    const sent = []
+    return { sent, ctx: { cloud: () => ({ get: async () => registry }), desktop: () => ({
+      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      post: async (path, body) => { sent.push({ path, body }); return { success: true, background: true, generationId: 'mock-generation' } },
+    }) } }
+  }
+  assert.equal(model, 'gpt-image-2-6-sunburst', 'the default image seat is GPT Image 2.6 Sunburst')
+  const older = desktopWithout(['image-models-v5'])
+  const made = await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, older.ctx)
+  assert.equal(older.sent[0].body.model, 'gpt-image-2-5-sunburst')
+  assert.match(made.text, /gpt-image-2-5-sunburst ran in place of gpt-image-2-6-sunburst, at the same price/)
+  assert.deepEqual([made.data.model, made.data.ranOn], ['gpt-image-2-6-sunburst', 'gpt-image-2-5-sunburst'])
+  const edited = await call('edit_image', { projectId, sourceAssetId, prompt: 'Make the jacket red', editModel: 'gpt-image-2-6-flare', resolution: '2k', background: true }, older.ctx)
+  assert.equal(older.sent[1].body.editModel, 'gpt-image-2-5-flare')
+  assert.match(edited.text, /gpt-image-2-5-flare ran in place of gpt-image-2-6-flare/)
+  const current = desktopWithout([])
+  const fresh = await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, current.ctx)
+  assert.equal(current.sent[0].body.model, 'gpt-image-2-6-sunburst')
+  assert.doesNotMatch(fresh.text, /ran in place of/)
+  const ancient = desktopWithout(['image-models-v5', 'image-models-v3'])
+  await assert.rejects(() => call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, ancient.ctx), /Update Slates: image-models-v3/)
+  assert.deepEqual(ancient.sent, [], 'a desktop with no GPT Image refuses before any request')
+  console.log('prompt-control: GPT Image 2.6 runs as 2.5 on a desktop without image-models-v5 and says so; without v3 it refuses')
+}
+
 // The plain text style came with text-fonts: alone it still asks for the token, so a desktop without it
 // refuses in words before any request, on add, update and captions; another style asks for nothing new.
 {
