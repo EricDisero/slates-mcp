@@ -322,6 +322,9 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   await assert.rejects(() => call('generate_video', gen({ duration: 12 }), longer.ctx), /runs Gemini Omni Flash 1\.1, which stops at 10s/)
   await assert.rejects(() => call('edit_video', edit, longer.ctx), /stops at 10s/)
   await assert.rejects(() => call('create_shot', { projectId, prompt: 'Room', model: 'omni-flash-1-2', params: { duration: 12 } }, longer.ctx), /stops at 10s/)
+  // Refused before the quote, too: the agent is never asked to confirm a job the substitution would refuse.
+  await assert.rejects(() => call('generate_video', gen({ duration: 12, confirm: undefined }), longer.ctx), /stops at 10s/)
+  await assert.rejects(() => call('edit_video', { ...edit, confirm: undefined }, longer.ctx), /stops at 10s/)
   assert.deepEqual(longer.sent, [], 'nothing reaches the desktop')
   // A desktop current with 1.2 runs 12s.
   const current = omniDesktop([], 12)

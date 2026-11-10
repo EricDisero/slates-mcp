@@ -5855,6 +5855,9 @@ export const generateVideo: Operation<{
           `A Seedance or Wan 3.0 video reference bills on combined input+output seconds (on a Seedance 2.5 Face row, max(input, output) + output), and Omni Flash caps each clip at ${omniFlashRefClipMax}s. Pass videoReferenceSecondsEach with exactly ${pluralRefCount} duration${pluralRefCount === 1 ? '' : 's'}, in the same order as videoReferenceAssetIds (durations are shown in slates_list_assets), so the pre-flight quote matches the bill.`,
       })
     }
+    // A desktop without Omni Flash 1.2 gets the 1.1 seat at the same price (`desktopModelId`), resolved before the
+    // quote so a job it cannot run is refused before the agent is asked to confirm it.
+    const seat = await desktopModelId(ctx.desktop(), input.model as string, `${input.model} generation`, input.duration)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const costKey = input.model === 'minimax-h3-max'
@@ -5986,8 +5989,6 @@ export const generateVideo: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    // A desktop without Omni Flash 1.2 gets the 1.1 seat at the same price (`desktopModelId`).
-    const seat = await desktopModelId(desktop, input.model as string, `${input.model} generation`, input.duration)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -6880,6 +6881,9 @@ export const editVideo: Operation<{
           '.'
       )
     }
+    // A desktop without Omni Flash 1.2 gets the 1.1 edit seat at the same price, on a clip 1.1 takes
+    // (`desktopModelId`), resolved before the quote so a job it cannot run is refused before the agent confirms it.
+    const seat = await desktopModelId(desktop, model as string, `${model} editing`, clipSeconds)
     const billedSeconds = Math.min(maxClipSeconds, Math.max(minClipSeconds, Math.ceil(clipSeconds - 0.05)))
     // Three engines, three key shapes — only Seedance's carries a resolution and
     // a face route, because only its price moves with them.
@@ -6929,8 +6933,6 @@ export const editVideo: Operation<{
       }
     }
 
-    // A desktop without Omni Flash 1.2 gets the 1.1 edit seat at the same price, on a clip 1.1 takes (`desktopModelId`).
-    const seat = await desktopModelId(desktop, model as string, `${model} editing`, clipSeconds)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
