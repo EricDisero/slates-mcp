@@ -39,7 +39,7 @@
     "slates-project-organization",
     "slates-prompting-elevenlabs",
     "slates-prompting-flux-3",
-    "slates-prompting-gpt-image-2-5",
+    "slates-prompting-gpt-image-2-6",
     "slates-prompting-inworld-tts",
     "slates-prompting-kling-v3",
     "slates-prompting-lip-sync",
@@ -215,9 +215,9 @@
       "summary": "Prompt or edit images with FLUX 3 Image (flux-3)."
     },
     {
-      "key": "slates-prompting-gpt-image-2-5",
+      "key": "slates-prompting-gpt-image-2-6",
       "tier": "license",
-      "summary": "Prompt or edit images with GPT Image 2.5 Flare or Sunburst."
+      "summary": "Prompt or edit images with GPT Image 2.6 Flare or Sunburst."
     },
     {
       "key": "slates-prompting-inworld-tts",
@@ -257,7 +257,7 @@
     {
       "key": "slates-prompting-omni-flash",
       "tier": "license",
-      "summary": "Prompt Gemini Omni Flash 1.1 video generation or edits (omni-flash, omni-flash-edit)."
+      "summary": "Prompt Gemini Omni Flash 1.2 video generation or edits (omni-flash-1-2, omni-flash-1-2-edit)."
     },
     {
       "key": "slates-prompting-seed-audio",
