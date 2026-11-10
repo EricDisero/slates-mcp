@@ -1,13 +1,32 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { ALL_OPERATIONS, brainFiles, useBrainSource } from '../packages/shared/dist/index.js'
 import { getPromptingGuide, nearestGuideName, resolveGuideTopic, retiredModelOfTopic } from '../packages/shared/dist/operations/index.js'
 import { SlatesCloudHttpError } from '../packages/shared/dist/clients/cloud.js'
 import { HYPERFRAMES_FILES, HYPERFRAMES_SKILL_NAMES } from '../packages/shared/dist/skills/hyperframes-content.js'
 import { publicGuideName, whiteLabel } from '../packages/shared/dist/skills/hyperframes.js'
 import { PUBLIC_SKILLS_DIR, brainOrSkip } from './brain-source.mjs'
+import { spawnSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+// A machine with no brain (nothing connected, nothing cached), run as a child in an empty home folder below.
+// `omni-flash` is a retired id and the stem of the live guide's name; the op once sent that topic back to itself
+// for ever, so the parent kills this run after a timeout and fails.
+if (process.argv[2] === '--no-brain') {
+  const noLogin = { cloud: () => ({ get: async () => { throw Object.assign(new Error('No Slates cloud token found.'), { code: 'CLOUD_TOKEN_MISSING' }) } }), desktop: () => { throw new Error('unexpected desktop call') } }
+  const ask = topic => getPromptingGuide.run(getPromptingGuide.input.parse({ topic }), noLogin)
+  for (const topic of ['omni-flash', 'omni-flash-edit', 'slates-prompting-omni-flash', 'omni-flash-1-2', 'omni-flash-1-2-edit']) {
+    const answer = await ask(topic)
+    assert.equal(answer.data.topic, 'slates-prompting-omni-flash', topic)
+    assert(answer.data.unavailable, `${topic}: answered as a guide not on this machine`)
+    assert(!answer.text.includes('is retired'), `${topic}: the live guide's own name is not a retired model`)
+  }
+  const gpt25 = await ask('gpt-image-2-5')
+  assert(gpt25.text.startsWith('gpt-image-2-5 is retired and gpt-image-2-6 replaced it') && gpt25.data.unavailable, gpt25.text.slice(0, 160))
+  process.exit(0)
+}
 
 // The guides are the card and router plus the brain (slates-api brain/), held as a member's server holds them.
 const brain = brainOrSkip('guide-discovery')
@@ -102,13 +121,24 @@ assert.deepEqual(nearestGuideName('slates-cutz', guideNames), { name: 'slates-cu
 for (const other of ['slates-prompting-seedance-2-0', 'slates-prompting-gpt-image-2', 'slates-prompting-gpt-image-2-5', 'slates-prompting-kling-v2', 'slates-prompting-flux-2']) assert.equal(nearestGuideName(other, guideNames), null, other)
 assert.deepEqual(nearestGuideName('slates-prompting-gpt-imgae-2-6', guideNames), { name: 'slates-prompting-gpt-image-2-6' })
 // A retired model, by id or by its old guide's name, serves its replacement's guide and says so first.
-assert.deepEqual(retiredModelOfTopic('gpt-image-2-5'), { retired: 'gpt-image-2-5', replacement: 'gpt-image-2-6-flare' })
+// A stem covering both seats names the family, never one seat.
+assert.deepEqual(retiredModelOfTopic('gpt-image-2-5'), { retired: 'gpt-image-2-5', replacement: 'gpt-image-2-6' })
+assert.deepEqual(retiredModelOfTopic('slates-prompting-gpt-image-2-5'), { retired: 'gpt-image-2-5', replacement: 'gpt-image-2-6' })
+assert.deepEqual(retiredModelOfTopic('omni-flash-1-1'), null, 'a stem no retired id carries is not retired')
+// The live guide's own name is not a retired model, though `omni-flash` is the retired 1.1 id.
+for (const live of ['omni-flash', 'omni-flash-edit', 'slates-prompting-omni-flash']) assert.equal(retiredModelOfTopic(live), null, live)
 for (const current of ['gpt-image-2-6-sunburst', 'gpt-image', 'nano-banana', 'flux', 'nano-banana-2-1', 'slates-captions']) assert.equal(retiredModelOfTopic(current), null, current)
 const gpt26 = 'slates-prompting-gpt-image-2-6'
 for (const [asked, retired, guide] of [['gpt-image-2-5', 'gpt-image-2-5', gpt26], ['slates-prompting-gpt-image-2-5', 'gpt-image-2-5', gpt26], ['gpt-image-2-5-sunburst', 'gpt-image-2-5-sunburst', gpt26], ['gpt-image-2', 'gpt-image-2', gpt26], ['nano-banana-2', 'nano-banana-2', 'slates-prompting-nano-banana-2-1']]) {
   const served = await run({ topic: asked })
   assert(served.text.startsWith(`${retired} is retired and `), `${asked}: ${served.text.slice(0, 120)}`)
   assert.equal(served.data.topic, guide, asked)
+}
+assert(!(await run({ topic: 'gpt-image-2-5' })).text.split('\n')[0].includes('flare'), 'the 2.5 note names no one seat')
+for (const live of ['omni-flash', 'omni-flash-edit', 'slates-prompting-omni-flash']) {
+  const served = await run({ topic: live })
+  assert.equal(served.data.topic, 'slates-prompting-omni-flash', live)
+  assert(!served.text.includes('is retired'), `${live}: served without a retirement note`)
 }
 const currentGuide = await run({ topic: 'gpt-image-2-6-sunburst' })
 assert.equal(currentGuide.data.topic, 'slates-prompting-gpt-image-2-6')
@@ -203,4 +233,10 @@ assert((await run({ topic: 'seedance-2.5' }, offline)).text.length > 0)
 assert.equal(offline.calls, 0, 'a free guide must not reach the cloud')
 assert(!Object.hasOwn(SKILLS, privateName))
 assert(ALL_OPERATIONS.some(op => op.id === getPromptingGuide.id))
+const home = mkdtempSync(join(tmpdir(), 'slates-guide-discovery-home-'))
+const noBrain = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--no-brain'], {
+  env: { ...process.env, HOME: home, USERPROFILE: home, SLATES_BRAIN_DIR: '' }, stdio: 'inherit', timeout: 30_000,
+})
+rmSync(home, { recursive: true, force: true })
+assert.equal(noBrain.status, 0, `with no brain the Omni Flash topics answer (${noBrain.signal ? `killed by ${noBrain.signal} after the timeout: a loop` : `exit ${noBrain.status}`})`)
 console.log(`Guide discovery: ${found.size} source-matched guides (${HYPERFRAMES_SKILL_NAMES.length} HyperFrames), catalog ${catalogChars} characters (ceiling ${CATALOG_CEILING}), natural briefs, ad ranking, pagination, aliases, near-miss names, sections, manual and private access passed.`)

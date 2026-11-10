@@ -11235,14 +11235,25 @@ function editDistance(a: string, b: string): number {
  * when it is a retired id, or a stem of retired ids that no current id shares (`gpt-image-2-5`, never
  * `flux` or `nano-banana`). The guide op serves the replacement's guide and says so first, as it does for
  * a typo: an agent asking for the 2.5 guide learns 2.5 is gone, not that 2.6 is what it asked for.
+ *
+ * A stem covering several seats names their family (`gpt-image-2-6`), never one of them. A topic under the
+ * stem of its replacement's own guide is that guide, not a retired model: `omni-flash` is the retired 1.1 id
+ * and also the name of the live `slates-prompting-omni-flash`, so it and `omni-flash-edit` are null.
  */
 export function retiredModelOfTopic(topic: string): { retired: string; replacement: string } | null {
   const core = topic.trim().toLowerCase().replace(/^(slates-)?prompting-/, '')
-  if (Object.hasOwn(RETIRED_MODELS, core)) return { retired: core, replacement: RETIRED_MODELS[core] }
   const under = (id: string) => id === core || id.startsWith(`${core}-`)
-  if (Object.keys(MODEL_CAPABILITIES).some(under)) return null
-  const retired = Object.keys(RETIRED_MODELS).find(under)
-  return retired ? { retired: core, replacement: RETIRED_MODELS[retired] } : null
+  const retiredIds = Object.hasOwn(RETIRED_MODELS, core) ? [core]
+    : Object.keys(MODEL_CAPABILITIES).some(under) ? []
+    : Object.keys(RETIRED_MODELS).filter(under)
+  if (retiredIds.length === 0) return null
+  const seats = [...new Set(retiredIds.map(id => RETIRED_MODELS[id]))].map(id => id.split('-'))
+  let common = 0
+  while (common < seats[0].length && seats.every(seat => seat[common] === seats[0][common])) common++
+  const replacement = seats[0].slice(0, common || seats[0].length).join('-')
+  const stem = resolveGuideTopic(replacement)?.replace(/^slates-prompting-/, '')
+  if (stem && (core === stem || core.startsWith(`${stem}-`))) return null
+  return { retired: core, replacement }
 }
 
 /**
@@ -11374,7 +11385,8 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
     // A retired model serves its replacement's guide, said first (retiredModelOfTopic).
     const retiredTopic = topic && !Object.hasOwn(brain.skills, topic) ? retiredModelOfTopic(topic) : null
     const replacementGuide = retiredTopic ? resolveGuideTopic(retiredTopic.replacement) : null
-    if (retiredTopic && replacementGuide) {
+    // Never back to the topic asked: a replacement guide that is the asked topic falls through to it.
+    if (retiredTopic && replacementGuide && replacementGuide !== topic) {
       const served = await getPromptingGuide.run({ ...input, topic: replacementGuide }, ctx)
       return { ...served, text: `${retiredTopic.retired} is retired and ${retiredTopic.replacement} replaced it: served ${replacementGuide}.\n\n${served.text}` }
     }
