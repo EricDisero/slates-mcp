@@ -34,14 +34,15 @@ interface Check {
 
 /** Every capability an op checks with `requireCapability`, and what needs it.
  *  scripts/agent-surface-lockstep-check.mjs (check 11) fails when this list and
- *  the ops' call sites disagree. */
-const REQUIRED_CAPABILITIES: Array<[string, string]> = [
+ *  the ops' call sites disagree. A third entry marks a token whose ops fall back
+ *  without it: what runs instead, so doctor reports it and still passes. */
+const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: string]> = [
   ['shots', 'Shots — the whole shot-list surface'],
   ['background-generation', 'background: true on any generate op'],
   ['image-references', 'reference images on image generation'],
   ['image-models-v3', 'GPT Image at all (five quality tiers)'],
   ['image-models-v4', 'nano-banana-2-1 / flux-3'],
-  ['image-models-v5', 'gpt-image-2-6-flare / gpt-image-2-6-sunburst (without it, the 2.5 seats run in their place)'],
+  ['image-models-v5', 'gpt-image-2-6-flare / gpt-image-2-6-sunburst', 'GPT Image 2.5 runs in their place, at the same price, until Slates updates'],
   ['edit-image', 'image edits'],
   ['edit-video', 'video edits'],
   ['audio-generation', 'the audio lane'],
@@ -197,14 +198,16 @@ export async function runDoctor(): Promise<void> {
   // 4. Desktop capabilities vs the ops that need them.
   if (health) {
     const have = new Set(health.capabilities ?? [])
-    const missing = REQUIRED_CAPABILITIES.filter(([cap]) => !have.has(cap))
+    const missing = REQUIRED_CAPABILITIES.filter(([cap, , fallback]) => !have.has(cap) && !fallback)
+    const fallingBack = REQUIRED_CAPABILITIES.filter(([cap, , fallback]) => !have.has(cap) && fallback)
+    const advisory = fallingBack.map(([cap, what, fallback]) => `${cap} absent (${what}): ${fallback}`).join('; ')
     checks.push({
       name: 'Desktop capabilities',
       ok: missing.length === 0,
       detail:
-        missing.length === 0
+        (missing.length === 0
           ? `${have.size} capabilities, all the ops need present`
-          : `missing: ${missing.map(([cap, what]) => `${cap} (${what})`).join(', ')}`,
+          : `missing: ${missing.map(([cap, what]) => `${cap} (${what})`).join(', ')}`) + (advisory ? `; ${advisory}` : ''),
       fix: 'Update Slates (Settings → Check for Updates). The ops that need these will refuse until you do.',
     })
   }
