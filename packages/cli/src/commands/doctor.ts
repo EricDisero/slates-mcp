@@ -45,6 +45,7 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['image-models-v5', 'gpt-image-2-6-flare / gpt-image-2-6-sunburst', 'GPT Image 2.5 runs in their place, at the same price, until Slates updates'],
   ['edit-image', 'image edits'],
   ['edit-video', 'video edits'],
+  ['video-models-v2', 'omni-flash-1-2 / omni-flash-1-2-edit', 'Gemini Omni Flash 1.1 runs in their place up to 10s, at the same price, until Slates updates'],
   ['audio-generation', 'the audio lane'],
   ['voices', 'the preset voice shelf'],
   ['timeline', 'the timeline'],
