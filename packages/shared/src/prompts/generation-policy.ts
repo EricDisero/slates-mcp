@@ -31,8 +31,13 @@ export const BUILT_IN_TOOLS = ['character-sheet', 'environment-plate', 'grid-ext
 export type BuiltInTool = typeof BUILT_IN_TOOLS[number]
 export const DEFAULT_IMAGE_SEAT = 'default-image' as const
 export const TOOL_SEAT: Record<BuiltInTool, typeof DEFAULT_IMAGE_SEAT | string> = {
-  'character-sheet': DEFAULT_IMAGE_SEAT,
-  'environment-plate': DEFAULT_IMAGE_SEAT,
+  // Pinned to the seat they ran on when Seedream 5.5 became the default image
+  // model (2026-11-16). A sheet is a panelled identity frame built from one base
+  // image, the layout work GPT Image is routed for, and on Seedream 5.5 every
+  // input image bills on its own; moving the sheets is a pick with a side-by-side
+  // of its own, not a side effect of the default changing.
+  'character-sheet': 'gpt-image-2-6-sunburst',
+  'environment-plate': 'gpt-image-2-6-sunburst',
   // Pinned: the image viewer offers grid extraction a fixed short list of seats,
   // and the cell-extraction prompt has a variant per seat family. Moving it is a
   // picker and a prompt change first.

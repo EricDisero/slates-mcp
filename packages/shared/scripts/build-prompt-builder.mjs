@@ -115,6 +115,11 @@ const specs = [
     kind: 'production-skill',
   },
   {
+    output: 'reference-seedream-5-5.md',
+    source: join(brain, 'slates-prompting-seedream-5-5.md'),
+    kind: 'production-skill',
+  },
+  {
     output: 'reference-omni-flash.md',
     source: join(brain, 'slates-prompting-omni-flash.md'),
     kind: 'production-skill',
@@ -127,6 +132,7 @@ const specs = [
 ]
 
 const portableModels = [
+  { id: 'seedream-5-5', guide: 'reference-seedream-5-5.md' },
   { id: 'gpt-image-2-6-sunburst', guide: 'reference-gpt-image-2-6.md' },
   { id: 'gpt-image-2-6-flare', guide: 'reference-gpt-image-2-6.md' },
   { id: 'nano-banana-2-1', guide: 'reference-nano-banana.md' },
@@ -158,6 +164,7 @@ function sha256(value) {
 const crossRefs = [
   ['slates-prompting-seedance-2-5', 'reference-seedance-2-5.md'],
   ['slates-prompting-gpt-image-2-6', 'reference-gpt-image-2-6.md'],
+  ['slates-prompting-seedream-5-5', 'reference-seedream-5-5.md'],
   ['slates-prompting-omni-flash', 'reference-omni-flash.md'],
   ['slates-model-selection', 'SKILL.md'],
   ['slates-prompting-nano-banana-2-1', 'reference-nano-banana.md'],

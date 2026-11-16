@@ -251,11 +251,12 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'gpt-image-2-6-sunburst',
     route: 'generate',
-    tier: 'default',
+    // The default image seat until 2026-11-16, when Seedream 5.5 took it (Eric).
+    tier: 'specialist',
     label: 'GPT Image 2.6 Sunburst',
     kind: 'image',
     ...caps('gpt-image-2-6-sunburst'),
-    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, same price as Flare, deliberately SLOWER. Route here unless speed is the point: finals, hero frames, photoreal people, and multi-reference edits where every reference must survive into one frame. Explore on Flare, finish on Sunburst.',
+    notes: 'THE QUALITY GPT IMAGE SEAT — OpenAI\'s most capable image model, same price as Flare, deliberately SLOWER. Route here for polish over realism: designed graphics, dense in-image text and layout, and multi-reference edits where every reference must survive into one frame. Explore on Flare, finish on Sunburst.',
   },
   {
     id: 'flux-3',
@@ -268,13 +269,17 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'The premium less-filtered image seat: photoreal frames, precise layout and in-image text, at its loosest safety setting, which can still reject a prompt. Auto-routes to its edit endpoint when references are present.',
   },
   {
-    id: 'seedream-5-lite',
+    id: 'seedream-5-5',
     route: 'generate',
-    tier: 'specialist',
-    label: 'Seedream 5 Lite',
+    tier: 'default',
+    // ByteDance's Seedream 5.5 on BytePlus ModelArk direct, replacing Seedream
+    // 5 Lite and taking the default image seat from Sunburst, 2026-11-16 (Eric:
+    // "there's no comparison in Fidelity for video frames and realistic looking
+    // images"). Stored 5 Lite ids migrate through RETIRED_MODELS.
+    label: 'Seedream 5.5',
     kind: 'image',
-    ...caps('seedream-5-lite'),
-    notes: 'Cheapest flat-priced image seat (GPT Image at low quality costs less per image). Less filtered, though it can still reject a prompt. Routes to its edit endpoint when references are present.',
+    ...caps('seedream-5-5'),
+    notes: 'DEFAULT IMAGE MODEL — the realism seat: photoreal people, places and products, and start and end frames for video, where it holds fidelity better than the GPT Image seats. Cheaper than every other seat at full quality (GPT Image on its low and medium tiers costs less) and less filtered, though it can still reject a prompt. Renders a TRANSPARENT background on request (backgroundMode). Go to Sunburst for designed graphics and dense in-image text.',
   },
   {
     id: 'seedance-2',

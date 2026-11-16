@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { findBannedTokens } from '../packages/shared/dist/prompts/banned-tokens.js'
 import { composeReferences, cleanPrompt } from '../packages/shared/dist/prompts/reference-composer.js'
-import { MODEL_CAPABILITIES, DEFAULT_GPT_QUALITY } from '../packages/shared/dist/prompts/model-capabilities.js'
+import { MODEL_CAPABILITIES, DEFAULT_GPT_QUALITY, defaultImageResolutionFor } from '../packages/shared/dist/prompts/model-capabilities.js'
 import { defaultModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 import { ALL_OPERATIONS, brainFiles, toolDefinitions, useBrainSource } from '../packages/shared/dist/index.js'
+import { imageCostKey, isGptImageModel } from '../packages/shared/dist/operations/index.js'
 import { brainOrSkip } from './brain-source.mjs'
 
 // The cinematic catalogue is the brain's (slates-api brain/), held as a member's server holds it.
@@ -128,7 +129,14 @@ for (const [id, c] of Object.entries(MODEL_CAPABILITIES)) {
 // No live credentials or provider calls. Verify the wire request, not source strings.
 const model = defaultModelFor('image')
 const posts = []
-const registry = { models: ['high', 'max'].flatMap((q) => ['2k', '3k', '4k'].map((r) => ({ model: `${model}-${q}-${r}`, cost_credits: 2 }))) }
+// The default image seat at its default rung, whichever seat that is: the registry carries its keys.
+const rung = defaultImageResolutionFor(model)
+const gpt = 'gpt-image-2-6-sunburst'
+const registry = { models: [
+  ...['2k', '3k'].map((r) => ({ model: imageCostKey(model, r, undefined, '16:9'), cost_credits: 2 })),
+  { model: imageCostKey(model, '2k', undefined, '16:9', 3), cost_credits: 3 },
+  ...['high', 'max'].flatMap((q) => ['2k', '3k', '4k'].map((r) => ({ model: `${gpt}-${q}-${r}`, cost_credits: 2 }))),
+] }
 const ctx = {
   cloud: () => ({ get: async () => registry }),
   desktop: () => ({ requireCapability: async () => {}, post: async (path, body) => {
@@ -136,19 +144,19 @@ const ctx = {
   } }),
 }
 const estimate = await call('estimate_generation_cost', { model, aspectRatio: '16:9' }, ctx)
-assert.equal(estimate.data.cost_key, `${model}-high-3k`)
+assert.equal(estimate.data.cost_key, imageCostKey(model, rung, undefined, '16:9'))
 assert.match(estimate.data.craft_card, /Inspect every reference first/)
 assert.match(estimate.data.craft_card, /Name every garment and close the foreground/)
 await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: literal, aspectRatio: '16:9', background: true }, ctx)
 assert.deepEqual(posts[0].body, {
-  projectId: '11111111-1111-4111-8111-111111111111', prompt: literal, model, resolution: '3k', aspectRatio: '16:9', count: 1,
-  gptQuality: DEFAULT_GPT_QUALITY, gptBackground: undefined, background: true,
+  projectId: '11111111-1111-4111-8111-111111111111', prompt: literal, model, resolution: rung, aspectRatio: '16:9', count: 1,
+  ...(isGptImageModel(model) ? { gptQuality: DEFAULT_GPT_QUALITY } : { maxCredits: 2 }), gptBackground: undefined, background: true,
 })
 await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: 'photorealistic cinematic room', aspectRatio: '16:9', resolution: '2k', background: true }, ctx)
 assert.equal(posts[1].body.resolution, '2k')
 const warning = await call('generate_image', { model: 'nano-banana-2-1', prompt: 'photorealistic cinematic' })
 assert.match(warning.data.prompt_warning, /nano-banana/)
-const allowed = await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: 'photorealistic cinematic' })
+const allowed = await call('generate_image', { projectId: '11111111-1111-4111-8111-111111111111', prompt: 'photorealistic cinematic' }, ctx)
 assert.equal(allowed.data.prompt_warning, undefined)
 
 const initial = toolDefinitions(ALL_OPERATIONS, { surface: 'desktop' })
@@ -179,8 +187,9 @@ for (const [id, capability] of Object.entries(MODEL_CAPABILITIES)) {
 const three = [...refs, {token: '@Peak', name: 'Peak', kind: 'environment', media: [{path: 'peak.png', mediaKind: 'image'}]}]
 assert.equal(composeReferences('Combine images 1, 2, and 3.', three).prompt, 'Combine images 1, 2, and 3.')
 
-const override = {model, aspectRatio: '16:9', resolution: '2k', quality: 'max'}
-assert.equal((await call('estimate_generation_cost', override, ctx)).data.cost_key, `${model}-max-2k`)
+// A quality override, on a seat that has quality tiers.
+const override = {model: gpt, aspectRatio: '16:9', resolution: '2k', quality: 'max'}
+assert.equal((await call('estimate_generation_cost', override, ctx)).data.cost_key, `${gpt}-max-2k`)
 await call('generate_image', {...override, projectId: '11111111-1111-4111-8111-111111111111', prompt: 'Room', background: true}, ctx)
 assert.equal(posts.at(-1).body.gptQuality, 'max')
 assert.equal(posts.at(-1).body.resolution, '2k')
@@ -196,9 +205,8 @@ assert.equal(posts.at(-1).body.resolution, '2k')
       post: async (path, body) => { sent.push({ path, body }); return { success: true, background: true, generationId: 'mock-generation' } },
     }) } }
   }
-  assert.equal(model, 'gpt-image-2-6-sunburst', 'the default image seat is GPT Image 2.6 Sunburst')
   const older = desktopWithout(['image-models-v5'])
-  const made = await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, older.ctx)
+  const made = await call('generate_image', { projectId, model: gpt, prompt: 'Room', aspectRatio: '16:9', background: true }, older.ctx)
   assert.equal(older.sent[0].body.model, 'gpt-image-2-5-sunburst')
   assert.match(made.text, /gpt-image-2-5-sunburst ran in place of gpt-image-2-6-sunburst, at the same price/)
   assert.deepEqual([made.data.model, made.data.ranOn], ['gpt-image-2-6-sunburst', 'gpt-image-2-5-sunburst'])
@@ -206,13 +214,44 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   assert.equal(older.sent[1].body.editModel, 'gpt-image-2-5-flare')
   assert.match(edited.text, /gpt-image-2-5-flare ran in place of gpt-image-2-6-flare/)
   const current = desktopWithout([])
-  const fresh = await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, current.ctx)
+  const fresh = await call('generate_image', { projectId, model: gpt, prompt: 'Room', aspectRatio: '16:9', background: true }, current.ctx)
   assert.equal(current.sent[0].body.model, 'gpt-image-2-6-sunburst')
   assert.doesNotMatch(fresh.text, /ran in place of/)
   const ancient = desktopWithout(['image-models-v5', 'image-models-v3'])
-  await assert.rejects(() => call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, ancient.ctx), /Update Slates: image-models-v3/)
+  await assert.rejects(() => call('generate_image', { projectId, model: gpt, prompt: 'Room', aspectRatio: '16:9', background: true }, ancient.ctx), /Update Slates: image-models-v3/)
   assert.deepEqual(ancient.sent, [], 'a desktop with no GPT Image refuses before any request')
   console.log('prompt-control: GPT Image 2.6 runs as 2.5 on a desktop without image-models-v5 and says so; without v3 it refuses')
+  // Seedream 5.5, the default seat, on a desktop that predates it (no image-models-v6): an omitted model runs
+  // on GPT Image 2.6 Sunburst, the default before it, and says so; a named Seedream 5.5 refuses.
+  assert.equal(model, 'seedream-5-5', 'the default image seat is Seedream 5.5')
+  const preSeedream = desktopWithout(['image-models-v6'])
+  const fellBack = await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, preSeedream.ctx)
+  assert.equal(preSeedream.sent[0].body.model, gpt)
+  assert.match(fellBack.text, /predates Seedream 5\.5/)
+  await assert.rejects(() => call('generate_image', { projectId, model, prompt: 'Room', aspectRatio: '16:9', background: true }, preSeedream.ctx), /image-models-v6/)
+  const withSeedream = desktopWithout([])
+  await call('generate_image', { projectId, prompt: 'Room', aspectRatio: '16:9', background: true }, withSeedream.ctx)
+  assert.equal(withSeedream.sent[0].body.model, model)
+  console.log('prompt-control: an omitted model runs Seedream 5.5, or Sunburst on a desktop without image-models-v6 and says so')
+  // Seedream bills each input picture, and the desktop adds @mention pictures this op cannot see: the op sends what
+  // it quoted as maxCredits, relays a refusal as a new quote with nothing run, and an approved total raises the cap.
+  const estimated = await call('estimate_generation_cost', { model, aspectRatio: '16:9', referenceImages: 3 }, withSeedream.ctx)
+  assert.equal(estimated.data.cost_key, imageCostKey(model, '2k', undefined, '16:9', 3), 'the estimate prices Seedream inputs')
+  assert.equal(withSeedream.sent[0].body.maxCredits, 2, 'a Seedream call carries the credits it was quoted')
+  assert.equal(current.sent[0].body.maxCredits, undefined, 'a seat that does not bill per input sends no cap')
+  const refusing = desktopWithout([])
+  const refusingDesktop = refusing.ctx.desktop
+  refusing.ctx.desktop = () => ({ ...refusingDesktop(), post: async (path, body) => {
+    refusing.sent.push({ path, body })
+    return body.maxCredits >= 3 ? { success: true, background: true, generationId: 'mock-generation' } : { success: false, quoteExceeded: { credits: 3, costKey: imageCostKey(model, '2k', undefined, '16:9', 1) } }
+  } })
+  const over = await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true }, refusing.ctx)
+  assert.equal(over.data.quote_exceeded, true)
+  assert.equal(over.data.estimated_credits, 3)
+  assert.match(over.text, /Nothing ran.*approvedCredits=3/s)
+  await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true, approvedCredits: 3 }, refusing.ctx)
+  assert.equal(refusing.sent.at(-1).body.maxCredits, 3)
+  console.log('prompt-control: a Seedream call is capped at its quote, a refusal comes back as a new quote, and the approved total runs')
 }
 
 // Every other op that hands the desktop a GPT Image id by name (a Shot's model, a draft's model) makes the same

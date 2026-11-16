@@ -262,6 +262,101 @@ export const GPT_IMAGE_25_SIZES: Record<string, Record<string, { width: number; 
 }
 
 /**
+ * Seedream 5.5's output `size` (`WxH`) per Slates rung and aspect ratio, sent to
+ * BytePlus ModelArk direct (`dola-seedream-5-5-261028`).
+ *
+ * 🚨 A BILLING INPUT. BytePlus bills an output by its total pixels P: $0.020 when
+ * P ≤ 1536² × 1.05² (2,601,123.84), $0.035 up to 2048² × 1.05² (4,624,220.16)
+ * (pricing page, ripped 2026-11-16 to second-brain/business/projects/slates/
+ * provider-docs/byteplus-seedream-5-5-docs.md). The proxy derives the cost key's
+ * rung from the body's `size` by that same line (`seedream55RungOfSize`), so every
+ * size here must sit inside its rung's band.
+ *
+ * Rungs are named by pixel width, as GPT Image's are (`2k` ≈ 2048 px wide, `3k`
+ * ≈ 2816): `2k` is BytePlus's "1.5K" preset class, `3k` its "2K" class. The 1K
+ * preset is not offered: it bills the same $0.020 as 1.5K for a smaller picture.
+ * Eight aspects are BytePlus's own preset dimensions (API reference, `size`,
+ * "Seedream 5.5 (image generation)"); `4:5` and `5:4`, which it does not list,
+ * hold the 1:1 preset's pixel count in multiples of 8. Exact `WxH` is sent rather
+ * than a bare preset because a preset lets the prompt choose the aspect.
+ * BytePlus's band: total pixels [921,600, 4,624,220], aspect [1/16, 16].
+ */
+export const SEEDREAM_5_5_SIZES: Record<'2k' | '3k', Record<AspectRatio, { width: number; height: number }>> = {
+  '2k': {
+    '1:1': { width: 1536, height: 1536 },
+    '16:9': { width: 2048, height: 1152 },
+    '9:16': { width: 1152, height: 2048 },
+    '4:3': { width: 1792, height: 1344 },
+    '3:4': { width: 1344, height: 1792 },
+    '3:2': { width: 1872, height: 1248 },
+    '2:3': { width: 1248, height: 1872 },
+    '5:4': { width: 1720, height: 1376 },
+    '4:5': { width: 1376, height: 1720 },
+    '21:9': { width: 2352, height: 1008 },
+  },
+  '3k': {
+    '1:1': { width: 2048, height: 2048 },
+    '16:9': { width: 2816, height: 1584 },
+    '9:16': { width: 1584, height: 2816 },
+    '4:3': { width: 2368, height: 1776 },
+    '3:4': { width: 1776, height: 2368 },
+    '3:2': { width: 2496, height: 1664 },
+    '2:3': { width: 1664, height: 2496 },
+    '5:4': { width: 2288, height: 1832 },
+    '4:5': { width: 1832, height: 2288 },
+    '21:9': { width: 3136, height: 1344 },
+  },
+}
+
+/** BytePlus's pixel line between Seedream 5.5's two price tiers, and its band. */
+export const SEEDREAM_5_5_PIXEL_BOUNDS = { min: 921_600, tierLine: 2_601_123, max: 4_624_220 } as const
+
+/**
+ * The rung a Seedream 5.5 `WxH` bills at, by BytePlus's pixel line, or null when
+ * the size is outside the band or malformed. The proxy's one reading of a 5.5
+ * request's price tier; the desktop's sizes come from `SEEDREAM_5_5_SIZES`.
+ */
+export function seedream55RungOfSize(size: unknown): '2k' | '3k' | null {
+  if (typeof size !== 'string') return null
+  const m = /^(\d{2,5})x(\d{2,5})$/.exec(size)
+  if (!m) return null
+  const w = Number(m[1])
+  const h = Number(m[2])
+  const pixels = w * h
+  if (w / h < 1 / 16 || w / h > 16) return null
+  if (pixels < SEEDREAM_5_5_PIXEL_BOUNDS.min || pixels > SEEDREAM_5_5_PIXEL_BOUNDS.max) return null
+  return pixels <= SEEDREAM_5_5_PIXEL_BOUNDS.tierLine ? '2k' : '3k'
+}
+
+/**
+ * Seedream 5.5's billing key: its price rung, then the input-image count when
+ * there is one (`seedream-5-5-3k`, `seedream-5-5-3k-ref2`). BytePlus bills each
+ * input image ($0.008) on top of the output, so the count is part of the price.
+ * THE ONE HOME of the key's shape: the op quote, the desktop's `imageCreditKey`
+ * and the proxy's key derivation all call this. Counts clamp to the model's cap,
+ * which the proxy refuses past.
+ */
+/** A requested rung, or the model's default when none (or an unknown one) is named. */
+function seedream55Rung(resolution: string | undefined): '2k' | '3k' {
+  if (resolution === '2k' || resolution === '3k') return resolution
+  return MODEL_CAPABILITIES['seedream-5-5']?.defaultImageResolution === '3k' ? '3k' : '2k'
+}
+
+export function seedream55CostKey(resolution: string | undefined, referenceCount: number): string {
+  const rung = seedream55Rung(resolution)
+  const cap = MODEL_CAPABILITIES['seedream-5-5']?.maxRefImages ?? 0
+  const refs = Math.max(0, Math.min(cap, Number.isFinite(referenceCount) ? Math.floor(referenceCount) : 0))
+  return `seedream-5-5-${rung}${refs > 0 ? `-ref${refs}` : ''}`
+}
+
+/** Seedream 5.5's `size` string for a rung and aspect ratio. */
+export function seedream55Size(aspectRatio: string | undefined, resolution: string | undefined): string {
+  const rung = seedream55Rung(resolution)
+  const dims = SEEDREAM_5_5_SIZES[rung][(aspectRatio ?? '16:9') as AspectRatio] ?? SEEDREAM_5_5_SIZES[rung]['16:9']
+  return `${dims.width}x${dims.height}`
+}
+
+/**
  * fal's named ~1MP presets per aspect ratio, with custom dims where fal has no
  * preset. The `1k` rung of every non-GPT image model resolves through this.
  */
@@ -320,8 +415,11 @@ export function falImageSize(
   if (res === '1k') {
     return FAL_1MP_SIZES[ar] || 'landscape_16_9'
   }
-  // Seedream 5 Lite: custom dims must be ≥3.69MP (2560×1440) and ≤9.44MP
-  // (3072×3072), so its three rungs target 4 / 7 / 9 MP — all inside that band.
+  // Seedream 5 Lite, retired 2026-11-16 for Seedream 5.5 (which never comes
+  // here: it runs on BytePlus with `seedream55Size`). Kept because slates-api
+  // still validates and bills 5 Lite requests from desktops 1.6.9 and older.
+  // Custom dims must be ≥3.69MP (2560×1440) and ≤9.44MP (3072×3072), so its
+  // three rungs target 4 / 7 / 9 MP, all inside that band.
   if (isSeedream5) {
     if (res === '4k') return computeFalDimensions(ar, 9)
     return res === '3k' ? computeFalDimensions(ar, 7) : computeFalDimensions(ar, 4)
@@ -523,9 +621,17 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxRefImages: 10,
   },
 
-  'seedream-5-lite': {
+  // Seedream 5.5 on BytePlus ModelArk direct (`dola-seedream-5-5-261028`),
+  // replacing Seedream 5 Lite 2026-11-16 (Eric) and THE DEFAULT IMAGE SEAT
+  // (MODEL_FACTS tier). Read off the ModelArk API reference, ripped 2026-11-16
+  // (provider-docs/byteplus-seedream-5-5-docs.md): "Seedream 5.5 ... support up
+  // to 10 reference images"; aspect ratio [1/16, 16] covers all ten of ours.
+  // Rungs and sizes: SEEDREAM_5_5_SIZES above. Default 2k (BytePlus 1.5K,
+  // 2048 px wide at 16:9; Eric, 2026-11-16: "We will mostly be doing 2K
+  // images"); 3k is the larger option. 5 Lite is in RETIRED_MODELS below.
+  'seedream-5-5': {
     defaultImageResolution: '2k',
-    imageResolutions: ['2k', '3k', '4k'],
+    imageResolutions: ['2k', '3k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 10,
   },
@@ -1045,6 +1151,8 @@ export const RETIRED_MODELS: Readonly<Record<string, string>> = {
   // 2026-11-10 (Eric, "Yes, same release"): Gemini Omni Flash 1.2 replaced 1.1, seat for seat.
   'omni-flash': 'omni-flash-1-2',
   'omni-flash-edit': 'omni-flash-1-2-edit',
+  // 2026-11-16 (Eric): Seedream 5.5 replaced Seedream 5 Lite and became the default image seat.
+  'seedream-5-lite': 'seedream-5-5',
 }
 
 /**

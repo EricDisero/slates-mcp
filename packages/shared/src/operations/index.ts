@@ -3,7 +3,7 @@ import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -2356,7 +2356,7 @@ export const estimateGenerationCost: Operation<{
     videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
     audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, including attached character voices.'),
     referenceImages: z.number().int().min(0).optional().describe(
-      `MiniMax H3 rows only — how many reference IMAGES the generation will carry. Each image past the row's free allowance is a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. The allowances differ: minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}. Ignored by every other model. Start/end frames are free on both rows and are not reference images.`
+      `MiniMax H3 rows and seedream-5-5 — how many reference IMAGES the generation will carry. They are a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. seedream-5-5 pays for every input image, @mention pictures included, and an edit's source picture counts as one. The MiniMax allowances differ: minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}; start/end frames are free on both rows and are not reference images. Ignored by every other model.`
     ),
   }),
   async run(input, ctx) {
@@ -2384,7 +2384,7 @@ export const estimateGenerationCost: Operation<{
       // billed `high`, so the op the doctrine tells agents to call before every
       // generation quoted 1 cr for a 2 cr job. Four separate copies of one
       // default is what made that possible; there are now none.
-      if (img) key = imageCostKey(img, input.resolution ?? defaultImageResolutionFor(img), input.quality, input.aspectRatio)
+      if (img) key = imageCostKey(img, input.resolution ?? defaultImageResolutionFor(img), input.quality, input.aspectRatio, input.referenceImages ?? 0)
     }
     // 2a) audio base id → seconds. Both surfaces bill per second, so a
     //     duration is always required. Runs BEFORE the video resolver: it is
@@ -2530,7 +2530,7 @@ export const estimateGenerationCost: Operation<{
     // Before the card on purpose: the desktop strips a repeated card by cutting
     // the text at "--- HOW TO PROMPT", and this line must survive that.
     const ownImage = (IMAGE_MODELS as readonly string[]).includes(input.model) ? (input.model as ImageModelId) : null
-    const cheaper = ownImage ? cheaperImageOptions(byKey, perCredits, ownImage, input.aspectRatio) : null
+    const cheaper = ownImage ? cheaperImageOptions(byKey, perCredits, ownImage, input.aspectRatio, input.referenceImages ?? 0) : null
     const framing = input.aspectRatio ?? '16:9'
     const unpricedNote = cheaper?.unpriced.length
       ? ` Not on the price list at ${framing}: ${cheaper.unpriced.join(', ')}; estimate one directly to price it.`
@@ -3735,7 +3735,7 @@ export type ImageModelId =
   | 'gpt-image-2-6-flare'
   | 'gpt-image-2-6-sunburst'
   | 'flux-3'
-  | 'seedream-5-lite'
+  | 'seedream-5-5'
 
 /** The exact `model` ids `slates_generate_image` accepts. */
 /** Derived compatibility export for callers enumerating the 3k ladder. */
@@ -3748,7 +3748,7 @@ export const IMAGE_MODELS = [
   'gpt-image-2-6-flare',
   'gpt-image-2-6-sunburst',
   'flux-3',
-  'seedream-5-lite',
+  'seedream-5-5',
 ] as const satisfies readonly ImageModelId[]
 
 /** True for either GPT Image seat. Flare and Sunburst differ in latency
@@ -3788,6 +3788,50 @@ async function gptImageSeatFor(
 /** The line a result carries when `gptImageSeatFor` sent the 2.5 seat. */
 function gptImageSubstitution(asked: string, sent: string): string {
   return sent === asked ? '' : `${sent} ran in place of ${asked}, at the same price: this Slates desktop predates GPT Image 2.6. Update Slates to run 2.6.`
+}
+
+/**
+ * The image seats that take `backgroundMode` (transparent / opaque / auto): both
+ * GPT Image seats and Seedream 5.5 (BytePlus `background`, read 2026-11-16). The
+ * desktop's twin is the `transparentBackground` feature on its registry rows,
+ * which shows the Background control; the wire field is `gptBackground` for
+ * every seat, a name kept from when GPT Image was the only one.
+ */
+export function takesBackgroundMode(model: string | undefined): boolean {
+  return isGptImageModel(model) || model === 'seedream-5-5'
+}
+
+/** The default image seat before Seedream 5.5 took it, which an older desktop still renders. */
+const PREVIOUS_DEFAULT_IMAGE_MODEL = 'gpt-image-2-6-sunburst' satisfies ImageModelId
+
+/**
+ * The seat to run when the caller left `model` out, on this desktop. Seedream
+ * 5.5 is the default, and only a desktop advertising `image-models-v6` (1.7.0
+ * and newer) knows it: an older one would render its Nano Banana fallback at a
+ * Seedream quote. So an unnamed call on such a desktop runs the previous
+ * default, which it knows, and the result says so; a call that NAMES Seedream
+ * 5.5 is refused with the update message instead, since the caller asked for it.
+ */
+async function defaultImageSeatFor(
+  desktop: () => Pick<SlatesDesktopClient, 'requireCapability'>,
+  named: ImageModelId | undefined,
+  feature: string
+): Promise<{ model: ImageModelId; note: string }> {
+  const model = named ?? DEFAULT_IMAGE_MODEL
+  if (model !== 'seedream-5-5') return { model, note: '' }
+  if (named) {
+    await desktop().requireCapability('image-models-v6', feature)
+    return { model, note: '' }
+  }
+  try {
+    await desktop().requireCapability('image-models-v6', feature)
+    return { model, note: '' }
+  } catch {
+    return {
+      model: PREVIOUS_DEFAULT_IMAGE_MODEL,
+      note: `${PREVIOUS_DEFAULT_IMAGE_MODEL} ran as the default image model: this Slates desktop predates Seedream 5.5, the default now. Update Slates to run it.`,
+    }
+  }
 }
 
 /** True for either Gemini Omni Flash 1.2 seat, generation or edit. */
@@ -3959,14 +4003,24 @@ function gptKeyAspect(aspectRatio?: string): string {
 // imports it and asserts, key by key, that it equals the desktop's
 // `imageCreditKey`. Before that check existed the byte-match was a comment and
 // a hope — the two are in different repos and nothing compared them.
+/**
+ * BytePlus bills every input image of a Seedream 5.5 call, so its key names the
+ * reference count (`seedream55CostKey`, model-capabilities.ts), and a quote made
+ * before the desktop composes @mention pictures can be short of the bill.
+ */
+function billsEachInputImage(model: string): boolean {
+  return model === 'seedream-5-5'
+}
+
 export function imageCostKey(
   model: ImageModelId,
   resolution: '1k' | '2k' | '3k' | '4k',
   quality: GptQualityId = DEFAULT_GPT_QUALITY,
-  aspectRatio?: string
+  aspectRatio?: string,
+  referenceCount = 0
 ): string {
   if (model === 'flux-3') return `flux-3-${resolution}`
-  if (model === 'seedream-5-lite') return 'seedream-5-lite'
+  if (billsEachInputImage(model)) return seedream55CostKey(resolution, referenceCount)
   if (isGptImageModel(model)) return `${model}-${gptKeyTier(quality)}-${resolution}${gptKeyAspect(aspectRatio)}`
   return `nano-banana-2-1-${resolution}`
 }
@@ -3992,7 +4046,8 @@ function cheaperImageOptions(
   byKey: ReadonlyMap<string, number>,
   than: number,
   own: ImageModelId,
-  aspectRatio?: string
+  aspectRatio?: string,
+  referenceCount = 0
 ): { shown: CheaperImageOption[]; cheaper: number; unpriced: ImageModelId[] } {
   const all: CheaperImageOption[] = []
   const unpriced: ImageModelId[] = []
@@ -4002,7 +4057,7 @@ function cheaperImageOptions(
     let best: CheaperImageOption | null = null
     for (const resolution of MODEL_CAPABILITIES[model]?.imageResolutions ?? []) {
       for (const quality of qualities) {
-        const credits = byKey.get(imageCostKey(model, resolution, quality, aspectRatio))
+        const credits = byKey.get(imageCostKey(model, resolution, quality, aspectRatio, referenceCount))
         if (credits == null) continue
         const better = !best || credits < best.credits || (credits === best.credits && (
           (resolution === fallback && best.resolution !== fallback) ||
@@ -4045,6 +4100,7 @@ export const generateImage: Operation<{
   referenceAssetIds?: string[]
   background?: boolean
   confirm?: boolean
+  approvedCredits?: number
   folderId?: string | null
 }> = {
   id: 'slates_generate_image',
@@ -4071,7 +4127,7 @@ export const generateImage: Operation<{
     projectId: z.string().uuid().optional().describe(`Save into this Slates project. Renderer refreshes live. Required for every model except ${HEADLESS_IMAGE_MODEL}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Omit for the selected model default. Override for a specific delivery size; use the same setting when estimating.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image only. Default ${DEFAULT_GPT_QUALITY}; estimate the chosen tier before generation.`),
-    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
+    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe(`${IMAGE_MODELS.filter(takesBackgroundMode).join(', ')} only. transparent = alpha channel (PNG). Free.`),
     aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe(
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
@@ -4080,6 +4136,7 @@ export const generateImage: Operation<{
     referenceAssetIds: z.array(z.string()).max(16).optional().describe(`Project assets as references — UUIDs or badge codes ("IMG-A8"), resolved at call time. Requires projectId. Caps: ${describeReferenceImageCaps(IMAGE_MODELS)}. Label every reference role in the prompt.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+    approvedCredits: z.number().int().positive().optional().describe('Only after a reply with `quote_exceeded`: the credits that reply named, once the user has approved them. The desktop counts @mention pictures as paid inputs on seedream-5-5 and runs nothing above the approved total.'),
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
@@ -4096,7 +4153,10 @@ export const generateImage: Operation<{
     // HEADLESS_IMAGE_MODEL without one, because it is the only headless seat. The
     // desktop resolves the same seat for its cost and plan-model guards
     // (`imageModelFor`, slate src/main/studio-agent/guards.ts): change both together.
-    const imageModel: ImageModelId = input.model ?? (input.projectId ? DEFAULT_IMAGE_MODEL : HEADLESS_IMAGE_MODEL)
+    const seat = input.projectId
+      ? await defaultImageSeatFor(() => ctx.desktop(), input.model, `${input.model ?? DEFAULT_IMAGE_MODEL} generation`)
+      : { model: input.model ?? HEADLESS_IMAGE_MODEL, note: '' }
+    const imageModel: ImageModelId = seat.model
     requireGuideRead(ctx, imageModel)
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
@@ -4194,7 +4254,7 @@ export const generateImage: Operation<{
     if (input.projectId && (input.count ?? 1) > LEGACY_DESKTOP_IMAGE_BATCH) {
       await ctx.desktop().requireCapability('image-variations', 'more than 4 images per call')
     }
-    const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1')
+    const costKey = imageCostKey(imageModel, resolution, input.quality, input.aspectRatio ?? '1:1', referenceAssetIds.length)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey) ??
@@ -4270,6 +4330,7 @@ export const generateImage: Operation<{
         generationId?: string
         generationIds?: string[]
         error?: string
+        quoteExceeded?: { credits: number; costKey: string }
       }>('/agent/generation/image', {
         projectId: input.projectId,
         prompt: input.prompt,
@@ -4277,11 +4338,28 @@ export const generateImage: Operation<{
         resolution,
         aspectRatio: input.aspectRatio ?? '1:1',
         count: input.count ?? 1,
-        ...(isGptImageModel(imageModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
+        ...(isGptImageModel(imageModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY } : {}),
+        ...(takesBackgroundMode(imageModel) ? { gptBackground: input.backgroundMode } : {}),
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
+        // The desktop adds @mention pictures this op cannot see; on a seat that bills
+        // each input it runs nothing above what the user was quoted or approved.
+        ...(billsEachInputImage(sentModel) ? { maxCredits: Math.max(totalCents, input.approvedCredits ?? 0) } : {}),
         ...folderBody(input.folderId),
         background: input.background,
       })
+      if (result.quoteExceeded) {
+        const { credits, costKey: billedKey } = result.quoteExceeded
+        return ok({
+          requires_confirm: true,
+          quote_exceeded: true,
+          model: billedKey,
+          estimated_cents: credits,
+          estimated_credits: credits,
+          message:
+            `Nothing ran. The @mention pictures in the prompt are paid inputs on ${imageModel}: this call bills ${fmtCredits(credits)} (${billedKey}), ` +
+            `not the ${fmtCredits(totalCents)} quoted. Tell the user, and once they approve, re-call with confirm=true and approvedCredits=${credits}.`,
+        })
+      }
       // Partial multi-image failure: the desktop attaches an error message
       // but result.assets still holds the images that DID save. Throwing
       // here would discard real, paid-for assets and invite a full retry
@@ -4291,7 +4369,7 @@ export const generateImage: Operation<{
       if (!result.success && !partialFailure) {
         throw new Error(result.error ?? 'Generation failed')
       }
-      const substitution = gptImageSubstitution(imageModel, sentModel)
+      const substitution = [seat.note, gptImageSubstitution(imageModel, sentModel)].filter(Boolean).join(' ')
       if (result.background) {
         const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
         return backgroundSubmitted(
@@ -4521,9 +4599,9 @@ export const editImage: Operation<{
     prompt: z.string().min(1).max(4000).describe('The change, not the whole image. @name and #look words attach nothing here: pass those pictures in referenceAssetIds.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
     referenceAssetIds: z.array(z.string().uuid().describe(ASSET_UUID_ONLY)).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
-    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('3k = GPT Image/seedream-5-lite only.'),
+    resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe(`Omit for the model's default. Per model: ${IMAGE_MODELS.map((m) => `${m} ${(MODEL_CAPABILITIES[m]?.imageResolutions ?? []).join('/')}`).join(', ')}.`),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
-    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe('GPT Image only. transparent = alpha channel. Free.'),
+    backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe(`${IMAGE_MODELS.filter(takesBackgroundMode).join(', ')} only. transparent = alpha channel (PNG). Free.`),
     aspectRatio: z.string().optional(),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
@@ -4534,8 +4612,14 @@ export const editImage: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    // The image-edit tool's seat (TOOL_SEAT), the model the app's own Edit uses.
-    const editModel = input.editModel ?? (toolModelFor('image-edit') as NonNullable<typeof input.editModel>)
+    // The image-edit tool's seat (TOOL_SEAT), the model the app's own Edit uses;
+    // on a desktop that predates Seedream 5.5, the seat it knows (defaultImageSeatFor).
+    const seat = input.editModel
+      ? await defaultImageSeatFor(() => desktop, input.editModel, `${input.editModel} editing`)
+      : toolModelFor('image-edit') === DEFAULT_IMAGE_MODEL
+        ? await defaultImageSeatFor(() => desktop, undefined, 'image editing')
+        : { model: toolModelFor('image-edit') as ImageModelId, note: '' }
+    const editModel = seat.model
     requireGuideRead(ctx, editModel)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
     let sentModel: string = editModel
@@ -4552,14 +4636,16 @@ export const editImage: Operation<{
     }
     // Past the model's cap the desktop sends the first ones and says so in its reply (`note`).
     const referencesOver = (input.referenceAssetIds?.length ?? 0) - editReferenceCap(editModel)
-    // Nano Banana and GPT Image edits charge the same key as gen;
-    // FLUX / Seedream route to dedicated edit endpoints priced under '-edit' keys.
+    // Nano Banana and GPT Image edits charge the same key as gen; FLUX routes to
+    // a dedicated edit endpoint priced under an '-edit' key; Seedream 5.5 bills
+    // every input image, the source included, so its key counts them.
     // Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts, which
     // this package cannot import: change both together.
+    const editInputs = 1 + Math.min(input.referenceAssetIds?.length ?? 0, editReferenceCap(editModel))
     const costKey =
-      editModel === 'flux-3' || editModel === 'seedream-5-lite'
+      editModel === 'flux-3'
         ? `${imageCostKey(editModel, resolution)}-edit`
-        : imageCostKey(editModel, resolution, input.quality, input.aspectRatio)
+        : imageCostKey(editModel, resolution, input.quality, input.aspectRatio, editInputs)
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey) ??
@@ -4599,12 +4685,13 @@ export const editImage: Operation<{
       editModel: sentModel,
       referenceAssetIds: input.referenceAssetIds,
       resolution,
-      ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY, gptBackground: input.backgroundMode } : {}),
+      ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY } : {}),
+      ...(takesBackgroundMode(editModel) ? { gptBackground: input.backgroundMode } : {}),
       aspectRatio: input.aspectRatio,
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Image edit failed')
-    const substitution = gptImageSubstitution(editModel, sentModel)
+    const substitution = [seat.note, gptImageSubstitution(editModel, sentModel)].filter(Boolean).join(' ')
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
       return backgroundSubmitted(`${editModel} image edit`, ids, {
@@ -4668,7 +4755,7 @@ export const editImage: Operation<{
  */
 
 /** The seats the viewer's Cells box offers. Mirrors slate's `GRID_EXTRACT_MODELS` (`shared/prompts/storyboard-grids.ts`), which this package cannot import. */
-const GRID_EXTRACT_SEATS = ['nano-banana-2-1', 'flux-3', 'seedream-5-lite'] as const
+const GRID_EXTRACT_SEATS = ['nano-banana-2-1', 'flux-3', 'seedream-5-5'] as const
 
 interface ExtractQuote {
   gridCode: string | null
@@ -11133,7 +11220,7 @@ export function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('nano-banana')) return 'slates-prompting-nano-banana-2-1'
   if (t === 'sunburst' || t === 'flare' || t.startsWith('gpt-image') || t.startsWith('gpt image')) return 'slates-prompting-gpt-image-2-6'
   if (t.startsWith('flux')) return 'slates-prompting-flux-3'
-  if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-lite'
+  if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-5'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
   if (t.startsWith('wan') || t === 'alibaba-wan-3.0') return 'slates-prompting-wan-3'
   // MiniMax H3 — both seats share one skill. Placed BEFORE the seed/seedance

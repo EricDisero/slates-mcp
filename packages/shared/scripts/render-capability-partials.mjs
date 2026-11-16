@@ -87,7 +87,8 @@ Never quote a credit figure from memory: \`slates_estimate_generation_cost\` ret
 const { defaultModelFor } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-facts.js')).href)
 const { DEFAULT_GPT_QUALITY } = await import(pathToFileURL(join(pkgRoot, 'dist/prompts/model-capabilities.js')).href)
 const imageDefault = defaultModelFor('image')
-const imageDefaults = `**Image default:** ${imageDefault}, quality \`${DEFAULT_GPT_QUALITY}\`, ${shared.MODEL_CAPABILITIES[imageDefault].defaultImageResolution}. User overrides take priority. Without a project, generation uses the headless Nano Banana 2.1 seat. When to reroll a frame on Nano Banana 2.1 instead: \`slates-cinematic-look\` § Model notes.\n\n| Model | Default resolution |\n|---|---|\n${Object.entries(shared.MODEL_CAPABILITIES).filter(([, c]) => c.imageResolutions).map(([id, c]) => `| ${id} | ${c.defaultImageResolution} |`).join('\n')}`
+// The quality tier is a GPT Image dial; another default seat has none to name.
+const imageDefaults = `**Image default:** ${imageDefault}${imageDefault.startsWith('gpt-image-') ? `, quality \`${DEFAULT_GPT_QUALITY}\`` : ''}, ${shared.MODEL_CAPABILITIES[imageDefault].defaultImageResolution}. User overrides take priority. Without a project, generation uses the headless Nano Banana 2.1 seat. When to reroll a frame on another seat instead: \`slates-cinematic-look\` § Model notes.\n\n| Model | Default resolution |\n|---|---|\n${Object.entries(shared.MODEL_CAPABILITIES).filter(([, c]) => c.imageResolutions).map(([id, c]) => `| ${id} | ${c.defaultImageResolution} |`).join('\n')}`
 // The sheet tools' seat, rung, tier and framing: what the desktop handler bills
 // and what its screens print, from the same TOOL_SEAT table (generation-policy.ts).
 // This line read "Default to Nano Banana 2 at 2K", typed, until 2026-09-21.
