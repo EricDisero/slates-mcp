@@ -626,11 +626,11 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // (MODEL_FACTS tier). Read off the ModelArk API reference, ripped 2026-11-16
   // (provider-docs/byteplus-seedream-5-5-docs.md): "Seedream 5.5 ... support up
   // to 10 reference images"; aspect ratio [1/16, 16] covers all ten of ours.
-  // Rungs and sizes: SEEDREAM_5_5_SIZES above. Default 2k (BytePlus 1.5K,
-  // 2048 px wide at 16:9; Eric, 2026-11-16: "We will mostly be doing 2K
-  // images"); 3k is the larger option. 5 Lite is in RETIRED_MODELS below.
+  // Rungs and sizes: SEEDREAM_5_5_SIZES above. Default 3k (2816 px wide at
+  // 16:9; Eric, 2026-11-16: "Why wouldn't we make the default 3K? It's cheap
+  // enough"); 2k is the cheaper option. 5 Lite is in RETIRED_MODELS below.
   'seedream-5-5': {
-    defaultImageResolution: '2k',
+    defaultImageResolution: '3k',
     imageResolutions: ['2k', '3k'],
     aspectRatios: FULL_ASPECT_RATIOS,
     maxRefImages: 10,

@@ -46,7 +46,7 @@ assert.deepEqual(nb2.data.cheaper_options.map((o) => [o.model, o.credits]), [
 ])
 // Ties go to the seat's default resolution, then the higher tier: medium costs what low does.
 assert.deepEqual(nb2.data.cheaper_options[2], { model: 'gpt-image-2-6-sunburst', credits: 1, resolution: '3k', quality: 'medium' })
-assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 5): nano-banana-2-1 3 credits (1k); gpt-image-2-6-flare 1 credits (quality medium); gpt-image-2-6-sunburst 1 credits (quality medium); seedream-5-5 1 credits.')
+assert.equal(nb2.text.split('\n')[1], 'Cheaper per image on the price list at 16:9 (4 of 5): nano-banana-2-1 3 credits (1k); gpt-image-2-6-flare 1 credits (quality medium); gpt-image-2-6-sunburst 1 credits (quality medium); seedream-5-5 1 credits (2k).')
 // It survives the desktop's repeated-card strip (loop.ts cuts at the card header).
 assert.match(nb2.text.split('\n\n--- HOW TO PROMPT')[0], /Cheaper per image/)
 // Priced at the asked framing: GPT Image prices a square frame higher, and a key the list

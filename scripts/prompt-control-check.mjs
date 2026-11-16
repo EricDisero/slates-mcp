@@ -134,7 +134,7 @@ const rung = defaultImageResolutionFor(model)
 const gpt = 'gpt-image-2-6-sunburst'
 const registry = { models: [
   ...['2k', '3k'].map((r) => ({ model: imageCostKey(model, r, undefined, '16:9'), cost_credits: 2 })),
-  { model: imageCostKey(model, '2k', undefined, '16:9', 3), cost_credits: 3 },
+  { model: imageCostKey(model, rung, undefined, '16:9', 3), cost_credits: 3 },
   ...['high', 'max'].flatMap((q) => ['2k', '3k', '4k'].map((r) => ({ model: `${gpt}-${q}-${r}`, cost_credits: 2 }))),
 ] }
 const ctx = {
@@ -236,14 +236,14 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   // Seedream bills each input picture, and the desktop adds @mention pictures this op cannot see: the op sends what
   // it quoted as maxCredits, relays a refusal as a new quote with nothing run, and an approved total raises the cap.
   const estimated = await call('estimate_generation_cost', { model, aspectRatio: '16:9', referenceImages: 3 }, withSeedream.ctx)
-  assert.equal(estimated.data.cost_key, imageCostKey(model, '2k', undefined, '16:9', 3), 'the estimate prices Seedream inputs')
+  assert.equal(estimated.data.cost_key, imageCostKey(model, rung, undefined, '16:9', 3), 'the estimate prices Seedream inputs')
   assert.equal(withSeedream.sent[0].body.maxCredits, 2, 'a Seedream call carries the credits it was quoted')
   assert.equal(current.sent[0].body.maxCredits, undefined, 'a seat that does not bill per input sends no cap')
   const refusing = desktopWithout([])
   const refusingDesktop = refusing.ctx.desktop
   refusing.ctx.desktop = () => ({ ...refusingDesktop(), post: async (path, body) => {
     refusing.sent.push({ path, body })
-    return body.maxCredits >= 3 ? { success: true, background: true, generationId: 'mock-generation' } : { success: false, quoteExceeded: { credits: 3, costKey: imageCostKey(model, '2k', undefined, '16:9', 1) } }
+    return body.maxCredits >= 3 ? { success: true, background: true, generationId: 'mock-generation' } : { success: false, quoteExceeded: { credits: 3, costKey: imageCostKey(model, rung, undefined, '16:9', 1) } }
   } })
   const over = await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true }, refusing.ctx)
   assert.equal(over.data.quote_exceeded, true)
