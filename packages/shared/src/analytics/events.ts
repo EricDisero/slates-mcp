@@ -109,6 +109,8 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'video_watch_50', senders: WEB, kind: 'funnel', what: 'Half a sales-page video watched' },
   { name: 'video_watch_75', senders: WEB, kind: 'funnel', what: 'Three quarters of a sales-page video watched' },
   { name: 'video_watch_100', senders: WEB, kind: 'funnel', what: 'A sales-page video watched to the end' },
+  { name: 'partner_invite_opened', senders: WEB, kind: 'funnel', what: "A personal partner invite (/affiliates?invite=) opened in a browser; carries invite_slug, never the person's name" },
+  { name: 'partner_invite_joined', senders: API, kind: 'funnel', what: 'A personal partner invite claimed by an apply or join (slates-api partner_invite.claimed_at); carries invite_slug and claimed_by (token or email)' },
   { name: 'web_login_link_sent', senders: WEB, kind: 'account', what: 'A web sign-in link sent' },
   { name: 'web_login_google_started', senders: WEB, kind: 'account', what: 'A web Google sign-in started' },
   { name: 'web_login_completed', senders: WEB, kind: 'account', what: 'A web sign-in finished' },
