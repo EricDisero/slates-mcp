@@ -1009,6 +1009,7 @@ function zodDescriptions(op) {
       ['DOCK_SECTIONS', 'VIEW_DOCK_SECTIONS', view],
       ['WINDOW_LAYOUTS', 'VIEW_WINDOW_LAYOUTS', view],
       ['VIEWER_MODES', 'VIEW_VIEWER_MODES', view],
+      ['SHAPE_SETTINGS', 'VIEW_SHAPE_SETTINGS', view],
       ['SELECTION_TARGETS', 'SELECTION_TARGETS', view],
       ['SELECTION_MODES', 'SELECTION_MODES', view],
       ['GRID_EXTRACT_MODELS', 'GRID_EXTRACT_SEATS', grids],

@@ -106,6 +106,7 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['asset-link', 'linking a clip to its picture'],
   ['frame-extract', 'extracting a frame from a clip'],
   ['view-v2', 'showing and opening things in the window'],
+  ['layout-presets', 'choosing a layout or the window shape'],
   ['selection-set', 'ticking cards and shots'],
   ['timeline-select', 'selecting timeline clips'],
   ['first-frames', 'using pictures as first frames'],
