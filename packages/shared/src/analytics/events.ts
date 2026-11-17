@@ -116,7 +116,7 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'charge_upsell_no_initial_pi', senders: API, kind: 'ops', what: 'An upsell refused: no base payment named' },
 
   // ── Offers and leads ──
-  { name: 'lead_captured', senders: [...API, ...WEB], kind: 'offer', what: 'An email kept before payment: typed at checkout, or left on a phone to send Slates to a computer' },
+  { name: 'lead_captured', senders: [...API, ...WEB], kind: 'offer', what: 'An email kept before payment: typed at checkout, left on a phone to send Slates to a computer, or left on a paused sales-page video to finish it later (source finish_video)' },
   { name: 'offer_code_issued', senders: API, kind: 'offer', what: 'A personal offer code minted' },
   { name: 'offer_code_redeemed', senders: API, kind: 'offer', what: 'A personal offer code spent by a payment' },
   { name: 'deal_viewed', senders: WEB, kind: 'offer', what: 'A page showing a live deal seen' },
