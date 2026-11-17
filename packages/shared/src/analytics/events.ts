@@ -82,7 +82,7 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: '$pageleave', senders: APP, kind: 'funnel', what: "posthog-js's own leave event in the app (capture_pageleave)", library: true },
   { name: 'view_content', senders: WEB, kind: 'funnel', what: 'A sales page seen; browser pixel and PostHog with one id' },
   { name: 'initiate_checkout', senders: WEB, kind: 'funnel', what: 'The checkout opened; browser pixel and PostHog with one id' },
-  { name: 'checkout_started', senders: API, kind: 'funnel', what: "The API first learns the buyer's email for a PaymentIntent" },
+  { name: 'checkout_started', senders: API, kind: 'funnel', what: "A checkout first learns the buyer's email: the lead post (lead_source) or the PaymentIntent attach (payment_intent_id), whichever comes first, once per email an hour; carries utm_*, ft_utm_* and lp_*" },
   { name: 'thumbs_checkout_started', senders: API, kind: 'funnel', what: 'A Thumbs checkout created' },
   { name: 'checkout_payment_intent_failed', senders: WEB, kind: 'funnel', what: 'The checkout could not create its PaymentIntent' },
   { name: 'headline_variant_shown', senders: WEB, kind: 'funnel', what: 'The sales page hero headline arm shown' },
