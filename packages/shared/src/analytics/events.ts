@@ -104,7 +104,6 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'upgrade_page_viewed', senders: WEB, kind: 'funnel', what: 'The /upgrade page seen' },
   { name: 'skills_pack_download_clicked', senders: WEB, kind: 'funnel', what: 'The Skills Pack download pressed on the success page' },
   { name: 'video_play', senders: WEB, kind: 'funnel', what: 'A sales-page video started' },
-  { name: 'video_unmute', senders: WEB, kind: 'funnel', what: 'A sales-page video unmuted' },
   { name: 'video_watch_25', senders: WEB, kind: 'funnel', what: 'A quarter of a sales-page video watched (forwarded to Meta)' },
   { name: 'video_watch_50', senders: WEB, kind: 'funnel', what: 'Half a sales-page video watched' },
   { name: 'video_watch_75', senders: WEB, kind: 'funnel', what: 'Three quarters of a sales-page video watched' },
