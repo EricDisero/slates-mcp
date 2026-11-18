@@ -24,7 +24,6 @@
     "check:mcp-instructions": "node scripts/mcp-instructions-smoke.mjs",
     "sync-partials": "npm run sync-partials -w packages/shared",
     "sync-prompt-builder": "npm run build-prompt-builder -w packages/shared",
-    "build:skills-pack": "node scripts/build-skills-pack.mjs",
     "typecheck": "npm run build -w packages/shared && tsc --noEmit",
     "clean": "rimraf --glob \"packages/*/dist\" \"packages/*/tsconfig.tsbuildinfo\"",
     "publish:all": "npm run build && npm publish -w packages/shared --access public && npm publish -w packages/mcp --access public && npm publish -w packages/cli --access public",

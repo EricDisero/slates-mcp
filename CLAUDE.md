@@ -108,7 +108,7 @@ If the op needs new desktop endpoints, add the route in `slate/src/main/agent/ro
 
 **Only the Director card and the router live in `packages/shared/skills/`, which ships inside the
 public npm tarball. Every playbook, rule and model guide lives in the private `slates-api/brain/`,
-served by the account's tier, and the pack skills in `slates-api/pack-skills/`; none may ever be put
+served by the account's tier, the pack's ad playbooks included; none may ever be put
 in this repo**, which is public: an entitlement filter over a public artifact protects nothing, and not
 shipping the file is the only gate. Builds and checks read the brain through `scripts/brain-source.mjs`
 (`SLATES_BRAIN_DIR`, which a worktree must set, else `../slates-api/brain`). The frontmatter, the four skill categories, the `resolveGuideTopic()` alias table and the

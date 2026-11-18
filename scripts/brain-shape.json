@@ -30,6 +30,7 @@
     "rule": [
       "slates-blocking-to-prompt",
       "slates-camera-language",
+      "slates-cinematic-advertisement",
       "slates-cinematic-look",
       "slates-content-policy",
       "slates-cost-discipline",
@@ -40,6 +41,7 @@
       "slates-shot-variety",
       "slates-style-prompting",
       "slates-transitions",
+      "slates-ugc-advertisement",
       "slates-vision-feedback-loop"
     ],
     "model": [
@@ -69,8 +71,8 @@
       "model": 6500
     },
     "layerWords": {
-      "playbook": 29500,
-      "rule": 25000,
+      "playbook": 29600,
+      "rule": 29000,
       "model": 43000
     },
     "mine": {

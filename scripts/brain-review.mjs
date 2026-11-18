@@ -72,8 +72,8 @@ const API = dirname(BRAIN)
 const BRAIN_PATH = basename(BRAIN)
 const PIN = join(API, API_PIN)
 // slates-api's code that decides who reads which brain file, what a locked file says, and what the members feed and
-// the pack's paid layer serve: a change here can open the bump playbooks to every license, so it waits on Eric too.
-const API_ACCESS = ['src/lib/brain.ts', 'src/lib/brain-notice.ts', 'src/lib/brain-served.ts', 'src/routes/brain.ts', 'src/lib/pack-skills.ts', 'src/routes/members.ts']
+// the members feed serve: a change here can open the bump playbooks to every license, so it waits on Eric too.
+const API_ACCESS = ['src/lib/brain.ts', 'src/lib/brain-notice.ts', 'src/lib/brain-served.ts', 'src/routes/brain.ts', 'src/routes/members.ts']
 const layerOf = (file) => {
   if (DOCTRINE.includes(file)) return 'doctrine'
   if (file === BOARD_PATH || file === API_PIN) return 'pin'

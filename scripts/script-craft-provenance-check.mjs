@@ -10,9 +10,9 @@
 //   4. the vault's preset specifications list exactly the shipped presets, each
 //      with the same techniques, a readiness note, and evidence ads that exist in
 //      the generated source inventory
-//   5. the free/paid boundary: no paid pack skill (slates-api/pack-skills/) ships
-//      in the public package, and neither the craft skill nor a preset names a
-//      vault path
+//   5. the free/paid boundary: no brain file (slates-api/brain/, the pack's ad
+//      playbooks included) ships in the public package, and neither the craft
+//      skill nor a preset names a vault path
 //
 // Why a gate and not a generator: the skill is written for an agent choosing
 // wording and the findings for a person weighing evidence, so neither derives
@@ -29,9 +29,6 @@ const repo = resolve(here, '..')
 // The skill is the brain's (slates-api brain/); the public folder keeps only the card and router.
 const BRAIN = brainOrSkip('script-craft-provenance')
 const SKILL = join(BRAIN, 'slates-script-craft.md')
-// The paid skills live in the private slates-api repo (moved 2026-09-27); the
-// pack build reads the same folder (`scripts/build-skills-pack.mjs`).
-const PACK = process.env.SLATES_PACK_SKILLS_DIR ?? resolve(repo, '..', 'slates-api', 'pack-skills')
 const RESEARCH = resolve(repo, '../../second-brain/business/projects/slates/research/script-craft')
 
 const failures = []
@@ -63,10 +60,8 @@ for (const preset of AD_PRESETS) {
 }
 
 // 5. The free/paid boundary, and no vault path in anything that ships.
-if (!existsSync(PACK)) console.warn(`script-craft-provenance: paid skills folder not found at ${PACK}; the pack overlap check is skipped (the pack build refuses the same overlap)`)
-const pack = existsSync(PACK) ? readdirSync(PACK).filter((f) => f.endsWith('.md')) : []
-const free = [PUBLIC_SKILLS_DIR, BRAIN].flatMap((dir) => readdirSync(dir).filter((f) => f.endsWith('.md')))
-for (const name of pack) if (free.includes(name)) fail(`paid pack skill ${name} is also in the public skills folder or the brain`)
+const publicSkills = readdirSync(PUBLIC_SKILLS_DIR).filter((f) => f.endsWith('.md'))
+for (const name of readdirSync(BRAIN).filter((f) => f.endsWith('.md'))) if (publicSkills.includes(name)) fail(`brain file ${name} is also in the public skills folder`)
 // The craft this gate covers ships with keys only; the evidence stays private.
 const vaultPath = /second-brain|ad-research\.db|business\/projects\//
 if (vaultPath.test(skill)) fail('slates-script-craft.md names a vault path')
