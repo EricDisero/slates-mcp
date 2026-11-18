@@ -1,27 +1,24 @@
 {
   "about": "The brain Eric last approved: its commit, the slates-api commit brain-approved.json pins with it (approvedApiCommit) and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
-  "approvedCommit": "1857be0",
-  "approvedBrainHash": "51f238898c90357c",
-  "approvedApiCommit": "a9396bd12c423156653f26182a735b75c1c40952",
-  "approvedOn": "2026-11-17",
+  "approvedCommit": "b913588",
+  "approvedBrainHash": "7debb11d668dfa6a",
+  "approvedApiCommit": "97b679fbc02611e9f9e45634e583c900cf9b7328",
+  "approvedOn": "2026-11-18",
   "lastApproval": {
-    "from": "f0867cd",
-    "page": "1857be0",
+    "from": "1857be0",
+    "page": "b913588",
     "approved": [
-      "3874cae",
-      "f94d29b",
-      "9a8ddb0",
-      "a9396bd",
-      "d997eb8",
-      "f14b1a7",
-      "e3b106c"
+      "05e6c64",
+      "b913588",
+      "da3b384",
+      "478afc9"
     ],
     "held": [],
     "reverts": [],
     "gate": [
-      "routing sonnet: candidate 102/102, baseline 101/102",
-      "routing haiku: candidate 88/102, baseline 85/102",
-      "craft claude-opus-5-5: the candidate wins 7 cases, loses 6, ties 12 against the approved brain (an equal brain loses that many or more 71% of the time); craft 1.53 against 1.50 of 2, read before building 94% against 94%, playbook 90% against 92%, forbidden 0 against 0"
+      "routing sonnet: candidate 102/102, baseline 102/102",
+      "routing haiku: candidate 82/102, baseline 80/102",
+      "craft claude-opus-5-5: the candidate wins 7 cases, loses 7, ties 11 against the approved brain (an equal brain loses that many or more 60% of the time); craft 1.53 against 1.51 of 2, read before building 94% against 92%, playbook 94% against 92%, forbidden 0 against 0"
     ]
   }
 }
