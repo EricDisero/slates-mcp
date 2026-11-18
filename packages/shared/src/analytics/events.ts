@@ -105,7 +105,6 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'pro_upgrade_accepted', senders: WEB, kind: 'funnel', what: 'The success-page Pro offer accepted' },
   { name: 'pro_upgrade_declined', senders: WEB, kind: 'funnel', what: 'The success-page Pro offer declined' },
   { name: 'upgrade_page_viewed', senders: WEB, kind: 'funnel', what: 'The /upgrade page seen' },
-  { name: 'skills_pack_download_clicked', senders: WEB, kind: 'funnel', what: 'The Skills Pack download pressed on the success page' },
   { name: 'hdyhau_answered', senders: WEB, kind: 'funnel', what: 'The buyer answered "How did you hear about Slates?" on the success page; sets the person property hdyhau' },
   { name: 'video_play', senders: WEB, kind: 'funnel', what: 'A sales-page video started' },
   { name: 'video_watch_25', senders: WEB, kind: 'funnel', what: 'A quarter of a sales-page video watched (forwarded to Meta)' },
