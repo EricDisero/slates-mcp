@@ -191,6 +191,30 @@ try {
   const broken = shared.brainSkills(notAFolder)
   check(broken.mine.size === 0 && broken.skipped.length === 1 && Object.hasOwn(broken.skills, 'slates-cuts'), 'an unreadable My brain folder is named and the shared brain still serves')
   check(Array.isArray(shared.archiveUnusedDaily(notAFolder)), 'the daily archive on a path that is not a folder does not throw')
+
+  // slates_remember, the write side: saved where the loader serves it, once, replaced with the loser logged, undone, refused past the cap.
+  const taught = join(scratch, 'taught')
+  const was = process.env.SLATES_MY_BRAIN_DIR
+  process.env.SLATES_MY_BRAIN_DIR = taught
+  try {
+    const op = shared.ALL_OPERATIONS.find((o) => o.id === 'slates_remember')
+    const run = (input) => op.run(input, {})
+    const saved = await run({ lesson: 'Cut every hook to its first word', file: 'hooks', source: 'said always' })
+    check(saved.data.saved && shared.loadMyBrain(taught).files.hooks?.includes('Cut every hook to its first word _(from said always, '), 'a remembered lesson lands in their file with its source and date, and loads')
+    check(shared.myBrainPreload(taught).includes('Cut every hook to its first word'), 'a remembered lesson is in the preload an agent reads first')
+    check((await run({ lesson: 'cut every hook to its FIRST word.', file: 'hooks' })).data.unchanged, 'the same lesson twice is kept once')
+    const replaced = await run({ lesson: 'Cut every hook to its second word', file: 'hooks', replaces: 'first word' })
+    const hooks = readFileSync(join(taught, 'hooks.md'), 'utf8')
+    check(replaced.data.removed === 'Cut every hook to its first word' && !hooks.includes('first word') && hooks.includes('second word'), 'a lesson that replaces an old line removes it')
+    check(readFileSync(join(taught, '.history.jsonl'), 'utf8').includes('"removed":"Cut every hook to its first word"'), 'the replaced line is kept in the history')
+    await run({ replaces: 'second word', file: 'hooks' })
+    check(!existsSync(join(taught, 'hooks.md')), 'undoing the only lesson removes the file the op made')
+    let refused = ''
+    try { await run({ lesson: 'x '.repeat(140).trim(), file: 'hooks' }); for (let i = 0; i < 60; i++) await run({ lesson: `Rule ${i} ${'word '.repeat(40)}`, file: 'hooks' }) } catch (error) { refused = error.message }
+    check(/^not saved: /.test(refused) && shared.loadMyBrain(taught).skipped.length === 0, 'a lesson past the cap is refused with its reason and the file still loads')
+  } finally {
+    process.env.SLATES_MY_BRAIN_DIR = was
+  }
 } finally {
   if (server) await server.close()
   rmSync(dir, { recursive: true, force: true })
@@ -200,4 +224,4 @@ if (fail.length) {
   console.error(`✗ my-brain check:\n  ${fail.join('\n  ')}`)
   process.exit(1)
 }
-console.log("✓ my-brain check: a same-name file is served over the shared guide (theirs first), new ones are served and found, the router stays shared and its answer carries the preload, the estimate and the gate carry their card, the shape is held on load as the lint holds it, every serve dates the file, unused files archive at 60 days at most once a day")
+console.log("✓ my-brain check: a same-name file is served over the shared guide (theirs first), new ones are served and found, the router stays shared and its answer carries the preload, the estimate and the gate carry their card, the shape is held on load as the lint holds it, every serve dates the file, unused files archive at 60 days at most once a day, and slates_remember saves, dedupes, replaces, undoes and refuses past the cap")

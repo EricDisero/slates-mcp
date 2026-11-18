@@ -22,6 +22,7 @@ import { SlatesDesktopClient } from '../clients/desktop.js'
 import { BlenderBridgeClient, BLENDER_SETUP_HINT, RENDER_TIMEOUT_MS } from '../clients/blender.js'
 import { SKILLS } from '../skills/content.js'
 import { brainSkills, myBrainDir, myBrainPreload, noteUsed } from '../skills/my-brain.js'
+import { remember } from '../skills/my-brain-write.js'
 import { brainFiles, refreshServedBrain, servedBrain } from '../skills/served.js'
 import { HYPERFRAMES_MAPPING, findHyperframesGuide, hyperframesCard, hyperframesCatalog, hyperframesFilesOf, hyperframesGuideHeader, hyperframesSkillBodies, loadHyperframes } from '../skills/hyperframes.js'
 import { appManualIndex, appManualSections } from '../manual/index.js'
@@ -11588,6 +11589,24 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
   },
 }
 
+export const rememberInMyBrain: Operation<{ lesson?: string; file?: string; source?: string; replaces?: string }> = {
+  id: 'slates_remember',
+  description: 'Save a lesson to the user\'s own brain (My brain, on their machine; it wins over the shared brain on every later job). Call it without asking when they say remember, always or never, or correct the same thing a second time; then tell them in one line what was saved and that "undo" removes it. One lesson per call, in their words. file groups lessons by topic (hooks, captions, profile for who they are and what they make; a shared guide\'s name adds to that guide for them). To change a rule pass replaces with the old line; to undo or forget pass replaces alone. A refusal names why (a cap, a lesson the shared brain already holds): merge into an existing line instead. Free.',
+  input: z.object({
+    lesson: z.string().min(3).max(300).optional().describe('One rule or preset in the user\'s words, for example "cut every hook to its first word". Omit with replaces to remove a line.'),
+    file: z.string().min(1).max(60).optional().describe('Their file, lowercase-hyphenated: a topic (hooks), profile, or a shared guide name. Default my-rules.'),
+    source: z.string().max(120).optional().describe('What taught it: "said always", "corrected twice", "kept take IMG-A8".'),
+    replaces: z.string().min(3).max(300).optional().describe('Text of the existing line this lesson replaces; alone, the line to remove.'),
+  }),
+  async run(input) {
+    const result = remember(input)
+    const text = result.unchanged ? `Already in your brain (${result.file}): ${result.saved}`
+      : result.saved ? `Saved to your brain (${result.file}): ${result.saved}${result.removed ? ` (replaces: ${result.removed})` : ''}`
+      : `Removed from your brain (${result.file}): ${result.removed}`
+    return { text, data: { ...result } }
+  },
+}
+
 /**
  * Task discovery and exact schemas share one operation. The desktop uses
  * names/group to replace its optional selection; MCP keeps its full list fixed.
@@ -12033,6 +12052,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getBoardProgress as unknown as Operation<unknown>,
   editCut as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
+  rememberInMyBrain as unknown as Operation<unknown>,
   loadTools as unknown as Operation<unknown>,
   // ── Blender previs, LAST and deliberately ────────────────────────────
   // These six landed at the TOP once, which put a third transport nobody
