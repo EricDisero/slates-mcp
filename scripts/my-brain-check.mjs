@@ -207,6 +207,13 @@ try {
     const hooks = readFileSync(join(taught, 'hooks.md'), 'utf8')
     check(replaced.data.removed === 'Cut every hook to its first word' && !hooks.includes('first word') && hooks.includes('second word'), 'a lesson that replaces an old line removes it')
     check(readFileSync(join(taught, '.history.jsonl'), 'utf8').includes('"removed":"Cut every hook to its first word"'), 'the replaced line is kept in the history')
+    const listed = shared.myBrainLessons(taught).find((f) => f.file === 'hooks')?.lessons
+    check(listed?.length === 1 && listed[0].text === 'Cut every hook to its second word' && /^\d{4}-\d{2}-\d{2}$/.test(listed[0].date), 'the panel lists each lesson with its source and date')
+    shared.setMyBrainLearning(false, taught)
+    let off = ''
+    try { await run({ lesson: 'Never use slow zooms', file: 'hooks' }) } catch (error) { off = error.message }
+    check(/learning off/.test(off) && !readFileSync(join(taught, 'hooks.md'), 'utf8').includes('slow zooms'), 'with learning off nothing is saved, and the agent is told why')
+    shared.setMyBrainLearning(true, taught)
     await run({ replaces: 'second word', file: 'hooks' })
     check(!existsSync(join(taught, 'hooks.md')), 'undoing the only lesson removes the file the op made')
     let refused = ''

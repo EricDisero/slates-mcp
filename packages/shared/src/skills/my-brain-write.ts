@@ -57,8 +57,39 @@ export interface RememberResult {
   unchanged?: boolean
 }
 
+const SETTINGS_FILE = '.settings.json'
+
+/** Whether agents may save lessons on their own. On unless the user switched it off (the desktop's My brain panel). */
+export function myBrainLearning(dir = myBrainDir()): boolean {
+  try {
+    return (JSON.parse(readFileSync(join(dir, SETTINGS_FILE), 'utf8')) as { learning?: boolean }).learning !== false
+  } catch {
+    return true
+  }
+}
+
+export function setMyBrainLearning(on: boolean, dir = myBrainDir()): void {
+  mkdirSync(dir, { recursive: true })
+  writeAtomic(join(dir, SETTINGS_FILE), JSON.stringify({ learning: on }, null, 2))
+}
+
+export interface MyBrainLesson { text: string; source: string; date: string }
+
+/** Every saved lesson, file by file, for a panel that lists them; lines written by hand are not lessons and are left out. */
+export function myBrainLessons(dir = myBrainDir()): Array<{ file: string; lessons: MyBrainLesson[] }> {
+  const { files } = loadMyBrain(dir)
+  return Object.entries(files).map(([file, text]) => ({
+    file,
+    lessons: (SUMMARY_RE.exec(text)?.[2] ?? '').split(/\r?\n/).flatMap((l) => {
+      const m = LESSON_RE.exec(l)
+      return m ? [{ text: m[1], source: m[2], date: m[3] }] : []
+    }),
+  })).filter((f) => f.lessons.length)
+}
+
 /** Add, replace or remove one lesson. Throws with a reason the agent can act on. */
 export function remember(input: RememberInput, dir = myBrainDir(), now = new Date()): RememberResult {
+  if (input.lesson && !myBrainLearning(dir)) throw new Error('not saved: the user turned learning off (Settings → AI tools → My brain). Tell them in one line; nothing was saved.')
   const file = (input.file ?? MY_BRAIN_RULES).trim().toLowerCase()
   if (!NAME_RE.test(file)) throw new Error('file must be lowercase words joined by hyphens, for example "hooks" or "profile"')
   const lesson = input.lesson ? oneLine(input.lesson) : ''
