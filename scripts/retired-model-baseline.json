@@ -39,12 +39,13 @@
     "src/types/index.ts": 19
   },
   "slates-web": {
+    "docs/copy.md": 4,
     "docs/design-reviews/2026-09-27-offer-machine-and-truth-pass.html": 3,
     "docs/design-reviews/home2-woodshed.html": 3,
     "next.config.ts": 2,
     "scripts/build-llm-docs.mjs": 2,
     "scripts/check-copy-facts.ts": 1,
-    "src/app/changelog/page.tsx": 4,
+    "src/app/copy/changelog.ts": 4,
     "src/app/home2/clips.ts": 4,
     "src/content/blog/index.ts": 1
   }
