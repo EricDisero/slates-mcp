@@ -115,6 +115,8 @@ const QUESTIONS = [
   ['add the pictures from a shop page to a product I already have', ['fill an item from a product page link']],
   ['put my logo from the Library into the end card layer', ["a layer's values in the inspector"]],
   ['make ad variants with different hooks and one body', ['ad variants']],
+  ['compare Meta Ads performance and find the exported video', ['Meta Ads reporting']],
+  ['publish a Meta video ad and change the ad set budget', ['Meta Ads publishing']],
   ['J-cut between the hook and the body', ['the seam between a hook and the body']],
   ['export several cuts at once', ['Export several cuts', 'Export several timelines']],
   ['export ad variants in several delivery formats', ['variant grid', 'ad variants — the grid', 'delivery formats', 'Export several cuts', 'Export several timelines']],
