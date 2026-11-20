@@ -113,6 +113,7 @@ export interface ShotParams {
   audioLanguage?: string
   audioAccent?: string
   generateMusic?: boolean
+  seedanceDraft?: boolean
   seedanceFace?: boolean
   multiShot?: boolean
   multiShotSegments?: Array<{ prompt: string; duration: number; camera: string; shotSize: string }> | null
@@ -424,14 +425,15 @@ function readParams(v: unknown): ShotParams {
   const n = (k: 'duration' | 'imageQuantity' | 'audioDurationSeconds' | 'audioPromptInfluence'): void => {
     if (typeof raw[k] === 'number' && Number.isFinite(raw[k])) out[k] = raw[k] as number
   }
-  const b = (k: 'sound' | 'generateMusic' | 'seedanceFace' | 'multiShot' | 'audioLoop' | 'audioMultilingual'): void => {
+  const b = (k: 'sound' | 'generateMusic' | 'seedanceDraft' | 'seedanceFace' | 'multiShot' | 'audioLoop' | 'audioMultilingual'): void => {
     if (typeof raw[k] === 'boolean') out[k] = raw[k] as boolean
   }
   s('aspectRatio'); s('imageResolution'); s('videoResolution'); s('quality')
   s('audioLanguage'); s('audioAccent'); s('negativePrompt')
   s('voiceId'); s('voiceReferenceAssetId'); s('voiceDescription')
   n('duration'); n('imageQuantity'); n('audioDurationSeconds'); n('audioPromptInfluence')
-  b('sound'); b('generateMusic'); b('seedanceFace'); b('multiShot'); b('audioLoop'); b('audioMultilingual')
+  b('sound'); b('generateMusic'); b('seedanceDraft'); b('seedanceFace'); b('multiShot'); b('audioLoop'); b('audioMultilingual')
+  if (out.seedanceDraft && out.videoResolution === undefined) out.videoResolution = '480p'
   // Shape validation only. The pre-2026-09-09 tier MIGRATION deliberately does
   // NOT live here: this file is a dependency-free leaf, and the migration's
   // SSOT is `migrateGptQuality` in slate/src/shared/pricing.ts, applied in

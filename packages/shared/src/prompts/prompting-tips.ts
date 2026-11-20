@@ -162,7 +162,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
   ...SEEDANCE,
   label: 'Seedance 2.5',
   intro: [
-    'Seedance 2.5 is the default video model. Against 2.0 it buys one 30-second take instead of 15, up to 30 image references (plus 10 video and 10 audio), audio-only references and integer-second timestamps — and it gives up 4K. It runs at 480p, 720p or 1080p, and it costs more than 2.0 at every tier they share, so pick 2.0 when you want the same resolution cheaper or you want 4K.',
+    'Seedance 2.5 supports takes up to 30 seconds, up to 30 image references plus 10 video and 10 audio references, audio-only references and integer-second timestamps. Both 2.0 and 2.5 can generate directly at native 4K with Pro. Choose 2.5 to cut with 480p drafts and finish approved takes at 1080p or 4K.',
     "ByteDance's official advanced formula has 8 slots: precise subject + action details + scene/environment + lighting & color tone + camera movement + visual style + image quality + constraints. Sweet spot 60-150 words for a single shot, longer for multi-shot.",
   ],
   columns: [
@@ -185,7 +185,7 @@ const SEEDANCE_25: PromptingTipsEntry = {
       {
         heading: '720p is not the cheap one here',
         example: '30s \u00b7 720p \u00b7 Seedance 2.5 Face = 489 credits\n15s \u00b7 1080p \u00b7 Seedance 2.0 Face = 411 credits',
-        note: 'Length is what moves the price, and 2.5 doubles the length ceiling — so a 30-second 720p clip can cost more than a 15-second 1080p one, against a 1,000-credit starting balance. Explore at short LENGTH rather than low resolution: cut the seconds to 4-8 while you are finding the shot, and stay at the resolution you actually want. A 480p pass does not de-risk a 720p render — generation is stochastic, so the 720p run is a different take, not the same shot rendered better. The Generate button always shows the exact number first.',
+        note: 'Length affects the price. Try 4–8 seconds while finding the shot. For a take you can finish later, select Draft before generating and save the 480p proxy. The finish quote covers the whole source at the chosen resolution, including referenced video, even if the cut uses only a few seconds. The draft and final are billed separately.',
         critical: true,
       },
       {

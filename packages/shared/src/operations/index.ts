@@ -100,6 +100,8 @@ import {
 export interface OperationContext {
   cloud: () => SlatesCloudClient
   desktop: () => SlatesDesktopClient
+  /** The Studio Agent attributes the final charge before it runs another paid operation. */
+  waitForCutFinish?: boolean
   /**
    * Cancellation, propagated from the caller.
    *
@@ -2356,6 +2358,7 @@ export const estimateGenerationCost: Operation<{
   quality?: GptQualityId
   aspectRatio?: string
   sound?: boolean
+  seedanceDraft?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
   referenceImages?: number
@@ -2390,6 +2393,7 @@ export const estimateGenerationCost: Operation<{
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     aspectRatio: z.string().optional().describe('GPT Image: the frame shape changes the price; pass the generation\'s value.'),
     sound: z.boolean().optional().describe('Kling 3.0: a silent take prices differently from one with sound. Omitted means sound on, as generation bills it; pass false to price a silent take. Kling 4K keys include audio.'),
+    seedanceDraft: z.boolean().optional().describe('Create a finishable Seedance 2.5 preview at 480p.'),
     seedanceFace: z.boolean().optional().describe('Seedance Face row, for an AI character\'s face.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance with a consented real person (premium key).'),
     videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
@@ -2405,11 +2409,15 @@ export const estimateGenerationCost: Operation<{
     if (retired) {
       throw new Error(`${retired} was retired and ${RETIRED_MODELS[retired]} replaced it. Quote ${RETIRED_MODELS[retired]} with the same parameters.`)
     }
+    if (input.seedanceDraft) {
+      const video = resolveVideoModel(input.model)
+      input.videoResolution = draftResolution(video?.model, input.videoResolution ?? video?.videoResolution)
+    }
     const registry = await ctx.cloud().get<ModelRegistryResponse>('/api/agent/models')
     const byKey = new Map(registry.models.filter((m) => !retiredModelOfKey(m.model)).map((m) => [m.model, creditCost(m)]))
 
     // 1) exact registry cost key
-    let key: string | null = byKey.has(input.model) ? input.model : null
+    let key: string | null = !input.seedanceDraft && byKey.has(input.model) ? input.model : null
     // 2) image base id + resolution (+ quality for GPT Image)
     if (!key) {
       // IMAGE_MODELS, never a second hand-typed copy: this list is declared
@@ -2530,7 +2538,7 @@ export const estimateGenerationCost: Operation<{
             resolved.videoResolution ??
             // Seedance quotes are resolution-scaled, so a missing resolution has
             // to fall back to the model's OWN default — the ladders differ per
-            // row (2.5 has no 4K) and a blanket literal quotes a key that does
+            // row and a blanket literal can quote a key that does
             // not exist. Read from the SSOT; this used to be a hand-typed
             // model-id ternary.
             defaultVideoResolutionFor(resolved.model),
@@ -5053,7 +5061,7 @@ export function videoCostKey(input: {
     // (fal partner endpoint). A reference video flips to `-vref-{res}-{T}s`,
     // T = in + out, or max(in, out) + out on the AI-face route.
     //
-    // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 runs 480p/720p/1080p (no 4K),
+    // ⚠️ EVERY BOUND HERE IS VERSION-SCOPED. 2.5 runs through native 4K,
     // reaches 30s, and takes references to 30s combined — so its vref total
     // reaches 60, DOUBLE 2.0's ceiling of 30. Clamping a 2.5 quote at 30 would
     // quote a real key at a fraction of the real bill. The ladder itself lives in
@@ -5450,6 +5458,13 @@ const VIDEO_MODEL_GUIDES = [
   ...new Set(VIDEO_MODELS.map((m) => promptingSkillFor(m))),
 ].join(' / ')
 
+function draftResolution(model: string | undefined, resolution?: string): '480p' {
+  if (model !== 'seedance-2.5' || (resolution != null && resolution !== '480p')) {
+    throw new Error('Draft previews require Seedance 2.5 at 480p.')
+  }
+  return '480p'
+}
+
 export const generateVideo: Operation<{
   prompt: string
   // Accepts base ids AND registry cost-key spellings — normalized by
@@ -5475,6 +5490,7 @@ export const generateVideo: Operation<{
   sound?: boolean
   audioLanguage?: 'EN' | 'ZH' | 'JA' | 'KO' | 'ES'
   generateMusic?: boolean
+  seedanceDraft?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
   realFaceConsent?: boolean
@@ -5566,6 +5582,7 @@ export const generateVideo: Operation<{
     sound: z.boolean().optional().describe('Kling 3.0 (every tier), LTX and Wan 3.0: sound on (default) or silent (false); Kling 3.0 bills audio as its own key. Seedance, Omni Flash, H3 and Kling 4.0 always generate audio.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling 3.0 model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling 3.0 model with sound on — auto-generate background music.'),
+    seedanceDraft: z.boolean().optional().describe('Create a finishable Seedance 2.5 preview at 480p.'),
     seedanceFace: z.boolean().optional().describe('Seedance only: a reference shows an AI character\'s face. Without it, faces are blocked; the estimate prices it. A real person fails here with [REAL_FACE_DETECTED]; see seedanceRealFace.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance ONLY: a reference shows a REAL person. The real-person tier, priced above Face: estimate it with the flag set first. REQUIRES realFaceConsent=true.'),
     realFaceConsent: z.boolean().optional().describe('MANDATORY with seedanceRealFace: true ONLY after the user has explicitly confirmed they hold rights/consent to this likeness and it does not impersonate or misrepresent them. Refused without it; public figures fail on every tier.'),
@@ -5590,6 +5607,10 @@ export const generateVideo: Operation<{
       )
     }
     input.model = resolved.model
+    if (input.seedanceDraft || (input.model === 'seedance-2.5' && (input.videoResolution ?? resolved.videoResolution) === '4k')) {
+      await ctx.desktop().requireCapability('seedance-drafts', 'Seedance 2.5 drafts and 4K output')
+    }
+    if (input.seedanceDraft) input.videoResolution = draftResolution(input.model, input.videoResolution ?? resolved.videoResolution)
     requireGuideRead(ctx, input.model)
     if (input.duration == null && resolved.duration != null) input.duration = resolved.duration
     if (input.videoResolution == null && resolved.videoResolution != null)
@@ -6159,6 +6180,7 @@ export const generateVideo: Operation<{
       generateMusic: input.generateMusic,
       seedanceFace: input.seedanceFace,
       seedanceRealFace: input.seedanceRealFace,
+      seedanceDraft: input.seedanceDraft,
       realFaceConsent: input.realFaceConsent,
       negativePrompt: input.negativePrompt,
       ...folderBody(input.folderId),
@@ -9753,6 +9775,7 @@ function shotParamsShape(described: boolean): z.ZodRawShape {
     imageQuantity: d(z.number().int().min(1).max(10).optional(), 'Image models only.'),
     negativePrompt: z.string().optional(),
     sound: d(z.boolean().optional(), 'Video models that co-generate audio.'),
+    seedanceDraft: d(z.boolean().optional(), 'Make a finishable Seedance 2.5 preview at 480p.'),
     seedanceFace: d(
       z.boolean().optional(),
       "Seedance only — a reference shows an AI character's face; without it faces are blocked. The estimate prices it."
@@ -9896,6 +9919,7 @@ function shotParamsPatch(p: ShotOpParams | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (!p) return out
   for (const [k, v] of Object.entries(p)) if (v !== undefined) out[k] = v
+  if (p.seedanceDraft && p.videoResolution === undefined) out.videoResolution = '480p'
   return out
 }
 
@@ -10057,6 +10081,7 @@ function assertShotCapabilities(
   model: string | undefined,
   params: ShotOpParams | undefined
 ): OperationResult | null {
+  if (params?.seedanceDraft && model) draftResolution(model, params.videoResolution)
   if (!model || !(VIDEO_MODELS as readonly string[]).includes(model)) return null
   const err = assertVideoCapabilities({
     model,
@@ -10065,6 +10090,15 @@ function assertShotCapabilities(
     duration: params?.duration,
   })
   return err ? ok(err) : null
+}
+
+async function requireDraftShotDesktop(desktop: SlatesDesktopClient, model: string | undefined, params: ShotOpParams | undefined, shotId?: string) {
+  if (params?.seedanceDraft) {
+    await desktop.requireCapability('seedance-drafts', 'saving a Seedance 2.5 draft')
+  } else if (params?.videoResolution === '4k') {
+    const target = model ?? (shotId ? (await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: shotId })).shot.model : undefined)
+    if (target === 'seedance-2.5') await desktop.requireCapability('seedance-drafts', 'saving a native 4K Seedance Shot')
+  }
 }
 
 /** What `/agent/shots` returns per row. Cheap on purpose: no composition, so no
@@ -10208,6 +10242,7 @@ export const createShot: Operation<
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    await requireDraftShotDesktop(desktop, input.model, input.params)
     // 1.6.0 ignores fromAssetId, and would then refuse the missing prompt.
     if (input.fromAssetId) await desktop.requireCapability('shot-from-asset', 'saving a result as a Shot')
     // 1.5.8 ignores `position` and files the Shot last.
@@ -10323,6 +10358,7 @@ export const updateShot: Operation<
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    await requireDraftShotDesktop(desktop, input.model, input.params, input.shotId)
     const { spec, seatNote } = await buildShotSpecInput(ctx, input.projectId, input)
     // Only send the halves the caller actually named; the route merges a PARTIAL
     // spec over the stored one, so an omitted field is never silently cleared.
@@ -10368,6 +10404,7 @@ export const duplicateShot: Operation<{
     if (capErr) return capErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
+    await requireDraftShotDesktop(desktop, input.model, input.params, input.shotId)
     // Only the halves actually named. The route merges two levels deep, so an
     // omitted param on the copy keeps the original's value rather than clearing it.
     const spec: Record<string, unknown> = {}
@@ -11050,6 +11087,12 @@ export const generateFromShots: Operation<{
     await desktop.requireCapability('board-quote', 'Shot prices')
     // Resolved first so a SHOT-A code fails here, not halfway through a billed run.
     const details = await Promise.all(input.shotIds.map((id) => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
+    // Older desktops drop the draft flag when reading a saved recipe. Its persisted 480p
+    // resolution survives, so require a capable desktop before firing an ambiguous video Shot.
+    if (!input.draft && details.some(({ shot }) => shot.model === 'seedance-2.5' &&
+      (shot.params?.seedanceDraft || ['480p', '4k'].includes(String(shot.params?.videoResolution))))) {
+      await desktop.requireCapability('seedance-drafts', 'generating saved Seedance 2.5 preview or 4K Shots')
+    }
     const { draft, note: seatNote } = await desktopDraft(desktop, input.draft)
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
       input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft }),
@@ -11118,6 +11161,114 @@ export const getBoardProgress: Operation<{ projectId: string }> = {
   async run(input, ctx) {
     await ctx.desktop().requireCapability('board-progress', 'board progress')
     return ok(await ctx.desktop().get('/agent/shots/progress', input))
+  },
+}
+
+const draftFinishInput = z.object({
+  projectId: z.string().uuid(),
+  assetId: z.string().describe('Draft video asset ID or badge code.'),
+  resolution: z.enum(['1080p', '4k']),
+})
+const draftApproval = {
+  confirm: z.literal(true).describe('The user approved this finish at the quoted price.'),
+  maxCredits: z.number().int().nonnegative().describe('Maximum credits the user approved for the finish.'),
+}
+const paidDraftFinishInput = draftFinishInput.extend(draftApproval)
+
+export const quoteDraftFinish: Operation<z.infer<typeof draftFinishInput>> = {
+  id: 'slates_quote_draft_finish',
+  description: 'Quote a draft take at its full source duration and check its expiry or existing final.',
+  input: draftFinishInput,
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('seedance-drafts', 'finishing draft takes')
+    const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    return ok(await desktop.get('/agent/assets/quote-draft-finish', { ...input, assetId: refs.get(input.assetId)!.id }))
+  },
+}
+
+export const finishDraft: Operation<z.infer<typeof paidDraftFinishInput>> = {
+  id: 'slates_finish_draft',
+  description: 'Finish an approved draft at 1080p or 4K. Quote the full price first. Check a background generation with slates_get_generation_status.',
+  input: paidDraftFinishInput,
+  billable: true,
+  async run(input, ctx) {
+    requireGuideRead(ctx, 'seedance-2.5')
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('seedance-drafts', 'finishing draft takes')
+    const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    const receipt = await desktop.post<{ status: string; assetId?: string; generationId?: string; cost_credits: number }>(
+      '/agent/assets/finish-draft', { ...input, assetId: refs.get(input.assetId)!.id, background: true },
+    )
+    if (!ctx.waitForCutFinish || receipt.status === 'completed') return ok(receipt)
+    if (!receipt.generationId) throw new Error('The finish did not return a generation ID.')
+    for (;;) {
+      if (ctx.signal?.aborted) throw new OperationCancelledError('check the submitted finish in Generations')
+      const status = await desktop.get<{
+        generation: { status: string; error?: string; assetId?: string; draftFinishCredits?: number }; asset?: { id: string }
+      }>('/agent/generation/status', { id: receipt.generationId })
+      if (status.generation.status === 'completed') {
+        const cost = receipt.cost_credits === 0 ? 0 : status.generation.draftFinishCredits ?? receipt.cost_credits
+        return ok({ ...receipt, status: 'completed', cost_credits: cost, assetId: status.asset?.id ?? status.generation.assetId })
+      }
+      if (status.generation.status !== 'processing' && status.generation.status !== 'pending') {
+        throw new Error(status.generation.error || 'The draft finish failed.')
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000))
+    }
+  },
+}
+
+const cutDraftInput = z.object({ projectId: z.string().uuid(), timelineId: z.string().uuid() })
+const quoteCutInput = cutDraftInput.extend({
+  resolutions: z.record(z.enum(['1080p', '4k'])).optional().describe('Target resolution by draft asset UUID. Defaults to 1080p.'),
+})
+const cutFinishStatusInput = cutDraftInput.extend({
+  quoteId: z.string().min(1).describe('Identifier returned by slates_quote_cut_drafts.'),
+})
+const finishCutInput = cutFinishStatusInput.extend(draftApproval)
+
+export const quoteCutDrafts: Operation<z.infer<typeof quoteCutInput>> = {
+  id: 'slates_quote_cut_drafts',
+  description: 'Price the distinct draft sources used in a cut. Returns full-source prices, expiry and a quote ID for approval.',
+  input: quoteCutInput,
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('seedance-drafts', 'finishing drafts in a cut')
+    return ok(await desktop.post('/agent/timeline/cut', { ...input, action: 'quoteDrafts' }))
+  },
+}
+
+export const finishCutDrafts: Operation<z.infer<typeof finishCutInput>> = {
+  id: 'slates_finish_cut_drafts',
+  description: 'Start finishing the approved cut in the background. Each ready final replaces its draft throughout the cut. Check progress with slates_get_cut_draft_status.',
+  input: finishCutInput,
+  billable: true,
+  async run(input, ctx) {
+    requireGuideRead(ctx, 'seedance-2.5')
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('seedance-drafts', 'finishing drafts in a cut')
+    const query = { projectId: input.projectId, timelineId: input.timelineId, quoteId: input.quoteId }
+    let receipt = await desktop.post<{ status: string; cost_credits: number }>('/agent/timeline/cut', {
+      ...input, action: 'finishDrafts', background: true,
+    })
+    while (ctx.waitForCutFinish && receipt.status === 'running') {
+      if (ctx.signal?.aborted) throw new OperationCancelledError('check the cut finish status for any source already submitted')
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      receipt = await desktop.get('/agent/timeline/draft-finish', query)
+    }
+    return ok(receipt)
+  },
+}
+
+export const getCutDraftStatus: Operation<z.infer<typeof cutFinishStatusInput>> = {
+  id: 'slates_get_cut_draft_status',
+  description: 'Check which sources in an approved cut have been finished, replaced, or kept as drafts.',
+  input: cutFinishStatusInput,
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('seedance-drafts', 'finishing drafts in a cut')
+    return ok(await desktop.get('/agent/timeline/draft-finish', input))
   },
 }
 
@@ -12050,6 +12201,11 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   generateFromShots as unknown as Operation<unknown>,
   quoteBoard as unknown as Operation<unknown>,
   getBoardProgress as unknown as Operation<unknown>,
+  quoteDraftFinish as unknown as Operation<unknown>,
+  finishDraft as unknown as Operation<unknown>,
+  quoteCutDrafts as unknown as Operation<unknown>,
+  finishCutDrafts as unknown as Operation<unknown>,
+  getCutDraftStatus as unknown as Operation<unknown>,
   editCut as unknown as Operation<unknown>,
   getPromptingGuide as unknown as Operation<unknown>,
   rememberInMyBrain as unknown as Operation<unknown>,

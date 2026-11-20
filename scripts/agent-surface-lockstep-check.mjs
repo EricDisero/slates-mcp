@@ -605,6 +605,7 @@ console.log('agent-surface-lockstep-check')
     ['slates_blender_docs', 'reads the API reference the add-on ships'],
     ['slates_blender_search_docs', 'reads the API reference the add-on ships'],
     ['slates_check_composition', 'POSTs because the composition is the payload; the check writes nothing'],
+    ['slates_quote_cut_drafts', 'POST carries target resolutions for the cut. A quote spends nothing and changes no media or edits.'],
   ])
 
   let missing = 0

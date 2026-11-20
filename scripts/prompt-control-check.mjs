@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import './draft-operations-check.mjs'
 import { findBannedTokens } from '../packages/shared/dist/prompts/banned-tokens.js'
 import { composeReferences, cleanPrompt } from '../packages/shared/dist/prompts/reference-composer.js'
 import { MODEL_CAPABILITIES, DEFAULT_GPT_QUALITY, defaultImageResolutionFor } from '../packages/shared/dist/prompts/model-capabilities.js'

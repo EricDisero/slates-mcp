@@ -289,7 +289,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     ...caps('seedance-2'),
     audioRefNeedsCompanion: true,
-    notes: 'THE 4K AND VALUE SEAT beside the 2.5 default — the only Seedance with native 4K (Pro-gated; base accounts get PRO_REQUIRED) and cheaper than 2.5 at every resolution they share, with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare "seedance" still resolves here for older CLIs that expect 4K.',
+    notes: 'The lower-cost Seedance seat through native 4K (Pro), with the same physics, effects and scale strengths; shorter takes, fewer references, no timestamps. VIDEO-ONLY. A bare "seedance" still resolves here for older CLIs that expect 4K.',
   },
   {
     id: 'seedance-2.5',
@@ -300,7 +300,7 @@ export const MODEL_FACTS: ModelFact[] = [
     ...caps('seedance-2.5'),
     // No companion requirement — audio-only references are one of the things
     // the second seat actually buys.
-    notes: 'DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. No 4K, and dearer than 2.0 at every shared resolution: go to 2.0 for 4K or the same resolution cheaper. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.',
+    notes: 'DEFAULT VIDEO MODEL — the strongest seat for physics, effects, scale and hero shots, and the only Seedance that takes long single takes, many references, audio-only references and integer-second timestamps. Generate directly through native 4K (Pro), or finish a selected 480p draft at 1080p or 4K. The final is billed separately at full duration. LENGTH is the price dial — quote long takes first. VIDEO-ONLY. Timestamp grammar and the edit/extend words that make the provider reclassify and fail a generation are in slates-prompting-seedance-2-5.',
   },
   {
     id: 'seedance-2.5-edit',

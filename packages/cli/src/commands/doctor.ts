@@ -86,6 +86,7 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['board-quote', 'Shot prices and the board quote'],
   ['board-progress', 'board progress'],
   ['cut-edit', 'editing a cut'],
+  ['seedance-drafts', 'finishing draft takes and cuts'],
   ['recipe-lookup', 'what made an exported ad'],
   ['sheet-tool-seats', 'sheet tools on the default image seat'],
   ['image-variations', 'more than 4 images per call'],

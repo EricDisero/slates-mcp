@@ -59,6 +59,8 @@ const READ_ONLY_PREFIXES = [
   'slates_blender_search_docs',
   // Runs HyperFrames' check on a composition and writes nothing; it POSTs because the document is the payload.
   'slates_check_composition',
+  'slates_quote_cut_drafts',
+  'slates_quote_draft_finish',
 ]
 
 /**
@@ -179,6 +181,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_update_style',
     'slates_delete_style',
     'slates_list_library',
+    'slates_quote_draft_finish', 'slates_finish_draft',
     'slates_create_library_item',
     'slates_update_library_item',
     'slates_delete_library_item',
@@ -199,6 +202,7 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
   script: ['slates_get_script_document', 'slates_update_script_document', 'slates_get_script_sections', 'slates_update_script_section', 'slates_get_script_suggestions', 'slates_update_script_suggestions', 'slates_get_script_uses', 'slates_preview_script_variation', 'slates_create_script_variation', 'slates_get_shot_inputs', 'slates_reuse_shot_take'],
   timeline: [
     'slates_list_timelines', 'slates_save_timeline', 'slates_export_cuts',
+    'slates_quote_cut_drafts', 'slates_finish_cut_drafts', 'slates_get_cut_draft_status',
     'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid', 'slates_get_recipe',
     'slates_reframe_clip', 'slates_get_reframe_report',
     'slates_get_timeline',
