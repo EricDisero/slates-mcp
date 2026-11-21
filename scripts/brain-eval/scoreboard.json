@@ -1,24 +1,21 @@
 {
   "about": "The brain Eric last approved: its commit, the slates-api commit brain-approved.json pins with it (approvedApiCommit) and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
-  "approvedCommit": "b913588",
-  "approvedBrainHash": "7debb11d668dfa6a",
-  "approvedApiCommit": "97b679fbc02611e9f9e45634e583c900cf9b7328",
-  "approvedOn": "2026-11-18",
+  "approvedCommit": "93eb096",
+  "approvedBrainHash": "020f041eb9ad359c",
+  "approvedApiCommit": "31f7f734e2a08858851d8c87f8f673917b1f43a0",
+  "approvedOn": "2026-11-21",
   "lastApproval": {
-    "from": "1857be0",
-    "page": "b913588",
+    "from": "b913588",
+    "page": "93eb096",
     "approved": [
-      "05e6c64",
-      "b913588",
-      "da3b384",
-      "478afc9"
+      "928ad8b"
     ],
     "held": [],
     "reverts": [],
     "gate": [
       "routing sonnet: candidate 102/102, baseline 102/102",
-      "routing haiku: candidate 82/102, baseline 80/102",
-      "craft claude-opus-5-5: the candidate wins 7 cases, loses 7, ties 11 against the approved brain (an equal brain loses that many or more 60% of the time); craft 1.53 against 1.51 of 2, read before building 94% against 92%, playbook 94% against 92%, forbidden 0 against 0"
+      "routing haiku: candidate 92/102, baseline 89/102",
+      "craft claude-opus-5-5: the candidate wins 9 cases, loses 9, ties 7 against the approved brain (an equal brain loses that many or more 59% of the time); craft 1.58 against 1.57 of 2, read before building 96% against 96%, playbook 92% against 94%, forbidden 0 against 0"
     ]
   }
 }
