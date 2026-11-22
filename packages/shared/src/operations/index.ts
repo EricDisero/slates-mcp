@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { MAX_IMAGE_VARIATIONS, SHEET_TOOL_ASPECT_RATIO, SHEET_TOOL_GPT_QUALITY } from '../prompts/generation-policy.js'
 import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
@@ -7720,18 +7721,19 @@ interface UpscaleQuote {
   assetId: string; code: string | null; factor: number; width: number; height: number; outWidth: number; outHeight: number
   credits: number | null; refused?: string
 }
-export const upscaleImage: Operation<{ projectId: string; assetId: string; factor: 2 | 4; confirm?: boolean }> = {
+export const upscaleImage: Operation<{ projectId: string; assetId: string; factor: 2 | 4; confirm?: boolean; requestId?: string }> = {
   id: 'slates_upscale_image',
   billable: true,
   description:
     "Make a sharper copy of a picture at 2x or 4x its size, as the picture viewer's Upscale does: faithful (no new content), saved as a new picture beside the original, which is untouched. Priced by the picture's size; a picture that would pass 144 megapixels at 4x is refused (try 2x). " +
     CONFIRM_GATE_SENTENCE +
-    ' Returns the new picture (id, code, file, size) and the credits spent. Requires image-upscale; update Slates on capability refusal.',
+    ' Supply a new UUID requestId once per intended upscale and reuse it for a retry: the same id never pays twice (a retry waits for the same run, or returns its picture). Returns the new picture (id, code, file, size) and cost_credits spent. Requires image-upscale; update Slates on capability refusal.',
   input: z.object({
     projectId: z.string().uuid(),
     assetId: z.string().min(1).describe('The picture: its code (IMG-A4) or id.'),
     factor: z.union([z.literal(2), z.literal(4)]).describe('2 or 4 times the size.'),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+    requestId: z.string().uuid().optional().describe('A new UUID per intended upscale; the same one on a retry. Absent: one is made for this call.'),
   }).strict(),
   async run(input, ctx) {
     const desktop = ctx.desktop()
@@ -7748,20 +7750,23 @@ export const upscaleImage: Operation<{ projectId: string; assetId: string; facto
         message: `Cost: ${fmtCredits(quote.credits)} to upscale ${name} ${quote.factor}x (${size}). Re-call with confirm=true after the user explicitly OKs the spend.`,
       })
     }
-    const r = await desktop.post<{ asset: { id: string; code: string | null; filePath: string; width: number; height: number }; credits: number }>(
-      '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits })
-    return ok(r, `Upscaled ${name} ${quote.factor}x (${size}) into ${r.asset.code ?? r.asset.id} for ${fmtCredits(r.credits)}.`)
+    const requestId = input.requestId ?? randomUUID()
+    const r = await desktop.post<{ status?: string; generationId?: string; asset?: { id: string; code: string | null; filePath: string; width: number; height: number }; credits?: number; cost_credits?: number }>(
+      '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits, requestId })
+    if (!r.asset) return ok({ ...r, requestId }, `The upscale of ${name} under this requestId is still running; check slates_get_generation_status with ${r.generationId ?? requestId}. Do not start it again with a new requestId.`)
+    const spent = r.cost_credits ?? r.credits ?? quote.credits
+    return ok({ ...r, cost_credits: spent, requestId }, `Upscaled ${name} ${quote.factor}x (${size}) into ${r.asset.code ?? r.asset.id} for ${fmtCredits(spent)}.`)
   },
 }
 
 export const getReviewPacket: Operation<{ projectId: string; packetId?: string; include?: 'sent' | 'open' | 'all'; claim?: boolean }> = {
   id: 'slates_get_review_packet',
   description:
-    "Read the notes the person sent from Review mode (the Viewer's Review button): each note with its number, its words or a wordless mark (mark: true, no words: 'this is off'), what it points at (a picture region, a clip span, a transition, a transcript join) with a still, its thread, and the ratings changed since (stars, favourite, rejected, redo, more like this). By default the oldest packet the person sent and nobody has read; include: open reads notes and ratings not yet sent, all every note. Reading a sent packet claims it, so the person sees it was picked up (claim: false only peeks). Answer each note with slates_resolve_review_note. null with a reason when nothing waits. Free. Requires review-mode; update Slates on capability refusal.",
+    "Read the notes the person sent from Review mode (the Viewer's Review button): each note with its number, its words or a wordless mark (mark: true, no words: 'this is off'), what it points at (a picture region, a clip span, a transition, a transcript join) with a still, its thread, and the ratings changed since (stars, favourite, rejected, redo, more like this). By default the oldest packet the person sent and nobody has read; include: open reads notes and ratings not yet sent; include: all reads every note and rating in the project, with the packets they were sent in, and claims nothing. Reading a sent packet claims it, so the person sees it was picked up (claim: false only peeks). Answer each note with slates_resolve_review_note. null with a reason when nothing waits. Free. Requires review-mode; update Slates on capability refusal.",
   input: z.object({
     projectId: z.string().uuid(),
     packetId: z.string().min(1).optional().describe('One packet by id; absent: the oldest unread.'),
-    include: z.enum(['sent', 'open', 'all']).optional().describe('sent (default): a packet the person sent. open: unsent notes and ratings. all: every note.'),
+    include: z.enum(['sent', 'open', 'all']).optional().describe('sent (default): a packet the person sent. open: unsent notes and ratings. all: every note and rating, with its packets; never claims.'),
     claim: z.boolean().optional().describe('False reads without claiming. Default true for a sent packet.'),
   }).strict(),
   async run(input, ctx) {
@@ -7780,7 +7785,7 @@ export const resolveReviewNote: Operation<{
 }> = {
   id: 'slates_resolve_review_note',
   description:
-    "Answer the person's review notes, on the note where it was pinned, as the Notes view shows it. One reply per note: fixed (done; text optional), question (ask what they meant), why_not (why it stays as is), alternates (two or three takes to choose from, assetIds), note (anything else). A wordless mark (mark: true with no words) is answered with alternates, two or three versions, never one guess, unless the person has since written in its thread. Every note must be in this project and not ticked done; every take one of its pictures or clips. Returns each note's new state and how many in its packet still wait. Free. Requires review-mode; update Slates on capability refusal.",
+    "Answer the person's review notes, on the note where it was pinned, as the Notes view shows it. One reply per note: fixed (done; text optional), question (ask what they meant), why_not (why it stays as is), alternates (two or three takes to choose from, assetIds), note (anything else). A wordless mark (mark: true with no words) is answered with alternates, two or three versions, never one guess, unless the person has since written in its thread. Only a sent note can be answered (not one still being written, nor one already answered or done); alternates are two or three different pictures or clips; every take is in this project. Returns each note's new state and how many in its packet still wait. Free. Requires review-mode; update Slates on capability refusal.",
   input: z.object({
     projectId: z.string().uuid(),
     replies: z.array(z.object({
