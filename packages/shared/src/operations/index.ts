@@ -7809,7 +7809,7 @@ export const resolveReviewNote: Operation<{
 const META_WINNERS = 'the Winners Loop (ad results per recipe)'
 
 type ClientAdReportInput = {
-  platform: 'google'
+  platform: 'google' | 'tiktok'
   accountId?: string
   managerId?: string
   since?: string
@@ -7819,14 +7819,14 @@ type ClientAdReportInput = {
 
 export const getClientAdReport: Operation<ClientAdReportInput> = {
   id: 'slates_get_client_ad_report',
-  description: 'List connected Google Ads advertisers and manager IDs, or read date-range ad performance with linked Slates exports. Uses the signed-in desktop connection. Publishing and account changes happen in the window.',
+  description: 'List connected Google Ads or TikTok Ads advertisers, or read date-range ad performance with linked Slates exports. Uses the signed-in desktop connection. Publishing and account changes happen in the window.',
   input: z.object({
-    platform: z.literal('google'),
+    platform: z.enum(['google', 'tiktok']),
     accountId: z.string().regex(/^\d{1,24}$/).optional(),
     managerId: z.string().regex(/^\d{10}$/).optional(),
     since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-    projectId: z.string().uuid().optional(),
+    projectId: z.string().uuid().optional().describe('Resolve linked export names within this project.'),
   }).strict(),
   async run(input, ctx) {
     const desktop = ctx.desktop()
