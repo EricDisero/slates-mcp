@@ -20,6 +20,7 @@
   },
   "slates-api": {
     ".claude/rules/credits.md": 1,
+    "data/winning-ads-catalog.json": 1,
     "docs/api-endpoints.md": 1,
     "docs/dead-code-and-ssot-sweep.md": 2,
     "docs/llm-docs-ssot-map.md": 2,

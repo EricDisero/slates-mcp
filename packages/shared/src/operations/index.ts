@@ -7804,6 +7804,366 @@ export const resolveReviewNote: Operation<{
   },
 }
 
+// ── Wave 6: the Winners Loop, Visual QA, stacked video edits, diagnostics, winning ads ──
+
+const META_WINNERS = 'the Winners Loop (ad results per recipe)'
+
+export const getAdWinners: Operation<{ projectId?: string }> = {
+  id: 'slates_get_ad_winners',
+  description:
+    "What each exported ad recipe earned in the person's ad account over the last pulled range, as the account reports it: spend, purchases, ROAS, the person's winner or loser mark, the losers, and the project's split tests (splitTests: each local id for slates_evaluate_split_test_winner, campaign, status and stored winner). Never remake a recipe listed in losers. Read this before planning more variants of an ad. Free. Requires meta-winners; update Slates on capability refusal.",
+  input: z.object({ projectId: z.string().uuid().optional().describe('One project; absent: every project.') }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('meta-winners', META_WINNERS)
+    return ok(await ctx.desktop().get('/agent/meta/winners', { projectId: input.projectId }))
+  },
+}
+
+export const setRecipeVerdict: Operation<{ recipeId: string; projectId?: string | null; verdict: 'winner' | 'loser' | null; note?: string }> = {
+  id: 'slates_set_recipe_verdict',
+  description:
+    "Mark an ad recipe a winner or a loser (null clears the mark), as the person decided from its results. A loser is never remade; More like this starts from a winner. Free. Requires meta-winners; update Slates on capability refusal.",
+  input: z.object({
+    recipeId: z.string().min(1).describe('The recipe ID from slates_get_ad_winners or an export.'),
+    projectId: z.string().uuid().nullable().optional(),
+    verdict: z.enum(['winner', 'loser']).nullable(),
+    note: z.string().max(2000).optional(),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('meta-winners', META_WINNERS)
+    return ok(await ctx.desktop().post('/agent/meta/verdict', input))
+  },
+}
+
+export const moreLikeThis: Operation<{ exportRef: string; openHookSlot?: boolean; extraHookCount?: number }> = {
+  id: 'slates_more_like_this',
+  description:
+    "Start a new cut from a winning export: its hook becomes a slot holding the winning hook plus open ones, and the answer quotes what finishing the variants would cost. Nothing is generated; show the person the quote before filling an open hook. Free. Requires meta-winners; update Slates on capability refusal.",
+  input: z.object({
+    exportRef: z.string().min(1).describe('The export reference from slates_get_ad_winners (exportRef).'),
+    openHookSlot: z.boolean().optional().describe('Default true: the hook becomes a slot.'),
+    extraHookCount: z.number().int().min(1).optional().describe('Open hook alternatives to add; the app caps it.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('meta-winners', META_WINNERS)
+    return ok(await ctx.desktop().post('/agent/meta/more-like-this', input))
+  },
+}
+
+const SPLIT_TEST_INPUT = z.object({
+  projectId: z.string().uuid(),
+  accountId: z.string().min(1).describe('The ad account id.'),
+  campaignName: z.string().min(1),
+  dailyBudgetMinor: z.number().int().positive().describe("The ad set's daily budget in the currency's minor units (cents)."),
+  currency: z.string().min(3).max(3),
+  exportRefs: z.array(z.string().min(1)).min(2).describe('The exported variants, one paused ad each.'),
+  country: z.string().length(2).describe('Two-letter audience country.'),
+  specialAdCategories: z.array(z.string()).nullable().describe('[] when none apply; the plan refuses null.'),
+  pageId: z.string().min(1),
+  destinationUrl: z.string().url(),
+  headline: z.string().optional(),
+  primaryText: z.string().optional(),
+  cta: z.string().optional(),
+  thresholdSpend: z.number().nonnegative().nullable().optional(),
+  thresholdImpressions: z.number().int().nonnegative().nullable().optional(),
+}).strict()
+
+export const planSplitTest: Operation<z.infer<typeof SPLIT_TEST_INPUT>> = {
+  id: 'slates_plan_split_test',
+  description:
+    "Plan a split test of exported variants: one campaign, one ad set and one paused ad per variant, checked against the spend caps, with every problem named. Creates nothing; the person creates the paused test from New split test… in Meta Ads. Free. Requires meta-winners; update Slates on capability refusal.",
+  input: SPLIT_TEST_INPUT,
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('meta-winners', META_WINNERS)
+    return ok(await ctx.desktop().post('/agent/meta/split-test/plan', input))
+  },
+}
+
+export const evaluateSplitTestWinner: Operation<{ testId: string; thresholds?: { minSpend?: number | null; minImpressions?: number | null } }> = {
+  id: 'slates_evaluate_split_test_winner',
+  description:
+    "Call a split test's winner from the ad account's report for that test's own ads only (read now, from the day the test was made): no call until every variant has results and passes the spend and impression thresholds; it compares ROAS (else cost per purchase, else click rate) and labels every figure as the ad account reports it. A tie or no call clears an older stored winner. Free. Requires meta-winners; update Slates on capability refusal.",
+  input: z.object({
+    testId: z.string().min(1).describe('The local split test id, from splitTests in slates_get_ad_winners.'),
+    thresholds: z.object({
+      minSpend: z.number().nonnegative().nullable().optional(),
+      minImpressions: z.number().int().nonnegative().nullable().optional(),
+    }).strict().optional().describe("Absent: the test's own thresholds."),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('meta-winners', META_WINNERS)
+    return ok(await ctx.desktop().post('/agent/meta/split-test/winner', input))
+  },
+}
+
+const VISUAL_QA = 'Visual QA'
+
+export const visualQaSample: Operation<{ projectId?: string; timelineId?: string; runId?: string; maxRounds?: number; budget?: number }> = {
+  id: 'slates_visual_qa_sample',
+  description:
+    "Visual QA, step one of a round: stills of the cut's overlay beats, transition middles and cuts, returned inline so you see every frame, with what this machine measured in them (clipped or crowded text, contrast, hold times, gaps), the rubric and the critique prompt. Score every still against the rubric, then answer with slates_visual_qa_record_round. Pass runId to take the next round's stills after your fixes. Free: the looking is yours. Requires visual-qa; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid().optional().describe('Defaults to the open project.'),
+    timelineId: z.string().min(1).optional().describe("Defaults to the project's timeline."),
+    runId: z.string().min(1).optional().describe('Continue this run with its next round; absent starts a run.'),
+    maxRounds: z.number().int().positive().optional().describe("Rounds a new run takes; the app's default and limits apply."),
+    // 24 is the desktop's MAX_VISUAL_QA_SAMPLES (slate src/shared/visualQa.ts), which the route enforces too.
+    budget: z.number().int().positive().max(24).optional().describe("The most stills a round takes, up to 24; the app's default applies."),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('visual-qa', VISUAL_QA)
+    const r = await ctx.desktop().post<{ stills?: Array<{ sampleId: string; data: string; mimeType: string }>; samples?: Array<{ id: string; sec: number }> } & Record<string, unknown>>(
+      '/agent/timeline/visual-qa/sample', input)
+    const stills = r.stills ?? []
+    const { stills: _inline, ...data } = r
+    const when = new Map((r.samples ?? []).map((s) => [s.id, s.sec]))
+    return {
+      text: `${JSON.stringify(data)}\n\nStills, in order: ${stills.map((s) => `${s.sampleId} (${when.get(s.sampleId) ?? '?'}s)`).join(', ') || 'none could be read'}.`,
+      images: stills.map((s) => ({ data: s.data, mimeType: s.mimeType })),
+      data,
+    }
+  },
+}
+
+const VQA_DIMENSION = z.enum(['alignment', 'legibility', 'hierarchy', 'pacing', 'transitions', 'motion', 'restraint'])
+
+export const visualQaRecordRound: Operation<{
+  runId: string
+  scores: Partial<Record<z.infer<typeof VQA_DIMENSION>, number>>
+  findings: Array<{
+    sampleId: string; dimension: z.infer<typeof VQA_DIMENSION>; severity: 'blocker' | 'should-fix' | 'polish'; diagnosis: string; exactFix: string
+    region?: { x: number; y: number; w: number; h: number } | null; span?: { startSec: number; endSec: number } | null; targetClipId?: string; targetTransitionId?: string
+    findingId?: string
+  }>
+  summary?: string
+  promoteToReview?: boolean
+}> = {
+  id: 'slates_visual_qa_record_round',
+  description:
+    "Visual QA, step two: record your scores (0-10 per rubric dimension) and findings for the round slates_visual_qa_sample handed you, each finding on its still with what is wrong and the exact fix. A measured finding stays unless your finding restates it (findingId) at the same or a higher severity. Answers pass or iterate, the score change and what stays open; after fixing, sample the next round with the same runId. A round is recorded once: on the final round pass promoteToReview: true, which turns what stays open into Review notes for the person only if the round does not pass. Free. Requires visual-qa; update Slates on capability refusal.",
+  input: z.object({
+    runId: z.string().min(1).describe('From slates_visual_qa_sample.'),
+    scores: z.record(VQA_DIMENSION, z.number().min(0).max(10)).describe('Every rubric dimension, 0-10.'),
+    findings: z.array(z.object({
+      sampleId: z.string().min(1).describe('The still it was seen in.'),
+      dimension: VQA_DIMENSION,
+      severity: z.enum(['blocker', 'should-fix', 'polish']),
+      diagnosis: z.string().min(1).describe('What is wrong, in that frame.'),
+      exactFix: z.string().min(1).describe('The change that fixes it: what to set, to what.'),
+      region: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).strict().nullable().optional().describe('Where in the frame, as fractions 0-1.'),
+      span: z.object({ startSec: z.number(), endSec: z.number() }).strict().nullable().optional(),
+      targetClipId: z.string().optional(),
+      targetTransitionId: z.string().optional(),
+      findingId: z.string().optional().describe("The measured finding's id this one restates; it replaces it only at the same or a higher severity."),
+    }).strict()),
+    summary: z.string().optional(),
+    promoteToReview: z.boolean().optional(),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('visual-qa', VISUAL_QA)
+    return ok(await ctx.desktop().post('/agent/timeline/visual-qa/round', input))
+  },
+}
+
+export const listVisualQaRuns: Operation<{ projectId?: string; timelineId?: string; runId?: string }> = {
+  id: 'slates_list_visual_qa_runs',
+  description:
+    "A timeline's Visual QA runs, newest first: status, rounds, round one's score against the last and the gain; runId reads one run in full. Free. Requires visual-qa; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid().optional().describe('Defaults to the open project.'),
+    timelineId: z.string().min(1).optional(),
+    runId: z.string().min(1).optional(),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('visual-qa', VISUAL_QA)
+    return ok(await ctx.desktop().get('/agent/timeline/visual-qa/runs', input))
+  },
+}
+
+const V2V = 'stacked video edits'
+const V2V_KIND = z.enum(['swap-person', 'change-angle', 'change-location', 'move-camera', 'relight', 'video-brush'])
+const V2V_RECIPE = {
+  model: z.string().min(1).optional().describe("The edit model; absent: the app's default."),
+  prompt: z.string().optional(),
+  params: z.record(z.unknown()).optional().describe('The kind\'s settings: subjectAssetId, locationAssetId, preset, directionDeg, colorTemp, diffusion, brushMode, videoResolution. Asset ids or badge codes.'),
+  referenceAssetIds: z.array(z.string().min(1)).optional().describe('Asset ids or badge codes.'),
+  startFrame: z.number().int().nonnegative().optional().describe('Timeline frame where the edited moment starts.'),
+  endFrame: z.number().int().positive().optional().describe('Timeline frame where it ends (exclusive).'),
+}
+
+/** A pass's asset references (UUIDs or badge codes) resolved against the project at call time. */
+async function resolvePassAssets<T extends { params?: Record<string, unknown>; referenceAssetIds?: string[] }>(ctx: OperationContext, projectId: string, input: T): Promise<T> {
+  const params = input.params ?? {}
+  const named = ['subjectAssetId', 'locationAssetId'].filter((k) => typeof params[k] === 'string') as Array<'subjectAssetId' | 'locationAssetId'>
+  const refs = [...named.map((k) => params[k] as string), ...(input.referenceAssetIds ?? [])]
+  if (!refs.length) return input
+  const resolved = await resolveAssetRefs(ctx, projectId, refs)
+  const id = (ref: string): string => resolved.get(ref)!.id
+  return {
+    ...input,
+    ...(input.params ? { params: { ...params, ...Object.fromEntries(named.map((k) => [k, id(params[k] as string)])) } } : {}),
+    ...(input.referenceAssetIds ? { referenceAssetIds: input.referenceAssetIds.map(id) } : {}),
+  }
+}
+
+export const listV2vPasses: Operation<{ projectId: string; timelineId: string; clipId?: string }> = {
+  id: 'slates_list_v2v_passes',
+  description:
+    "The stacked video edits on a timeline (or one clip), bottom first: each pass's kind, moment, settings, recipe ID, status, output and estimated credits. Free. Requires v2v-edits; update Slates on capability refusal.",
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().min(1), clipId: z.string().min(1).optional() }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('v2v-edits', V2V)
+    return ok(await ctx.desktop().get('/agent/timeline/v2v', input))
+  },
+}
+
+export const editV2vPass: Operation<{
+  projectId: string; action: 'create' | 'update' | 'delete' | 'reorder'
+  input?: { timelineId: string; clipId: string; kind: z.infer<typeof V2V_KIND>; label?: string; model?: string; prompt?: string; params?: Record<string, unknown>; referenceAssetIds?: string[]; startFrame?: number; endFrame?: number }
+  passId?: string
+  patch?: { label?: string; enabled?: boolean; orderIndex?: number; model?: string; prompt?: string; params?: Record<string, unknown>; referenceAssetIds?: string[]; startFrame?: number; endFrame?: number }
+  timelineId?: string; clipId?: string; orderedIds?: string[]
+}> = {
+  id: 'slates_edit_v2v_pass',
+  description:
+    "Add, change, remove or reorder a stacked video edit on a video clip's moment: swap the person, change the angle or location, move the camera, relight, or a brushed region. Each pass edits the output of the one under it. Saving a pass generates nothing; quote with slates_quote_v2v_passes, then run. Free. Requires v2v-edits; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    action: z.enum(['create', 'update', 'delete', 'reorder']),
+    input: z.object({ timelineId: z.string().min(1), clipId: z.string().min(1), kind: V2V_KIND, label: z.string().optional(), ...V2V_RECIPE }).strict().optional().describe('create: the new pass.'),
+    passId: z.string().min(1).optional().describe('update and delete.'),
+    patch: z.object({ label: z.string().optional(), enabled: z.boolean().optional(), orderIndex: z.number().int().nonnegative().optional(), ...V2V_RECIPE }).strict().optional().describe('update: the fields to change.'),
+    timelineId: z.string().min(1).optional().describe('reorder.'),
+    clipId: z.string().min(1).optional().describe('reorder.'),
+    orderedIds: z.array(z.string().min(1)).optional().describe('reorder: every pass on the clip, bottom first.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('v2v-edits', V2V)
+    const body = {
+      ...input,
+      ...(input.input ? { input: await resolvePassAssets(ctx, input.projectId, input.input) } : {}),
+      ...(input.patch ? { patch: await resolvePassAssets(ctx, input.projectId, input.patch) } : {}),
+    }
+    return ok(await ctx.desktop().post('/agent/timeline/v2v/pass', body))
+  },
+}
+
+export const quoteV2vPasses: Operation<{ projectId: string; passIds: string[] }> = {
+  id: 'slates_quote_v2v_passes',
+  description:
+    "Price stacked video edits before running them: per pass the billed seconds, credits, warnings or what blocks it, its recipe ID, and the total. Show the person the total; slates_run_v2v_passes takes it as maxCredits and quoteFingerprint as the quote it runs. Free. Requires v2v-edits; update Slates on capability refusal.",
+  input: z.object({ projectId: z.string().uuid(), passIds: z.array(z.string().min(1)).min(1) }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('v2v-edits', V2V)
+    return ok(await ctx.desktop().post('/agent/timeline/v2v/quote', input))
+  },
+}
+
+export const runV2vPasses: Operation<{ projectId: string; timelineId: string; passIds: string[]; maxCredits: number; quoteFingerprint: string; requestId?: string; maxParallel?: number }> = {
+  id: 'slates_run_v2v_passes',
+  billable: true,
+  description:
+    "Run stacked video edits that slates_quote_v2v_passes priced and the person approved: each pass edits the output of the one under it, independent passes in parallel. maxCredits is the approved total and quoteFingerprint the quote's own; a run that would cost more, or whose passes changed since the quote, is refused before anything runs. Pass a requestId of your own: a retry with the same one returns the first run's result and spends nothing again. The answer's cost_credits is what the run charged. Spends credits. Requires v2v-edits; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    timelineId: z.string().min(1).describe("The passes' timeline; every pass must be on it."),
+    passIds: z.array(z.string().min(1)).min(1),
+    maxCredits: z.number().int().nonnegative().describe("The quote's total the person approved."),
+    quoteFingerprint: z.string().min(1).describe('quoteFingerprint from slates_quote_v2v_passes for these passes.'),
+    requestId: z.string().min(1).max(200).optional().describe('Your idempotency key for this run; reuse it only to retry the same run.'),
+    maxParallel: z.number().int().positive().optional(),
+  }).strict(),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('v2v-edits', V2V)
+    // Every selected pass must be on the named timeline: the model guides checked are those of exactly the passes run.
+    const { passes } = await desktop.get<{ passes: Array<{ id: string; model: string }> }>('/agent/timeline/v2v', { projectId: input.projectId, timelineId: input.timelineId })
+    const byId = new Map(passes.map((p) => [p.id, p]))
+    const missing = input.passIds.filter((id) => !byId.has(id))
+    if (missing.length) throw new Error(`These passes are not on timeline ${input.timelineId}: ${missing.join(', ')}. Run passes of one timeline at a time.`)
+    for (const model of new Set(input.passIds.map((id) => byId.get(id)!.model))) requireGuideRead(ctx, model)
+    return ok(await desktop.post('/agent/timeline/v2v/run', input))
+  },
+}
+
+export const v2vPassesToVariants: Operation<{ projectId: string; timelineId: string; passIds: string[]; slotName?: string }> = {
+  id: 'slates_v2v_passes_to_variants',
+  description:
+    "Send finished video edits of one clip's moment to the variant grid: a slot on the timeline with one alternative per pass, each keeping its recipe ID, so they export as ad variants. Free. Requires v2v-edits; update Slates on capability refusal.",
+  input: z.object({ projectId: z.string().uuid(), timelineId: z.string().min(1), passIds: z.array(z.string().min(1)).min(1), slotName: z.string().min(1).optional() }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('v2v-edits', V2V)
+    return ok(await ctx.desktop().post('/agent/timeline/v2v/to-variants', input))
+  },
+}
+
+export const getDiagnosticsStatus: Operation<Record<string, never>> = {
+  id: 'slates_get_diagnostics_status',
+  description:
+    "Whether this Slates shares crash and error reports and what it last caught, each marked captured locally / queued: delivery is never confirmed, so tell the person a bug was captured and queued, not that it arrived. Reads only. Free. Requires diagnostics; update Slates on capability refusal.",
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    await ctx.desktop().requireCapability('diagnostics', 'the diagnostics status')
+    return ok(await ctx.desktop().get('/agent/diagnostics/status'))
+  },
+}
+
+const WINNING_ADS = 'winning ads'
+
+export const findWinningAds: Operation<{
+  query?: string; niche?: string; platform?: 'all' | 'meta' | 'google'; minRunDays?: number; format?: 'all' | 'video' | 'image'
+  activeOnly?: boolean; hasBreakdown?: boolean; sort?: 'run_length' | 'variations' | 'recent'; limit?: number; offset?: number
+}> = {
+  id: 'slates_find_winning_ads',
+  description:
+    "Search proven ads: the ads that ran longest, by niche, platform, format and words in the advertiser, headline, body or button, each with how long it ran, its variations and its link. The answer says where the list came from and how fresh it is. Break one down into shots with slates_break_down_winning_ad. Free. Requires winning-ads; update Slates on capability refusal.",
+  input: z.object({
+    query: z.string().optional(),
+    niche: z.string().optional().describe('A niche id from slates_list_winning_ad_niches.'),
+    platform: z.enum(['all', 'meta', 'google']).optional(),
+    minRunDays: z.number().int().nonnegative().optional(),
+    format: z.enum(['all', 'video', 'image']).optional(),
+    activeOnly: z.boolean().optional(),
+    hasBreakdown: z.boolean().optional(),
+    sort: z.enum(['run_length', 'variations', 'recent']).optional(),
+    limit: z.number().int().positive().optional().describe("The app caps it."),
+    offset: z.number().int().nonnegative().optional(),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('winning-ads', WINNING_ADS)
+    return ok(await ctx.desktop().get('/agent/reference/winning-ads', input))
+  },
+}
+
+export const listWinningAdNiches: Operation<Record<string, never>> = {
+  id: 'slates_list_winning_ad_niches',
+  description: 'The winning-ads niches and how many ads each holds, for slates_find_winning_ads. Free. Requires winning-ads; update Slates on capability refusal.',
+  input: z.object({}).strict(),
+  async run(_input, ctx) {
+    await ctx.desktop().requireCapability('winning-ads', WINNING_ADS)
+    return ok(await ctx.desktop().get('/agent/reference/winning-ads/niches'))
+  },
+}
+
+export const breakDownWinningAd: Operation<{ projectId?: string; adId: string; platform?: 'meta' | 'google'; build?: boolean; name?: string; model?: string; jobId?: string }> = {
+  id: 'slates_break_down_winning_ad',
+  description:
+    "Break a winning ad from slates_find_winning_ads down into shots: one shot per cut with its words, built as a board in the project, the same run as slates_break_down_reference. The board copies the ad's structure and generates nothing; the ad's own footage is never used in it. Free. Requires winning-ads; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid().optional().describe('Defaults to the open project.'),
+    adId: z.string().min(1).describe('The adId from slates_find_winning_ads.'),
+    platform: z.enum(['meta', 'google']).optional().describe('Default meta.'),
+    build: z.boolean().optional().describe('As on slates_break_down_reference.'),
+    name: z.string().optional(),
+    model: z.string().optional(),
+    jobId: z.string().optional(),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('winning-ads', WINNING_ADS)
+    return ok(await ctx.desktop().post('/agent/reference/winning-ads/breakdown', input))
+  },
+}
+
 export const listTimelines: Operation<{ projectId: string }> = {
   id: 'slates_list_timelines', description: "List the independent named cuts in a project (not a slot's alternative timelines: slates_get_variants names those). Use the selected timelineId for edits, builds and exports.",
   input: z.object({ projectId: z.string().uuid() }),
@@ -12457,6 +12817,23 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   upscaleImage as unknown as Operation<unknown>,
   getReviewPacket as unknown as Operation<unknown>,
   resolveReviewNote as unknown as Operation<unknown>,
+  getAdWinners as unknown as Operation<unknown>,
+  setRecipeVerdict as unknown as Operation<unknown>,
+  moreLikeThis as unknown as Operation<unknown>,
+  planSplitTest as unknown as Operation<unknown>,
+  evaluateSplitTestWinner as unknown as Operation<unknown>,
+  visualQaSample as unknown as Operation<unknown>,
+  visualQaRecordRound as unknown as Operation<unknown>,
+  listVisualQaRuns as unknown as Operation<unknown>,
+  listV2vPasses as unknown as Operation<unknown>,
+  editV2vPass as unknown as Operation<unknown>,
+  quoteV2vPasses as unknown as Operation<unknown>,
+  runV2vPasses as unknown as Operation<unknown>,
+  v2vPassesToVariants as unknown as Operation<unknown>,
+  getDiagnosticsStatus as unknown as Operation<unknown>,
+  findWinningAds as unknown as Operation<unknown>,
+  listWinningAdNiches as unknown as Operation<unknown>,
+  breakDownWinningAd as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,
   getTimelineLoudness as unknown as Operation<unknown>,
   addClipToTimeline as unknown as Operation<unknown>,

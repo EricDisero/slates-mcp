@@ -143,6 +143,11 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['image-upscale', 'picture upscale'],
   ['review-mode', 'Review mode packets and answers'],
   ['view-review', 'turning Review mode on and off'],
+  ['meta-winners', 'ad results per recipe, winner marks, More like this and split tests'],
+  ['visual-qa', 'Visual QA rounds on a cut'],
+  ['v2v-edits', 'stacked video edits on a clip'],
+  ['diagnostics', 'the crash and error report status'],
+  ['winning-ads', 'searching winning ads and breaking one down'],
 ]
 
 export async function runDoctor(): Promise<void> {

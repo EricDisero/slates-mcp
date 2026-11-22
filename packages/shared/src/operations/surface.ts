@@ -61,6 +61,10 @@ const READ_ONLY_PREFIXES = [
   'slates_check_composition',
   'slates_quote_cut_drafts',
   'slates_quote_draft_finish',
+  // Searches the winning-ads catalog; GET only.
+  'slates_find_winning_ads',
+  // Prices stacked video edits; it POSTs because the pass list is the payload, and spends nothing.
+  'slates_quote_v2v_passes',
 ]
 
 /**
@@ -121,7 +125,7 @@ const REGISTRY_IDS: ReadonlySet<string> = new Set(['slates_list_motion_blocks', 
  * Ops that fetch a web address the user names: product intake (a store's page and its pictures) and a
  * reference link (a Meta Ad Library page and the ad's video file, or a direct video link).
  */
-const WEB_PAGE_IDS: ReadonlySet<string> = new Set(['slates_get_product_page', 'slates_import_product', 'slates_break_down_reference'])
+const WEB_PAGE_IDS: ReadonlySet<string> = new Set(['slates_get_product_page', 'slates_import_product', 'slates_break_down_reference', 'slates_break_down_winning_ad'])
 
 /**
  * Derive an op's four hints.
@@ -248,6 +252,14 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_export_video',
     'slates_export_timeline_xml',
     'slates_trim_video',
+    'slates_visual_qa_sample',
+    'slates_visual_qa_record_round',
+    'slates_list_visual_qa_runs',
+    'slates_list_v2v_passes',
+    'slates_edit_v2v_pass',
+    'slates_quote_v2v_passes',
+    'slates_run_v2v_passes',
+    'slates_v2v_passes_to_variants',
   ],
   // Rename, delete, reorder. The 63-op CRUD tail the review measured at 39.5 KB.
   admin: [
