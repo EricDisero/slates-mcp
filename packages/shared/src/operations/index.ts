@@ -766,11 +766,27 @@ const DOCK_SECTION_NAMES: Record<DockSection, string> = { storyboards: 'Boards',
 // Delivery ids and dimensions come from the desktop catalog, not model capabilities.
 const deliveryAspectInput = z.string().min(1).describe('Delivery format id from slates_get_variant_grid.formats; the desktop validates it and supplies dimensions.')
 const gridSelectionInput = z.object({ rowKeys: z.array(z.string()), aspects: z.array(deliveryAspectInput) }).strict()
+// A file's encoding. Mirrors slate's `@shared/deliveryFormats` (PLATFORM_PRESET_IDS, EXPORT_VIDEO_CODECS,
+// EXPORT_FRAME_RATES, VIDEO_BITRATE_RANGE); the desktop validates every value again.
+const PLATFORM_PRESET_IDS = ['tiktok', 'reels', 'meta-feed', 'stories', 'shorts', 'youtube'] as const
+const exportEncodingShape = {
+  presetId: z.enum(PLATFORM_PRESET_IDS).optional().describe("A platform's targets: its frame size, H.264 bitrate, frame-rate ceiling and sound."),
+  codec: z.enum(['h264', 'h265', 'prores']).optional().describe('h264 (default) and h265 write an .mp4; prores writes a .mov with PCM sound for editing elsewhere.'),
+  videoBitrateMbps: z.number().min(2).max(120).nullable().optional().describe("The picture's Mb/s; null is Auto (the preset's, else the engine's own). Ignored by prores."),
+  fps: z.union([z.literal(24), z.literal(30), z.literal(60)]).nullable().optional().describe("The file's frame rate; null is the timeline's."),
+}
+const exportEncodingInput = z.object(exportEncodingShape).strict()
 const deliveryInput = z.object({
   formats: z.array(deliveryAspectInput).min(1),
   shortSide: z.number().int().positive().optional().describe('Optional short side supported by the desktop delivery settings.'),
   mode: z.enum(['fill', 'fit']).optional().describe('Fill crops around focus; fit pads the frame.'),
+  presetId: z.enum(PLATFORM_PRESET_IDS).nullable().optional().describe('The platform the cut is made for: its encoding targets and its safe-area guide.'),
+  encoding: exportEncodingInput.nullable().optional().describe("The cut's own encoding over the preset's; every export of it uses it."),
 }).strict()
+/** A delivery naming a preset or an encoding: an older desktop drops both without a word. */
+async function requireDeliveryEncoding(desktop: ReturnType<OperationContext['desktop']>, delivery: z.infer<typeof deliveryInput> | null | undefined): Promise<void> {
+  if (delivery && (delivery.presetId != null || delivery.encoding != null)) await desktop.requireCapability('export-encoding', 'platform presets and export encoding')
+}
 const taxonomyInput = z.object({
   concept: z.string().min(1), variant: z.string().min(1),
   hook: z.string().optional(), body: z.string().optional(), cast: z.string().optional(),
@@ -811,6 +827,7 @@ interface ViewShape {
   /** `mode` and `sourceAssetId`: the timeline's Viewer, absent from a desktop of 1.6.2 or older. */
   viewer?: { assetId: string | null; mode?: 'source' | 'timeline'; sourceAssetId?: string | null }
   compare?: { open: boolean; assetIds: string[] }
+  review?: { on: boolean; notesOpen: boolean; assetIds: string[] | null }
   animatic?: { open: boolean }
   settings?: { open: boolean }
   composer?: { open: boolean }
@@ -950,6 +967,8 @@ export const setView: Operation<{
   library?: { categoryId: string | null }
   viewer?: { assetId?: string | null; mode?: (typeof VIEW_VIEWER_MODES)[number] }
   compare?: { open?: boolean; assetIds?: string[] }
+  review?: boolean
+  reviewAssetIds?: string[] | null
   animatic?: { open: boolean; fromShotId?: string }
   settings?: { open: boolean; pane?: (typeof VIEW_SETTINGS_PANES)[number] }
   composer?: { open: boolean }
@@ -965,7 +984,7 @@ export const setView: Operation<{
 }> = {
   id: 'slates_set_view',
   description:
-    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Slates Director panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout (Edit, Plan or one the user saved), its shape and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
+    "Change what the user is looking at, as their own clicks would: open a project or go Home, switch tab, open a board, jump to a scene, set the Board's View and Filter, set Media's tab, folder and narrowing, jump to a card in Media, open a Library page, a picture in the picture viewer or a clip in the timeline's Viewer, Compare, Review mode (review, reviewAssetIds), the animatic or Settings on a pane, show or hide the prompt box, open or park the timeline or switch the cut on it, open a Shot's panel on Script, set the side panels (the project navigator and its folded sections, the Slates Director panel), the Script page's Words or Words + shots and its text size, the Board's card size and linked clips, and on a desktop with the one-window layout the layout (Edit, Plan or one the user saved), its shape and which areas show. Only the fields you name change; the app clamps sizes, answers with what it settled on, and names any field it could not apply. A project change is applied alone (it restores that project's own view). Use it when the user asks you to show or open something, not to answer a question they can see for themselves.",
   input: z
     .object({
       projectId: z.string().nullable().optional().describe('Open this project, or null for Home. Applied alone.'),
@@ -1055,6 +1074,8 @@ export const setView: Operation<{
         .object({ open: z.boolean().optional(), assetIds: z.array(z.string()).max(4).optional().describe('The compare set, two to four items.') })
         .strict()
         .optional(),
+      review: z.boolean().optional().describe("Review mode on or off, as the Viewer's Review button: on shows the Viewer with the Notes view in its drawer, where the person marks, rates and sends notes."),
+      reviewAssetIds: z.array(z.string()).nullable().optional().describe('With review on: the pictures and clips the arrow keys step through (a round to review); null steps through what is on screen. Turns review on.'),
       animatic: z.object({ open: z.boolean(), fromShotId: z.string().optional() }).strict().optional().describe('Play the board as a rough cut from a Shot (the Board or Script tab must be showing).'),
       settings: z.object({ open: z.boolean(), pane: z.enum(VIEW_SETTINGS_PANES).optional() }).strict().optional().describe('Open Settings, on a pane (ai is AI tools, keys is API keys).'),
       composer: z.object({ open: z.boolean() }).strict().optional().describe('Show or hide the prompt box.'),
@@ -1099,6 +1120,7 @@ export const setView: Operation<{
     if (input.cut?.format !== undefined || input.cut?.gridSelection !== undefined) {
       await ctx.desktop().requireCapability('ad-variant-export', 'delivery preview and variant grid selection')
     }
+    if (input.review !== undefined || input.reviewAssetIds !== undefined) await ctx.desktop().requireCapability('view-review', 'Review mode')
     // A desktop from before the one window has no capability token for it, and refuses a patch holding only
     // `window` as empty; its view report has no `window`, so read that first.
     if (input.window !== undefined && Object.entries(input).every(([k, v]) => k === 'window' || v === undefined)) {
@@ -7505,16 +7527,275 @@ const reframeClipInput = reframeReportInput.extend({ clipId: z.string().uuid(), 
   mode: z.enum(['fill', 'fit']).optional(), focusX: z.number().min(0).max(1).optional(),
   focusY: z.number().min(0).max(1).optional(), zoom: z.number().min(1).optional(),
 }).strict().nullable().optional().describe('Normalized focus and zoom for this clip/aspect. Null resets the override; the desktop binds it to the current take. Required unless follow is set.'),
-  follow: z.enum(['face', 'off']).optional().describe('"face" finds the face in the clip and keys its focusX/focusY to it (smooth, held where the face is lost; every format draws those keys, each keyframe editable by hand or with slates_set_clip_keyframes); "off" removes those keys. Runs on the computer and spends nothing.') })
+  follow: z.union([z.enum(['face', 'off']), z.object({ maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/) }).strict()]).optional().describe('"face" finds the face in the clip and keys its focusX/focusY to it (smooth, held where the face is lost; every format draws those keys, each keyframe editable by hand or with slates_set_clip_keyframes); { maskId } follows one of the clip\'s subject masks instead (slates_get_subject_mask lists them); "off" removes those keys. Runs on the computer and spends nothing.') })
 export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
-  id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. follow: "face" makes a vertical cut follow a talking head (framing, when sent too, lands first) and answers follow: the clip keyframes, samples, found, still and the lost spans in seconds. Requires ad-variant-export, and reframe-follow for follow; update Slates on capability refusal.',
+  id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. follow: "face" makes a vertical cut follow a talking head, or { maskId } a subject mask (framing, when sent too, lands first) and answers follow: the clip keyframes, samples, found, still and the lost spans in seconds. Requires ad-variant-export, and reframe-follow for follow; update Slates on capability refusal.',
   billable: false,
   input: reframeClipInput,
   async run(input, ctx) {
     await ctx.desktop().requireCapability('ad-variant-export', 'clip delivery reframing')
     if (input.follow) await ctx.desktop().requireCapability('reframe-follow', 'following a face')
+    if (typeof input.follow === 'object') await ctx.desktop().requireCapability('subject-follow', 'following a subject mask')
     else if (input.framing === undefined) throw new Error('Send framing (null resets it) or follow')
     return ok(await ctx.desktop().post('/agent/timeline/reframe', input))
+  },
+}
+
+// ── The Cut's finishing tools and Review mode (slate roadmap Waves 1 to 3) ─────────────
+// Desktop routes in slate `src/main/agent/routes-finishing.ts`; each calls the core the window's own control
+// calls. A clip's grade, LUT, colour key, shape mask and reverse are fields on slates_update_clip.
+
+const clipTargetInput = {
+  projectId: z.string().uuid(),
+  clipId: z.string().uuid().describe('The clip on the timeline (slates_get_timeline lists them).'),
+}
+
+export const freezeFrame: Operation<{ projectId: string; clipId: string; frame?: number; sec?: number; seconds?: number; linked?: boolean }> = {
+  id: 'slates_freeze_frame',
+  billable: false,
+  description:
+    "Hold one frame of a video clip as a still, as the Inspector's Freeze frame does: the frame at the timeline point named (frame, or sec) is saved as a new picture and placed on the clip's own lane for seconds (default 2), the clip splitting around it and everything after moving later; linked: false leaves the clip's linked sound where it is. Returns the clips written, stillClipId and stillAssetId. Free, on this machine. Requires freeze-frame; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    frame: z.number().int().min(0).optional().describe('The timeline frame to hold. Or sec.'),
+    sec: z.number().min(0).optional().describe('The timeline second to hold. Or frame.'),
+    seconds: z.number().min(0.1).max(60).optional().describe('How long the still holds, 0.1 to 60 seconds. Default 2.'),
+    linked: z.boolean().optional().describe("False: leave the linked sound in place. Default true."),
+  }).strict(),
+  async run(input, ctx) {
+    if (input.frame === undefined && input.sec === undefined) throw new Error('Name the frame to hold: frame (timeline frames) or sec (timeline seconds).')
+    await ctx.desktop().requireCapability('freeze-frame', 'freeze frame')
+    return ok(await ctx.desktop().post('/agent/timeline/freeze-frame', input))
+  },
+}
+
+export const stabilizeClip: Operation<{ projectId: string; clipId: string; strength: 'light' | 'standard' | 'strong' | null }> = {
+  id: 'slates_stabilize_clip',
+  billable: false,
+  description:
+    "Steady a shaky video clip, as the Inspector's Stabilize does: the file's motion is analysed on this machine and a steadied copy plays in its place (the original file is untouched). strength light keeps most of the move and crops least, strong holds the frame stillest and crops most; null turns it off. Takes about as long as the clip runs. Free. Requires stabilize; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    strength: z.enum(['light', 'standard', 'strong']).nullable().describe('How steady; null turns stabilize off.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('stabilize', 'stabilize')
+    return ok(await ctx.desktop().post('/agent/timeline/stabilize', input))
+  },
+}
+
+export const slideClip: Operation<{ projectId: string; clipId: string; deltaFrames: number }> = {
+  id: 'slates_slide_clip',
+  billable: false,
+  description:
+    "Slide a clip between its neighbours, as the Slide tool does: the clip keeps its own content and length and moves deltaFrames later (or earlier, negative), the clip before it growing and the one after shrinking to fill, so nothing else on the timeline moves. Needs a clip touching each side; held to the media each neighbour has. Returns the clips written and slidFrames, the move made. Free. Requires slide-edit; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    deltaFrames: z.number().int().describe('Frames to move: positive later, negative earlier.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('slide-edit', 'slide edit')
+    return ok(await ctx.desktop().post('/agent/timeline/slide-clip', input))
+  },
+}
+
+export const punchIn: Operation<{
+  projectId: string; clipId: string; amount?: number; style?: 'cut' | 'ease-in' | 'slow-push'; fromFrame?: number
+  words?: number[]; holdSec?: number; off?: boolean; replaceKeys?: boolean
+}> = {
+  id: 'slates_punch_in',
+  billable: false,
+  description:
+    "Punch in on a video clip or picture, as the Inspector's Punch in does: scale and position keys that push in about the subject (its framing focus). From a point: fromFrame (frames from the clip's start, default 0) to the clip's end. On emphasis words: words (indexes into slates_get_asset_transcript's words) each punch in on the word and back out holdSec after it (default about half a second). style: cut (a hard punch), ease-in, slow-push. amount is the scale, above 1 and at most 1.5 (default 1.15). off: true takes the punch away. A clip with hand-set scale or position keys is refused unless replaceKeys: true. Returns the clip's keyframes and the punch read back. Every key stays editable with slates_set_clip_keyframes. Free. Requires punch-in; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    amount: z.number().gt(1).max(1.5).optional().describe('The scale, above 1 and at most 1.5. Default 1.15.'),
+    style: z.enum(['cut', 'ease-in', 'slow-push']).optional(),
+    fromFrame: z.number().int().min(0).optional().describe("Where the punch starts, in frames from the clip's start."),
+    words: z.array(z.number().int().min(0)).min(1).optional().describe("Punch on these words, by index in the clip's transcript words."),
+    holdSec: z.number().min(0).max(5).optional().describe('With words: how long each punch holds past its word, 0 to 5 seconds.'),
+    off: z.boolean().optional().describe('True removes the punch in.'),
+    replaceKeys: z.boolean().optional().describe("True puts the punch in place of the clip's own scale and position keys."),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('punch-in', 'punch in')
+    return ok(await ctx.desktop().post('/agent/timeline/punch-in', input))
+  },
+}
+
+const dialogueCleanupOptions = z.object({
+  fillers: z.boolean().optional().describe('Filler words (um, uh, like as a filler). Default on.'),
+  pauses: z.boolean().optional().describe('Long pauses. Default on.'),
+  repeats: z.boolean().optional().describe('A word or phrase said twice in a row: the first goes. Default on.'),
+  minPauseSec: z.number().min(0).optional().describe('A pause counts from this long.'),
+  keepAirSec: z.number().min(0).optional().describe('Air kept at each side of a cut pause.'),
+}).strict()
+export const cleanUpDialogue: Operation<{
+  projectId: string; clipId: string; action?: 'scan' | 'apply' | 'restore' | 'nudge'
+  options?: z.infer<typeof dialogueCleanupOptions>; range?: { startSec: number; endSec: number }
+  edge?: 'start' | 'end'; deltaFrames?: number; linked?: boolean
+}> = {
+  id: 'slates_clean_up_dialogue',
+  billable: false,
+  description:
+    "Clean up a talking clip by its transcript, as the Transcript page's Clean up does. scan (default, writes nothing) lists the fillers, long pauses and repeated words found, with counts, the top fillers, what apply would cut and the joins an earlier clean-up left. apply cuts them all in one edit (ripple; the linked sound and captions follow unless linked: false) and lists each join. restore puts one join's cut back (range, as scan or apply listed it); nudge moves the clip edge at a join (edge start or end) by deltaFrames. options turns each kind on or off and sets the pause length and the air kept. The clip needs a transcript (slates_transcribe_asset, free). For words picked one by one, slates_cut_by_transcript. Free. Requires dialogue-cleanup; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    action: z.enum(['scan', 'apply', 'restore', 'nudge']).optional().describe('Default scan.'),
+    options: dialogueCleanupOptions.optional(),
+    range: z.object({ startSec: z.number().min(0), endSec: z.number().min(0) }).strict().optional().describe("restore: the join's range, in the file's own seconds."),
+    edge: z.enum(['start', 'end']).optional().describe('nudge: start (where the cut begins) or end (where it stops).'),
+    deltaFrames: z.number().int().optional().describe('nudge: frames to move the edge, positive later.'),
+    linked: z.boolean().optional().describe("False: cut only the clip's lane. Default true."),
+  }).strict(),
+  async run(input, ctx) {
+    if (input.action === 'restore' && !input.range) throw new Error('restore needs range: a join as scan or apply listed it.')
+    if (input.action === 'nudge' && (!input.edge || input.deltaFrames === undefined)) throw new Error('nudge needs edge and deltaFrames.')
+    await ctx.desktop().requireCapability('dialogue-cleanup', 'dialogue clean-up')
+    return ok(await ctx.desktop().post('/agent/timeline/dialogue-cleanup', input))
+  },
+}
+
+export const autoColourClip: Operation<{ projectId: string; clipId: string; frame?: number; sec?: number }> = {
+  id: 'slates_auto_colour_clip',
+  billable: false,
+  description:
+    "Give a video clip or picture a neutral grade from its own frame, as the Inspector's Auto colour does: the frame at frame or sec (default the clip's middle) is read, and exposure, contrast, temperature, tint, highlights and shadows are written to the clip's look as ordinary values (other look fields kept), each editable with slates_update_clip. Returns the values, the look and the frame read. Free, on this machine. Requires clip-grade; update Slates on capability refusal.",
+  input: z.object({
+    ...clipTargetInput,
+    frame: z.number().int().min(0).optional().describe('The timeline frame to read.'),
+    sec: z.number().min(0).optional().describe('The timeline second to read.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('clip-grade', 'auto colour')
+    return ok(await ctx.desktop().post('/agent/timeline/auto-colour', input))
+  },
+}
+
+export const autoDuck: Operation<{
+  projectId: string; trackId?: string; clipId?: string; duckDb?: number; attackSec?: number; releaseSec?: number
+  holdSec?: number; bridgeSec?: number; off?: boolean
+}> = {
+  id: 'slates_auto_duck',
+  billable: false,
+  description:
+    "Dip music under speech, as the lane's Auto duck does: a music lane (trackId) or one clip (clipId) drops by duckDb wherever another lane speaks, read from the transcripts (a clip with no transcript counts as speech for its whole sound). attackSec and releaseSec shape the dip, holdSec keeps it down past each word, bridgeSec joins gaps shorter than that. Written as one effect on the lane or clip, redone on each call; off: true takes it away. Returns dips, the number of dips. Transcribe the voice first for word-tight dips (slates_transcribe_asset, free). Free. Requires audio-suite; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    trackId: z.string().min(1).optional().describe('The music lane. Or clipId.'),
+    clipId: z.string().uuid().optional().describe('One clip. Or trackId.'),
+    duckDb: z.number().min(-40).max(0).optional().describe('The dip in dB, -40 to 0. Default -12.'),
+    attackSec: z.number().min(0).max(10).optional().describe('How fast it dips. Default 0.15.'),
+    releaseSec: z.number().min(0).max(10).optional().describe('How fast it comes back. Default 0.3.'),
+    holdSec: z.number().min(0).max(10).optional().describe('How long it stays down past a word. Default 0.1.'),
+    bridgeSec: z.number().min(0).max(10).optional().describe('Gaps in speech shorter than this stay ducked. Default 0.6.'),
+    off: z.boolean().optional().describe('True removes the auto duck.'),
+  }).strict(),
+  async run(input, ctx) {
+    if ((input.trackId === undefined) === (input.clipId === undefined)) throw new Error('Name trackId (a lane) or clipId (one clip), not both.')
+    await ctx.desktop().requireCapability('audio-suite', 'auto duck')
+    return ok(await ctx.desktop().post('/agent/timeline/auto-duck', input))
+  },
+}
+
+export const matchLoudness: Operation<{ projectId: string; timelineId?: string; trackId?: string }> = {
+  id: 'slates_match_loudness',
+  billable: false,
+  description:
+    "Bring a mix or one lane to -14 LUFS, the level social platforms play at, as the Output level popover's Match does: the sound is measured as the export writes it, then one gain is set on the master (or on the lane, with trackId) to land on -14 LUFS integrated under a -1 dBTP true peak (held lower when the peak would pass it). Redone on each call. Returns the target, what was measured, the gain set and the effects. Measure without changing anything with slates_get_timeline_loudness. Free. Requires audio-suite; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    timelineId: z.string().uuid().optional().describe("The cut; absent: the project's default timeline."),
+    trackId: z.string().min(1).optional().describe('Match this lane alone; absent: the whole mix, on the master.'),
+  }).strict(),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('audio-suite', 'loudness match')
+    await requireNamedCut(desktop, input.timelineId)
+    return ok(await desktop.post('/agent/timeline/match-loudness', input))
+  },
+}
+
+interface UpscaleQuote {
+  assetId: string; code: string | null; factor: number; width: number; height: number; outWidth: number; outHeight: number
+  credits: number | null; refused?: string
+}
+export const upscaleImage: Operation<{ projectId: string; assetId: string; factor: 2 | 4; confirm?: boolean }> = {
+  id: 'slates_upscale_image',
+  billable: true,
+  description:
+    "Make a sharper copy of a picture at 2x or 4x its size, as the picture viewer's Upscale does: faithful (no new content), saved as a new picture beside the original, which is untouched. Priced by the picture's size; a picture that would pass 144 megapixels at 4x is refused (try 2x). " +
+    CONFIRM_GATE_SENTENCE +
+    ' Returns the new picture (id, code, file, size) and the credits spent. Requires image-upscale; update Slates on capability refusal.',
+  input: z.object({
+    projectId: z.string().uuid(),
+    assetId: z.string().min(1).describe('The picture: its code (IMG-A4) or id.'),
+    factor: z.union([z.literal(2), z.literal(4)]).describe('2 or 4 times the size.'),
+    confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+  }).strict(),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('image-upscale', 'picture upscale')
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const quote = await desktop.get<UpscaleQuote>('/agent/generation/upscale-quote', { projectId: input.projectId, assetId: id, factor: String(input.factor) })
+    if (quote.credits === null) throw new Error(quote.refused ?? 'This picture cannot be upscaled at that size.')
+    const name = quote.code ?? id
+    const size = `${quote.width}x${quote.height} to ${quote.outWidth}x${quote.outHeight}`
+    if (quote.credits > CONFIRM_CREDITS && !input.confirm) {
+      return ok({
+        requires_confirm: true, estimated_credits: quote.credits, estimated_cents: quote.credits, factor: quote.factor,
+        width: quote.width, height: quote.height, outWidth: quote.outWidth, outHeight: quote.outHeight,
+        message: `Cost: ${fmtCredits(quote.credits)} to upscale ${name} ${quote.factor}x (${size}). Re-call with confirm=true after the user explicitly OKs the spend.`,
+      })
+    }
+    const r = await desktop.post<{ asset: { id: string; code: string | null; filePath: string; width: number; height: number }; credits: number }>(
+      '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits })
+    return ok(r, `Upscaled ${name} ${quote.factor}x (${size}) into ${r.asset.code ?? r.asset.id} for ${fmtCredits(r.credits)}.`)
+  },
+}
+
+export const getReviewPacket: Operation<{ projectId: string; packetId?: string; include?: 'sent' | 'open' | 'all'; claim?: boolean }> = {
+  id: 'slates_get_review_packet',
+  description:
+    "Read the notes the person sent from Review mode (the Viewer's Review button): each note with its number, its words or a wordless mark (mark: true, no words: 'this is off'), what it points at (a picture region, a clip span, a transition, a transcript join) with a still, its thread, and the ratings changed since (stars, favourite, rejected, redo, more like this). By default the oldest packet the person sent and nobody has read; include: open reads notes and ratings not yet sent, all every note. Reading a sent packet claims it, so the person sees it was picked up (claim: false only peeks). Answer each note with slates_resolve_review_note. null with a reason when nothing waits. Free. Requires review-mode; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    packetId: z.string().min(1).optional().describe('One packet by id; absent: the oldest unread.'),
+    include: z.enum(['sent', 'open', 'all']).optional().describe('sent (default): a packet the person sent. open: unsent notes and ratings. all: every note.'),
+    claim: z.boolean().optional().describe('False reads without claiming. Default true for a sent packet.'),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('review-mode', 'Review mode')
+    return ok(await ctx.desktop().get('/agent/review/packet', {
+      projectId: input.projectId,
+      ...(input.packetId ? { packetId: input.packetId } : {}),
+      ...(input.include ? { include: input.include } : {}),
+      ...(input.claim !== undefined ? { claim: String(input.claim) } : {}),
+    }))
+  },
+}
+
+export const resolveReviewNote: Operation<{
+  projectId: string; replies: Array<{ noteId: string; kind: 'fixed' | 'question' | 'why_not' | 'alternates' | 'note'; text?: string; assetIds?: string[] }>
+}> = {
+  id: 'slates_resolve_review_note',
+  description:
+    "Answer the person's review notes, on the note where it was pinned, as the Notes view shows it. One reply per note: fixed (done; text optional), question (ask what they meant), why_not (why it stays as is), alternates (two or three takes to choose from, assetIds), note (anything else). A wordless mark (mark: true with no words) is answered with alternates, two or three versions, never one guess, unless the person has since written in its thread. Every note must be in this project and not ticked done; every take one of its pictures or clips. Returns each note's new state and how many in its packet still wait. Free. Requires review-mode; update Slates on capability refusal.",
+  input: z.object({
+    projectId: z.string().uuid(),
+    replies: z.array(z.object({
+      noteId: z.string().min(1),
+      kind: z.enum(['fixed', 'question', 'why_not', 'alternates', 'note']),
+      text: z.string().max(4000).optional().describe('The answer. Needed for question, why_not and note.'),
+      assetIds: z.array(z.string().min(1)).max(3).optional().describe('alternates: two or three takes, codes or ids. fixed: the take that fixes it.'),
+    }).strict()).min(1),
+  }).strict(),
+  async run(input, ctx) {
+    await ctx.desktop().requireCapability('review-mode', 'Review mode')
+    const refs = [...new Set(input.replies.flatMap((r) => r.assetIds ?? []))]
+    const resolved = refs.length ? await resolveAssetRefs(ctx, input.projectId, refs) : new Map<string, { id: string }>()
+    const replies = input.replies.map((r) => (r.assetIds ? { ...r, assetIds: r.assetIds.map((a) => resolved.get(a)!.id) } : r))
+    return ok(await ctx.desktop().post('/agent/review/resolve', { projectId: input.projectId, replies }))
   },
 }
 
@@ -7533,6 +7814,7 @@ export const saveTimeline: Operation<{ projectId: string; timelineId?: string; n
     if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
       await ctx.desktop().requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')
     }
+    await requireDeliveryEncoding(ctx.desktop(), input.delivery)
     return ok(await ctx.desktop().post('/agent/timelines', input))
   },
 }
@@ -7928,7 +8210,7 @@ const audioEffectList = z
     z
       .object({
         id: z.string().max(64).optional().describe('Kept when sent back; a new effect gets one.'),
-        type: z.enum(['volume', 'eq']).describe("volume: gain in dB (param gainDb, -60 silent to +12). eq: ten bands in this order: a high-pass, a low shelf, six bells, a high shelf, a low-pass; send the ones it plays as bands. An older eq's 'lowpass.frequency' and 'lowpass.q' read as the low-pass at 12 dB."),
+        type: z.enum(['volume', 'eq', 'denoise', 'voice_enhance']).describe("volume: gain in dB (param gainDb, -60 silent to +12). eq: ten bands in this order: a high-pass, a low shelf, six bells, a high shelf, a low-pass; send the ones it plays as bands. An older eq's 'lowpass.frequency' and 'lowpass.q' read as the low-pass at 12 dB. denoise: pushes the noise between words down (amount 0 to 1, floorDb -48 to -12). voice_enhance: a broadcast voice chain, EQ and levelling (amount 0 to 1)."),
         bypass: z.boolean().optional(),
         params: z.record(z.number()).optional().describe("Fixed values by parameter name ('gainDb'; an eq's '<band>.<name>', as 'bell3.gain' or 'highpass.slope')."),
         keyframes: z.record(keyframeKeys.max(4000)).optional().describe('Keys by parameter name; a keyed parameter reads its keys instead of its fixed value.'),
@@ -7937,6 +8219,10 @@ const audioEffectList = z
       .strict()
   )
   .max(16)
+
+/** True when an effect list holds a voice cleaner (denoise, voice_enhance), which an older desktop refuses. */
+const usesVoiceCleaners = (effects: z.infer<typeof audioEffectList> | null | undefined): boolean =>
+  (effects ?? []).some((e) => e.type === 'denoise' || e.type === 'voice_enhance')
 
 /** True when an effect list uses the ten-band EQ: a band list, or a parameter an older desktop does not know. */
 function usesEqBands(effects: z.infer<typeof audioEffectList> | null | undefined): boolean {
@@ -7947,6 +8233,7 @@ function usesEqBands(effects: z.infer<typeof audioEffectList> | null | undefined
 /** An older desktop refuses every eq band but the low-pass; ask first, so the refusal names the update. */
 async function requireEqBands(desktop: ReturnType<OperationContext['desktop']>, effects: z.infer<typeof audioEffectList> | null | undefined): Promise<void> {
   if (usesEqBands(effects)) await desktop.requireCapability('eq-bands', 'the ten-band EQ')
+  if (usesVoiceCleaners(effects)) await desktop.requireCapability('audio-suite', 'denoise and voice enhance')
 }
 
 /** A clip's panel (slate's `src/shared/clipPanel.ts`): lengths in fractions of the frame's height. */
@@ -7966,12 +8253,58 @@ const clipPanel = z.object({
   }).strict().optional().describe('Present is on: {} is the default border.'),
 }).strict()
 
+/** A clip's look (slate's `src/shared/clipLook.ts`): blend, grain, colour, exposure, the grade and a LUT. */
+const GRADE_DESCRIBE = '-1 to 1; 0 is as shot.'
+const clipLookInput = z.object({
+  blend: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft-light']).optional(),
+  grain: z.number().min(0).max(1).optional(),
+  saturation: z.number().min(0).max(2).optional(),
+  exposure: z.number().min(-4).max(4).optional().describe('Stops of light: 1 is twice as bright, -1 half.'),
+  contrast: z.number().min(-1).max(1).optional().describe(`Flat (-1) to punchy (1). ${GRADE_DESCRIBE}`),
+  temperature: z.number().min(-1).max(1).optional().describe(`Cool blue (-1) to warm amber (1). ${GRADE_DESCRIBE}`),
+  tint: z.number().min(-1).max(1).optional().describe(`Green (-1) to magenta (1). ${GRADE_DESCRIBE}`),
+  highlights: z.number().min(-1).max(1).optional().describe(`Pulls the bright parts down (-1) or lifts them (1). ${GRADE_DESCRIBE}`),
+  shadows: z.number().min(-1).max(1).optional().describe(`Crushes the dark parts (-1) or opens them (1). ${GRADE_DESCRIBE}`),
+  lutPath: localFile('lutPath', ['cube']).optional().describe('A 3D LUT (.cube) laid on after the grade, by its absolute path; the app copies it into the project.'),
+  lutIntensity: z.number().min(0).max(1).optional().describe('How much of the LUT shows, 0 to 1 (default 1).'),
+}).strict()
+const GRADE_FIELDS = ['contrast', 'temperature', 'tint', 'highlights', 'shadows', 'lutPath', 'lutIntensity'] as const
+/** A clip's matte (slate's `src/shared/clipMatte.ts`): a subject mask, a shape, or a colour key. One kind at a time. */
+const clipMatteInput = z.union([
+  z.object({
+    maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).describe("One of the clip's own media's subject masks."),
+    mode: z.enum(['subject', 'background']).optional().describe('subject (default) draws only the subject; background everything but it.'),
+    feather: z.number().min(0).max(1).optional().describe('How soft the edge is: 0 as made, 1 softened over about 3% of the picture height. Default 0.'),
+  }).strict(),
+  z.object({
+    shape: z.object({
+      kind: z.enum(['rect', 'ellipse']),
+      x: z.number().min(0).max(1).describe('Centre, 0 left to 1 right.'),
+      y: z.number().min(0).max(1).describe('Centre, 0 top to 1 bottom.'),
+      w: z.number().min(0.01).max(2).describe("Width as a fraction of the picture's."),
+      h: z.number().min(0.01).max(2).describe("Height as a fraction of the picture's."),
+      rotation: z.number().min(-180).max(180).optional().describe('Degrees clockwise.'),
+      feather: z.number().min(0).max(1).optional().describe('0 crisp to 1 soft.'),
+      invert: z.boolean().optional().describe('Draw what is outside the shape instead.'),
+    }).strict(),
+  }).strict(),
+  z.object({
+    chroma: z.object({
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).describe("The screen's colour, #rrggbb (#00ff00 green, #0000ff blue)."),
+      tolerance: z.number().min(0).max(1).describe('How far from the colour still keys out; 0.35 is a good start.'),
+      softness: z.number().min(0).max(1).describe('Width of the soft edge; 0.2 is a good start.'),
+      spill: z.number().min(0).max(1).optional().describe("How much of the screen's colour is pulled off the subject."),
+    }).strict(),
+  }).strict(),
+])
+
 export const updateClip: Operation<{
   projectId: string; clipId: string
   speed?: number | null; volume?: number | null; audioOffsetFrames?: number | null
   fadeInFrames?: number | null; fadeOutFrames?: number | null; audioFadeInFrames?: number | null; audioFadeOutFrames?: number | null
-  look?: { blend?: 'normal' | 'multiply' | 'screen' | 'overlay' | 'soft-light'; grain?: number; saturation?: number; exposure?: number } | null
-  matte?: { maskId: string; mode?: 'subject' | 'background'; feather?: number } | null
+  look?: z.infer<typeof clipLookInput> | null
+  matte?: z.infer<typeof clipMatteInput> | null
+  reversed?: boolean | null
   space?: { pitch?: number; yaw?: number; perspective?: number } | null
   panel?: z.infer<typeof clipPanel> | null
   blur?: { amount: number; maskId?: string } | null
@@ -7982,7 +8315,7 @@ export const updateClip: Operation<{
 } & SoundEdges> = {
   id: 'slates_update_clip',
   description:
-    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain, Colour and Exposure, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2, exposure is stops of light from -4 to 4 (1 twice as bright); null clears the look. matte draws a video clip through one of its subject masks (slates_get_subject_mask lists them): mode subject draws only the subject, background everything but it, feather softens the edge from 0 to 1; lay a matted copy over the clip and put a title on a lane between them (slates_update_timeline_track above or below) to put the title behind the subject. space turns any picture clip in 3D about its centre: pitch leans the top away (degrees, -85 to 85), yaw turns the right edge away (-85 to 85), perspective 0 flat to 1 very wide (0.5 a normal lens). panel makes it a floating panel: radius rounds the corners, shadow puts a soft shadow under it, border a line just inside its edge; lengths are fractions of the frame's height (0.02 is about 22 px at 1080p). blur is a lens blur, amount 0 sharp to 1 (a point spreads over 5% of the frame's height), with a maskId to blur only around the subject and keep it sharp. Each of matte, space, panel and blur is sent whole and null clears it; their amounts can be keyed with slates_set_clip_keyframes. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (up to ten bands: high- and low-pass cuts at 6 to 48 dB per octave, shelves, bells, a notch, a band-pass), each value fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
+    "Set a timeline clip's own speed, volume, split edit (J-cut or L-cut) and fades, as the Cut's Inspector does. Only the fields you name change; null puts one back to the default. speed keeps the clip's media in and out points and its start and changes its length (2 is twice as fast, half as long); with ripple: true the lane's later clips move by the change, otherwise a longer clip covers what follows. audioOffsetFrames, on a video clip, moves its own sound against its picture in sync: below 0 is a J-cut (the sound starts first), above 0 an L-cut (it runs on). Fades are frames: fadeIn/fadeOut for the picture, audioFadeIn/audioFadeOut for the sound. volume is linear gain (1 = 0 dB, 0 = silent). look, on a clip with a picture, is the Inspector's Blend, Grain, Colour and Exposure, sent whole: blend mixes the picture with what is under it (multiply darkens, screen lightens, overlay and soft-light add contrast), grain is film grain from 0 to 1, saturation is colour from 0 (black and white) through 1 (as shot) to 2, exposure is stops of light from -4 to 4 (1 twice as bright); null clears the look. matte draws a video clip through one of its subject masks (slates_get_subject_mask lists them): mode subject draws only the subject, background everything but it, feather softens the edge from 0 to 1; lay a matted copy over the clip and put a title on a lane between them (slates_update_timeline_track above or below) to put the title behind the subject. space turns any picture clip in 3D about its centre: pitch leans the top away (degrees, -85 to 85), yaw turns the right edge away (-85 to 85), perspective 0 flat to 1 very wide (0.5 a normal lens). panel makes it a floating panel: radius rounds the corners, shadow puts a soft shadow under it, border a line just inside its edge; lengths are fractions of the frame's height (0.02 is about 22 px at 1080p). blur is a lens blur, amount 0 sharp to 1 (a point spreads over 5% of the frame's height), with a maskId to blur only around the subject and keep it sharp. look also takes a grade and a .cube LUT, matte a shape mask or a colour key, and reversed plays it backward (each field says how). Each of matte, space, panel and blur is sent whole and null clears it; their amounts can be keyed with slates_set_clip_keyframes. effects is the clip's sound effects, sent whole, in order: a volume (gain in dB) and an eq (up to ten bands: high- and low-pass cuts at 6 to 48 dB per octave, shelves, bells, a notch, a band-pass), each value fixed or keyed in frames from the clip's start, the same in preview and export. speedRamp keys the speed over the clip (a slow-motion ramp): media in and out stay, the length becomes what the keys take, and the sound follows tape-style; not with speed. speedSound 'tape' makes a constant speed's sound change pitch with it. On an audio lane, startSec, sourceInSec and sourceOutSec (or sourceInSample and sourceOutSample) set where its sound starts and its media in and out to the sample, for a music edit between frames; a longer clip covers what follows unless ripple; not with speed in the same call.",
   input: z.object({
     projectId: z.string().uuid(),
     clipId: z.string().uuid(),
@@ -7993,17 +8326,9 @@ export const updateClip: Operation<{
     fadeOutFrames: z.number().int().min(0).nullable().optional(),
     audioFadeInFrames: z.number().int().min(0).nullable().optional(),
     audioFadeOutFrames: z.number().int().min(0).nullable().optional(),
-    look: z.object({
-      blend: z.enum(['normal', 'multiply', 'screen', 'overlay', 'soft-light']).optional(),
-      grain: z.number().min(0).max(1).optional(),
-      saturation: z.number().min(0).max(2).optional(),
-      exposure: z.number().min(-4).max(4).optional().describe('Stops of light: 1 is twice as bright, -1 half.'),
-    }).strict().nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1, exposure 0). null clears it.'),
-    matte: z.object({
-      maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).describe("One of the clip's own media's subject masks."),
-      mode: z.enum(['subject', 'background']).optional().describe('subject (default) draws only the subject; background everything but it.'),
-      feather: z.number().min(0).max(1).optional().describe('How soft the edge is: 0 as made, 1 softened over about 3% of the picture height. Default 0.'),
-    }).strict().nullable().optional().describe('A video clip drawn through a subject mask; null draws the whole picture.'),
+    look: clipLookInput.nullable().optional().describe('The whole look, at least one field; a field left out is its default (normal, no grain, colour 1, exposure 0, no grade, no LUT). null clears it.'),
+    matte: clipMatteInput.nullable().optional().describe('A subject mask ({ maskId }), a shape ({ shape }) or a colour key ({ chroma }); null draws the whole picture.'),
+    reversed: z.boolean().nullable().optional().describe("true plays the clip's media backward (its linked sound too); false or null forward."),
     space: z.object({
       pitch: z.number().min(-85).max(85).optional().describe('Degrees; positive leans the top away.'),
       yaw: z.number().min(-85).max(85).optional().describe('Degrees; positive turns the right edge away.'),
@@ -8030,7 +8355,11 @@ export const updateClip: Operation<{
       await requireKeysBetweenFrames(desktop, input.speedRamp, input.effects)
     }
     // An empty look would clear the clip's look without saying so; null is how to ask for that.
-    if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one of blend, grain, saturation or exposure; send look: null to clear it')
+    if (input.look && Object.keys(input.look).length === 0) throw new Error('look needs at least one field (blend, grain, saturation, exposure, a grade value or a LUT); send look: null to clear it')
+    const matteKind = input.matte && ('shape' in input.matte || 'chroma' in input.matte)
+    if (GRADE_FIELDS.some((f) => input.look?.[f] !== undefined) || matteKind || input.reversed !== undefined) {
+      await desktop.requireCapability('clip-grade', 'the grade, LUTs, colour keys, shape masks and reverse')
+    }
     if (input.look !== undefined) await desktop.requireCapability('clip-look', "a clip's blend, grain and colour")
     if (input.look?.exposure !== undefined || input.matte !== undefined || input.space !== undefined || input.panel !== undefined || input.blur !== undefined) {
       await desktop.requireCapability('clip-panels', 'subject mask layers, 3D panels and lens blur')
@@ -8105,7 +8434,9 @@ export const addTimelineTrack: Operation<{
 // and the batch cap slate's `src/main/agent/routes-editor.ts`, which this package cannot import;
 // lockstep check 12 fails when they differ. The 0..1 position and
 // opacity are fractions by definition, not a desktop choice.
-const TEXT_STYLE_IDS = ['word-pop', 'keyword', 'subtitle', 'headline', 'clean', 'plain'] as const
+// A desktop before the caption presets refuses one of the last six by name, so they need no gate.
+const TEXT_STYLE_IDS = ['word-pop', 'keyword', 'subtitle', 'headline', 'clean', 'plain',
+  'active-pill', 'reel-bold', 'impact-hook', 'lower-third', 'minimal-caption', 'kinetic-pop'] as const
 // A text clip set exactly (slate 1.6.x, capability text-fonts): the fonts Slates carries, the exact size,
 // the picture before the words and a line of clips, mirrored from slate's `src/shared/textStyles.ts` and
 // `src/shared/overlays.ts` like the rest (lockstep check 12).
@@ -8655,6 +8986,7 @@ export const updateTimelineSettings: Operation<{
     if (input.delivery !== undefined || input.taxonomy !== undefined || input.gridBinding !== undefined) {
       await desktop.requireCapability('ad-variant-export', 'cut delivery, naming and grid bindings')
     }
+    await requireDeliveryEncoding(desktop, input.delivery)
     if (input.timelineId && input.delivery !== undefined && Object.keys(input).every(key => ['projectId', 'timelineId', 'delivery'].includes(key))) {
       return ok(await desktop.post('/agent/timeline/delivery', input))
     }
@@ -8671,20 +9003,21 @@ export const exportVideo: Operation<{
   overwrite?: boolean
   aspect?: string
   audioBitrate?: typeof AUDIO_BITRATES[number]
-}> = {
+} & z.infer<typeof exportEncodingInput>> = {
   id: 'slates_export_video',
   billable: false,
   description:
-    "Render the project's timeline to an MP4 file on disk through the desktop app's timeline engine, the renderer its monitor shows, so the file matches the preview (H.264 + AAC, every video lane composited with its transitions, fades and keyframes, gaps rendered as black; the Slates window must be open, and the export opens the timeline's project there first, answering openedProject: true when it did). No dialogs — pass an absolute outputPath ending in .mp4. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline. The sound is AAC at the timeline's Sound bitrate (slates_update_timeline_settings audioBitrate; default 320 kb/s) unless audioBitrate names one for this file. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
+    "Render the project's timeline to a video file on disk through the desktop app's timeline engine, the renderer its monitor shows, so the file matches the preview (H.264 + AAC by default, every video lane composited with its transitions, fades and keyframes, gaps rendered as black; the Slates window must be open, and the export opens the timeline's project there first, answering openedProject: true when it did). No dialogs — pass an absolute outputPath ending in .mp4 (.mov for codec prores). presetId exports for a platform (tiktok, reels, meta-feed, stories, shorts, youtube: its bitrate, frame-rate ceiling and sound); codec, videoBitrateMbps and fps override it, or the cut's own encoding, for this file. Fails if the file exists unless overwrite=true. Blocks until encoding finishes (can take minutes for long timelines) and returns the real file size and probed duration. After success, consider slates_reveal_file to show the file to the user. Requires at least one video clip on the timeline. The sound is AAC at the timeline's Sound bitrate (slates_update_timeline_settings audioBitrate; default 320 kb/s) unless audioBitrate names one for this file. Pass exactly one of projectId (the project's default timeline) or timelineId (a named cut).",
   input: z
     .object({
       projectId: z.string().uuid().optional(),
       timelineId: z.string().uuid().optional(),
-      outputPath: localFile('outputPath', ['mp4'])
-        .describe('Absolute path for the rendered file, ending in .mp4 (e.g. C:\\Users\\you\\Videos\\ad.mp4 or /Users/you/ad.mp4). slates_get_project_directory gives a sensible default folder.'),
+      outputPath: localFile('outputPath', ['mp4', 'mov'])
+        .describe('Absolute path for the rendered file, ending in .mp4, or .mov for prores (e.g. C:\\Users\\you\\Videos\\ad.mp4 or /Users/you/ad.mp4). slates_get_project_directory gives a sensible default folder.'),
       overwrite: z.boolean().optional(),
       aspect: deliveryAspectInput.optional().describe('Optional delivery aspect from slates_get_variant_grid; requires ad-variant-export. Omission keeps existing export behavior.'),
       audioBitrate: audioBitrateInput.optional().describe(`This file's AAC sound in kb/s (${AUDIO_BITRATES.join(', ')}); omit for the timeline's Sound bitrate.`),
+      ...exportEncodingShape,
     })
     .refine((d) => !!d.projectId !== !!d.timelineId, {
       message: 'Pass exactly one of projectId or timelineId',
@@ -8692,6 +9025,12 @@ export const exportVideo: Operation<{
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('export', 'video export')
+    if (input.presetId !== undefined || input.codec !== undefined || input.videoBitrateMbps !== undefined || input.fps !== undefined) {
+      await desktop.requireCapability('export-encoding', 'platform presets and export encoding')
+    }
+    if (input.codec !== undefined && (input.codec === 'prores') !== /\.mov$/i.test(input.outputPath)) {
+      throw new Error('A prores export writes a .mov file and every other codec an .mp4: change outputPath to match.')
+    }
     if (input.aspect !== undefined) await desktop.requireCapability('ad-variant-export', 'single video delivery export')
     if (input.audioBitrate !== undefined) await requireSoundPrecision(desktop)
     const r = await desktop.post<{
@@ -8710,11 +9049,15 @@ export const exportVideo: Operation<{
       overwrite: input.overwrite,
       aspect: input.aspect,
       audioBitrate: input.audioBitrate,
+      presetId: input.presetId,
+      codec: input.codec,
+      videoBitrateMbps: input.videoBitrateMbps,
+      fps: input.fps,
     })
     const mb = r.fileSizeBytes != null ? (r.fileSizeBytes / (1024 * 1024)).toFixed(1) : '?'
     return ok(
       r,
-      `Exported ${r.durationSec ?? '?'}s MP4 (${mb} MB) to ${r.outputPath ?? input.outputPath}.`
+      `Exported ${r.durationSec ?? '?'}s ${/\.mov$/i.test(input.outputPath) ? 'MOV' : 'MP4'} (${mb} MB) to ${r.outputPath ?? input.outputPath}.`
     )
   },
 }
@@ -12098,6 +12441,17 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getRecipe as unknown as Operation<unknown>,
   reframeClip as unknown as Operation<unknown>,
   getReframeReport as unknown as Operation<unknown>,
+  freezeFrame as unknown as Operation<unknown>,
+  stabilizeClip as unknown as Operation<unknown>,
+  slideClip as unknown as Operation<unknown>,
+  punchIn as unknown as Operation<unknown>,
+  cleanUpDialogue as unknown as Operation<unknown>,
+  autoColourClip as unknown as Operation<unknown>,
+  autoDuck as unknown as Operation<unknown>,
+  matchLoudness as unknown as Operation<unknown>,
+  upscaleImage as unknown as Operation<unknown>,
+  getReviewPacket as unknown as Operation<unknown>,
+  resolveReviewNote as unknown as Operation<unknown>,
   getTimeline as unknown as Operation<unknown>,
   getTimelineLoudness as unknown as Operation<unknown>,
   addClipToTimeline as unknown as Operation<unknown>,

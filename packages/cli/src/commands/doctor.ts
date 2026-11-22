@@ -131,6 +131,18 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['whip-pans', 'whip pans in your footage and joining shots on them'],
   ['transcript-cut', 'cut by transcript'],
   ['proxies', "a clip's proxy and Make proxies automatically at import"],
+  ['export-encoding', 'platform presets, codec, bitrate and frame rate on export'],
+  ['audio-suite', 'denoise, voice enhance, auto duck and loudness match'],
+  ['clip-grade', 'the grade, LUTs, auto colour, colour keys, shape masks and reverse'],
+  ['freeze-frame', 'freeze frame'],
+  ['dialogue-cleanup', 'dialogue clean-up'],
+  ['punch-in', 'punch in'],
+  ['subject-follow', 'reframing to follow a subject mask'],
+  ['slide-edit', 'slide edit'],
+  ['stabilize', 'stabilize'],
+  ['image-upscale', 'picture upscale'],
+  ['review-mode', 'Review mode packets and answers'],
+  ['view-review', 'turning Review mode on and off'],
 ]
 
 export async function runDoctor(): Promise<void> {

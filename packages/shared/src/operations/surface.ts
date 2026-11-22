@@ -205,6 +205,8 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_quote_cut_drafts', 'slates_finish_cut_drafts', 'slates_get_cut_draft_status',
     'slates_get_export_batch', 'slates_cancel_export_batch', 'slates_get_variant_grid', 'slates_get_recipe',
     'slates_reframe_clip', 'slates_get_reframe_report',
+    'slates_freeze_frame', 'slates_stabilize_clip', 'slates_slide_clip', 'slates_punch_in', 'slates_clean_up_dialogue',
+    'slates_auto_colour_clip', 'slates_auto_duck', 'slates_match_loudness',
     'slates_get_timeline',
     'slates_get_timeline_loudness',
     'slates_add_clip_to_timeline',
