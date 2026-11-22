@@ -855,19 +855,11 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
     videoResolution: { options: ['480p', '720p', '1080p', '4k'], default: '720p' },
     duration: { min: 4, max: 30, mode: 'continuous' },
-    // 🚨 ZERO, AND IT MUST MATCH WHAT THE HANDLER SENDS. The model's edit task
-    // type does accept reference images, but slate's
-    // `generation/handlers/edit-video.ts` sends the prompt and the source clip
-    // and NOTHING ELSE on this row — no `image_urls` on the EvoLink call, no
-    // `image_url` items in the BytePlus content array. This declared 30 while
-    // the handler sent 0, so attaching references produced no error, no
-    // warning, and no images in the request: a silent drop, which is the one
-    // outcome `validateComposition` exists to prevent. Both sibling edit rows
-    // already model this correctly (Omni Flash Edit is 0 and warns "takes the
-    // prompt + source clip only"; Kling O3 Edit is 4 and actually sends them).
-    //
-    // Raising it is a HANDLER change first: wire the refs, then move the cap.
-    maxIngredientImages: 0,
+    // ByteDance recommends 1–5 reference images on video edits ("replace the man
+    // in dark clothing in @Video 1 with @Image 2"). Wired in slate's
+    // `generation/handlers/edit-video.ts` (BytePlus `role: 'reference_image'`
+    // items + EvoLink `image_urls`) and V2V Video Brush / Swap Person / Location.
+    maxIngredientImages: 5,
     // NO multimodal reference caps, deliberately: on an edit row the clip IS the
     // canvas and arrives through `sourceVideo`, not as a reference.
   },

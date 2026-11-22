@@ -2340,13 +2340,12 @@ export const EDIT_VIDEO_MODELS = [
 ] as const
 
 type EditVideoModel = (typeof EDIT_VIDEO_MODELS)[number]
-// The op's default, not MODEL_FACTS' edit tier default: the desktop route defaults to the same Kling
-// engine (slate routes.ts, /agent/generation/edit-video), so moving it is a two-repo change.
-const EDIT_VIDEO_DEFAULT: EditVideoModel = 'kling-v3.0-omni-edit'
+// The op's default, matching MODEL_FACTS' edit tier default and slate routes.ts (/agent/generation/edit-video).
+const EDIT_VIDEO_DEFAULT: EditVideoModel = 'seedance-2.5-edit'
 /** The edit engines that take character and style references (elements); the run refuses them on the rest. */
 const EDIT_VIDEO_ELEMENT_MODELS: readonly EditVideoModel[] = EDIT_VIDEO_MODELS.filter((m) => (getModelCapability(m)?.maxIngredientImages ?? 0) > 0)
 const EDIT_VIDEO_ELEMENT_CAP = Math.max(...EDIT_VIDEO_ELEMENT_MODELS.map((m) => getModelCapability(m)?.maxIngredientImages ?? 0))
-const EDIT_VIDEO_ELEMENTS_ONLY = `Only ${EDIT_VIDEO_ELEMENT_MODELS.join(' and ')} take them; the other engines refuse them.`
+const EDIT_VIDEO_ELEMENTS_ONLY = `Only ${EDIT_VIDEO_ELEMENT_MODELS.join(', ')} take them; the other engines refuse them.`
 
 /**
  * Source-clip length an edit engine accepts, read from the SSOT.
@@ -6968,7 +6967,7 @@ export const editVideo: Operation<{
     // point to in a tool result) and go stale on the next rate change; the
     // windows are owned by MODEL_CAPABILITIES and are generated below into the
     // params that enforce them.
-    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engine routing, clip-length and resolution windows are on the `model` param (subject and style refs: ' + EDIT_VIDEO_ELEMENT_MODELS.join(' and ') + ' only); seedanceFace:true for AI-character faces on seedance-2.5-edit. Cost is per second: output seconds on Kling and Omni Flash, input + output on Seedance; quote it with slates_estimate_generation_cost. Subjects to swap IN go as characterAssetIds (frontal + angle images become Kling elements — Kling models only); style refs as styleAssetIds; max 4 combined. The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: the `model` param and slates-model-selection. Prompting: slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash. ' +
+    'Edit an EXISTING video clip with one instruction — character swap, environment change, style transfer — in one pass, no masking. Original motion, camera, and audio are preserved; only what the prompt names changes. Use when a clip is ~90% right (fix it, don\'t re-roll it) or to AI-edit the user\'s own footage. Engine routing, clip-length and resolution windows are on the `model` param (subject and style refs: ' + EDIT_VIDEO_ELEMENT_MODELS.join(', ') + ' only); seedanceFace:true for AI-character faces on seedance-2.5-edit. Cost is per second: output seconds on Kling and Omni Flash, input + output on Seedance; quote it with slates_estimate_generation_cost. Subjects to swap IN go as characterAssetIds; style refs as styleAssetIds (up to the model\'s reference cap combined). The edited clip saves as a NEW asset linked to its parent (chain edits freely). Routing: the `model` param and slates-model-selection. Prompting: slates-prompting-seedance-2-5 / slates-prompting-kling-v3 §Edit / slates-prompting-omni-flash. ' +
     confirmGateSentence('any character or style reference'),
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
@@ -7029,8 +7028,9 @@ export const editVideo: Operation<{
     const styleAssetIds = (input.styleAssetIds ?? []).map(rid)
     const refEcho = describeResolvedRefs(refInputs, resolved)
 
-    if (characterAssetIds.length + styleAssetIds.length > EDIT_VIDEO_ELEMENT_CAP) {
-      throw new Error(`${model} takes at most ${EDIT_VIDEO_ELEMENT_CAP} subject and style references combined.`)
+    const modelElementCap = getModelCapability(model)?.maxIngredientImages ?? 0
+    if (characterAssetIds.length + styleAssetIds.length > modelElementCap) {
+      throw new Error(`${model} takes at most ${modelElementCap} subject and style references combined.`)
     }
 
     // The billed key needs the clip's duration (ceiled). Read it from the

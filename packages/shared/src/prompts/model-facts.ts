@@ -305,12 +305,12 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'seedance-2.5-edit',
     route: 'edit',
-    tier: 'specialist',
+    tier: 'default',
     label: 'Seedance 2.5 Edit',
     kind: 'video',
-    // 0 ingredients: prompt + source clip only on slates_edit_video.
+    // Takes reference images (subject swaps, location swaps, painted Video Brush masks) on BytePlus and EvoLink.
     ...caps('seedance-2.5-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT via slates_edit_video, and the only edit engine that takes a clip longer than the other two reach — that length is the whole reason to route here. Inside their range, compare on fidelity instead: Omni Flash edit won the prompt-only head-to-head, and Kling edit is the one that takes reference images. Edits audio on the same row (re-voice, re-accent, translate with re-fitted lips, replace BGM). Costs about 1.2x a plain 2.5 generation of the same length: an edit bills at twice the reduced video-reference rate.',
+    notes: 'DEFAULT VIDEO EDIT MODEL — the flagship video-to-video edit seat: takes the source clip plus reference images (character swaps, location swaps, painted Video Brush masks), reaches longer clips than the other edit engines, and edits audio on the same row (re-voice, re-accent, translate with re-fitted lips, replace BGM). Set seedanceFace: true when an AI character face is visible; real-person footage that the Face route rejects goes to Kling O3 Edit. Costs about 1.2x a plain 2.5 generation of the same length: an edit bills at twice the reduced video-reference rate.',
   },
   {
     id: 'kling-v3',
@@ -330,7 +330,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // Family-level fact; 4 = combined subject elements + style refs per edit.
     ...caps('kling-v3.0-omni-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, the REF-DRIVEN one: it is the only edit seat that takes element/style reference images to lock subject identity, and its keepAudio preserves the original audio verbatim. Route here when an edit NEEDS reference images or bit-exact audio; for prompt-only footage-synced VFX, Omni Flash edit won the fidelity head-to-head. One instruction beat per pass — multi-beat prompts get under-executed.',
+    notes: 'VIDEO-TO-VIDEO EDIT, the real-person and bit-exact-audio specialist: takes element/style reference images and its keepAudio preserves the original audio verbatim. Route here for real-person footage Seedance\'s face policy rejects, or when bit-exact original audio is required. One instruction beat per pass — multi-beat prompts get under-executed.',
   },
   {
     id: 'kling-v4.0',
@@ -360,12 +360,12 @@ export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'omni-flash-1-2-edit',
     route: 'edit',
-    tier: 'default',
+    tier: 'specialist',
     label: 'Omni Flash 1.2 Edit',
     kind: 'video',
     // 0: prompt + source clip ONLY — no element/style refs on this endpoint.
     ...caps('omni-flash-1-2-edit'),
-    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only. The 1.0 edit won the head-to-head against Kling edit on real talking footage (lips held, audio near-identical, both action beats landed); 1.2 has not been re-measured against it. Footage-synced prop, effect, environment and lighting swaps; 1080p and 4K output are upscales; it does not edit voices. Takes NO reference images — identity swaps needing refs go to Kling edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
+    notes: 'VIDEO-TO-VIDEO EDIT, prompt-only specialist. Footage-synced prop, effect, environment and lighting swaps when no reference photo or mask is needed; its top resolution tiers are upscales; it does not edit voices. Takes NO reference images — identity swaps and Video Brush masks go to Seedance 2.5 Edit (default) or Kling O3 Edit. Fidelity is EARNED by prompt discipline; the exact form is in slates-prompting-omni-flash.',
   },
   {
     id: 'minimax-h3',

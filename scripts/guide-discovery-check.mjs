@@ -99,7 +99,7 @@ assert(!names(diner).includes('slates-prompting-seedance-2-5'), 'a clip duration
 assert(!unfamiliar.text.includes('ask the user'))
 assert.equal(resolveGuideTopic('constructor'), null)
 assert.equal(resolveGuideTopic('seedance-2.5'), 'slates-prompting-seedance-2-5')
-assert.equal(resolveGuideTopic('video-edit'), 'slates-prompting-omni-flash')
+assert.equal(resolveGuideTopic('video-edit'), 'slates-prompting-seedance-2-5')
 assert.equal(resolveGuideTopic('subtitles'), 'slates-captions')
 assert.equal(resolveGuideTopic('lower third'), 'slates-motion')
 assert.equal(resolveGuideTopic('remake'), 'slates-storyboard-from-script')
