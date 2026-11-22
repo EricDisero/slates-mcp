@@ -7808,6 +7808,33 @@ export const resolveReviewNote: Operation<{
 
 const META_WINNERS = 'the Winners Loop (ad results per recipe)'
 
+type ClientAdReportInput = {
+  platform: 'google'
+  accountId?: string
+  managerId?: string
+  since?: string
+  until?: string
+  projectId?: string
+}
+
+export const getClientAdReport: Operation<ClientAdReportInput> = {
+  id: 'slates_get_client_ad_report',
+  description: 'List connected Google Ads advertisers and manager IDs, or read date-range ad performance with linked Slates exports. Uses the signed-in desktop connection. Publishing and account changes happen in the window.',
+  input: z.object({
+    platform: z.literal('google'),
+    accountId: z.string().regex(/^\d{1,24}$/).optional(),
+    managerId: z.string().regex(/^\d{10}$/).optional(),
+    since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    until: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    projectId: z.string().uuid().optional(),
+  }).strict(),
+  async run(input, ctx) {
+    const desktop = ctx.desktop()
+    await desktop.requireCapability('client-ads', 'connected ad account reporting')
+    return ok(await desktop.get('/agent/client-ads', { ...input }))
+  },
+}
+
 export const getAdWinners: Operation<{ projectId?: string }> = {
   id: 'slates_get_ad_winners',
   description:
@@ -12818,6 +12845,7 @@ export const ALL_OPERATIONS: ReadonlyArray<Operation<unknown>> = [
   getReviewPacket as unknown as Operation<unknown>,
   resolveReviewNote as unknown as Operation<unknown>,
   getAdWinners as unknown as Operation<unknown>,
+  getClientAdReport as unknown as Operation<unknown>,
   setRecipeVerdict as unknown as Operation<unknown>,
   moreLikeThis as unknown as Operation<unknown>,
   planSplitTest as unknown as Operation<unknown>,

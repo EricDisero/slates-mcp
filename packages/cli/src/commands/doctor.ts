@@ -144,6 +144,7 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['review-mode', 'Review mode packets and answers'],
   ['view-review', 'turning Review mode on and off'],
   ['meta-winners', 'ad results per recipe, winner marks, More like this and split tests'],
+  ['client-ads', 'connected ad accounts and export-linked performance'],
   ['visual-qa', 'Visual QA rounds on a cut'],
   ['v2v-edits', 'stacked video edits on a clip'],
   ['diagnostics', 'the crash and error report status'],
