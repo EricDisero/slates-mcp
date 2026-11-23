@@ -2,6 +2,7 @@
 // A/B (README.md). One HTTP server on 127.0.0.1 answers the desktop's /agent/*
 // routes and the cloud's /api/* and /members/* routes from the small project
 // below, and records every request so the scorer can see what each run asked.
+// The desktop's reads beyond the board and its media live in fixture-routes.mjs.
 //
 // Nothing here writes: every POST is refused and recorded, so no run can change
 // a real project, and no route reaches the real desktop. The one live call is
@@ -18,6 +19,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { crc32, deflateSync } from 'node:zlib'
 import { brainDir, readSkillDir, servedTiers } from '../brain-source.mjs'
+import { agentErrors, desktopDelivery, moreRoutes, OPEN_PROJECT_HINT } from './fixture-routes.mjs'
 
 // The framing buckets, word count and speech-rate budget the desktop also imports (this checkout's shared build).
 const grammar = await import(pathToFileURL(join(import.meta.dirname, '..', '..', 'packages', 'shared', 'dist', 'prompts', 'shot-grammar.js')).href)
@@ -159,6 +161,8 @@ const PROJECTS = [
 ]
 const STORYBOARDS = [{ id: SB1, projectId: P1, name: 'Cold brew 15s v1', description: 'Hook, proof, end card', sceneCount: 2, shotCount: SHOTS.length, updatedAt: T0, createdAt: T0 }]
 
+// Each project's cut: the empty one the desktop makes the first time a route reads it (getOrCreateProjectTimeline).
+const DEFAULT_TIMELINES = Object.fromEntries(PROJECTS.map((p, i) => [p.id, id('7e1e0000', i + 1)]))
 const VIEW = {
   projectId: P1,
   lens: 'board',
@@ -236,6 +240,15 @@ export async function fetchPriceList(cloudToken, cloudBase = 'https://slates-api
  */
 export async function startFixture({ desktopDir, priceList: given, cloudToken, cloudBase = 'https://slates-api.fly.dev', brain = brainDir(), brainTiers = ['bump', 'license'] } = {}) {
   const health = desktopCapabilities(desktopDir)
+  // An id or input error answers as slate's would: its text and its status (fixture-routes.mjs agentErrors).
+  const refuse = await agentErrors(desktopDir)
+  const deliveryFormat = await desktopDelivery(desktopDir)
+  const assetOf = (ref, type) => {
+    const a = ASSETS.find((x) => x.id === ref || x.code === ref)
+    if (!a) throw refuse(`Asset not found: ${ref}`)
+    if (a.type !== type) throw refuse(type === 'video' ? `Asset is not a video: ${ref} (type=${a.type})` : `${a.code} is a ${a.type}, not an ${type}`)
+    return a
+  }
   const priceList = given ?? await fetchPriceList(cloudToken, cloudBase)
   const requests = []
   const bundle = brainBundle(brain, brainTiers)
@@ -244,8 +257,11 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
     'GET /agent/healthz': () => ({ ok: true, service: 'slates-agent', version: '1.6.0', ...health }),
     'GET /agent/projects': () => ({ projects: PROJECTS }),
     'GET /agent/projects/get': (q) => {
-      const p = PROJECTS.find((x) => x.id === q.get('id'))
-      if (!p) throw httpError(404, `No project ${q.get('id')}. List them with slates_list_projects.`)
+      // routes.ts requireProject (require-ids.ts).
+      const raw = q.get('id')?.trim()
+      if (!raw) throw refuse(`projectId is required. ${OPEN_PROJECT_HINT}`, 'missing_id')
+      const p = PROJECTS.find((x) => x.id === raw)
+      if (!p) throw refuse(`No project ${raw}. ${OPEN_PROJECT_HINT}`, 'unknown_id')
       return { project: { ...p, storyboards: p.id === P1 ? STORYBOARDS : [], libraryItemCount: p.id === P1 ? LIBRARY.items.length : 0 } }
     },
     'GET /agent/projects/location': (q) => ({ directory: `C:\\Users\\user\\Slates Projects\\${q.get('id')}` }),
@@ -253,18 +269,22 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
     'GET /agent/selection': () => ({ selection: null, viewing: null }),
     'GET /agent/assets': (q) => ({ assets: projectOf(q) === P1 ? ASSETS : [] }),
     'GET /agent/assets/image': (q) => {
+      if (!q.get('id')) throw refuse('id query param required')
       const a = assetOf(q.get('id'), 'image')
       return { ...assetFields(a), ...picture(a) }
     },
     'GET /agent/assets/video-frames': (q) => {
+      if (!q.get('id')) throw refuse('id query param required')
       const a = assetOf(q.get('id'), 'video')
       const count = Math.min(Number(q.get('count') ?? 3) || 3, 8)
       const frames = Array.from({ length: count }, (_, i) => ({ ...picture(a), timestamp_seconds: Math.round((a.duration * (i + 0.5) / count) * 100) / 100 }))
       return { ...assetFields(a), duration_seconds: a.duration, frames }
     },
     'GET /agent/assets/get': (q) => {
+      // routes-parity.ts.
+      if (!q.get('id')) throw refuse('id query param required')
       const a = ASSETS.find((x) => x.id === q.get('id') || x.code === q.get('id'))
-      if (!a) throw httpError(404, `No asset ${q.get('id')}`)
+      if (!a) throw refuse(`Asset not found: ${q.get('id')}`)
       return { asset: a }
     },
     'GET /agent/folders': () => ({ folders: [] }),
@@ -275,8 +295,10 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
     'GET /agent/styles': () => ({ styles: [] }),
     'GET /agent/storyboards': (q) => ({ storyboards: projectOf(q) === P1 ? STORYBOARDS : [] }),
     'GET /agent/storyboards/get': (q) => {
+      // routes.ts requireRow (require-ids.ts).
+      if (!q.get('id')) throw refuse('id query param required')
       const sb = STORYBOARDS.find((s) => s.id === q.get('id'))
-      if (!sb) throw httpError(404, `No storyboard ${q.get('id')}. List them with slates_list_storyboards.`)
+      if (!sb) throw refuse(`No storyboard ${q.get('id')}. List them with slates_list_storyboards.`, 'unknown_id')
       return { storyboard: sb }
     },
     'GET /agent/scenes/full': (q) => (q.get('storyboardId') === SB1 ? { scenes: SCENES, variety: VARIETY.report, varietySummary: VARIETY.summary } : { scenes: [], variety: null, varietySummary: '' }),
@@ -285,8 +307,10 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
       return { shots: rows, variety: rows.length ? VARIETY.report : null, varietySummary: rows.length ? VARIETY.summary : '' }
     },
     'GET /agent/shots/get': (q) => {
+      // routes.ts shotIdOrThrow.
+      if (!q.get('id')) throw refuse('id query param required')
       const s = shotById(q.get('id'))
-      if (!s) throw httpError(404, `No shot ${q.get('id')}`)
+      if (!s) throw refuse(`No shot ${q.get('id')} — pass a shot id or its SHOT-A code.`)
       return { shot: detail(s) }
     },
     'GET /agent/shots/quote': (q) => {
@@ -326,6 +350,7 @@ export async function startFixture({ desktopDir, priceList: given, cloudToken, c
     'GET /agent/templates': () => ({ templates: [] }),
     'GET /agent/manual/pictures': () => ({ pictures: [] }),
     'GET /agent/ui/targets': () => ({ targets: [] }),
+    ...moreRoutes({ projects: PROJECTS, assets: ASSETS, openProject: VIEW.projectId, defaultTimelines: DEFAULT_TIMELINES, fetchedAt: T0, refuse, deliveryFormat }),
     // Cloud
     'GET /api/agent/me': () => ({ success: true, email: 'user@example.com', name: 'Test User', license: 'pro', credit_balance: 1240 }),
     'GET /api/agent/credits/balance': () => ({ success: true, credit_balance: 1240 }),
@@ -404,10 +429,6 @@ function projectOf(q) {
   return q.get('projectId') ?? P1
 }
 
-function httpError(status, message) {
-  return Object.assign(new Error(message), { status })
-}
-
 /** A solid-colour PNG, small enough to ride a tool result: what the vision reads hand the model. */
 function solidPng(width, height, [r, g, b]) {
   const chunk = (type, data) => {
@@ -437,12 +458,6 @@ function picture(asset) {
 
 const assetFields = (a) => ({ asset_id: a.id, code: a.code, label: a.label, file_path: ['C:', 'Users', 'user', 'Slates Projects', a.projectId, `${a.code}.${a.type === 'video' ? 'mp4' : 'png'}`].join('\\') })
 
-function assetOf(ref, type) {
-  const a = ASSETS.find((x) => x.id === ref || x.code === ref)
-  if (!a) throw httpError(404, `No asset ${ref}`)
-  if (a.type !== type) throw httpError(400, `${a.code} is a ${a.type}, not an ${type}`)
-  return a
-}
 
 /** POST routes that only read, so the fixture answers them instead of refusing. */
 const READ_POSTS = {
@@ -450,12 +465,11 @@ const READ_POSTS = {
     const images = []
     const errors = []
     for (const ref of body.ids ?? []) {
-      try {
-        const a = assetOf(ref, 'image')
-        images.push({ ...assetFields(a), ...picture(a) })
-      } catch (error) {
-        errors.push({ asset_id: ref, error: error.message })
-      }
+      // routes.ts reports each id's failure in the answer, in its own words.
+      const a = ASSETS.find((x) => x.id === ref || x.code === ref)
+      if (!a) errors.push({ asset_id: ref, error: 'not found' })
+      else if (a.type !== 'image') errors.push({ asset_id: ref, error: 'asset is a video — use /agent/assets/video-frames' })
+      else images.push({ ...assetFields(a), ...picture(a) })
     }
     return { images, errors }
   },
