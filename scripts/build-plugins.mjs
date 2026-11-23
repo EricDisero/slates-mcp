@@ -15,7 +15,7 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 import ts from 'typescript'
-import { brainDir, servedTiers } from './brain-source.mjs'
+import { brainOrSkip, servedTiers } from './brain-source.mjs'
 import { desktopSource } from './desktop-source.mjs'
 import { loadTypeScriptModule } from './load-typescript.mjs'
 import { buildZip } from './zip.mjs'
@@ -365,7 +365,7 @@ async function main() {
   // The bump files the public router does not route to (the pack's ad playbooks, brain-shape.json's rules): no public
   // plugin file may name one. A bump playbook in the router's table is named there by design and locks by its notice.
   const routed = new Set(readJson('scripts/brain-shape.json').layers.playbook)
-  const paidSkills = [...servedTiers(brainDir()).bump].filter(name => !routed.has(name))
+  const paidSkills = [...servedTiers(brainOrSkip('build-plugins')).bump].filter(name => !routed.has(name))
   assert(paidSkills.length, 'slates-api brain/tiers.json: no bump file outside the router; the plugin leak check has nothing to refuse.')
   const rules = frozenRules(models, paidSkills)
   validateSpec(spec, specSource, rules)
