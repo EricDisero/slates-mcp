@@ -164,6 +164,8 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'agent_op_failed', senders: APP, kind: 'ops', what: "An outside agent's /agent request answered 500, or a Studio Agent tool call threw" },
   { name: 'action_retried', senders: APP, kind: 'ops', what: 'One action (same target, same input) failed three times inside ten minutes' },
   { name: 'session_ended_after_error', senders: APP, kind: 'ops', what: 'The app quit within a minute of one of the failures above' },
+  { name: 'payment_checkout_input', senders: API, kind: 'ops', what: 'An expected checkout step such as incomplete card details, 3DS or a saved-card fallback' },
+  { name: 'payment_report_unverified', senders: API, kind: 'ops', what: 'A browser reported an error without a verified recent unpaid intent' },
   { name: 'payment_failed', senders: API, kind: 'ops', what: 'A payment failed at any step (create, confirm, upsell, webhook, grant), on an anonymous distinct id: step, error_code, amount in minor units, currency, payment_intent_id; never card data or the email' },
 ];
 
