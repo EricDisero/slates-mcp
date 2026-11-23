@@ -161,7 +161,7 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: '$exception', senders: [...APP, ...API], kind: 'ops', what: 'An error: posthog-js exception capture in the app, captureException in main and slates-api', library: true },
   { name: 'generation_failed', senders: APP, kind: 'ops', what: 'A generation turned failed: its model, error class and provider status, never the prompt' },
   { name: 'export_failed', senders: APP, kind: 'ops', what: 'An MP4 or XML export failed, by error class' },
-  { name: 'agent_op_failed', senders: APP, kind: 'ops', what: "An outside agent's /agent request answered 500, or a Studio Agent tool call threw" },
+  { name: 'agent_op_failed', senders: APP, kind: 'ops', what: "An outside agent's /agent request failed (reason: missing_id, unknown_id, invalid_input, auth, upstream or internal), or a Studio Agent tool call threw" },
   { name: 'action_retried', senders: APP, kind: 'ops', what: 'One action (same target, same input) failed three times inside ten minutes' },
   { name: 'session_ended_after_error', senders: APP, kind: 'ops', what: 'The app quit within a minute of one of the failures above' },
   { name: 'payment_checkout_input', senders: API, kind: 'ops', what: 'An expected checkout step such as incomplete card details, 3DS or a saved-card fallback' },
