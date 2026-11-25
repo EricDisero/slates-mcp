@@ -16,7 +16,7 @@
     "check:brand-words": "node scripts/brand-words-check.mjs --self-test",
     "check:retired-model": "node scripts/retired-model-check.mjs",
     "check:skill-copy": "node scripts/skill-copy-check.mjs",
-    "check:brain": "node scripts/brain-lint.mjs --self-test && node scripts/brain-eval/tokens.mjs && node scripts/skill-copy-check.mjs",
+    "check:brain": "node scripts/brain-lint.mjs --self-test && node scripts/brain-eval/tokens.mjs && node scripts/skill-copy-check.mjs && node scripts/brain-eval/gate-check.mjs",
     "check:cinematic-catalogue": "node scripts/cinematic-catalogue-check.mjs",
     "check:script-craft-provenance": "node scripts/script-craft-provenance-check.mjs",
     "check:guide-gate": "node scripts/guide-gate-check.mjs",

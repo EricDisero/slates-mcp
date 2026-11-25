@@ -18,6 +18,9 @@
 //            either arm, a case one arm lacks, or a rate falling by more than one run: the router or the case's
 //            playbook read before the first build call (readFirst, craft.mjs) or the playbook loaded at all;
 //   routing  candidate accuracy below the baseline's by more than one ask, any ask that errored, none answered.
+//            Routing hands the model only the card and the router; when both arms held the same text (equal
+//            layersHash, routing.mjs) they asked the same question, so a gap is the run's spread and gates nothing.
+//            Measured 2026-11-25: Haiku, identical text in both arms, 79 against 81 of 102, and one ask 0 of 8 against 7 of 8.
 //
 // compare() is exported for brain-review.mjs --approve; the CLI below is a thin wrapper. Nothing here writes:
 // the approved brain moves only through brain-review.mjs --approve, after Eric's decisions.
@@ -131,7 +134,9 @@ export function compare(board, results, current) {
       continue
     }
     lines.push(`routing ${r.model}: candidate ${c.hits}/${c.answered.length}, baseline ${base.noRouter ? 'none (the approved brain has no router)' : `${b.hits}/${b.answered.length}`}`)
-    if (c.accuracy < baseAccuracy - 1 / c.answered.length - EPS) fail.push(`${what}: the candidate routed ${pct(c.accuracy)} against the approved brain's ${pct(baseAccuracy)}, more than one ask below; misses: ${c.answered.filter((x) => !x.hit).map((x) => x.case).join(', ')}`)
+    const sameText = !base.noRouter && !!cand.layersHash && cand.layersHash === base.layersHash
+    if (sameText) lines.push(`routing ${r.model}: both arms held the same card and router (${cand.layersHash}), so the gap is the run's spread, not the brain`)
+    else if (c.accuracy < baseAccuracy - 1 / c.answered.length - EPS) fail.push(`${what}: the candidate routed ${pct(c.accuracy)} against the approved brain's ${pct(baseAccuracy)}, more than one ask below; misses: ${c.answered.filter((x) => !x.hit).map((x) => x.case).join(', ')}`)
   }
 
   for (const { file, data } of results.craft) {

@@ -25,6 +25,7 @@
 // this run did not test. --out writes a rerun of a few cases elsewhere, so it never replaces the batch's file.
 // Fails when the candidate is under --min. Every ask is the release batch: only release-batch.mjs starts one
 // (release-guard.mjs); without it, --cases names what a fix touches.
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -57,7 +58,12 @@ async function armOf(name, root, brain) {
   if (unbuilt.length) console.warn(`warning: ${name}: ${unbuilt.length} skills differ from the build (${unbuilt.join(', ')}); this arm records no brain hash and the gate will refuse it. npm run build there first.`)
   const skills = readSkills(skillsDir)
   // The markdown, cut as the package cuts it, so a router edit is tested before a build.
-  return { name, root, brainHash: unbuilt.length ? null : await brainHash(root, { brain }), ...(skills[ROUTER] ? brainLayers(skills) : { noRouter: true }) }
+  const layers = skills[ROUTER] ? brainLayers(skills) : null
+  // What this test hands the model, hashed: two arms with the same layersHash ask the same question, so the gate
+  // reads their accuracy gap as the run's own spread, never as the brain (gate.mjs).
+  const layersHash = layers ? createHash('sha256').update(`${layers.card}
+${layers.routerBody}`).digest('hex').slice(0, 16) : null
+  return { name, root, brainHash: unbuilt.length ? null : await brainHash(root, { brain }), ...(layers ? { ...layers, layersHash } : { noRouter: true }) }
 }
 const arms = {}
 for (const [name, root] of Object.entries(roots)) arms[name] = await armOf(name, root, brains[name])
@@ -135,7 +141,7 @@ const summary = Object.fromEntries(Object.entries(arms).map(([name, arm]) => {
   const rs = results[name].sort((a, b) => a.case.localeCompare(b.case) || a.run - b.run)
   const answered = rs.filter((r) => !r.error)
   const accuracy = answered.length ? answered.filter((r) => r.hit).length / answered.length : arm.noRouter ? 0 : null
-  return [name, { root: scrubHome(arm.root), brainHash: arm.brainHash, ...(arm.noRouter ? { noRouter: true } : {}), accuracy, hits: answered.filter((r) => r.hit).length, answered: answered.length, errors: rs.length - answered.length, results: rs }]
+  return [name, { root: scrubHome(arm.root), brainHash: arm.brainHash, layersHash: arm.layersHash ?? null, ...(arm.noRouter ? { noRouter: true } : {}), accuracy, hits: answered.filter((r) => r.hit).length, answered: answered.length, errors: rs.length - answered.length, results: rs }]
 }))
 const out = join(here, 'results')
 const file = arg('out') ? resolve(arg('out')) : join(out, `${new Date().toISOString().slice(0, 10)}-routing-${model}.json`)

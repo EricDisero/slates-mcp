@@ -31,4 +31,12 @@ red('a mean drop past 0.1 rejects at a winning count', fails({ losses: 2, wins: 
 red('a mean drop past 0.1 rejects at an even count', fails({ losses: 5, wins: 5, ties: 15, candidateMean: 1.39, baselineMean: 1.5 }).some((f) => f.includes('more than 0.1 lower')))
 assert.deepEqual(fails({ losses: 5, wins: 5, ties: 15, candidateMean: 1.41, baselineMean: 1.5 }), [], 'a drop inside 0.1 passes')
 
+// Routing: a gap past one ask rejects, unless both arms held the same card and router.
+const routingArm = (brainHash, hits, layersHash) => ({ brainHash, layersHash, results: Array.from({ length: 10 }, (_, i) => ({ case: `c${i}`, hit: i < hits })) })
+const routing = (candHash, baseHash) => compare(board, { routing: [{ file: 'routing.json', data: { model: 'm', arms: { candidate: routingArm('cand', 7, candHash), baseline: routingArm('base', 9, baseHash) } } }], craft: [] }, current)
+red('a routing drop of two asks rejects when the router changed', routing('aaa', 'bbb').fail.some((f) => f.includes('more than one ask below')))
+red('a routing drop of two asks rejects when a file records no layers hash', routing(undefined, undefined).fail.some((f) => f.includes('more than one ask below')))
+assert.deepEqual(routing('aaa', 'aaa').fail, [], 'the same card and router in both arms gates nothing on the gap')
+assert.ok(routing('aaa', 'aaa').lines.some((l) => l.includes("the run's spread")), 'and the report says why')
+
 console.log(`gate-check: ${n} broken batches caught, passing batches pass.`)

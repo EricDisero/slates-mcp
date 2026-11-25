@@ -6,7 +6,10 @@
 //
 //   node scripts/brain-eval/release-batch.mjs --spec <spec.json> --decisions <decisions.json> --root <build of the
 //     approved commit> --baseline-brain <slates-api brain/ at the approved pin> [--models sonnet,haiku]
-//     [--routing-runs 2] [--craft-runs 2]
+//     [--routing-runs 2] [--craft-runs 2] [--craft <craft.json from a batch on this brain hash>]
+//
+// --craft reuses a finished craft result instead of running the briefs again, when only routing must re-run (a routing
+// fix after the batch). The gate at --approve still refuses it unless it tested the brain hash being approved.
 //
 // Refuses unless the decisions cover every waiting commit and every held one is reverted (brain-review.mjs
 // reviewAnswered), nothing under packages/shared or the brain files is uncommitted, and the build is current: the
@@ -33,6 +36,7 @@ const routingRuns = countArg('routing-runs', '2')
 // Two runs a brief, as every release batch before this script ran (results/2026-10-25-craft-*/arms.json): at one,
 // a single judge swing on a case both arms read the same guides for decides its sign.
 const craftRuns = countArg('craft-runs', '2')
+const reuseCraft = arg('craft') ? resolve(arg('craft')) : null
 
 const { refuse, page, after } = reviewAnswered(JSON.parse(readFileSync(specFile, 'utf8')), JSON.parse(readFileSync(decisionsFile, 'utf8')))
 const built = await buildRefusals(page, after)
@@ -58,12 +62,16 @@ function step(label, script, args) {
 for (const model of models) {
   step(`routing on ${model}`, 'routing.mjs', ['--root', baseline, '--baseline-brain', baselineBrain, '--model', model, '--runs', String(routingRuns)])
 }
-step('craft briefs, both arms', join('..', 'behaviour-ab', 'run.mjs'), ['--cases-file', join(here, 'craft-cases.json'), '--baseline', baseline, '--baseline-brain', baselineBrain, '--arms', 'baseline,candidate', '--out', craftOut, '--runs', String(craftRuns)])
-step('craft scoring and judge', 'craft.mjs', ['--out', craftOut])
+if (reuseCraft) console.log(`
+→ craft: reusing ${reuseCraft}`)
+else {
+  step('craft briefs, both arms', join('..', 'behaviour-ab', 'run.mjs'), ['--cases-file', join(here, 'craft-cases.json'), '--baseline', baseline, '--baseline-brain', baselineBrain, '--arms', 'baseline,candidate', '--out', craftOut, '--runs', String(craftRuns)])
+  step('craft scoring and judge', 'craft.mjs', ['--out', craftOut])
+}
 
 const rel = (f) => relative(repo, f).split('\\').join('/')
 const routingFiles = models.map((m) => `--routing ${rel(join(results, `${date}-routing-${m}.json`))}`).join(' ')
-console.log(`\nnode scripts/brain-review.mjs --approve --spec ${specFile} --decisions ${decisionsFile} --craft ${rel(join(craftOut, 'craft.json'))} ${routingFiles}`)
+console.log(`\nnode scripts/brain-review.mjs --approve --spec ${specFile} --decisions ${decisionsFile} --craft ${rel(reuseCraft ?? join(craftOut, 'craft.json'))} ${routingFiles}`)
 if (failed.length) {
   console.error(`✗ release batch: ${failed.join('; ')}`)
   process.exit(1)
