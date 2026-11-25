@@ -83,6 +83,17 @@ try {
     const wrong = run('slates_export_video', ['--outputPath', out, '--overwrite', word])
     assert.ok(!wrong.ok && /overwrite/.test(wrong.message), `--overwrite ${word} must be refused by name, never read as false`)
   }
+  // A number arrives as a string from a shell flag or a model: every decimal spelling is read, nothing else is.
+  const { z } = await import('zod/v3')
+  const numbered = { id: 'numbered', input: z.object({ n: z.number() }) }
+  for (const [typed, n] of [['.5', 0.5], ['-.5', -0.5], ['5.', 5], ['+5', 5], ['1e3', 1000], [' 2.5 ', 2.5]]) {
+    const parsed = shared.parseOperationInput(numbered, { n: typed })
+    assert.ok(parsed.ok && parsed.input.n === n, `"${typed}" is read as ${n}`)
+  }
+  for (const typed of ['', 'Infinity', '0x10', 'on', '1e', '.']) {
+    assert.ok(!shared.parseOperationInput(numbered, { n: typed }).ok, `"${typed}" is not a number and is refused`)
+  }
+
   const images = buildOpInput(op('slates_generate_image'), ['--prompt', 'a, b', '--referenceAssetIds', 'IMG-A1,IMG-A2'], () => null)
   assert.deepEqual([images.prompt, images.referenceAssetIds], ['a, b', ['IMG-A1', 'IMG-A2']], 'a list flag splits on commas; a string flag never does')
 

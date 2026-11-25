@@ -12,10 +12,14 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const HOSTS = ['packages/mcp/src', 'packages/cli/src']
-const DIRECT_RUN = /\b(?:op|operation)\??\.run\(|\b(?:getOperation|opsById\.get)\([^)]*\)\??\.run\(/
+// Every `.run(` in a host is a violation unless its receiver is the call the shared parse returned, so a
+// new spelling (a non-null `!`, another variable name) cannot slip past.
+const ANY_RUN = /\.run\(/g
+const PARSED_RUN = /\b(?:prepared\.call|call)\.run\(/g
 
 const violations = (text) =>
-  text.split('\n').flatMap((line, i) => (DIRECT_RUN.test(line) && !line.trim().startsWith('//') ? [i + 1] : []))
+  text.split('\n').flatMap((line, i) =>
+    !line.trim().startsWith('//') && (line.match(ANY_RUN)?.length ?? 0) > (line.match(PARSED_RUN)?.length ?? 0) ? [i + 1] : [])
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -27,10 +31,17 @@ function walk(dir, out = []) {
 }
 
 if (process.argv.includes('--self-test')) {
-  for (const line of ["result = await op.run(parsed as never, defaultContext())", "const r = await opsById.get(name).run(a, c)"]) {
+  for (const line of [
+    'result = await op.run(parsed as never, defaultContext())',
+    'const r = await opsById.get(name).run(a, c)',
+    'await opsById.get(request.params.name)!.run(a, c)',
+    'await tool.run(a, c)',
+  ]) {
     if (violations(line).length !== 1) throw new Error(`self-test: missed ${line}`)
   }
-  if (violations('result = await prepared.call.run(defaultContext())').length) throw new Error('self-test: flagged call.run')
+  for (const line of ['result = await prepared.call.run(defaultContext())', 'run: (patch) => call.run({ ...ctx }, patch)']) {
+    if (violations(line).length) throw new Error(`self-test: flagged ${line}`)
+  }
 }
 
 // Vic's call, through the shared parse: a stringified duration is repaired at its path, then the

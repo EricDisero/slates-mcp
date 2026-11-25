@@ -32,7 +32,8 @@ export function flattenZodError(err: z.ZodError, indent = ''): string {
     .join('\n')
 }
 
-const NUMERIC = /^\s*-?\d+(\.\d+)?\s*$/
+/** A decimal number as a model or a shell types it: '5', '.5', '-.5', '5.', '+5', '1e3'. Never '', 'Infinity' or '0x10'. */
+const NUMERIC = /^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?\s*$/
 
 /** Every issue that names a wrong scalar type, with the type the schema wanted; a union's branches included. */
 function* scalarIssues(err: z.ZodError): Generator<{ path: (string | number)[]; expected: string }> {

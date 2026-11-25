@@ -343,6 +343,12 @@ else {
     // The manual's first line, which installed builds test and which can never change.
     (manual.contents?.[0]?.text ?? '').startsWith('# Slates — Complete Reference for AI Assistants')
   )
+  // A project id that is not an id: the read fails with the op's own words, never an empty object.
+  const badShots = await client.readResource({ uri: 'slates://project/not-a-uuid/shots' }).then(
+    (r) => `answered ${r.contents?.[0]?.text}`,
+    (e) => String(e?.message ?? e)
+  )
+  check('a shots resource read with a bad project id is refused by name', /Invalid arguments for slates_list_shots/.test(badShots), badShots)
   const templates = (await client.listResourceTemplates()).resourceTemplates
   check(
     'the skill and shot-list resource templates are listed',

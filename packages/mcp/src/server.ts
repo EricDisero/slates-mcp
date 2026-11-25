@@ -562,6 +562,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const op = opsById.get('slates_list_shots')
       if (!op) throw new Error('slates_list_shots is not registered')
       const r = await runOperation(op, { projectId: decodeURIComponent(shots[1]) }, defaultContext())
+      if (r.invalid) throw new Error(r.text)
       return JSON.stringify(r.data ?? {}, null, 2)
     }
     throw new Error(`Unknown resource: ${uri}`)
