@@ -2645,10 +2645,11 @@ export const estimateGenerationCost: Operation<{
     // It is here rather than in a param description because a description is
     // paid for on every turn of every session and read once — this is paid for
     // only by the call that is about to use the model.
-    const skill = promptingSkillFor(input.model)
+    // A tool or engine key (upscale, the reasoning model) has no guide and gets no card.
+    const skill = resolveGuideTopic(input.model)
     // From the user's brain: their My brain card for this model rides first when they wrote one (craft-cards.ts).
-    const card = describeCraftCard(skill, brainSkills().skills[skill])
-    const banned = describeBannedTokensForSkill(skill)
+    const card = skill ? describeCraftCard(skill, brainSkills().skills[skill]) : ''
+    const banned = skill ? describeBannedTokensForSkill(skill) : ''
     // Before the card on purpose: the desktop strips a repeated card by cutting
     // the text at "--- HOW TO PROMPT", and this line must survive that.
     const ownImage = (IMAGE_MODELS as readonly string[]).includes(input.model) ? (input.model as ImageModelId) : null
@@ -5738,16 +5739,20 @@ function spokenTextByAssetId(
   return Object.keys(out).length > 0 ? out : undefined
 }
 
-// Maps a model id to its bundled prompting skill (frontmatter `name:`), so
-// guidance text points at a skill that actually exists.
+// Maps a model id to its prompting guide (frontmatter `name:`), so guidance
+// text points at a guide that actually exists.
 //
 // 🚨 ONE RESOLVER. This was a second hand-typed alias table beside
 // `resolveGuideTopic()`, and it had already fallen behind: it knew nothing
-// about LTX-2.5, so every LTX generation was told to read the cost skill
+// about one seat, so every generation on it was told to read the cost skill
 // instead of its own guide. Delegate; the ordering traps (2.5 before seedance,
-// seed-audio before seedance, minimax before both) are solved once, there.
+// seed-audio before seedance, minimax before both) are solved once, there. A
+// model with no guide throws: `VIDEO_MODEL_GUIDES` below runs it over the whole
+// video roster at load, and slates-api's model-lifecycle check over the registry.
 function promptingSkillFor(model: string): string {
-  return resolveGuideTopic(model) ?? 'slates-cost-discipline'
+  const guide = resolveGuideTopic(model)
+  if (!guide) throw new Error(`No prompting guide resolves for model ${model}: add its prefix to resolveGuideTopic in packages/shared/src/operations/index.ts.`)
+  return guide
 }
 
 /**
