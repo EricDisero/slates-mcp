@@ -1,21 +1,29 @@
 {
   "about": "The brain Eric last approved: its commit, the slates-api commit brain-approved.json pins with it (approvedApiCommit) and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
-  "approvedCommit": "2f7d03a",
-  "approvedBrainHash": "a6bc793a98c20b90",
-  "approvedApiCommit": "369714cc5049b70931904249a40335ced9eb227f",
-  "approvedOn": "2026-11-22",
+  "approvedCommit": "ca6b29f",
+  "approvedBrainHash": "3a86e750d5ec0e51",
+  "approvedApiCommit": "1e59d7b843580aaf4696f59b4f6a939c69c54d62",
+  "approvedOn": "2026-11-25",
   "lastApproval": {
-    "from": "93eb096",
-    "page": "2f7d03a",
+    "from": "2f7d03a",
+    "page": "ca6b29f",
     "approved": [
-      "369714c"
+      "3e0157c",
+      "9913a31",
+      "3db1564",
+      "44d529e",
+      "2693006",
+      "4ff5077",
+      "4db3105"
     ],
     "held": [],
     "reverts": [],
     "gate": [
-      "routing sonnet: candidate 102/102, baseline 102/102",
-      "routing haiku: candidate 95/102, baseline 93/102",
-      "craft claude-opus-5-5: the candidate wins 11 cases, loses 8, ties 6 against the approved brain (an equal brain loses that many or more 82% of the time); craft 1.53 against 1.51 of 2, read before building 94% against 92%, playbook 92% against 90%, forbidden 0 against 1"
+      "routing sonnet: candidate 101/102, baseline 100/102",
+      "routing sonnet: both arms held the same card and router (8b73f5fbc222d7d2), so the gap is the run's spread, not the brain",
+      "routing haiku: candidate 83/102, baseline 84/102",
+      "routing haiku: both arms held the same card and router (8b73f5fbc222d7d2), so the gap is the run's spread, not the brain",
+      "craft claude-opus-5-5: the candidate wins 9 cases, loses 8, ties 8 against the approved brain (an equal brain loses that many or more 69% of the time); craft 1.68 against 1.66 of 2, read before building 96% against 94%, playbook 94% against 92%, forbidden 0 against 0"
     ]
   }
 }
