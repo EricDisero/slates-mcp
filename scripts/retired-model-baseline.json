@@ -62,7 +62,7 @@
     },
     "slates-web": {
       "docs/copy.md": 1,
-      "src/app/copy/changelog.ts": 1
+      "src/app/copy/changelog.ts": 2
     }
   }
 }
