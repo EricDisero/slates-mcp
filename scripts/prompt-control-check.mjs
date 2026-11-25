@@ -252,7 +252,12 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   assert.equal(over.data.quote_exceeded, true)
   assert.equal(over.data.estimated_credits, 3)
   assert.match(over.text, /Nothing ran.*approvedCredits=3/s)
-  await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true, approvedCredits: 3 }, refusing.ctx)
+  assert.equal(over.data.approvedCredits, 3, 'the refusal names the figure a confirm approves')
+  // A ceiling above the quote that nobody was shown is asked about before anything runs, then held to.
+  const sentBefore = refusing.sent.length
+  const shown = await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true, approvedCredits: 3 }, refusing.ctx)
+  assert.deepEqual([shown.data.requires_confirm, shown.data.approvedCredits, refusing.sent.length], [true, 3, sentBefore], 'an unconfirmed raised ceiling asks first')
+  await call('generate_image', { projectId, prompt: '@Marcus at the counter', aspectRatio: '16:9', background: true, confirm: true, approvedCredits: 3 }, refusing.ctx)
   assert.equal(refusing.sent.at(-1).body.maxCredits, 3)
   console.log('prompt-control: a Seedream call is capped at its quote, a refusal comes back as a new quote, and the approved total runs')
 }

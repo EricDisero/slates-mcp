@@ -8,7 +8,8 @@
 //      a transparent background on a seat without one, a folder with no project);
 //   3. the headless poller names the job and stops on a status that cannot change;
 //   4. a headless result URL that does not answer with an image keeps its link, and a headless
-//      submit carries an id the server keeps the job under, so a lost answer is asked for by it;
+//      submit carries an id the server keeps the job under, so a lost answer is asked for by it, and one
+//      still uncertain comes back pending with that id to repeat (an unreadable 200 included), never a fresh one;
 //   5. a blank asset ref gets the teaching error, and no op reaches a bare
 //      `.get(ref)!.id` again (static);
 //   6. the upscale quote hands back the requestId the confirmed call and its
@@ -175,8 +176,47 @@ try {
   assert.match(sent.generationId ?? '', /^[0-9a-f-]{36}$/, 'the headless submit carries a generationId')
   assert.deepEqual(asked, [`/proxy/generations/${sent.generationId}`])
   assert.deepEqual(lost.data.urls, [url], 'the job the server kept is delivered')
+
+  // The answer is lost AND the lookup cannot find the job yet (or fails): the call hands back the id it bought
+  // under, and repeating it with that id sends the same id, which the server answers with the first job.
+  const submits = []
+  const uncertain = (post, lookup = async () => { throw new Error('slates-api /proxy/generations/x failed (404): No job') }) => ({
+    desktop,
+    cloud: () => ({ get: async (path) => (path.startsWith('/proxy/generations/') ? lookup(path) : pricedCloud(1).get(path)), post: async (path, body) => (submits.push(body.generationId), post(path, body)) }),
+  })
+  const pending = await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1' }, uncertain(async () => { throw new Error('slates-api /proxy/generate timed out.') }))
+  assert.deepEqual([pending.data.pending, pending.data.requestId], [true, submits[0]], 'an uncertain purchase is a pending result naming its id, not an error')
+  assert.match(pending.data.message, new RegExp(`requestId=${submits[0]}`))
+  await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1', requestId: pending.data.requestId }, uncertain(async () => ({ success: true, data: { images: [{ url }] } })))
+  assert.equal(submits[1], submits[0], 'the repeat is sent under the same id, so the server can return what it bought')
+  // A success whose body could not be read is the same uncertainty: a null result goes to the lookup.
+  const unreadable = await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1' }, uncertain(async () => null))
+  assert.equal(unreadable.data.pending, true, 'an unreadable success is never read as nothing bought')
+  // A refusal the server answered bought nothing: it is the error, with no lookup.
+  const { SlatesCloudHttpError } = await import(new URL('../packages/shared/dist/clients/cloud.js', import.meta.url))
+  const refusal = new SlatesCloudHttpError('slates-api /proxy/generate failed (402): Insufficient credits', 402)
+  let looked = 0
+  await assert.rejects(call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1' }, uncertain(async () => { throw refusal }, async () => { looked++ })), /402/)
+  assert.equal(looked, 0)
+  // An above-threshold headless quote names the id its confirmed call buys under.
+  const quoted = await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1' }, ctx)
+  assert.match(quoted.data.requestId ?? '', /^[0-9a-f-]{36}$/, 'the headless confirm hands back a requestId')
+  assert.ok(refused(await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1', projectId, requestId: quoted.data.requestId }, ctx), 'requestId'), 'a requestId beside a projectId would be dropped, so it is refused')
 } finally {
   globalThis.fetch = realFetch
+}
+// The real cloud client: a 200 whose body is not JSON is an unknown result, thrown, never a silent null.
+{
+  const { createServer } = await import('node:http')
+  const { SlatesCloudClient } = await import(new URL('../packages/shared/dist/clients/cloud.js', import.meta.url))
+  const server = createServer((_req, res) => { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html>proxy hiccup</html>') })
+  await new Promise((done) => server.listen(0, '127.0.0.1', done))
+  try {
+    const client = new SlatesCloudClient('slates_sk_check', `http://127.0.0.1:${server.address().port}`)
+    await assert.rejects(client.post('/proxy/generate', {}), /not JSON, so its result is unknown/)
+  } finally {
+    server.close()
+  }
 }
 
 // ── 5 (runtime): a blank ref is the teaching error, not a TypeError ──

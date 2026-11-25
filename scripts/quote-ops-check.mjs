@@ -37,6 +37,37 @@ for (const cap of ['quote-post', 'video-quote', 'edit-image-quote', 'lip-sync-qu
   assert.ok(ALL_CAPS.includes(cap), `the desktop advertises ${cap}`)
 }
 
+// ── 0 (static). Every paid send of a billable op is held to the host's approval as it goes ──
+// The Director withdraws a plan while an op is still pricing (the user steers or stops); an op that awaited a quote
+// and then posted anyway spent on a withdrawn plan. So each billable op's paid `.post` (any post but a quote route's)
+// must follow an `approvedSpend(ctx` with no await between them but the post's own.
+function unheldSends(source) {
+  const lines = source.split('\n')
+  const starts = lines.flatMap((line, i) => (/^(export )?const \w+\s*:\s*Operation\b/.test(line) ? [i] : []))
+  const found = []
+  starts.forEach((start, k) => {
+    const chunk = lines.slice(start, starts[k + 1] ?? lines.length).join('\n')
+    if (!/\bbillable: true\b/.test(chunk)) return
+    const name = /const (\w+)/.exec(lines[start])[1]
+    for (const post of chunk.matchAll(/\.post\s*[<(]/g)) {
+      const path = /\(\s*['`]([^'`]*)['`]/.exec(chunk.slice(post.index, post.index + 800))?.[1] ?? ''
+      if (/quote/.test(path)) continue
+      const held = chunk.lastIndexOf('approvedSpend(ctx', post.index)
+      const between = held < 0 ? null : chunk.slice(held, post.index).replace(/\bawait\s+[\w.()]+\s*$/, '')
+      if (between === null || /\bawait\b/.test(between)) found.push(`${name} → ${path || '(unnamed route)'}`)
+    }
+  })
+  return found
+}
+{
+  const op = (body) => `export const x: Operation<{}> = {\n  billable: true,\n  async run(input, ctx) {\n${body}\n  },\n}\n`
+  assert.deepEqual(unheldSends(op("    await desktop.post('/agent/generation/x', {})")), ['x → /agent/generation/x'], 'self-test: a send with no approvedSpend')
+  assert.deepEqual(unheldSends(op("    approvedSpend(ctx)\n    await desktop.requireCapability('y', 'y')\n    await desktop.post('/agent/generation/x', {})")).length, 1, 'self-test: an await between the check and the send')
+  assert.deepEqual(unheldSends(op("    const q = await desktop.post('/agent/generation/x-quote', {})\n    const approved = approvedSpend(ctx, input)\n    const r = await ctx.desktop().post<{ a: 1 }>('/agent/generation/x', {})")), [], 'self-test: a quote post, then a held send')
+  const unheld = unheldSends(readFileSync(new URL('../packages/shared/src/operations/index.ts', import.meta.url), 'utf8'))
+  assert.deepEqual(unheld, [], `A billable op sends without checking the host's approval right before it:\n  ${unheld.join('\n  ')}\nCall approvedSpend(ctx) immediately before the paid send, after the op's last await, so a withdrawn plan sends nothing.`)
+}
+
 /** A desktop on a local port. `routes` maps "METHOD /path" to (payload) => answer; `requests` records every call. */
 const servers = []
 async function desktop(routes, { without = [] } = {}) {
@@ -154,9 +185,25 @@ try {
     // The desktop composes a dearer request than it quoted (the route's own refusal).
     answer = { success: false, quoteExceeded: { credits: 66, costKey: 'seedance-2.5-vref-720p-22s' } }
     const refused = await generateVideo.run({ ...call, confirm: true, approvedCredits: 63, background: true }, ctx)
-    assert.deepEqual([refused.data.quote_exceeded, refused.data.estimated_credits], [true, 66], "the route's refusal comes back as a new price to approve, never an error")
+    assert.deepEqual([refused.data.quote_exceeded, refused.data.estimated_credits, refused.data.approvedCredits], [true, 66, 66], "the route's refusal comes back as a new price to approve, never an error")
     assert.match(refused.data.message, /^Nothing ran\./)
     answer = made
+
+    // The confirm approves the figure in the unit the desktop holds (list credits), and a run approved below the
+    // current quote is asked about again, never sent with a ceiling above the approval.
+    assert.equal(preflight.data.approvedCredits, 60, 'the pre-flight names the figure a confirm approves')
+    const discounted = ctxFor(d, cloud({ 'seedance-2.5-vref-720p-21s': 45 }))
+    discounted.cloud = () => ({ get: async (path) => {
+      const key = new URL(path, 'http://x').searchParams.get('costKey') ?? quote.costKey
+      return { models: [{ model: key, cost_credits: 45, list_credits: 63 }] }
+    } })
+    const sentCount = d.sent('POST /agent/generation/video').length
+    const underList = await generateVideo.run({ ...call, confirm: true, approvedCredits: 50, background: true }, discounted)
+    assert.deepEqual([underList.data.quote_exceeded, underList.data.estimated_credits], [true, 63], 'an approval below the list quote asks again, even where the debit (45) fits under it')
+    assert.equal(d.sent('POST /agent/generation/video').length, sentCount, 'and nothing is sent')
+    // A host's approval carries the quote it was approved for to the desktop.
+    await generateVideo.run({ ...call, confirm: true, background: true }, { ...ctx, spend: { approvedCredits: 63, quoteFingerprint: 'fp-v', approved: () => true } })
+    assert.deepEqual([d.sent('POST /agent/generation/video').at(-1).maxCredits, d.sent('POST /agent/generation/video').at(-1).quoteFingerprint], [63, 'fp-v'])
 
     // MiniMax H3: a character named in the prompt brings reference pictures only the desktop can count.
     quote = { costKey: 'minimax-h3-768p-5s-ref2', credits: 44 }
@@ -208,59 +255,79 @@ try {
       'POST /agent/generation/lip-sync-quote': () => ({ seconds, credits: null }),
       'POST /agent/generation/lip-sync': () => ({ success: true, asset: { id: id(9) }, generationId: 'gen-3' }),
     }
-    const prices = cloud({ 'kling-lip-sync-avatar-5s': 20, 'kling-lip-sync-avatar-25s': 100 })
+    const prices = cloud({ 'kling-lip-sync-avatar-5s': 20, 'kling-lip-sync-avatar-25s': 100, 'kling-lip-sync-avatar-30s': 120 })
     const call = { projectId, sourceAssetId: id(1), sourceType: 'image', audioMethod: 'upload', audioFilePath: 'C:/voice/take-3.wav' }
     const d = await desktop(routes)
     const preflight = await generateLipSync.run({ ...call }, ctxFor(d, prices))
-    assert.deepEqual([preflight.data.variant, preflight.data.estimated_credits], ['kling-lip-sync-avatar-25s', 100], 'a 23s track is five blocks, measured before the quote')
+    assert.deepEqual([preflight.data.variant, preflight.data.estimated_credits, preflight.data.approvedCredits], ['kling-lip-sync-avatar-25s', 100, 100], 'a 23s track is five blocks, measured before the quote, and that is the figure a confirm approves')
     assert.doesNotMatch(preflight.data.message, /or more|at least/, 'a measured price is the price')
     const ran = await generateLipSync.run({ ...call, confirm: true }, ctxFor(d, prices))
     assert.equal(ran.data.cost_credits, 100)
     assert.equal(d.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, 100, 'the run is held to the price confirmed')
+
+    // The approved figure is a ceiling: a track that now measures longer runs nothing and asks again.
+    seconds = 28
+    const risen = await generateLipSync.run({ ...call, confirm: true, approvedCredits: 100 }, ctxFor(d, prices))
+    assert.deepEqual([risen.data.quote_exceeded, risen.data.estimated_credits, risen.data.approvedCredits], [true, 120, 120], 'a quote above the approved credits is asked about again')
+    assert.equal(d.sent('POST /agent/generation/lip-sync').length, 1, 'and nothing is sent')
 
     seconds = null
     const unread = await generateLipSync.run({ ...call, confirm: true }, ctxFor(d, prices))
     assert.equal(unread.data.requires_clarification, true, 'a track that cannot be measured has no price')
     assert.equal(d.sent('POST /agent/generation/lip-sync').length, 1, 'so it does not run')
 
-    // A desktop that cannot measure: the floor is called a floor, before and after.
+    // Desktop 1.6.12 and older cannot measure an uploaded track and ignore the ceiling a run is sent with, so a
+    // 30s track approved as one block would bill six: refused before anything is asked or sent.
     const older = await desktop(routes, { without: ['lip-sync-quote'] })
-    const floor = await generateLipSync.run({ ...call }, ctxFor(older, prices))
-    assert.equal(floor.data.requires_confirm, true)
-    assert.match(floor.data.message, /^Cost: at least 20 credits, one 5s block/)
-    assert.equal(floor.data.quote_is_floor, true)
-    const blind = await generateLipSync.run({ ...call, confirm: true }, ctxFor(older, prices))
-    assert.deepEqual([blind.data.cost_credits, blind.data.minimum_credits], [null, 20], 'an unmeasured run never reports the one-block floor as its cost')
-    assert.deepEqual(older.sent('POST /agent/generation/lip-sync-quote'), [])
+    for (const confirm of [undefined, true]) {
+      await assert.rejects(generateLipSync.run({ ...call, confirm }, ctxFor(older, prices)), /'lip-sync-quote'.*Update Slates/s, 'an older desktop is told to update')
+    }
+    assert.deepEqual(older.requests.filter((r) => r.key.startsWith('POST ')), [], 'and is sent nothing')
 
-    // The desktop measures the media before it runs: above the credits it was sent, it runs nothing and names its price.
-    const measuring = await desktop({
-      ...routes,
+    // A clip with no recorded length is quoted at one block; the desktop measures it before it runs and, above the
+    // credits it was sent, runs nothing and names its price.
+    const unmeasuredClip = { id: id(4), code: 'VID-V2', type: 'video', projectId }
+    const clipRoutes = {
+      'GET /agent/assets': () => ({ assets: [...assets, unmeasuredClip] }),
+      'GET /agent/assets/path': () => ({ code: 'VID-V2', label: null }),
       'POST /agent/generation/lip-sync': ({ maxCredits }) => (maxCredits < 360
-        ? { success: false, quoteExceeded: { credits: 360, costKey: 'kling-lip-sync-avatar-90s', fingerprint: 'fp-90s' } }
+        ? { success: false, quoteExceeded: { credits: 360, costKey: 'kling-lip-sync-video-90s', fingerprint: 'fp-90s' } }
         : { success: true, asset: { id: id(9) }, generationId: 'gen-4' }),
-    }, { without: ['lip-sync-quote'] })
-    const dearer = await generateLipSync.run({ ...call, confirm: true }, ctxFor(measuring, prices))
-    assert.deepEqual([dearer.data.quote_exceeded, dearer.data.estimated_credits, dearer.data.variant, dearer.data.quote_fingerprint], [true, 360, 'kling-lip-sync-avatar-90s', 'fp-90s'], 'a floor approved at one block is asked about again at 18, naming that quote')
+    }
+    const clipPrices = cloud({ 'kling-lip-sync-video-5s': 20 })
+    const clipCall = { projectId, sourceAssetId: id(4), sourceType: 'video', audioMethod: 'tts', ttsText: 'Hello there.', ttsVoice: 'oversea_male1' }
+    const measuring = await desktop(clipRoutes)
+    const floor = await generateLipSync.run({ ...clipCall }, ctxFor(measuring, clipPrices))
+    assert.deepEqual([floor.data.requires_confirm, floor.data.quote_is_floor, floor.data.approvedCredits], [true, true, 20])
+    assert.match(floor.data.message, /^Cost: at least 20 credits, one 5s block/)
+    const dearer = await generateLipSync.run({ ...clipCall, confirm: true }, ctxFor(measuring, clipPrices))
+    assert.deepEqual([dearer.data.quote_exceeded, dearer.data.estimated_credits, dearer.data.approvedCredits, dearer.data.quote_fingerprint], [true, 360, 360, 'fp-90s'], 'a floor approved at one block is asked about again at 18, naming that quote')
     assert.deepEqual(measuring.sent('POST /agent/generation/lip-sync').map((p) => p.maxCredits), [20], 'held to the floor that was quoted')
-    await generateLipSync.run({ ...call, confirm: true, approvedCredits: 360 }, ctxFor(measuring, prices))
+    // The call that carries the measured price shows the user that figure before it runs, and runs held to it.
+    const shown = await generateLipSync.run({ ...clipCall, approvedCredits: 360 }, ctxFor(measuring, clipPrices))
+    assert.deepEqual([shown.data.requires_confirm, shown.data.approvedCredits], [true, 360])
+    assert.match(shown.data.message, /up to 360 credits/, 'a ceiling above the quote is named before anything runs')
+    assert.equal(measuring.sent('POST /agent/generation/lip-sync').length, 1)
+    await generateLipSync.run({ ...clipCall, confirm: true, approvedCredits: 360 }, ctxFor(measuring, clipPrices))
     assert.equal(measuring.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, 360, 'the approved price is the new ceiling')
+    const olderClip = await desktop(clipRoutes, { without: ['lip-sync-quote'] })
+    await assert.rejects(generateLipSync.run({ ...clipCall, confirm: true }, ctxFor(olderClip, clipPrices)), /'lip-sync-quote'/, 'an unmeasured clip on an older desktop is refused too')
+    assert.deepEqual(olderClip.sent('POST /agent/generation/lip-sync'), [])
 
     // A host with its own spending decision (the desktop Studio Agent's loop): the input's approvedCredits is not
     // read, the ceiling and the quote are the host's, and a call whose approval was withdrawn sends nothing.
-    const hosted = (spend) => ({ ...ctxFor(measuring, prices), spend })
-    await generateLipSync.run({ ...call, confirm: true, approvedCredits: 999 }, hosted({ approved: () => true }))
+    const hosted = (spend) => ({ ...ctxFor(measuring, clipPrices), spend })
+    await generateLipSync.run({ ...clipCall, confirm: true, approvedCredits: 999 }, hosted({ approved: () => true }))
     assert.deepEqual([measuring.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, measuring.sent('POST /agent/generation/lip-sync').at(-1).quoteFingerprint],
       [20, undefined], "the model's approvedCredits raises nothing")
-    await generateLipSync.run({ ...call, confirm: true }, hosted({ approvedCredits: 360, quoteFingerprint: 'fp-90s', approved: () => true }))
+    await generateLipSync.run({ ...clipCall, confirm: true }, hosted({ approvedCredits: 360, quoteFingerprint: 'fp-90s', approved: () => true }))
     assert.deepEqual([measuring.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, measuring.sent('POST /agent/generation/lip-sync').at(-1).quoteFingerprint],
       [360, 'fp-90s'], "the host's approval, for the quote it approved")
     const sentBefore = measuring.sent('POST /agent/generation/lip-sync').length
-    await assert.rejects(generateLipSync.run({ ...call, confirm: true }, hosted({ approvedCredits: 360, approved: () => false })), /withdrawn/)
+    await assert.rejects(generateLipSync.run({ ...clipCall, confirm: true }, hosted({ approvedCredits: 360, approved: () => false })), /withdrawn/)
     assert.equal(measuring.sent('POST /agent/generation/lip-sync').length, sentBefore, 'a withdrawn approval sends nothing')
 
     // Motion transfer: a clip with no recorded length is a floor, held to it, and never reported as its cost.
-    const unmeasuredClip = { id: id(4), code: 'VID-V2', type: 'video', projectId }
     const motion = await desktop({
       'GET /agent/assets': () => ({ assets: [...assets, unmeasuredClip] }),
       'GET /agent/assets/path': () => ({ code: 'VID-V2', label: null }),
@@ -268,11 +335,27 @@ try {
     })
     const mt = { projectId, sourceVideoAssetId: id(4), targetImageAssetId: id(1), motionModel: 'kling-mc-std' }
     const mtFloor = await generateMotionTransfer.run({ ...mt }, ctxFor(motion, cloud({ 'kling-mc-std-5s': 30 })))
-    assert.deepEqual([mtFloor.data.requires_confirm, mtFloor.data.quote_is_floor], [true, true])
+    assert.deepEqual([mtFloor.data.requires_confirm, mtFloor.data.quote_is_floor, mtFloor.data.approvedCredits], [true, true, 30])
     const mtRan = await generateMotionTransfer.run({ ...mt, confirm: true }, ctxFor(motion, cloud({ 'kling-mc-std-5s': 30 })))
     assert.equal(motion.sent('POST /agent/generation/motion-transfer').at(-1).maxCredits, 30, 'held to the one-block floor')
     assert.deepEqual([mtRan.data.cost_credits, mtRan.data.minimum_credits, mtRan.data.quote_is_floor], [null, 30, true], 'an unmeasured clip never reports the floor as its cost')
-    console.log('quote-ops: a lip-sync on uploaded audio is quoted on the measured track; unmeasured, the floor is never reported as the cost; both tools are held to the credits approved')
+    const mtRisen = await generateMotionTransfer.run({ ...mt, confirm: true, approvedCredits: 25 }, ctxFor(motion, cloud({ 'kling-mc-std-5s': 30 })))
+    assert.deepEqual([mtRisen.data.quote_exceeded, mtRisen.data.approvedCredits], [true, 30], 'a quote above an approved ceiling asks again, never raises it')
+    assert.equal(motion.sent('POST /agent/generation/motion-transfer').length, 1, 'and sends nothing')
+    const mtOlder = await desktop({ 'GET /agent/assets': () => ({ assets: [...assets, unmeasuredClip] }) }, { without: ['lip-sync-quote'] })
+    await assert.rejects(generateMotionTransfer.run({ ...mt, confirm: true }, ctxFor(mtOlder, cloud({ 'kling-mc-std-5s': 30 }))), /'lip-sync-quote'/, 'an older desktop would bill every block of an unmeasured clip')
+
+    // A tier debited below list (the admin tier): the ceiling the desktop compares is the list price, the unit it quotes in.
+    const discounted = { get: async (path) => {
+      const key = new URL(path, 'http://x').searchParams.get('costKey')
+      return { models: [{ model: key, cost_credits: 20, list_credits: 60 }] }
+    } }
+    const mtMeasured = { ...mt, sourceVideoAssetId: id(2) }
+    const listed = await generateMotionTransfer.run({ ...mtMeasured }, ctxFor(motion, discounted))
+    assert.deepEqual([listed.data.estimated_credits, listed.data.approvedCredits], [20, 60], 'the user sees the debit; the confirm approves the list figure the desktop holds')
+    const listRan = await generateMotionTransfer.run({ ...mtMeasured, confirm: true }, ctxFor(motion, discounted))
+    assert.deepEqual([motion.sent('POST /agent/generation/motion-transfer').at(-1).maxCredits, listRan.data.cost_credits], [60, 20], 'held in list credits, reported at the debit')
+    console.log('quote-ops: a lip-sync on uploaded audio is quoted on the measured track and refused on a desktop that cannot hold it; an approved figure is a ceiling that asks again when the quote rises; ceilings are in list credits')
   }
 
   // ── 5. a partial batch cost what was saved ──

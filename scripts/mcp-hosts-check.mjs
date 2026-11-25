@@ -173,6 +173,40 @@ try {
     ask: async () => true,
   })
   assert.deepEqual(patches, [undefined, { requestId: 'R1', confirm: true }], 'the confirmed run carries the quote’s request id')
+  // The amount the user approved binds the run: the quote's own approvedCredits, never the model's figure.
+  const bound = []
+  await runWithConsent({
+    opId: 'slates_generate_video', gate: 'op-asks', args: { confirm: true, approvedCredits: 9999 }, hostCanAsk: true,
+    run: async (patch) => { bound.push(patch); return patch?.confirm ? { text: 'ran' } : { text: 'quote', data: { requires_confirm: true, estimated_credits: 60, approvedCredits: 60, message: 'Cost: 60 credits' } } },
+    ask: async () => true,
+  })
+  assert.deepEqual(bound, [{ confirm: undefined }, { approvedCredits: 60, confirm: true }], 'the confirmed run is held to the approved quote, not the 9999 the model sent')
+  const dropped = []
+  await runWithConsent({
+    opId: 'slates_generate_image', gate: 'op-asks', args: { approvedCredits: 9999 }, hostCanAsk: true,
+    run: async (patch) => { dropped.push(patch); return patch?.confirm ? { text: 'ran' } : { text: 'quote', data: { requires_confirm: true, message: 'Cost' } } },
+    ask: async () => true,
+  })
+  assert.deepEqual(dropped.at(-1), { approvedCredits: undefined, confirm: true }, 'a figure the quote did not name is dropped from the confirmed run')
+  // End to end on the real op: the price rises while the form is open, and the confirmed run asks again.
+  let videoQuote = { costKey: 'seedance-2.5-720p-5s', credits: 60 }
+  const videoSent = []
+  const videoCtx = {
+    cloud: () => ({ get: async (path) => { const key = new URL(path, 'http://x').searchParams.get('costKey'); return { models: [{ model: key ?? videoQuote.costKey, cost_credits: videoQuote.credits }] } } }),
+    desktop: () => ({
+      hasCapability: async () => true, requireCapability: async () => {},
+      get: async () => ({ assets: [] }),
+      quote: async () => videoQuote,
+      post: async (path, body) => { videoSent.push([path, body]); return { success: true, background: true, generationId: 'g' } },
+    }),
+  }
+  const video = shared.prepareOperation(op('slates_generate_video'), { projectId: PROJECT, model: 'seedance-2.5', prompt: 'A lighthouse at dusk.', aspectRatio: '16:9', duration: 5, videoResolution: '720p', background: true })
+  const rose = await runWithConsent({
+    opId: 'slates_generate_video', gate: 'op-asks', args: video.call.input, hostCanAsk: true,
+    run: (patch) => video.call.run(videoCtx, patch),
+    ask: async () => { videoQuote = { costKey: 'seedance-2.5-720p-6s', credits: 72 }; return true },
+  })
+  assert.deepEqual([rose.data?.quote_exceeded, rose.data?.estimated_credits, videoSent.length], [true, 72, 0], 'a quote that rose while the form was open runs nothing and names the new price')
   // A failed upscale names the id its retry must reuse.
   const upscaleCtx = { desktop: () => ({
     requireCapability: async () => {},

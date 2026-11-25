@@ -106,7 +106,9 @@ export class SlatesCloudClient {
     try {
       parsed = text ? JSON.parse(text) : null
     } catch {
-      // fall through
+      // A success whose body cannot be read is not an answer: a paid submit treats it as lost and asks for its
+      // job by id, where a `null` result would read as nothing and skip that.
+      if (res.ok) throw new Error(`slates-api ${path} answered ${res.status} with a body that is not JSON, so its result is unknown.`)
     }
     if (!res.ok) {
       // 401 = the slates_sk_ token is missing, expired, or was revoked

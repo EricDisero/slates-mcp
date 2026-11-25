@@ -130,7 +130,8 @@ export interface OperationContext {
    * the credits the user approved beyond the call's own quote, the quote they approved (its `fingerprint`), and
    * whether that approval still stands. Present, a paid op takes its ceiling from here and never from
    * `approvedCredits` in its input, and sends nothing once `approved()` is false (`approvedSpend`). Absent (MCP,
-   * the CLI), the input's `approvedCredits` stands: the host client's per-call approval is the consent.
+   * the CLI), the input's `approvedCredits` stands: on MCP the confirm gate sets it to the figure the user approved
+   * (the reply's own `approvedCredits`), else the host client's per-call approval is the consent.
    */
   spend?: { approvedCredits?: number; quoteFingerprint?: string; approved: () => boolean }
 }
@@ -293,11 +294,12 @@ function zEnum<T extends string>(values: readonly T[]): z.ZodEnum<[T, ...T[]]> {
 }
 
 /**
- * What a paid call is held to as it is sent: the credits approved beyond its own quote, and the quote they were
- * approved for. From the host's decision (`ctx.spend`) where it has one, refused there once that approval was
- * withdrawn; else from the input. Called just before the send, after every await.
+ * What a paid call is held to as it is sent: the credits approved for it, in the desktop's unit (list credits), and
+ * the quote they were approved for. From the host's decision (`ctx.spend`) where it has one, refused there once that
+ * approval was withdrawn; else from the input. Every billable op calls it immediately before its paid send, after
+ * its last await (`quote-ops-check.mjs` § 0), so a plan withdrawn while the op was pricing sends nothing.
  */
-function approvedSpend(ctx: OperationContext, input: { approvedCredits?: number }): { approvedCredits?: number; quoteFingerprint?: string } {
+function approvedSpend(ctx: OperationContext, input: { approvedCredits?: number } = {}): { approvedCredits?: number; quoteFingerprint?: string } {
   if (!ctx.spend) return { approvedCredits: input.approvedCredits }
   if (!ctx.spend.approved()) throw new Error('Nothing was sent: the approval for this call was withdrawn while it was being priced.')
   return { approvedCredits: ctx.spend.approvedCredits, quoteFingerprint: ctx.spend.quoteFingerprint }
@@ -3531,6 +3533,7 @@ export const generateCharacterIdentity: Operation<{
     }
     const quote = await sheetConfirmGate(ctx, input, (input.model ?? toolModelFor('character-sheet')) as ImageModelId)
     if (quote) return quote
+    approvedSpend(ctx)
     const made = await ctx.desktop().post('/agent/characters/generate-identity', {
       characterId: input.characterId,
       projectId: input.projectId,
@@ -3572,6 +3575,7 @@ export const generateEnvironmentPlate: Operation<{
     await ctx.desktop().requireCapability('sheet-tool-seats', 'sheet tools on the default image seat')
     const quote = await sheetConfirmGate(ctx, input, toolModelFor('environment-plate') as ImageModelId)
     if (quote) return quote
+    approvedSpend(ctx)
     return ok(
       await ctx.desktop().post('/agent/environments/generate-plate', {
         environmentId: input.environmentId,
@@ -4152,7 +4156,7 @@ function referenceCapRefusal(model: string, count: number, cap: number, param: s
  */
 function droppedImageParams(
   model: string,
-  input: { projectId?: string; referenceImageUrls?: string[]; backgroundMode?: GptBackgroundId; folderId?: string | null }
+  input: { projectId?: string; referenceImageUrls?: string[]; backgroundMode?: GptBackgroundId; folderId?: string | null; requestId?: string }
 ): Clarification | null {
   const rows: Array<{ param: string; set: boolean; consumed: boolean; why: string }> = [
     {
@@ -4172,6 +4176,12 @@ function droppedImageParams(
       set: input.folderId !== undefined && input.folderId !== null,
       consumed: !!input.projectId,
       why: 'A folder belongs to a project. Pass the projectId it lives in, or drop folderId.',
+    },
+    {
+      param: 'requestId',
+      set: input.requestId !== undefined,
+      consumed: !input.projectId,
+      why: 'A requestId resumes a headless image only. With a projectId the desktop keeps the generation: read it with slates_get_generation_status.',
     },
   ]
   const dropped = rows.filter((r) => r.set && !r.consumed)
@@ -4311,6 +4321,7 @@ export const generateImage: Operation<{
   background?: boolean
   confirm?: boolean
   approvedCredits?: number
+  requestId?: string
   folderId?: string | null
 }> = {
   id: 'slates_generate_image',
@@ -4346,7 +4357,8 @@ export const generateImage: Operation<{
     referenceAssetIds: z.array(z.string()).max(Math.max(...IMAGE_MODELS.map(imageReferenceCap))).optional().describe(`Project assets as references — UUIDs or badge codes ("IMG-A8"), resolved at call time. Requires projectId. Caps: ${describeReferenceImageCaps(IMAGE_MODELS)}; over a model's cap is refused, never trimmed. Label every reference role in the prompt.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
-    approvedCredits: z.number().int().positive().optional().describe('Only after a reply with `quote_exceeded`: the credits that reply named, once the user has approved them. The desktop counts @mention pictures as paid inputs on seedream-5-5 and runs nothing above the approved total.'),
+    approvedCredits: z.number().int().positive().optional().describe('With confirm=true: the approvedCredits a reply named (its quote, or a quote_exceeded price), once the user has approved it. The desktop counts @mention pictures as paid inputs on seedream-5-5 and runs nothing above it.'),
+    requestId: z.string().uuid().optional().describe('Headless only: the requestId a reply named. The same call sent with it again returns the image that request bought, never a second one.'),
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
@@ -4474,21 +4486,33 @@ export const generateImage: Operation<{
       (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]
     if (!entry) throw new Error(`Model not in registry: ${costKey}`)
     const totalCents = creditCost(entry) * (input.count ?? 1)
+    // A seat that bills each input picture is held to a ceiling in the desktop's unit (list credits): the quote, or a
+    // higher approved figure, which a confirm shows the user first (`toolCeiling`).
+    const perInput = !!input.projectId && billsEachInputImage(sentModel)
+    const listQuote = listCredits(entry) * (input.count ?? 1)
+    const ceiling = toolCeiling(listQuote, perInput ? requestedCredits(ctx, input) : undefined)
+    // A headless purchase is made under an id minted here and named in every reply, so a call whose answer is lost
+    // is repeated with it and returns what it bought (`/proxy/generate` keeps one live job per id).
+    const pressId = input.projectId ? undefined : (input.requestId ?? randomUUID())
+    const press = pressId ? { requestId: pressId } : {}
+    const pressText = pressId ? ` Pass requestId=${pressId} with it.` : ''
     // Confirm gate. Fires above CONFIRM_CREDITS, AND (look-first, mirroring
     // slates_generate_video) whenever reference assets are involved
     // regardless of cost — the LLM must see what it's referencing before
     // committing spend.
-    if ((totalCents > CONFIRM_CREDITS || referenceAssetIds.length > 0) && !input.confirm) {
+    if ((totalCents > CONFIRM_CREDITS || referenceAssetIds.length > 0 || ceiling.raised) && !input.confirm) {
       if (referenceAssetIds.length === 0) {
         return ok({
           requires_confirm: true,
           model: costKey,
           estimated_cents: totalCents,
           estimated_credits: totalCents,
+          approvedCredits: ceiling.credits,
+          ...press,
           ...(promptWarning ? { prompt_warning: promptWarning } : {}),
           message:
             (promptWarning ? `${promptWarning}\n\n` : '') +
-            `Cost exceeds ${CONFIRM_CREDITS} credits. Re-call with confirm=true to proceed, or pick a smaller resolution / count.`,
+            `Cost: ${fmtCredits(totalCents)}. ${ceiling.sentence}Re-call with confirm=true to proceed, or pick a smaller resolution / count.${pressText}`,
         })
       }
       const previews = await previewAssets(
@@ -4504,7 +4528,7 @@ export const generateImage: Operation<{
           `Review them against your prompt — every reference's role must be labeled in the prompt text. ` +
           `If the references suggest a different composition / style than the current prompt captures, REVISE the prompt before confirming. ` +
           `When you talk to the user about this gen, refer to each reference by its code (e.g. "${previews[0]?.ref ?? 'IMG-A?'}") — they'll see the matching badge in the Slates gallery.` +
-          `\n\nWhen ready, re-call slates_generate_image with confirm=true and the (possibly revised) prompt.` +
+          `\n\n${ceiling.sentence}When ready, re-call slates_generate_image with confirm=true and the (possibly revised) prompt.${pressText}` +
           (promptWarning ? `\n\n${promptWarning}` : ''),
         images: previews.flatMap((p) => p.images),
         data: {
@@ -4513,6 +4537,8 @@ export const generateImage: Operation<{
           variant: costKey,
           estimated_cents: totalCents,
           estimated_credits: totalCents,
+          approvedCredits: ceiling.credits,
+          ...press,
           references: previews.map((p) => ({
             role: p.role,
             ref: p.ref,
@@ -4536,6 +4562,9 @@ export const generateImage: Operation<{
     if (input.projectId) {
       const desktop = ctx.desktop()
       const approved = approvedSpend(ctx, input)
+      if (perInput && approved.approvedCredits != null && listQuote > approved.approvedCredits) {
+        return toolPriceChanged(`${imageModel} image`, approved.approvedCredits, { credits: listQuote, costKey })
+      }
       const result = await desktop.post<{
         success: boolean
         background?: boolean
@@ -4557,7 +4586,7 @@ export const generateImage: Operation<{
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         // The desktop adds @mention pictures this op cannot see; on a seat that bills
         // each input it runs nothing above what the user was quoted or approved.
-        ...(billsEachInputImage(sentModel) ? heldBody(Math.max(listCredits(entry) * (input.count ?? 1), approved.approvedCredits ?? 0), approved.quoteFingerprint) : {}),
+        ...(perInput ? heldBody(approved.approvedCredits ?? listQuote, approved.quoteFingerprint) : {}),
         ...folderBody(input.folderId),
         background: input.background,
       })
@@ -4569,6 +4598,7 @@ export const generateImage: Operation<{
           model: billedKey,
           estimated_cents: credits,
           estimated_credits: credits,
+          approvedCredits: credits,
           ...(fingerprint ? { quote_fingerprint: fingerprint } : {}),
           message:
             `Nothing ran. The @mention pictures in the prompt are paid inputs on ${imageModel}: this call bills ${fmtCredits(credits)} (${billedKey}), ` +
@@ -4674,11 +4704,12 @@ export const generateImage: Operation<{
     const endpoint = hasReferenceImages
       ? 'google/nano-banana-2.1/edit'
       : 'google/nano-banana-2.1'
-    // The server keeps the job a submit bought under this id, so an answer lost on the way back is asked for by
-    // it (below) instead of the call failing with the credits spent.
-    const generationId = randomUUID()
+    // The server keeps the job a submit bought under this id, so an answer lost on the way back is asked for by it
+    // (below), and a call that still cannot tell hands the id back to be repeated with, never a fresh one.
+    const generationId = pressId as string
     type ProxySubmit = { success: boolean; data?: { images?: Array<{ url?: string }> }; jobId?: string; error?: string }
-    const proxyResult = await cloud.post<ProxySubmit>('/proxy/generate', {
+    approvedSpend(ctx, input)
+    const submitted = await cloud.post<ProxySubmit | null>('/proxy/generate', {
       generationId,
       provider: 'fal',
       type: 'image',
@@ -4712,11 +4743,29 @@ export const generateImage: Operation<{
           ? { image_urls: input.referenceImageUrls }
           : {}),
       },
-    }).catch(async (error: unknown): Promise<ProxySubmit> => {
-      const held = await cloud.get<{ jobId?: string }>(`/proxy/generations/${generationId}`).catch(() => null)
-      if (!held?.jobId) throw error
-      return { success: true, jobId: held.jobId }
+    }).catch((error: unknown) => {
+      // The server answered with a refusal: nothing was bought, and the error says why.
+      if (error instanceof SlatesCloudHttpError && error.status < 500) throw error
+      return { lost: error instanceof Error ? error.message : String(error) }
     })
+    // An answer that never arrived, or arrived unreadable, may still have bought the image: ask for it by its id.
+    let proxyResult: ProxySubmit
+    if (submitted && typeof submitted === 'object' && !('lost' in submitted)) {
+      proxyResult = submitted
+    } else {
+      const held = await cloud.get<{ jobId?: string }>(`/proxy/generations/${generationId}`).catch(() => null)
+      if (!held?.jobId) {
+        const why = submitted && 'lost' in submitted ? submitted.lost : 'its answer could not be read'
+        return ok({
+          pending: true,
+          requestId: generationId,
+          message:
+            `Slates cannot tell yet whether this image was bought (${why}). Call slates_generate_image again with the same arguments and requestId=${generationId}: ` +
+            'if this call bought it, that returns it and charges nothing again; if not, it buys it once. A call without that requestId buys another image.',
+        })
+      }
+      proxyResult = { success: true, jobId: held.jobId }
+    }
     if (!proxyResult.success) {
       throw new Error(proxyResult.error ?? 'Generation failed')
     }
@@ -4950,6 +4999,7 @@ export const editImage: Operation<{
       })
     }
 
+    approvedSpend(ctx)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -5120,6 +5170,7 @@ export const extractGridCells: Operation<{
           `Re-call with confirm=true after the user explicitly OKs the spend. When discussing with the user, refer to the grid by its code (matches the gallery badge).`,
       })
     }
+    approvedSpend(ctx)
     const result = await desktop.post<{
       success?: boolean
       background?: boolean
@@ -5245,6 +5296,7 @@ function videoPriceChanged(model: string, costKey: string, credits: number, appr
     variant: costKey,
     estimated_cents: credits,
     estimated_credits: credits,
+    approvedCredits: credits,
     message:
       `Nothing ran. This ${model} call now prices at ${fmtCredits(credits)} (${costKey}), above the ${fmtCredits(approved)} approved: ` +
       `a reference measured longer, or the prompt names a character or look that brings a billed input. ` +
@@ -6361,11 +6413,13 @@ export const generateVideo: Operation<{
       )
     }
     const totalCents = creditCost(entry)
+    // What the send is held to, in the desktop's unit (list credits): its own quote, else the registry's list price.
+    const quotedCredits = quote?.credits ?? listCredits(entry)
     // The price the user approved binds the call that spends: a reference re-measured longer or a
     // character that gained a billed picture since the pre-flight is asked about again, never run.
-    const approvedCredits = input.confirm ? (ctx.spend ? ctx.spend.approvedCredits : input.approvedCredits) : undefined
-    if (approvedCredits != null && totalCents > approvedCredits) {
-      return ok(videoPriceChanged(input.model, costKey, totalCents, approvedCredits))
+    const approvedCredits = requestedCredits(ctx, input)
+    if (approvedCredits != null && quotedCredits > approvedCredits) {
+      return ok(videoPriceChanged(input.model, costKey, quotedCredits, approvedCredits))
     }
     if (intentHits.length > 0 && !input.confirm) {
       return ok({
@@ -6374,6 +6428,7 @@ export const generateVideo: Operation<{
         missing: ['prompt'],
         variant: costKey,
         estimated_credits: totalCents,
+        approvedCredits: quotedCredits,
         message:
           `Seedance 2.5 reads ${intentHits.map((w) => `"${w}"`).join(', ')} in this prompt as an EDIT or EXTEND instruction and may run it as a video edit, ` +
           `which fails after the job has queued. If you mean to edit an existing clip, call slates_edit_video with model "seedance-2.5-edit". ` +
@@ -6425,7 +6480,7 @@ export const generateVideo: Operation<{
           `${fmtCredits(totalCents)}.` +
           refSummary +
           (promptWarning ? `\n\n${promptWarning}` : '') +
-          `\n\nWhen ready, re-call slates_generate_video with confirm=true, approvedCredits=${totalCents} and the (possibly revised) prompt.`,
+          `\n\nWhen ready, re-call slates_generate_video with confirm=true, approvedCredits=${quotedCredits} and the (possibly revised) prompt.`,
         images: refImages,
         data: {
           requires_confirm: true,
@@ -6433,6 +6488,7 @@ export const generateVideo: Operation<{
           variant: costKey,
           estimated_cents: totalCents,
           estimated_credits: totalCents,
+          approvedCredits: quotedCredits,
           references: previews.map((p) => ({
             role: p.role,
             ref: p.ref,
@@ -6449,7 +6505,7 @@ export const generateVideo: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    approvedSpend(ctx, input)
+    const approved = approvedSpend(ctx, input)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -6460,12 +6516,13 @@ export const generateVideo: Operation<{
       quoteExceeded?: { credits: number; costKey: string }
     }>('/agent/generation/video', {
       ...request,
-      // The desktop composes the request again and sends nothing that prices above its own quote.
-      ...(quote ? { maxCredits: quote.credits } : {}),
+      // The desktop composes the request again and sends nothing that prices above its own quote, which the
+      // check above holds at or below the approved credits, for the quote they were approved for.
+      ...(quote ? heldBody(quote.credits, approved.quoteFingerprint) : {}),
       background: input.background,
     })
     if (result.quoteExceeded) {
-      return ok(videoPriceChanged(input.model, result.quoteExceeded.costKey, result.quoteExceeded.credits, totalCents))
+      return ok(videoPriceChanged(input.model, result.quoteExceeded.costKey, result.quoteExceeded.credits, quotedCredits))
     }
     if (!result.success) {
       throw new Error(result.error ?? 'Generation failed')
@@ -6821,6 +6878,7 @@ export const generateAudio: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
 
+    approvedSpend(ctx)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -6900,22 +6958,54 @@ async function quoteToolBlocks(
   stem: string,
   seconds: number | null,
   voiceStep: boolean
-): Promise<{ costKey: string; totalCents: number; blocks: number }> {
+): Promise<{ costKey: string; totalCents: number; listTotal: number; blocks: number }> {
   const blocks = Math.max(1, toolBlocks(seconds ?? 0))
   const costKey = toolBlockKey(stem, blocks)
-  const byKey = new Map<string, number>()
-  const price = async (key: string): Promise<number> => {
-    await loadDynamicPrice(ctx, byKey, key)
-    const credits = byKey.get(key)
-    if (credits == null) throw new Error(`Model variant not in registry: ${key}`)
-    return credits
+  const row = async (key: string) => {
+    const found = (await ctx.cloud().get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(key)}`)).models.find((m) => m.model === key)
+    if (!found) throw new Error(`Model variant not in registry: ${key}`)
+    return found
   }
-  const totalCents = (await price(costKey)) + (voiceStep ? await price(toolBlockKey(stem, 1)) : 0)
-  return { costKey, totalCents, blocks }
+  const rows = [await row(costKey), ...(voiceStep ? [await row(toolBlockKey(stem, 1))] : [])]
+  // `totalCents` is what the account is debited; `listTotal` is the same quote in the desktop's unit, which the
+  // run's ceiling (`maxCredits`) is held in. They differ only on a tier the registry prices below list.
+  const sum = (price: (m: (typeof rows)[number]) => number) => rows.reduce((total, m) => total + price(m), 0)
+  return { costKey, totalCents: sum(creditCost), listTotal: sum(listCredits), blocks }
 }
 
-/** `approvedCredits` on the two tools: what a `quote_exceeded` reply named, once the user approved it. */
-const TOOL_APPROVED_CREDITS = z.number().int().positive().optional().describe('Only after a reply with `quote_exceeded`: the credits that reply named, once the user has approved them. The desktop measures the media before it runs and runs nothing above the approved total.')
+/** `approvedCredits` on the two tools: the figure a reply named as `approvedCredits`, once the user approved it. */
+const TOOL_APPROVED_CREDITS = z.number().int().positive().optional().describe('With confirm=true: the approvedCredits a reply named (its quote, or a quote_exceeded price), once the user has approved it. The desktop measures the media before it runs and runs nothing above it; a call that now quotes higher runs nothing and asks again.')
+
+/**
+ * The credits approved for a call, as it is priced: the host's decision where it has one, else the input's.
+ * `approvedSpend` reads the same figure again at the send.
+ */
+const requestedCredits = (ctx: OperationContext, input: { approvedCredits?: number }): number | undefined =>
+  ctx.spend ? ctx.spend.approvedCredits : input.approvedCredits
+
+/**
+ * A tool run whose length the op could not read is quoted at one block and measured by the desktop as it runs, and
+ * only a desktop with 'lip-sync-quote' does that: its lip-sync and motion-transfer routes hold a run to the
+ * `maxCredits` it is sent (`holdTool`, released with that token). Desktop 1.6.12 and older ignore the ceiling and
+ * bill every 5s block of the media against a one-block approval, so there the run is refused before any spend.
+ */
+async function requireToolHold(ctx: OperationContext, seconds: number | null, feature: string): Promise<void> {
+  if (seconds == null) await ctx.desktop().requireCapability('lip-sync-quote', feature)
+}
+
+/**
+ * What a confirm asks the user to approve, in the desktop's unit: the quote, or a higher figure the call already
+ * carries (a `quote_exceeded` price, or the model's own claim), which the user is then shown. The reply names it
+ * as `approvedCredits`, and the MCP confirm gate sends exactly that figure with the confirmed run.
+ */
+function toolCeiling(quoted: number, requested: number | undefined): { credits: number; raised: boolean; sentence: string } {
+  const raised = requested != null && requested > quoted
+  return {
+    credits: raised ? requested : quoted,
+    raised,
+    sentence: raised ? `Approving lets it spend up to ${fmtCredits(requested)}. ` : '',
+  }
+}
 
 /** The desktop's answer to a tool run sent with `maxCredits`: the run, or the measured price it refused to run above. */
 interface ToolRunAnswer {
@@ -6936,6 +7026,7 @@ function toolPriceChanged(tool: string, held: number, exceeded: { credits: numbe
     variant: exceeded.costKey,
     estimated_cents: exceeded.credits,
     estimated_credits: exceeded.credits,
+    approvedCredits: exceeded.credits,
     ...(exceeded.fingerprint ? { quote_fingerprint: exceeded.fingerprint } : {}),
     message:
       `Nothing ran. Slates measured this ${tool} at ${fmtCredits(exceeded.credits)} (${exceeded.costKey}), above the ${fmtCredits(held)} it was held to. ` +
@@ -7013,22 +7104,21 @@ export const generateLipSync: Operation<{
     // button's), an uploaded file measured by the desktop off disk. Typed
     // words on a still are two billed calls: the voice step adds one flat block.
     const uploadOnStill = input.sourceType === 'image' && input.audioMethod === 'upload'
-    const desktopMeasures = uploadOnStill && await ctx.desktop().hasCapability('lip-sync-quote')
+    // An uploaded track is measured by the desktop, and one that cannot measure it cannot hold the run either.
+    if (uploadOnStill) await ctx.desktop().requireCapability('lip-sync-quote', 'pricing a lip-sync on uploaded audio before it runs')
     const seconds = input.sourceType === 'video'
       ? await recordedSeconds(ctx.desktop(), input.projectId, input.sourceAssetId)
       : input.audioMethod === 'tts'
         ? (input.ttsText ?? '').trim().length / (13 * (input.ttsSpeed ?? 1))
-        : desktopMeasures
-          ? (await ctx.desktop().post<{ seconds: number | null }>('/agent/generation/lip-sync-quote', {
-              request: {
-                projectId: input.projectId, sourceAssetId: input.sourceAssetId, audioMethod: input.audioMethod,
-                audioFilePath: input.audioFilePath, avatarModel: input.avatarModel,
-              },
-            })).seconds
-          : null
+        : (await ctx.desktop().post<{ seconds: number | null }>('/agent/generation/lip-sync-quote', {
+            request: {
+              projectId: input.projectId, sourceAssetId: input.sourceAssetId, audioMethod: input.audioMethod,
+              audioFilePath: input.audioFilePath, avatarModel: input.avatarModel,
+            },
+          })).seconds
     // The desktop could not read the file's length, so there is no price to confirm: one block would
     // be a guess, and the run bills every 5s of the audio.
-    if (desktopMeasures && seconds == null) {
+    if (uploadOnStill && seconds == null) {
       return ok({
         requires_clarification: true,
         missing: ['audioFilePath'],
@@ -7037,16 +7127,18 @@ export const generateLipSync: Operation<{
           'Check the path and that the file plays (mp3, wav or m4a), then call again.',
       })
     }
+    await requireToolHold(ctx, seconds, 'holding a lip-sync on a clip with no recorded length to the price approved')
     const voiceStep = input.sourceType === 'image' && input.audioMethod === 'tts'
-    const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, stem, seconds, voiceStep)
+    const { costKey, totalCents, listTotal, blocks } = await quoteToolBlocks(ctx, stem, seconds, voiceStep)
     const length = `${blocks * TOOL_BLOCK_SECONDS}s${voiceStep ? ' + voice' : ''}`
+    const ceiling = toolCeiling(listTotal, requestedCredits(ctx, input))
 
     // Cost confirm gate. Lip-sync is mechanical — the model re-syncs the
     // user-chosen source to the user-chosen audio. The agent doesn't
     // write a prompt that depends on what the source looks like, so we
     // skip the inline preview and just announce the source code in text.
-    // An unknown length quotes one block, a floor, so it always asks.
-    if ((totalCents > CONFIRM_CREDITS || seconds == null) && !input.confirm) {
+    // An unknown length quotes one block, a floor, so it always asks, and so does a ceiling above the quote.
+    if ((totalCents > CONFIRM_CREDITS || seconds == null || ceiling.raised) && !input.confirm) {
       const sourceRef = await lookupAssetRef(ctx.desktop(), input.sourceAssetId)
       const audioPreview = input.audioMethod === 'tts'
         ? `Audio: TTS — "${(input.ttsText ?? '').slice(0, 120)}"`
@@ -7056,12 +7148,14 @@ export const generateLipSync: Operation<{
         variant: costKey,
         estimated_cents: totalCents,
         estimated_credits: totalCents,
+        approvedCredits: ceiling.credits,
         ...(seconds == null ? { quote_is_floor: true } : {}),
         source_ref: sourceRef,
         message:
           (seconds == null
-            ? `Cost: at least ${fmtCredits(totalCents)}, one 5s block (${costKey}). This version of Slates cannot measure the audio before it runs, and each further 5s of it bills another block: tell the user the audio's length and that total before they approve, or update Slates (Settings → Check for Updates) for an exact price. `
+            ? `Cost: at least ${fmtCredits(totalCents)}, one 5s block (${costKey}). The source clip has no recorded length: Slates measures it before it runs and runs nothing above the credits approved, answering with the measured price instead. `
             : `Cost: ${fmtCredits(totalCents)} for ${length} lip-sync (${costKey}). `) +
+          ceiling.sentence +
           `Source: ${sourceRef}. ${audioPreview}. ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
@@ -7072,10 +7166,11 @@ export const generateLipSync: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    // Held to the quote, or to the price a `quote_exceeded` reply named and the user approved: the desktop
-    // measures the media first and runs nothing above it, so a one-block floor cannot bill eighteen.
+    // Held to the credits approved, else the quote: the desktop measures the media first and runs nothing above
+    // it, so a one-block floor cannot bill eighteen. A quote now above the approval runs nothing and asks again.
     const approved = approvedSpend(ctx, input)
-    const held = Math.max(totalCents, approved.approvedCredits ?? 0)
+    if (approved.approvedCredits != null && listTotal > approved.approvedCredits) return toolPriceChanged('lip-sync', approved.approvedCredits, { credits: listTotal, costKey })
+    const held = approved.approvedCredits ?? listTotal
     const result = await desktop.post<ToolRunAnswer>('/agent/generation/lip-sync', {
       projectId: input.projectId,
       sourceAssetId: input.sourceAssetId,
@@ -7163,14 +7258,16 @@ export const generateMotionTransfer: Operation<{
     // the orientation's maximum (the desktop's `motionTransferEstimate`).
     const clipSeconds = await recordedSeconds(ctx.desktop(), input.projectId, input.sourceVideoAssetId)
     const seconds = clipSeconds == null ? null : Math.min(clipSeconds, MOTION_TRANSFER_MAX_SECONDS[input.characterOrientation ?? 'video'])
-    const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, motionModel, seconds, false)
+    await requireToolHold(ctx, seconds, 'holding a motion transfer on a clip with no recorded length to the price approved')
+    const { costKey, totalCents, listTotal, blocks } = await quoteToolBlocks(ctx, motionModel, seconds, false)
+    const ceiling = toolCeiling(listTotal, requestedCredits(ctx, input))
 
     // Cost confirm gate. Motion transfer is mechanical — the model
     // applies source motion to target image deterministically. We don't
     // burn tokens previewing assets the user already chose; codes in the
     // text are enough to keep the chat unambiguous. A clip with no recorded
-    // length quotes one block, a floor, so it always asks.
-    if ((totalCents > CONFIRM_CREDITS || seconds == null) && !input.confirm) {
+    // length quotes one block, a floor, so it always asks, and so does a ceiling above the quote.
+    if ((totalCents > CONFIRM_CREDITS || seconds == null || ceiling.raised) && !input.confirm) {
       const desktop = ctx.desktop()
       const [source, target] = await Promise.all([
         lookupAssetRef(desktop, input.sourceVideoAssetId),
@@ -7181,11 +7278,13 @@ export const generateMotionTransfer: Operation<{
         variant: costKey,
         estimated_cents: totalCents,
         estimated_credits: totalCents,
+        approvedCredits: ceiling.credits,
         ...(seconds == null ? { quote_is_floor: true } : {}),
         source_ref: source,
         target_ref: target,
         message:
           `Cost: ${fmtCredits(totalCents)}${seconds == null ? ' or more' : ''} for ${blocks * TOOL_BLOCK_SECONDS}s ${motionModel} (${costKey}). ` +
+          ceiling.sentence +
           `Transferring motion from ${source} onto ${target}. ` +
           // The saving is READ from the registry, never guessed: "~10 credits"
           // was hand-typed and is a rate change away from being a lie.
@@ -7206,9 +7305,10 @@ export const generateMotionTransfer: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    // Held to the quote, or to the approved price of a `quote_exceeded` reply, as the lip-sync run is.
+    // Held to the credits approved, else the quote, as the lip-sync run is.
     const approved = approvedSpend(ctx, input)
-    const held = Math.max(totalCents, approved.approvedCredits ?? 0)
+    if (approved.approvedCredits != null && listTotal > approved.approvedCredits) return toolPriceChanged('motion transfer', approved.approvedCredits, { credits: listTotal, costKey })
+    const held = approved.approvedCredits ?? listTotal
     const result = await desktop.post<ToolRunAnswer>('/agent/generation/motion-transfer', {
       projectId: input.projectId,
       sourceVideoAssetId: input.sourceVideoAssetId,
@@ -7427,6 +7527,7 @@ export const editVideo: Operation<{
       }
     }
 
+    approvedSpend(ctx)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -8076,6 +8177,7 @@ export const upscaleImage: Operation<{ projectId: string; assetId: string; facto
         message: `Cost: ${fmtCredits(quote.credits)} to upscale ${name} ${quote.factor}x (${size}). Re-call with confirm=true and requestId=${requestId} after the user explicitly OKs the spend, and keep that requestId on any retry.`,
       })
     }
+    approvedSpend(ctx)
     const r = await desktop.post<{ status?: string; generationId?: string; asset?: { id: string; code: string | null; filePath: string; width: number; height: number }; credits?: number; cost_credits?: number }>(
       '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits, requestId },
     ).catch((error: unknown) => {
@@ -8439,6 +8541,7 @@ export const runV2vPasses: Operation<{ projectId: string; timelineId: string; pa
     const missing = input.passIds.filter((id) => !byId.has(id))
     if (missing.length) throw new Error(`These passes are not on timeline ${input.timelineId}: ${missing.join(', ')}. Run passes of one timeline at a time.`)
     for (const model of new Set(input.passIds.map((id) => byId.get(id)!.model))) requireGuideRead(ctx, model)
+    approvedSpend(ctx)
     return ok(await desktop.post('/agent/timeline/v2v/run', input))
   },
 }
@@ -12220,6 +12323,7 @@ export const generateFromShots: Operation<{
           (seatNote ? `\n${seatNote}` : '')
       )
     }
+    approvedSpend(ctx)
     const ran = await desktop.post('/agent/shots/batch-generate', {
       shotIds: quote.items.map((i) => i.shotId),
       fingerprint: quote.fingerprint,
@@ -12301,6 +12405,7 @@ export const finishDraft: Operation<z.infer<typeof paidDraftFinishInput>> = {
     const desktop = ctx.desktop()
     await desktop.requireCapability('seedance-drafts', 'finishing draft takes')
     const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
+    approvedSpend(ctx)
     const receipt = await desktop.post<{ status: string; assetId?: string; generationId?: string; cost_credits: number }>(
       '/agent/assets/finish-draft', { ...input, assetId: refs.id(input.assetId), background: true },
     )
@@ -12353,6 +12458,7 @@ export const finishCutDrafts: Operation<z.infer<typeof finishCutInput>> = {
     const desktop = ctx.desktop()
     await desktop.requireCapability('seedance-drafts', 'finishing drafts in a cut')
     const query = { projectId: input.projectId, timelineId: input.timelineId, quoteId: input.quoteId }
+    approvedSpend(ctx)
     let receipt = await desktop.post<{ status: string; cost_credits: number }>('/agent/timeline/cut', {
       ...input, action: 'finishDrafts', background: true,
     })

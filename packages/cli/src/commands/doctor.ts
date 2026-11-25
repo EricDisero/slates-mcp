@@ -46,6 +46,7 @@ const REQUIRED_CAPABILITIES: Array<[token: string, what: string, fallback?: stri
   ['image-models-v6', 'seedream-5-5', 'a call naming no model runs gpt-image-2-6-sunburst, the previous default, until Slates updates'],
   ['edit-image', 'image edits'],
   ['edit-video', 'video edits'],
+  ['lip-sync-quote', 'lip-sync on uploaded audio, and lip-sync or motion transfer on a clip with no recorded length'],
   ['video-models-v2', 'omni-flash-1-2 / omni-flash-1-2-edit', 'Gemini Omni Flash 1.1 runs in their place up to 10s, at the same price, until Slates updates'],
   ['audio-generation', 'the audio lane'],
   ['voices', 'the preset voice shelf'],

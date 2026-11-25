@@ -74,7 +74,13 @@ export async function runWithConsent(call: ConsentCall): Promise<OperationResult
     // A quote that minted a request id (`slates_upscale_image`) is paid under that id: the
     // confirmed run and any retry of it are then one run to the desktop.
     const requestId = typeof data.requestId === 'string' ? { requestId: data.requestId } : {}
-    return run({ ...fingerprint, ...requestId, confirm: true })
+    // The amount the user approved is the one the run is held to: the quote's own `approvedCredits`, never a
+    // figure the model put in its arguments, which is dropped when the quote names none. The op treats it as a
+    // ceiling and asks again if its price has since risen above it.
+    const approvedCredits = typeof data.approvedCredits === 'number'
+      ? { approvedCredits: data.approvedCredits }
+      : Object.hasOwn(args, 'approvedCredits') ? { approvedCredits: undefined } : {}
+    return run({ ...fingerprint, ...requestId, ...approvedCredits, confirm: true })
   }
   // null: no person answered, so this call stands as it would on a host with no elicitation. The
   // model's own confirm and fingerprint run, and without a confirm the quote goes back to the model.
