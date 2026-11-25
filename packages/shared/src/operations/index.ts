@@ -11158,7 +11158,7 @@ function shotReader(desktop: SlatesDesktopClient, ref: string, projectId?: strin
       .get<{ shot: ShotDetail }>('/agent/shots/get', projectId ? { id: ref, projectId } : { id: ref })
       .then(({ shot }) => {
         if (projectId && shot.projectId && shot.projectId !== projectId) {
-          throw new Error(`${ref} is a Shot of another project, not ${projectId}. Pass the Shot's id, or its code in this project.`)
+          throw new Error(`${ref} is a Shot of another project (${shot.projectId}), not ${projectId}. Pass that project as projectId to work on it, or a Shot of this project.`)
         }
         return shot
       }))
@@ -11684,7 +11684,10 @@ export const getShot: Operation<{ shotId: string; projectId?: string }> = {
     await desktop.requireCapability('shots', 'saved Shots')
     // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
     await desktop.requireCapability('board-quote', 'Shot prices')
-    const r = { shot: await shotReader(desktop, input.shotId, input.projectId)() }
+    // A read by the Shot's own id needs no project: the project only says where a code is looked up, and a
+    // default one (the CLI's `slates use`) must not refuse a Shot that lives elsewhere.
+    const scope = UUID_RE.test(input.shotId.trim()) ? undefined : input.projectId
+    const r = { shot: await shotReader(desktop, input.shotId, scope)() }
     const quote = await desktop.quote<DesktopShotQuote>('/agent/shots/quote', 'input', { projectId: r.shot.projectId, shotIds: [r.shot.id] })
     const q = quote.items[0]
 

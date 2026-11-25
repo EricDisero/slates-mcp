@@ -93,6 +93,9 @@ assert.equal((await generateFromShots.run({ projectId, shotIds: ['SHOT-A1'] }, s
 // A Shot the desktop finds in another project is refused, never written or billed.
 const leaky = { desktop: () => ({ ...twoProjects, get: async (path, query) => path === '/agent/shots/get' ? { shot: shotsByProject[otherProject] } : twoProjects.get(path, query) }) }
 await assert.rejects(updateShot.run({ projectId, shotId: 'SHOT-A1', name: 'x' }, leaky), /another project/)
+// Reading a Shot by its own id needs no project; a code that lands in another project is still refused.
+assert.equal((await getShot.run({ projectId, shotId: 'bbbbbbbb-1111-4222-8333-444444444444' }, scoped)).data.id, 'b-shot')
+await assert.rejects(getShot.run({ projectId, shotId: 'SHOT-A1' }, leaky), /another project/)
 await assert.rejects(generateFromShots.run({ shotIds: ['a-shot', 'SHOT-A1'] }, {
   desktop: () => ({ ...twoProjects, get: async (path, query) => path === '/agent/shots/get'
     ? { shot: query.id === 'a-shot' ? shotsByProject[projectId] : shotsByProject[otherProject] } : twoProjects.get(path, query) }),
