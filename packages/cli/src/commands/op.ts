@@ -1,9 +1,9 @@
-import { z } from 'zod/v3'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, extname } from 'node:path'
 import {
   ALL_OPERATIONS,
   defaultContext,
+  prepareOperation,
   readDefaultProjectId,
   type Operation,
 } from '@slatesvideo/shared'
@@ -219,29 +219,6 @@ function typeLabel(t: ZodLike | undefined): string {
   }
 }
 
-/**
- * Zod's default error is a JSON blob of issue objects. Flatten to one readable
- * line per problem, with the legal set printed whenever an enum was what
- * failed — the same treatment the MCP server gives it, because both surfaces
- * are read by an agent that pays a turn for every unclear error.
- */
-function flattenZodError(err: z.ZodError): string {
-  return err.issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : '(root)'
-      if (issue.code === 'invalid_enum_value') {
-        const legal = (issue as unknown as { options?: unknown[] }).options ?? []
-        return `  ${path}: ${issue.message}. Legal values: ${legal.join(', ')}`
-      }
-      if (issue.code === 'unrecognized_keys') {
-        const keys = (issue as unknown as { keys?: string[] }).keys ?? []
-        return `  ${path}: unknown parameter(s) ${keys.join(', ')}`
-      }
-      return `  ${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
 function firstSentence(text: string): string {
   const s = text.split(/(?<=[.!?])\s/)[0].trim()
   return s.length > 200 ? `${s.slice(0, 197)}…` : s
@@ -315,16 +292,11 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
     if (fallback) coerced.projectId = fallback
   }
 
-  let parsed: unknown
-  try {
-    parsed = op.input.parse(coerced)
-  } catch (err) {
-    // 🚨 ONE LINE PER PROBLEM, not Zod's issue JSON. The raw error is an array
-    // of objects the caller has to read past to find the field name — and this
-    // is the surface a Claude Code session shells out to, so an unreadable
-    // error costs a turn every time. Same flattening the MCP server does.
-    console.error(`Invalid arguments for ${op.id}:`)
-    console.error(err instanceof z.ZodError ? flattenZodError(err) : String(err))
+  const prepared = prepareOperation(op, coerced)
+  if (!prepared.ok) {
+    // One line per problem (the shared flattener), never Zod's issue JSON: an
+    // agent shelling out pays a turn for every unreadable error.
+    console.error(prepared.message)
     // An OBJECT field is the failure the flag parser structurally cannot fix,
     // so name the one thing that does fix it rather than leaving the caller to
     // guess why `--params.duration 8` did nothing.
@@ -333,7 +305,8 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
     )
     if (objectFields.length > 0) {
       console.error(
-        `\nNote: ${objectFields.join(', ')} ${objectFields.length === 1 ? 'is an OBJECT' : 'are OBJECTS'} — ` +
+        `
+Note: ${objectFields.join(', ')} ${objectFields.length === 1 ? 'is an OBJECT' : 'are OBJECTS'} — ` +
           `flags cannot express nested values. Pass them with --input '<json>' or --input-file <path>. ` +
           `\`slates run ${op.id} --help\` lists every flag.`
       )
@@ -343,7 +316,7 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
 
   let result
   try {
-    result = await op.run(parsed as never, defaultContext())
+    result = await prepared.call.run(defaultContext())
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(message)

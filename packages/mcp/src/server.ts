@@ -16,7 +16,6 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { z } from 'zod/v3'
 import {
   ALL_OPERATIONS,
   ARCHIVE_AFTER_DAYS,
@@ -35,6 +34,8 @@ import {
   noteUsed,
   APP_MANUAL,
   defaultContext,
+  prepareOperation,
+  runOperation,
   toolDefinitions,
   cachedLatestVersion,
   refreshLatestVersion,
@@ -234,29 +235,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   })),
 }))
 
-/**
- * Zod's default error is a JSON blob of issue objects. The model has to parse
- * prose out of it to learn that `aspectRatio` was the problem and what the
- * legal values are — so flatten to one line per issue, and print the legal set
- * whenever an enum was the thing that failed.
- */
-function flattenZodError(err: z.ZodError): string {
-  return err.issues
-    .map((issue) => {
-      const path = issue.path.length > 0 ? issue.path.join('.') : '(root)'
-      if (issue.code === 'invalid_enum_value') {
-        const legal = (issue as unknown as { options?: unknown[] }).options ?? []
-        return `${path}: ${issue.message}. Legal values: ${legal.join(', ')}`
-      }
-      if (issue.code === 'unrecognized_keys') {
-        const keys = (issue as unknown as { keys?: string[] }).keys ?? []
-        return `${path}: unknown parameter(s) ${keys.join(', ')} — check the tool schema`
-      }
-      return `${path}: ${issue.message}`
-    })
-    .join('\n')
-}
-
 /** Fire-and-forget: a host that has not enabled logging must not break a call. */
 function warn(message: string): void {
   if (!server.getClientCapabilities()?.['logging' as never]) return
@@ -340,23 +318,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     }
   }
   try {
-    let args: unknown
-    try {
-      args = op.input.parse(request.params.arguments ?? {})
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Invalid arguments for ${op.id}:\n${flattenZodError(err)}`,
-            },
-          ],
-          isError: true,
-        }
-      }
-      throw err
-    }
+    const prepared = prepareOperation(op, request.params.arguments)
+    if (!prepared.ok) return { content: [{ type: 'text', text: prepared.message }], isError: true }
+    const { call } = prepared
+    const args = call.input
 
     // Progress notifications: a background render is invisible to the host
     // until the model polls. When the client sent a progress token, tick while
@@ -385,14 +350,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     // with no form elicitation, the CLI among them, nobody is asked: a spend there is the model's word and
     // no one's approval, and the desktop's checks are all that stands behind it.
     const canAskUser = opTakesConfirm(op) && clientSupportsElicitation() && !elicitationFailed
-    const { confirm: agentConfirm, ...unconfirmed } = args as { confirm?: unknown }
-    const claimed = canAskUser && agentConfirm === true
+    const claimed = canAskUser && (args as { confirm?: unknown }).confirm === true
 
-    const runOp = (input: unknown) => op.run(input as never, { ...defaultContext(), signal: extra?.signal, guidesRead })
+    const runOp = (patch?: Record<string, unknown>) =>
+      call.run({ ...defaultContext(), signal: extra?.signal, guidesRead }, patch as never)
 
     let result
     try {
-      result = await runOp(claimed ? unconfirmed : args)
+      result = await runOp(claimed ? { confirm: undefined } : undefined)
     } finally {
       if (ticker) clearInterval(ticker)
     }
@@ -424,12 +389,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         // fired only with it: the user approved THAT quote, and a changed
         // recipe must still refuse.
         const fingerprint = typeof data.fingerprint === 'string' ? { fingerprint: data.fingerprint } : {}
-        result = await runOp({ ...unconfirmed, ...fingerprint, confirm: true })
+        result = await runOp({ ...fingerprint, confirm: true })
         data = result.data as Record<string, unknown> | undefined
       } else if (claimed) {
         // null → no person answered, so this call stands as it would on a host with no elicitation: the
         // model's own confirm and fingerprint run, and without a confirm the quote goes back to the model.
-        result = await runOp(args)
+        result = await runOp()
         data = result.data as Record<string, unknown> | undefined
       }
     }
@@ -635,7 +600,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
     if (shots) {
       const op = opsById.get('slates_list_shots')
       if (!op) throw new Error('slates_list_shots is not registered')
-      const r = await op.run({ projectId: decodeURIComponent(shots[1]) } as never, defaultContext())
+      const r = await runOperation(op, { projectId: decodeURIComponent(shots[1]) }, defaultContext())
       return JSON.stringify(r.data ?? {}, null, 2)
     }
     throw new Error(`Unknown resource: ${uri}`)

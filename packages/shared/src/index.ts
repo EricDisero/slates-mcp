@@ -8,6 +8,8 @@ export { parseSkillMetadata, type SkillMetadata } from './skills/metadata.js'
 export { MY_BRAIN_RULES, myBrainLearning, myBrainLessons, remember, setMyBrainLearning, type MyBrainLesson, type RememberInput, type RememberResult } from './skills/my-brain-write.js'
 export { ARCHIVE_AFTER_DAYS, archiveUnused, archiveUnusedDaily, brainSkills, loadMyBrain, myBrainDir, myBrainPreload, noteUsed, MY_BRAIN_PRELOAD_CHARS, type Brain } from './skills/my-brain.js'
 export * as operations from './operations/index.js'
+// Every host turns raw tool arguments into an op call through these, so the schema applies everywhere.
+export { flattenZodError, parseOperationInput, prepareOperation, runOperation, type ParsedInput, type PreparedOperation } from './operations/parse-input.js'
 export { ALL_OPERATIONS, VIDEO_MODELS, AUDIO_MODELS, IMAGE_MODELS, defaultContext, OperationCancelledError, type Operation, type OperationContext, type OperationResult, type OperationAnnotations, type OperationTier, type OperationGroup } from './operations/index.js'
 // The spend thresholds the DESKTOP and the SKILLS both quote. `CONFIRM_CREDITS`
 // is the op-level confirm gate; `DEVIATION_FACTOR` is the Studio Agent's
