@@ -383,7 +383,7 @@ export const MODEL_FACTS: ModelFact[] = [
     label: 'Gemini Omni Flash 1.2',
     kind: 'video',
     ...caps('omni-flash-1-2'),
-    notes: 'Google\'s video model with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. Describe each input\'s role in plain words; it reads no tags. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; LTX, H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
+    notes: 'Google\'s video model with native synced audio in the same pass; 1080p and 4K are upscales of its 720p render. Takes a start frame with an optional last frame, or reference images plus short reference videos that carry a likeness (their audio is ignored), with no audio references. Describe each input\'s role in plain words; it reads no tags. It cuts between shots by default, so ask for a single shot. Route here for cheap takes with sound and reference-driven character consistency; H3 and H3 Max Turbo cost less per second. VIDEO-ONLY. Hero-shot quality against Seedance is not yet measured.',
   },
   {
     id: 'omni-flash-1-2-edit',
@@ -451,29 +451,6 @@ export const MODEL_FACTS: ModelFact[] = [
     // 10 images + 5 videos (15s total) + 5 audio (15s total), 20 files max.
     ...caps('wan-3.0'),
     notes: 'Alibaba\'s video model, added 2026-10-17: first on Artificial Analysis text-to-video that day, at about a third of Seedance 2.5\'s price per second at 1080p. Long single takes, multi-shot sequences with timestamps, sound on or off. Start frame with an optional last frame, or references across images, videos and audio cited as Image N / Video N / Audio N (audio-only allowed); frames and references never mix. Reference video seconds bill on top of the output. Route here for long takes, timed multi-shot scenes and reference-driven shots on a budget; Seedance 2.5 stays the default. VIDEO-ONLY.',
-  },
-  {
-    id: 'ltx-2-5',
-    tipsKey: 'ltx-2-5',
-    route: 'generate',
-    tier: 'specialist',
-    label: 'LTX-2.5',
-    kind: 'video',
-    // No reference caps: fal publishes text-to-video and image-to-video for LTX
-    // and no reference endpoint at all, so `caps()` returns nulls and the
-    // composer refuses references. Start/end FRAMES are unaffected.
-    ...caps('ltx-2-5'),
-    notes: 'THE VOLUME SEAT — the cheapest native 1080p second with sound included (H3 Max Turbo\'s 1080p is refined from 768p), and the row for MANY takes rather than one hero shot. Native synced audio is included free at every tier, unlike Kling where sound is a paid key dimension. It reaches higher resolutions and longer takes than most seats; use the capability surface for its resolution-dependent duration limits. VIDEO-ONLY. INPUTS ARE FRAMES, NOT REFERENCES: start frame plus an optional end frame, and no reference endpoint at all — for character consistency across shots use H3 or Kling. Route here for batch coverage, long takes, and anything where the credit budget is the binding constraint.',
-  },
-  {
-    id: 'ltx-2-5-pro',
-    tipsKey: 'ltx-2-5',
-    route: 'generate',
-    tier: 'specialist',
-    label: 'LTX-2.5 Pro',
-    kind: 'video',
-    ...caps('ltx-2-5-pro'),
-    notes: 'THE FIDELITY SEAT of the LTX pair — the full diffusion build against the base row\'s distilled one. 🚨 IT IS NOT A SUPERSET OF THE BASE ROW, which is the opposite of every other Pro seat here: it reaches a SHORTER resolution ladder and makes SHORTER clips, and it costs more at both tiers they share. Reaching for it because the name says Pro costs more AND takes away reach. Everything else matches the base row. Route here only when a specific shot needs the fidelity and fits inside its narrower envelope.',
   },
   {
     id: 'seed-audio',

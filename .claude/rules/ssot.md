@@ -278,7 +278,7 @@ Four new locks, each replacing a fact that was stated in prose with one the buil
     never proof that a prompt follows the brief), that it LEADS the file, and that the estimate op
     still attaches it.
 - **🚨 PER-MODEL BANNED LISTS.** `describeBannedTokens('image')` was Nano Banana's list and
-  `('video')` was Seedance's — two skills of fifteen — so a Kling, LTX, MiniMax, FLUX, Seedream,
+  `('video')` was Seedance's — two skills of fifteen — so a Kling, MiniMax, FLUX, Seedream,
   GPT-Image or audio prompt was matched against another model's never-use list. Every per-model skill
   now carries its own `@banned` block. Only the selected model's list rides its estimate result and
   warning. Shared operation descriptions carry no borrowed cross-model blacklist.

@@ -88,7 +88,7 @@ const manifest = JSON.parse(readFileSync(join(pkgRoot, 'manifest.json'), 'utf8')
 manifest.version = pkg.version
 
 // 🚨 KEYWORDS AND THE ROSTER SENTENCE ARE GENERATED FROM MODEL_FACTS. The
-// hand-typed list omitted ltx, gpt-image, minimax-h3-max and seedream, and the
+// hand-typed list omitted gpt-image, minimax-h3-max and seedream, and the
 // description named a 2026-07 roster — this file is what a Claude Desktop user
 // SEARCHES, so a missing keyword is a model nobody finds. Same rule as the
 // READMEs: never hand-type a fact the build already knows.

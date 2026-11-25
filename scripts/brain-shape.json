@@ -51,7 +51,6 @@
       "slates-prompting-inworld-tts",
       "slates-prompting-kling-v3",
       "slates-prompting-lip-sync",
-      "slates-prompting-ltx-2-5",
       "slates-prompting-minimax-h3",
       "slates-prompting-motion-transfer",
       "slates-prompting-nano-banana-2-1",
@@ -91,8 +90,7 @@
       "slates-blocking-to-prompt + slates-dialogue-blocking": 49,
       "slates-prompting-lip-sync + slates-prompting-motion-transfer": 42,
       "slates-blocking-to-prompt + slates-restyle-from-blocking": 25,
-      "slates-prompting-kling-v3 + slates-prompting-seedance": 22,
-      "slates-prompting-ltx-2-5 + slates-prompting-minimax-h3": 15
+      "slates-prompting-kling-v3 + slates-prompting-seedance": 22
     },
     "about": "Pairs of files that shared a passage when the check landed (2026-10-25), with the count of nine-word runs they shared then. Each is a lesson in two homes to merge; a count may only fall, and the lint fails on any new pair at failAt or more."
   },

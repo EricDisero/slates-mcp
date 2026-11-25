@@ -2245,21 +2245,6 @@ export const VIDEO_MODELS = [
   'minimax-h3',
   'minimax-h3-max',
   'minimax-h3-max-turbo',
-  // LTX-2.5, two seats in one family (2026-08-29). Base is the VOLUME seat —
-  // cheapest native 1080p second with sound included, free native audio at every tier,
-  // the only row reaching 1440p, and clips up to 20s.
-  // Pro is the fidelity seat and is NOT a superset: shorter ladder (no
-  // 1440p/4K), shorter clips (6/8/10 only) and ~1/3 dearer.
-  //
-  // NEVER PREFIX-MATCH: 'ltx-2-5-pro' starts with 'ltx-2-5'. A prefix test
-  // bills Pro at base rates AND offers it 1440p/4K and 12-20s durations it
-  // cannot render — the same trap as the MiniMax pair, one row worse.
-  //
-  // Durations are DISCRETE AND EVEN (6,8,10,12,14,16,18,20); the union bounds
-  // below stay 3-30 because other rows are wider, so `assertVideoCapabilities`
-  // is what refuses an odd second. It reads `values`, not just min/max.
-  'ltx-2-5',
-  'ltx-2-5-pro',
 ] as const
 
 type VideoModel = (typeof VIDEO_MODELS)[number]
@@ -2316,18 +2301,6 @@ const MINIMAX_FREE_REF_IMAGES_BY_MODEL: Record<string, number> = {
   'minimax-h3': 5,
   'minimax-h3-max': 4,
 }
-
-/**
- * The LTX-2.5 pair. A SET, not a prefix test — `ltx-2-5-pro` starts with
- * `ltx-2-5`, and the two rows differ on ladder, duration list AND price.
- *
- * Their cost key is the plainest shape in the file — `{model}-{res}-{N}s` with
- * no suffix ever, because LTX has no paid option: native audio is included at
- * every tier (so no `-audio` variant like Kling) and there is no reference
- * endpoint at all (so no `-ref{K}` variant like H3). Mirrors `ltxCreditKey()`
- * in slate/src/shared/pricing.ts.
- */
-const LTX_MODELS = new Set<string>(['ltx-2-5', 'ltx-2-5-pro'])
 
 /** K for the `-ref{K}` suffix: images past the free five, capped by the model's
  *  own declared ceiling. 0 for h3-max (no reference transport) and for anything
@@ -5333,16 +5306,6 @@ export function videoCostKey(input: {
     const k = minimaxRefSurchargeCount(input.model, input.referenceImages)
     return `${input.model}-${res}-${input.duration}s${k > 0 ? `-ref${k}` : ''}`
   }
-  // LTX-2.5, both seats. EXACT-ID SET, NEVER A PREFIX — `ltx-2-5-pro` starts
-  // with `ltx-2-5`, and a prefix match would quote base rates for the dearer
-  // row. No suffix dimension exists: audio is free and there are no references.
-  // The resolution default is read PER ROW (both are 1080p today, but the two
-  // ladders differ, so a shared literal would be a latent bug the day one
-  // moves). Mirrors ltxCreditKey() in slate/src/shared/pricing.ts.
-  if (LTX_MODELS.has(input.model)) {
-    const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
-    return `${input.model}-${res}-${input.duration}s`
-  }
   if (input.model.startsWith('seedance')) {
     // Mirrors seedanceCreditKey() in slate/src/shared/pricing.ts (version × face
     // × vref × res × duration). AI-face route bills the `-face-` key (~45% over
@@ -5759,7 +5722,7 @@ function promptingSkillFor(model: string): string {
  * The per-model prompting guides for the whole video roster, DERIVED.
  *
  * `slates_generate_video`'s description hand-typed five of them and omitted
- * `slates-prompting-ltx-2-5` for as long as LTX shipped — an agent reading the
+ * one seat's guide for as long as that seat shipped — an agent reading the
  * description could not learn the guide existed. A hand-typed index of a
  * generated corpus is a stale index; it is only a matter of when.
  */
@@ -5889,7 +5852,7 @@ export const generateVideo: Operation<{
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
       'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'
     ),
-    sound: z.boolean().optional().describe('Kling 3.0 (every tier), LTX and Wan 3.0: sound on (default) or silent (false); Kling 3.0 bills audio as its own key. Seedance, Omni Flash, H3 and Kling 4.0 always generate audio.'),
+    sound: z.boolean().optional().describe('Kling 3.0 (every tier) and Wan 3.0: sound on (default) or silent (false); Kling 3.0 bills audio as its own key. Seedance, Omni Flash, H3 and Kling 4.0 always generate audio.'),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling 3.0 model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling 3.0 model with sound on — auto-generate background music.'),
     seedanceDraft: z.boolean().optional().describe('Create a finishable Seedance 2.5 preview at 480p.'),
@@ -6085,8 +6048,8 @@ export const generateVideo: Operation<{
     // Kling 4.0's SHAPE constraint: FRAMES, NEVER REFERENCES. Only fal's
     // `kling/v4/image-to-video` (start frame plus an optional end frame) and
     // `kling/v4/text-to-video` are sold; its reference-to-video is not, so a
-    // reference id has no transport and is refused rather than dropped (the
-    // LTX rule below). An end frame needs the start frame: text-to-video has
+    // reference id has no transport and is refused rather than dropped. An end
+    // frame needs the start frame: text-to-video has
     // no frame slot at all.
     if (input.model === 'kling-v4.0') {
       const refs =
@@ -6106,38 +6069,6 @@ export const generateVideo: Operation<{
             : null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
-      }
-    }
-
-    // LTX-2.5's SHAPE constraint: FRAMES, NEVER REFERENCES. fal publishes
-    // text-to-video and image-to-video for `lightricks/ltx-2.5` and nothing
-    // else — there is no reference-to-video endpoint on either seat, so there
-    // is no transport for an ingredient, character, environment, style,
-    // reference-video or reference-audio input.
-    //
-    // This has to be an EXPLICIT refusal rather than a silent no-op: accepting
-    // reference ids we cannot send is the exact "no error, no warning, no
-    // images in the request" failure `seedance-2.5-edit` shipped with. Start
-    // and end FRAMES are unaffected — image-to-video carries `image_url` plus
-    // an optional `end_image_url`, which is what `features.lastFrame` records.
-    if (LTX_MODELS.has(input.model)) {
-      const refImages =
-        (input.ingredientAssetIds?.length ?? 0) +
-        (input.characterAssetIds?.length ?? 0) +
-        (input.environmentAssetIds?.length ?? 0) +
-        (input.styleAssetIds?.length ?? 0)
-      const refMedia =
-        (input.videoReferenceAssetIds?.length ?? 0) +
-        (input.audioReferenceAssetIds?.length ?? 0) +
-        (input.videoReferenceAssetId ? 1 : 0) +
-        (input.audioReferenceAssetId ? 1 : 0)
-      if (refImages > 0 || refMedia > 0) {
-        return ok({
-          requires_clarification: true,
-          missing: [],
-          message:
-            `${input.model} takes a prompt and up to two frames (start and/or end) — it has no reference endpoint at all, so reference images, video and audio cannot be sent. Drop them, or switch to minimax-h3, which reads ${getModelCapability('minimax-h3')?.maxIngredientImages ?? 9} images plus reference video and audio.`,
-        })
       }
     }
 
@@ -12598,11 +12529,6 @@ export function resolveGuideTopic(topic: string): string | null {
   ) {
     return 'slates-prompting-minimax-h3'
   }
-  // LTX-2.5 — both seats share one skill. A PREFIX is right HERE (unlike every
-  // rate, key and endpoint lookup, which must be exact) precisely because both
-  // rows resolve to the same guide: `ltx-2-5-pro` matching the `ltx` prefix is
-  // the intended outcome, not a collision.
-  if (t.startsWith('ltx') || t === 'lightricks') return 'slates-prompting-ltx-2-5'
   if (t.startsWith('kling-mc')) return 'slates-prompting-motion-transfer'
   if (t === 'edit-video' || t === 'video-edit' || t === 'edit video' || t === 'video edit') return resolveGuideTopic(defaultModelFor('video', 'edit'))
   // Kling 4.0 shares the Kling guide, which carries its own short 4.0 section:

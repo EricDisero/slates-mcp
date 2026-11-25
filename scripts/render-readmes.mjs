@@ -2,7 +2,7 @@
 // README GENERATION — the counts and the roster, from the BUILD.
 //
 // All three READMEs said "64 tools" and "15 skills" against a real surface of
-// 91 and 33, and listed "Seedance 2.0" as the video roster months after LTX,
+// 91 and 33, and listed "Seedance 2.0" as the video roster months after
 // MiniMax and Omni Flash shipped. The confirm threshold was quoted as "$0.50",
 // which stopped being the unit in the 2026-07-07 credit re-denomination.
 //

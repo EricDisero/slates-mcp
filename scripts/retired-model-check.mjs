@@ -48,8 +48,9 @@ for (const [id, seat] of Object.entries(RETIRED_SEATS)) {
 const SKIP = /(^|\/)(package-lock\.json|.*\.(png|jpe?g|webp|gif|ico|bmp|mp3|wav|mp4|mov|webm|woff2?|ttf|zip|tgz|mcpb|pdf))$|^packages\/shared\/skills\/hyperframes\/.*\/fonts\.css$/i
 // History a retirement keeps, in every repo.
 const HISTORY = /(^|\/)CHANGELOG\.md$|(^|\/)docs\/design-reviews\/|(^|\/)[^/]*\d{4}-\d{2}-\d{2}[^/]*(\/|$)|^scripts\/(agent-eval\/evidence|behaviour-ab\/results|brain-eval\/results)\/|^drizzle\//
-// A family's word that names something else in one place, keyed by the family's first id.
-const NOT_OURS = {}
+// A family's word that names something else in one place, keyed by the family's first id. LTX: HyperFrames'
+// own local video provider, which its bundled guides describe; it is not our seat.
+const NOT_OURS = { 'ltx-2-5': /^packages\/shared\/skills\/hyperframes\// }
 const SELF = new Set(['scripts/retired-model-check.mjs', 'scripts/retired-model-baseline.json', LIST_FILE])
 const MAX_BYTES = 2_000_000
 

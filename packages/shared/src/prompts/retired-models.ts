@@ -45,6 +45,8 @@ export interface RetiredSeat {
 // Two expressions per family, because only the first may ignore case: `/i` on
 // the second would let lowercase `veo` inside `curveOut` match.
 const VEO_TERMS = [/(?<![A-Za-z])veo/gi, /(?<=[a-z])Veo/g] as const
+const LTX_TERMS = [/(?<![A-Za-z])ltx/gi, /(?<=[a-z])Ltx/g] as const
+const LTX_SERVER_FILES = ['slates-api/src/lib/ltx-keys.ts', 'slates-api/scripts/ltx-billing-gate-check.mjs'] as const
 
 export const RETIRED_SEATS: Readonly<Record<string, RetiredSeat>> = {
   // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not
@@ -66,6 +68,11 @@ export const RETIRED_SEATS: Readonly<Record<string, RetiredSeat>> = {
   'omni-flash-edit': { replacement: 'omni-flash-1-2-edit', label: 'Omni Flash 1.1 Edit', retiredOn: '2026-11-10', keysBilledUntil: 'update-floor', terms: [] },
   // 2026-11-16 (Eric): Seedream 5.5 replaced Seedream 5 Lite and became the default image seat.
   'seedream-5-lite': { replacement: 'seedream-5-5', label: 'Seedream 5 Lite', retiredOn: '2026-11-16', keysBilledUntil: 'update-floor', oldGuide: 'slates-prompting-seedream-5-lite', terms: [] },
+  // 2026-11-24 (Eric, "I would just remove LTX 2.5 completely"): both seats, nothing replaces them. A saved
+  // recipe lands on Seedance 2.5, which takes every LTX length (6-20s inside its 4-30s); a 1440p Shot is clamped
+  // to the nearest rung Seedance has.
+  'ltx-2-5': { replacement: 'seedance-2.5', label: 'LTX-2.5', retiredOn: '2026-11-25', keysBilledUntil: 'update-floor', oldGuide: 'slates-prompting-ltx-2-5', terms: LTX_TERMS, serverFiles: LTX_SERVER_FILES },
+  'ltx-2-5-pro': { replacement: 'seedance-2.5', label: 'LTX-2.5 Pro', retiredOn: '2026-11-25', keysBilledUntil: 'update-floor', oldGuide: 'slates-prompting-ltx-2-5', terms: LTX_TERMS, serverFiles: LTX_SERVER_FILES },
 }
 
 /**

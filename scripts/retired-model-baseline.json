@@ -39,5 +39,31 @@
       "src/app/copy/changelog.ts": 4,
       "src/content/blog/index.ts": 1
     }
+  },
+  "ltx-2-5": {
+    "slate": {
+      "scripts/agent-eval/fixtures/model-registry.json": 28
+    },
+    "slates-api": {
+      ".claude/rules/credits.md": 3,
+      "docs/dead-code-and-ssot-sweep.md": 5,
+      "PRICING.md": 29,
+      "scripts/endpoint-key-binding-check.mjs": 10,
+      "scripts/pricing-consistency-check.mjs": 3,
+      "scripts/run-checks.mjs": 1,
+      "src/lib/activation-emails/store.ts": 1,
+      "src/lib/fal-allowlist.ts": 10,
+      "src/lib/key-family.ts": 3,
+      "src/lib/omni-flash-keys.ts": 1,
+      "src/lib/seedance-keys.ts": 1,
+      "src/lib/veo-keys.ts": 1,
+      "src/lib/video-edit-bounds.ts": 1,
+      "src/routes/proxy.ts": 13,
+      "src/types/index.ts": 24
+    },
+    "slates-web": {
+      "docs/copy.md": 1,
+      "src/app/copy/changelog.ts": 1
+    }
   }
 }
