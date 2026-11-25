@@ -1359,15 +1359,35 @@ export function checkFramesWithReferenceMedia(
  *  8.02), so that much over a whole second or over a ceiling is not counted. */
 export const REFERENCE_SECONDS_TOLERANCE = 0.05
 
+/** An edit's source clip is probed the same way, so it takes the same slack. */
+export const EDIT_SECONDS_TOLERANCE = REFERENCE_SECONDS_TOLERANCE
+
+/** The whole seconds a probed length counts as: up past the probe slack, so
+ *  4.3s is 5 and 8.02s is 8. The one rounding every billed clip length takes;
+ *  slates-api's `check:all` fails on a copy of it anywhere else. */
+export function probedWholeSeconds(seconds: number): number {
+  return Math.ceil(seconds - REFERENCE_SECONDS_TOLERANCE)
+}
+
 /** The whole seconds a reference-video key bills for these clips: each measured
  *  clip rounds up on its own (4.3s bills 5, 8.02s bills 8), never the sum. A
  *  length of zero or less is an unmeasured clip and adds nothing. */
 export function billedReferenceSeconds(clips: readonly number[]): number {
   let total = 0
   for (const sec of clips) {
-    if (Number.isFinite(sec) && sec > 0) total += Math.max(1, Math.ceil(sec - REFERENCE_SECONDS_TOLERANCE))
+    if (Number.isFinite(sec) && sec > 0) total += Math.max(1, probedWholeSeconds(sec))
   }
   return total
+}
+
+/** The whole seconds a video edit bills for a measured source clip. An edit's
+ *  output follows its source, so the row's duration window is the clip window
+ *  and the probed length is held inside it. A row with no window throws: an
+ *  edit priced on a guessed window bills the wrong key. */
+export function billedEditSeconds(model: string, seconds: number): number {
+  const window = MODEL_CAPABILITIES[model]?.duration
+  if (!window) throw new Error(`billedEditSeconds: no duration capability for "${model}"`)
+  return Math.min(window.max, Math.max(window.min, probedWholeSeconds(seconds)))
 }
 
 /** The per-clip window, the least and most combined seconds a row takes for one

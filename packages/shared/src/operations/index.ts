@@ -4,7 +4,7 @@ import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, checkReferenceSeconds, checkFramesWithReferenceMedia, checkVideoParams, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, checkReferenceSeconds, checkFramesWithReferenceMedia, checkVideoParams, billedEditSeconds, EDIT_SECONDS_TOLERANCE, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -7434,7 +7434,7 @@ export const editVideo: Operation<{
     if (!Number.isFinite(clipSeconds) || clipSeconds <= 0) {
       throw new Error('Source clip has no recorded duration — cannot quote the edit. Re-import the clip or pick another.')
     }
-    if (clipSeconds > maxClipSeconds + 0.05 || clipSeconds < minClipSeconds - 0.05) {
+    if (clipSeconds > maxClipSeconds + EDIT_SECONDS_TOLERANCE || clipSeconds < minClipSeconds - EDIT_SECONDS_TOLERANCE) {
       throw new Error(
         `Source clip is ${clipSeconds.toFixed(1)}s — ${model} accepts ${minClipSeconds}–${maxClipSeconds}s. ` +
           `Trim it first with slates_trim_video (e.g. inSec 0, outSec ${maxClipSeconds}), then edit the trimmed clip` +
@@ -7445,7 +7445,7 @@ export const editVideo: Operation<{
     // A desktop without Omni Flash 1.2 gets the 1.1 edit seat at the same price, on a clip 1.1 takes
     // (`desktopModelId`), resolved before the quote so a job it cannot run is refused before the agent confirms it.
     const seat = await desktopModelId(desktop, model as string, `${model} editing`, clipSeconds)
-    const billedSeconds = Math.min(maxClipSeconds, Math.max(minClipSeconds, Math.ceil(clipSeconds - 0.05)))
+    const billedSeconds = billedEditSeconds(model, clipSeconds)
     // Three engines, three key shapes — only Seedance's carries a resolution and
     // a face route, because only its price moves with them.
     const costKey = isSeedanceEdit
