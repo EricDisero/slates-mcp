@@ -51,7 +51,7 @@ process.env.APPDATA = join(home, 'AppData', 'Roaming')
 try {
   const shared = await import(new URL('../packages/shared/dist/index.js', import.meta.url))
   const { SlatesCloudHttpError } = await import(new URL('../packages/shared/dist/clients/cloud.js', import.meta.url))
-  const { buildOpInput } = await import(new URL('../packages/cli/dist/commands/op.js', import.meta.url))
+  const { buildOpInput, prepareOpCall } = await import(new URL('../packages/cli/dist/commands/op.js', import.meta.url))
   const { EXIT, exitFor } = await import(new URL('../packages/cli/dist/exit-codes.js', import.meta.url))
   const { inspectJsonMcpConfigs } = await import(new URL('../packages/cli/dist/commands/mcp-config.js', import.meta.url))
   const { confirmGate, runWithConsent } = await import(new URL('../packages/mcp/dist/confirm-gate.js', import.meta.url))
@@ -77,6 +77,18 @@ try {
     'a refined op gets the default project, and a literal-union number and a boolean arrive typed'
   )
   assert.equal(run('slates_export_video', ['--outputPath', out, '--fps', 'null']).call?.input.fps, null, '--fps null is null where the field allows it')
+  // The default project is a guess: an export named by its timeline goes out without it.
+  const TIMELINE = '55555555-5555-4555-8555-555555555555'
+  for (const id of ['slates_export_video', 'slates_export_timeline_xml']) {
+    const byTimeline = prepareOpCall(op(id), ['--timelineId', TIMELINE, '--outputPath', id.endsWith('xml') ? join(home, 'out.xml') : out], () => PROJECT)
+    assert.ok(byTimeline.ok, `${id} by timeline with a default project set: ${byTimeline.message}`)
+    assert.deepEqual([byTimeline.call.input.projectId, byTimeline.call.input.timelineId], [undefined, TIMELINE])
+  }
+  assert.equal(prepareOpCall(op('slates_export_video'), ['--outputPath', out], () => PROJECT).call?.input.projectId, PROJECT, 'with no timeline the default project still fills')
+  assert.equal(prepareOpCall(op('slates_get_variants'), ['--timelineId', TIMELINE], () => PROJECT).call?.input.projectId, PROJECT, 'an op that takes both keeps the default project')
+  const mistake = prepareOpCall(op('slates_export_timeline_xml'), ['--timelineId', TIMELINE, '--outputPath', out], () => PROJECT).message
+  assert.ok(/\.xml/.test(mistake) && !/exactly one of/.test(mistake), `a real mistake is named without the guessed project: ${mistake}`)
+  assert.doesNotMatch(prepareOpCall(op('slates_get_variants'), ['--timelineId', 'not-a-uuid'], () => PROJECT).message, /projectId/, 'and the default project is kept where the op needs one')
   const badFps = run('slates_export_video', ['--outputPath', out, '--fps', '45'])
   assert.ok(!badFps.ok && /fps/.test(badFps.message), 'a frame rate outside the union still fails, naming fps')
   for (const word of ['on', 'yes', 'True', '1']) {

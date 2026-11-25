@@ -240,7 +240,7 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
   }
 
   const { properties } = opFields(op)
-  const prepared = prepareOperation(op, buildOpInput(op, opts.rawArgs, readDefaultProjectId))
+  const prepared = prepareOpCall(op, opts.rawArgs, readDefaultProjectId)
   if (!prepared.ok) {
     // One line per problem (the shared flattener), never Zod's issue JSON: an
     // agent shelling out pays a turn for every unreadable error.
@@ -358,4 +358,21 @@ export function buildOpInput(
     if (fallback) input.projectId = fallback
   }
   return input
+}
+
+/**
+ * The call the flags describe. The default project is a guess: where the op
+ * refuses the input with it (an export names a project OR a timeline), the
+ * flags are tried as written. When both are refused, the refusal naming fewer
+ * problems is the one shown (one line each), so the guess is never the complaint.
+ */
+export function prepareOpCall(op: Operation<unknown>, rawArgs: string[], defaultProjectId: () => string | null) {
+  const input = buildOpInput(op, rawArgs, defaultProjectId)
+  const prepared = prepareOperation(op, input)
+  if (prepared.ok) return prepared
+  const asWritten = buildOpInput(op, rawArgs, () => null)
+  if (asWritten.projectId === input.projectId) return prepared
+  const retried = prepareOperation(op, asWritten)
+  const problems = (message: string): number => message.split(/\n/).length
+  return retried.ok || problems(retried.message) < problems(prepared.message) ? retried : prepared
 }
