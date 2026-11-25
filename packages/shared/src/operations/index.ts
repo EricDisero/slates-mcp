@@ -6955,6 +6955,41 @@ async function quoteToolBlocks(
   return { costKey, totalCents, blocks }
 }
 
+/** `approvedCredits` on the two tools: what a `quote_exceeded` reply named, once the user approved it. */
+const TOOL_APPROVED_CREDITS = z.number().int().positive().optional().describe('Only after a reply with `quote_exceeded`: the credits that reply named, once the user has approved them. The desktop measures the media before it runs and runs nothing above the approved total.')
+
+/** The desktop's answer to a tool run sent with `maxCredits`: the run, or the measured price it refused to run above. */
+interface ToolRunAnswer {
+  success: boolean
+  background?: boolean
+  asset?: Record<string, unknown>
+  generationId?: string
+  generationIds?: string[]
+  error?: string
+  quoteExceeded?: { credits: number; costKey: string }
+}
+
+/** The reply when the desktop measured a tool's media above the credits it was sent: nothing ran, and that price is the one to approve. */
+function toolPriceChanged(tool: string, held: number, exceeded: { credits: number; costKey: string }): OperationResult {
+  return ok({
+    requires_confirm: true,
+    quote_exceeded: true,
+    variant: exceeded.costKey,
+    estimated_cents: exceeded.credits,
+    estimated_credits: exceeded.credits,
+    message:
+      `Nothing ran. Slates measured this ${tool} at ${fmtCredits(exceeded.credits)} (${exceeded.costKey}), above the ${fmtCredits(held)} it was held to. ` +
+      `Tell the user, and once they approve, re-call with confirm=true and approvedCredits=${exceeded.credits}.`,
+  })
+}
+
+/** What a tool run reports it charged. With no measured length the quote was one block, a floor: the charge is unknown, never the floor. */
+function toolCharge(seconds: number | null, totalCents: number) {
+  return seconds == null
+    ? { cost_cents: null, cost_credits: null, minimum_credits: totalCents, quote_is_floor: true }
+    : { cost_cents: totalCents, cost_credits: totalCents }
+}
+
 // ── Generate lip-sync ───────────────────────────────────────────
 
 export const generateLipSync: Operation<{
@@ -6970,6 +7005,7 @@ export const generateLipSync: Operation<{
   avatarModel?: 'avatar-standard' | 'avatar-pro'
   background?: boolean
   confirm?: boolean
+  approvedCredits?: number
 }> = {
   id: 'slates_generate_lip_sync',
   billable: true,
@@ -6989,6 +7025,7 @@ export const generateLipSync: Operation<{
     avatarModel: z.enum(['avatar-standard', 'avatar-pro']).optional().describe('Image-source only. avatar-standard for general use; avatar-pro for sharper face fidelity. Price each with slates_estimate_generation_cost.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+    approvedCredits: TOOL_APPROVED_CREDITS,
   }),
   async run(input, ctx) {
     if (input.audioMethod === 'tts' && !input.ttsText) {
@@ -7059,6 +7096,7 @@ export const generateLipSync: Operation<{
         variant: costKey,
         estimated_cents: totalCents,
         estimated_credits: totalCents,
+        ...(seconds == null ? { quote_is_floor: true } : {}),
         source_ref: sourceRef,
         message:
           (seconds == null
@@ -7074,14 +7112,10 @@ export const generateLipSync: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    const result = await desktop.post<{
-      success: boolean
-      background?: boolean
-      asset?: Record<string, unknown>
-      generationId?: string
-      generationIds?: string[]
-      error?: string
-    }>('/agent/generation/lip-sync', {
+    // Held to the quote, or to the price a `quote_exceeded` reply named and the user approved: the desktop
+    // measures the media first and runs nothing above it, so a one-block floor cannot bill eighteen.
+    const held = Math.max(totalCents, input.approvedCredits ?? 0)
+    const result = await desktop.post<ToolRunAnswer>('/agent/generation/lip-sync', {
       projectId: input.projectId,
       sourceAssetId: input.sourceAssetId,
       audioMethod: input.audioMethod,
@@ -7093,14 +7127,12 @@ export const generateLipSync: Operation<{
       avatarModel: input.avatarModel,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
+      maxCredits: held,
       background: input.background,
     })
+    if (result.quoteExceeded) return toolPriceChanged('lip-sync', held, result.quoteExceeded)
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
-    // With no measured length the quote was one block, a floor: the charge is every 5s of the audio,
-    // so it is reported as unknown here, never as the floor.
-    const charged = seconds == null
-      ? { cost_cents: null, cost_credits: null, minimum_credits: totalCents }
-      : { cost_cents: totalCents, cost_credits: totalCents }
+    const charged = toolCharge(seconds, totalCents)
     const chargedText = seconds == null
       ? `at ${fmtCredits(totalCents)} per 5s of the audio (its length was not measured, so read the charge from the credit balance)`
       : `for ${fmtCredits(totalCents)}`
@@ -7145,6 +7177,7 @@ export const generateMotionTransfer: Operation<{
   prompt?: string
   background?: boolean
   confirm?: boolean
+  approvedCredits?: number
 }> = {
   id: 'slates_generate_motion_transfer',
   billable: true,
@@ -7160,6 +7193,7 @@ export const generateMotionTransfer: Operation<{
     prompt: z.string().optional().describe('Optional refinement. Read slates-prompting-motion-transfer.'),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+    approvedCredits: TOOL_APPROVED_CREDITS,
   }),
   async run(input, ctx) {
     const motionModel = input.motionModel ?? 'kling-mc-pro'
@@ -7186,6 +7220,7 @@ export const generateMotionTransfer: Operation<{
         variant: costKey,
         estimated_cents: totalCents,
         estimated_credits: totalCents,
+        ...(seconds == null ? { quote_is_floor: true } : {}),
         source_ref: source,
         target_ref: target,
         message:
@@ -7210,14 +7245,9 @@ export const generateMotionTransfer: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
-    const result = await desktop.post<{
-      success: boolean
-      background?: boolean
-      asset?: Record<string, unknown>
-      generationId?: string
-      generationIds?: string[]
-      error?: string
-    }>('/agent/generation/motion-transfer', {
+    // Held to the quote, or to the approved price of a `quote_exceeded` reply, as the lip-sync run is.
+    const held = Math.max(totalCents, input.approvedCredits ?? 0)
+    const result = await desktop.post<ToolRunAnswer>('/agent/generation/motion-transfer', {
       projectId: input.projectId,
       sourceVideoAssetId: input.sourceVideoAssetId,
       targetImageAssetId: input.targetImageAssetId,
@@ -7226,9 +7256,12 @@ export const generateMotionTransfer: Operation<{
       prompt: input.prompt,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
+      maxCredits: held,
       background: input.background,
     })
+    if (result.quoteExceeded) return toolPriceChanged('motion transfer', held, result.quoteExceeded)
     if (!result.success) throw new Error(result.error ?? 'Motion transfer generation failed')
+    const charged = toolCharge(seconds, totalCents)
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
       return backgroundSubmitted(`motion transfer (${motionModel})`, ids, {
@@ -7237,15 +7270,14 @@ export const generateMotionTransfer: Operation<{
         projectId: input.projectId,
         sourceVideoAssetId: input.sourceVideoAssetId,
         targetImageAssetId: input.targetImageAssetId,
-        cost_cents: totalCents,
-        cost_credits: totalCents,
+        ...charged,
       })
     }
 
     return {
       text:
         `Generated motion transfer (${motionModel}) into project ${input.projectId} ` +
-        `for ${fmtCredits(totalCents)}.` +
+        (seconds == null ? `at ${fmtCredits(totalCents)} per 5s of the clip (its length was not measured, so read the charge from the credit balance).` : `for ${fmtCredits(totalCents)}.`) +
         (input.prompt ? ` Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"` : ''),
       data: {
         variant: costKey,
@@ -7253,8 +7285,7 @@ export const generateMotionTransfer: Operation<{
         projectId: input.projectId,
         sourceVideoAssetId: input.sourceVideoAssetId,
         targetImageAssetId: input.targetImageAssetId,
-        cost_cents: totalCents,
-        cost_credits: totalCents,
+        ...charged,
         asset: result.asset,
         generationId: result.generationId,
       },

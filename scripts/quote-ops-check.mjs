@@ -8,7 +8,8 @@
 //   2  slates_generate_video takes its key and credits from /agent/generation/video-quote on every
 //      model and sends them back as maxCredits; a higher price after confirm runs nothing
 //   3  slates_edit_image confirms the key for the ratio the desktop resolved from the picture
-//   4  a lip-sync on uploaded audio is priced on the measured track, never on a one-block floor
+//   4  a lip-sync on uploaded audio is priced on the measured track, never on a one-block floor, and the two
+//      tools send the desktop the credits they are held to (maxCredits): a dearer measure runs nothing
 //   5  a partial image batch reports what the saved images cost
 //   6  an asset id from another project is a miss; a timeline clip may point into one
 //   7  references over a model's cap are refused before any spend, and the caps come from the rows
@@ -21,7 +22,7 @@ import { readFileSync } from 'node:fs'
 import { desktopSource } from './desktop-source.mjs'
 import { SlatesDesktopClient, MAX_GET_URL_LENGTH } from '../packages/shared/dist/clients/desktop.js'
 import {
-  listShots, generateVideo, editImage, generateLipSync, generateImage, getAsset, editCut, listAssets,
+  listShots, generateVideo, editImage, generateLipSync, generateMotionTransfer, generateImage, getAsset, editCut, listAssets,
   videoCostKey, imageCostKey, IMAGE_MODELS, VIDEO_MODELS,
 } from '../packages/shared/dist/operations/index.js'
 import { MODEL_CAPABILITIES, maxIngredientImagesFor } from '../packages/shared/dist/prompts/model-capabilities.js'
@@ -213,6 +214,7 @@ try {
     assert.doesNotMatch(preflight.data.message, /or more|at least/, 'a measured price is the price')
     const ran = await generateLipSync.run({ ...call, confirm: true }, ctxFor(d, prices))
     assert.equal(ran.data.cost_credits, 100)
+    assert.equal(d.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, 100, 'the run is held to the price confirmed')
 
     seconds = null
     const unread = await generateLipSync.run({ ...call, confirm: true }, ctxFor(d, prices))
@@ -224,10 +226,38 @@ try {
     const floor = await generateLipSync.run({ ...call }, ctxFor(older, prices))
     assert.equal(floor.data.requires_confirm, true)
     assert.match(floor.data.message, /^Cost: at least 20 credits, one 5s block/)
+    assert.equal(floor.data.quote_is_floor, true)
     const blind = await generateLipSync.run({ ...call, confirm: true }, ctxFor(older, prices))
     assert.deepEqual([blind.data.cost_credits, blind.data.minimum_credits], [null, 20], 'an unmeasured run never reports the one-block floor as its cost')
     assert.deepEqual(older.sent('POST /agent/generation/lip-sync-quote'), [])
-    console.log('quote-ops: a lip-sync on uploaded audio is quoted on the measured track; unmeasured, the floor is never reported as the cost')
+
+    // The desktop measures the media before it runs: above the credits it was sent, it runs nothing and names its price.
+    const measuring = await desktop({
+      ...routes,
+      'POST /agent/generation/lip-sync': ({ maxCredits }) => (maxCredits < 360
+        ? { success: false, quoteExceeded: { credits: 360, costKey: 'kling-lip-sync-avatar-90s' } }
+        : { success: true, asset: { id: id(9) }, generationId: 'gen-4' }),
+    }, { without: ['lip-sync-quote'] })
+    const dearer = await generateLipSync.run({ ...call, confirm: true }, ctxFor(measuring, prices))
+    assert.deepEqual([dearer.data.quote_exceeded, dearer.data.estimated_credits, dearer.data.variant], [true, 360, 'kling-lip-sync-avatar-90s'], 'a floor approved at one block is asked about again at 18')
+    assert.deepEqual(measuring.sent('POST /agent/generation/lip-sync').map((p) => p.maxCredits), [20], 'held to the floor that was quoted')
+    await generateLipSync.run({ ...call, confirm: true, approvedCredits: 360 }, ctxFor(measuring, prices))
+    assert.equal(measuring.sent('POST /agent/generation/lip-sync').at(-1).maxCredits, 360, 'the approved price is the new ceiling')
+
+    // Motion transfer: a clip with no recorded length is a floor, held to it, and never reported as its cost.
+    const unmeasuredClip = { id: id(4), code: 'VID-V2', type: 'video', projectId }
+    const motion = await desktop({
+      'GET /agent/assets': () => ({ assets: [...assets, unmeasuredClip] }),
+      'GET /agent/assets/path': () => ({ code: 'VID-V2', label: null }),
+      'POST /agent/generation/motion-transfer': () => ({ success: true, asset: { id: id(9) }, generationId: 'gen-5' }),
+    })
+    const mt = { projectId, sourceVideoAssetId: id(4), targetImageAssetId: id(1), motionModel: 'kling-mc-std' }
+    const mtFloor = await generateMotionTransfer.run({ ...mt }, ctxFor(motion, cloud({ 'kling-mc-std-5s': 30 })))
+    assert.deepEqual([mtFloor.data.requires_confirm, mtFloor.data.quote_is_floor], [true, true])
+    const mtRan = await generateMotionTransfer.run({ ...mt, confirm: true }, ctxFor(motion, cloud({ 'kling-mc-std-5s': 30 })))
+    assert.equal(motion.sent('POST /agent/generation/motion-transfer').at(-1).maxCredits, 30, 'held to the one-block floor')
+    assert.deepEqual([mtRan.data.cost_credits, mtRan.data.minimum_credits, mtRan.data.quote_is_floor], [null, 30, true], 'an unmeasured clip never reports the floor as its cost')
+    console.log('quote-ops: a lip-sync on uploaded audio is quoted on the measured track; unmeasured, the floor is never reported as the cost; both tools are held to the credits approved')
   }
 
   // ── 5. a partial batch cost what was saved ──
