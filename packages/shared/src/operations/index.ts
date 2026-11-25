@@ -4,7 +4,7 @@ import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, checkReferenceSeconds, checkFramesWithReferenceMedia, checkVideoParams, billedEditSeconds, EDIT_SECONDS_TOLERANCE, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, checkReferenceSeconds, checkFramesWithReferenceMedia, checkVideoParams, billedEditSeconds, EDIT_SECONDS_TOLERANCE, TOOL_BLOCK_SECONDS, toolBlockKey, toolBlocks, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -6944,9 +6944,6 @@ export const generateAudio: Operation<{
 
 // ── The Kling tools' quote (lip-sync, motion transfer) ─────────
 
-/** The server bills the tools in blocks of this many seconds (slates-api `TOOL_BLOCK_SECONDS`). */
-const TOOL_BLOCK_SECONDS = 5
-
 /** A project asset's recorded length in seconds, or null when its row has none. */
 async function recordedSeconds(desktop: SlatesDesktopClient, projectId: string, assetId: string): Promise<number | null> {
   const { assets } = await desktop.get<{ assets: Array<{ id?: string; duration?: number | null }> }>('/agent/assets', { projectId })
@@ -6968,8 +6965,8 @@ async function quoteToolBlocks(
   seconds: number | null,
   voiceStep: boolean
 ): Promise<{ costKey: string; totalCents: number; blocks: number }> {
-  const blocks = Math.max(1, Math.ceil((seconds ?? 0) / TOOL_BLOCK_SECONDS))
-  const costKey = `${stem}-${blocks * TOOL_BLOCK_SECONDS}s`
+  const blocks = Math.max(1, toolBlocks(seconds ?? 0))
+  const costKey = toolBlockKey(stem, blocks)
   const byKey = new Map<string, number>()
   const price = async (key: string): Promise<number> => {
     await loadDynamicPrice(ctx, byKey, key)
@@ -6977,7 +6974,7 @@ async function quoteToolBlocks(
     if (credits == null) throw new Error(`Model variant not in registry: ${key}`)
     return credits
   }
-  const totalCents = (await price(costKey)) + (voiceStep ? await price(`${stem}-${TOOL_BLOCK_SECONDS}s`) : 0)
+  const totalCents = (await price(costKey)) + (voiceStep ? await price(toolBlockKey(stem, 1)) : 0)
   return { costKey, totalCents, blocks }
 }
 

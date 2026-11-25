@@ -1390,6 +1390,22 @@ export function billedEditSeconds(model: string, seconds: number): number {
   return Math.min(window.max, Math.max(window.min, probedWholeSeconds(seconds)))
 }
 
+/** Lip-sync and motion transfer bill in whole blocks of this many seconds. */
+export const TOOL_BLOCK_SECONDS = 5
+
+/** The whole tool blocks a length bills: rounded up with no probe slack, since a
+ *  block already absorbs it (a 5.02s clip and a 5.0s clip are both one block).
+ *  Zero for no length; each caller sets its own floor. */
+export function toolBlocks(seconds: number): number {
+  return Math.ceil(seconds / TOOL_BLOCK_SECONDS)
+}
+
+/** A tool's credit key for `blocks` whole blocks: `${stem}-${blocks × 5}s`, as the
+ *  server's price list names them. */
+export function toolBlockKey(stem: string, blocks: number): string {
+  return `${stem}-${blocks * TOOL_BLOCK_SECONDS}s`
+}
+
 /** The per-clip window, the least and most combined seconds a row takes for one
  *  kind of reference, and how its combined cap is counted. `max` 0 = no cap. */
 export function referenceSecondsBounds(model: string, kind: 'video' | 'audio'): {
