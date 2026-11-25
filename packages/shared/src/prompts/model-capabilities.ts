@@ -37,7 +37,7 @@
 // `@slatesvideo/shared`). Rates, credit costs and cost-key builders deliberately
 // did NOT move — billing stays in slate with its existing checkers.
 //
-// ⚠️ LEAF MODULE — no imports, no Node built-ins. The desktop RENDERER reaches
+// ⚠️ LEAF MODULE — no imports but its sibling leaf `retired-models.ts`, no Node built-ins. The desktop RENDERER reaches
 // this through `@slatesvideo/shared/prompts`, so anything pulled in here has to
 // bundle for the browser.
 //
@@ -47,6 +47,8 @@
 // `reference-caps-lockstep-check.mjs`, `pricing-consistency-check.mjs`. If a
 // value moved, they go red.
 // ─────────────────────────────────────────────────────────────────────────────
+
+import { RETIRED_MODELS } from './retired-models.js'
 
 /** Every aspect ratio any Slates model accepts. There is no `9:21`. */
 export type AspectRatio =
@@ -1159,31 +1161,9 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
 // ── Retired seats ────────────────────────────────────────────────────────────
 
-/**
- * Seats that left the roster, each with the seat that replaced it. The desktop
- * moves a stored or sent id onto its replacement (slate `migrateRetiredModel`,
- * which reads this map and adds the retired video seats this repo does not name).
- * The server keeps their cost keys so desktops released before a retirement
- * still bill; the list and estimate ops hide those keys and name the replacement
- * instead.
- */
-export const RETIRED_MODELS: Readonly<Record<string, string>> = {
-  // 2026-09-09: GPT Image 2.5 replaced it; Sunburst is the seat that does not
-  // downgrade. 2026-11-10 (Eric): GPT Image 2.6 replaced 2.5, seat for seat.
-  'gpt-image-2': 'gpt-image-2-6-sunburst',
-  'gpt-image-2-5-flare': 'gpt-image-2-6-flare',
-  'gpt-image-2-5-sunburst': 'gpt-image-2-6-sunburst',
-  // 2026-10-23 (Eric): Nano Banana 2.1 replaced every Nano Banana row, FLUX 3 Image replaced FLUX.2 Max.
-  'nano-banana-2': 'nano-banana-2-1',
-  'nano-banana-2-lite': 'nano-banana-2-1',
-  'nano-banana-pro': 'nano-banana-2-1',
-  'flux-2-max': 'flux-3',
-  // 2026-11-10 (Eric, "Yes, same release"): Gemini Omni Flash 1.2 replaced 1.1, seat for seat.
-  'omni-flash': 'omni-flash-1-2',
-  'omni-flash-edit': 'omni-flash-1-2-edit',
-  // 2026-11-16 (Eric): Seedream 5.5 replaced Seedream 5 Lite and became the default image seat.
-  'seedream-5-lite': 'seedream-5-5',
-}
+// The one list of retired seats lives in its own leaf, re-exported here so
+// `@slatesvideo/shared/model-capabilities` importers read it where they always did.
+export { RETIRED_MODELS, RETIRED_SEATS, HISTORY_MODEL_LABELS, type RetiredSeat } from './retired-models.js'
 
 /**
  * The retired seat a cost key bills, or null when the key belongs to a current

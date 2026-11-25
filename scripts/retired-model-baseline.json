@@ -1,53 +1,43 @@
 {
-  "slate": {
-    ".claude/generation.md": 1,
-    ".claude/rules/storyboard.md": 1,
-    "CHANGELOG.md": 5,
-    "CLAUDE.md": 1,
-    "docs/api-documentation/GOOGLE_API.md": 25,
-    "docs/api-documentation/KLING_API.md": 9,
-    "docs/design-reviews/2026-09-27-first-hour-ux-walk.html": 1,
-    "docs/design-reviews/aurora-comparison-pass.html": 1,
-    "docs/design-reviews/minimax-h3-model-picker.html": 2,
-    "docs/design-reviews/prompt-surface-and-audio-scope.html": 6,
-    "docs/design-reviews/slates-design-review.html": 1,
-    "docs/devlogs/2026-02-04-SEAMLESS_PLAYBACK_IMPLEMENTATION.md": 1,
-    "docs/generation-recovery.md": 1,
-    "scripts/agent-eval/fixtures/model-registry.json": 16,
-    "src/main/api/slates-api.ts": 1,
-    "src/main/recovery.ts": 1,
-    "src/shared/pricing.ts": 14
-  },
-  "slates-api": {
-    ".claude/rules/credits.md": 1,
-    "data/winning-ads-catalog.json": 1,
-    "docs/api-endpoints.md": 1,
-    "docs/dead-code-and-ssot-sweep.md": 2,
-    "docs/llm-docs-ssot-map.md": 2,
-    "PRICING.md": 11,
-    "scripts/activation-emails-check.mts": 2,
-    "scripts/audio-billing-gate-check.mjs": 2,
-    "scripts/endpoint-key-binding-check.mjs": 59,
-    "scripts/proxy-job-ledger-check.mjs": 6,
-    "src/lib/activation-emails/store.ts": 1,
-    "src/lib/agent-models.ts": 1,
-    "src/lib/fal-allowlist.ts": 5,
-    "src/lib/key-family.ts": 5,
-    "src/lib/providers/google.ts": 8,
-    "src/lib/providers/guards.ts": 2,
-    "src/lib/veo-keys.ts": 45,
-    "src/routes/proxy.ts": 16,
-    "src/types/index.ts": 19
-  },
-  "slates-web": {
-    "docs/copy.md": 4,
-    "docs/design-reviews/2026-09-27-offer-machine-and-truth-pass.html": 3,
-    "docs/design-reviews/home2-woodshed.html": 3,
-    "next.config.ts": 2,
-    "scripts/build-llm-docs.mjs": 2,
-    "scripts/check-copy-facts.ts": 1,
-    "src/app/copy/changelog.ts": 4,
-    "src/app/home2/clips.ts": 4,
-    "src/content/blog/index.ts": 1
+  "veo-3.1-fast": {
+    "slate": {
+      ".claude/generation.md": 1,
+      ".claude/rules/storyboard.md": 1,
+      "CLAUDE.md": 1,
+      "docs/api-documentation/GOOGLE_API.md": 25,
+      "docs/api-documentation/KLING_API.md": 9,
+      "docs/generation-recovery.md": 1,
+      "scripts/agent-eval/fixtures/model-registry.json": 16,
+      "src/main/api/slates-api.ts": 1,
+      "src/main/recovery.ts": 1,
+      "src/shared/pricing.ts": 3
+    },
+    "slates-api": {
+      ".claude/rules/credits.md": 1,
+      "data/winning-ads-catalog.json": 1,
+      "docs/api-endpoints.md": 1,
+      "docs/dead-code-and-ssot-sweep.md": 2,
+      "docs/llm-docs-ssot-map.md": 2,
+      "PRICING.md": 11,
+      "scripts/activation-emails-check.mts": 2,
+      "scripts/audio-billing-gate-check.mjs": 2,
+      "scripts/endpoint-key-binding-check.mjs": 59,
+      "scripts/proxy-job-ledger-check.mjs": 6,
+      "src/lib/activation-emails/store.ts": 1,
+      "src/lib/fal-allowlist.ts": 5,
+      "src/lib/key-family.ts": 5,
+      "src/lib/providers/google.ts": 8,
+      "src/lib/providers/guards.ts": 2,
+      "src/routes/proxy.ts": 16,
+      "src/types/index.ts": 19
+    },
+    "slates-web": {
+      "docs/copy.md": 4,
+      "next.config.ts": 2,
+      "scripts/build-llm-docs.mjs": 2,
+      "scripts/check-copy-facts.ts": 1,
+      "src/app/copy/changelog.ts": 4,
+      "src/content/blog/index.ts": 1
+    }
   }
 }
