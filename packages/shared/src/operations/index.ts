@@ -125,6 +125,14 @@ export interface OperationContext {
    * desktop one per chat. Absent (the CLI, one call per process), no gate.
    */
   guidesRead?: Set<string>
+  /**
+   * The host's own spending decision for this one call, where the host has one (the desktop Studio Agent's loop):
+   * the credits the user approved beyond the call's own quote, the quote they approved (its `fingerprint`), and
+   * whether that approval still stands. Present, a paid op takes its ceiling from here and never from
+   * `approvedCredits` in its input, and sends nothing once `approved()` is false (`approvedSpend`). Absent (MCP,
+   * the CLI), the input's `approvedCredits` stands: the host client's per-call approval is the consent.
+   */
+  spend?: { approvedCredits?: number; quoteFingerprint?: string; approved: () => boolean }
 }
 
 // One factory for every default context, so per-connection caches can key on it.
@@ -283,6 +291,20 @@ function zEnum<T extends string>(values: readonly T[]): z.ZodEnum<[T, ...T[]]> {
   if (values.length === 0) throw new Error('zEnum: empty value list')
   return z.enum(values as unknown as [T, ...T[]])
 }
+
+/**
+ * What a paid call is held to as it is sent: the credits approved beyond its own quote, and the quote they were
+ * approved for. From the host's decision (`ctx.spend`) where it has one, refused there once that approval was
+ * withdrawn; else from the input. Called just before the send, after every await.
+ */
+function approvedSpend(ctx: OperationContext, input: { approvedCredits?: number }): { approvedCredits?: number; quoteFingerprint?: string } {
+  if (!ctx.spend) return { approvedCredits: input.approvedCredits }
+  if (!ctx.spend.approved()) throw new Error('Nothing was sent: the approval for this call was withdrawn while it was being priced.')
+  return { approvedCredits: ctx.spend.approvedCredits, quoteFingerprint: ctx.spend.quoteFingerprint }
+}
+
+/** The fields a held send carries: the ceiling, and the quote it was approved for when there is one. */
+const heldBody = (maxCredits: number, quoteFingerprint: string | undefined) => ({ maxCredits, ...(quoteFingerprint ? { quoteFingerprint } : {}) })
 
 function ok(data: unknown, text?: string): OperationResult {
   return {
@@ -4539,6 +4561,7 @@ export const generateImage: Operation<{
     //      a desktop attached).
     if (input.projectId) {
       const desktop = ctx.desktop()
+      const approved = approvedSpend(ctx, input)
       const result = await desktop.post<{
         success: boolean
         background?: boolean
@@ -4547,7 +4570,7 @@ export const generateImage: Operation<{
         generationId?: string
         generationIds?: string[]
         error?: string
-        quoteExceeded?: { credits: number; costKey: string }
+        quoteExceeded?: { credits: number; costKey: string; fingerprint?: string }
       }>('/agent/generation/image', {
         projectId: input.projectId,
         prompt: input.prompt,
@@ -4560,18 +4583,19 @@ export const generateImage: Operation<{
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         // The desktop adds @mention pictures this op cannot see; on a seat that bills
         // each input it runs nothing above what the user was quoted or approved.
-        ...(billsEachInputImage(sentModel) ? { maxCredits: Math.max(listCredits(entry) * (input.count ?? 1), input.approvedCredits ?? 0) } : {}),
+        ...(billsEachInputImage(sentModel) ? heldBody(Math.max(listCredits(entry) * (input.count ?? 1), approved.approvedCredits ?? 0), approved.quoteFingerprint) : {}),
         ...folderBody(input.folderId),
         background: input.background,
       })
       if (result.quoteExceeded) {
-        const { credits, costKey: billedKey } = result.quoteExceeded
+        const { credits, costKey: billedKey, fingerprint } = result.quoteExceeded
         return ok({
           requires_confirm: true,
           quote_exceeded: true,
           model: billedKey,
           estimated_cents: credits,
           estimated_credits: credits,
+          ...(fingerprint ? { quote_fingerprint: fingerprint } : {}),
           message:
             `Nothing ran. The @mention pictures in the prompt are paid inputs on ${imageModel}: this call bills ${fmtCredits(credits)} (${billedKey}), ` +
             `not the ${fmtCredits(totalCents)} quoted. Tell the user, and once they approve, re-call with confirm=true and approvedCredits=${credits}.`,
@@ -6403,8 +6427,9 @@ export const generateVideo: Operation<{
     const totalCents = creditCost(entry)
     // The price the user approved binds the call that spends: a reference re-measured longer or a
     // character that gained a billed picture since the pre-flight is asked about again, never run.
-    if (input.confirm && input.approvedCredits != null && totalCents > input.approvedCredits) {
-      return ok(videoPriceChanged(input.model, costKey, totalCents, input.approvedCredits))
+    const approvedCredits = input.confirm ? (ctx.spend ? ctx.spend.approvedCredits : input.approvedCredits) : undefined
+    if (approvedCredits != null && totalCents > approvedCredits) {
+      return ok(videoPriceChanged(input.model, costKey, totalCents, approvedCredits))
     }
     if (intentHits.length > 0 && !input.confirm) {
       return ok({
@@ -6488,6 +6513,7 @@ export const generateVideo: Operation<{
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
+    approvedSpend(ctx, input)
     const result = await desktop.post<{
       success: boolean
       background?: boolean
@@ -6966,17 +6992,18 @@ interface ToolRunAnswer {
   generationId?: string
   generationIds?: string[]
   error?: string
-  quoteExceeded?: { credits: number; costKey: string }
+  quoteExceeded?: { credits: number; costKey: string; fingerprint?: string }
 }
 
 /** The reply when the desktop measured a tool's media above the credits it was sent: nothing ran, and that price is the one to approve. */
-function toolPriceChanged(tool: string, held: number, exceeded: { credits: number; costKey: string }): OperationResult {
+function toolPriceChanged(tool: string, held: number, exceeded: { credits: number; costKey: string; fingerprint?: string }): OperationResult {
   return ok({
     requires_confirm: true,
     quote_exceeded: true,
     variant: exceeded.costKey,
     estimated_cents: exceeded.credits,
     estimated_credits: exceeded.credits,
+    ...(exceeded.fingerprint ? { quote_fingerprint: exceeded.fingerprint } : {}),
     message:
       `Nothing ran. Slates measured this ${tool} at ${fmtCredits(exceeded.credits)} (${exceeded.costKey}), above the ${fmtCredits(held)} it was held to. ` +
       `Tell the user, and once they approve, re-call with confirm=true and approvedCredits=${exceeded.credits}.`,
@@ -7114,7 +7141,8 @@ export const generateLipSync: Operation<{
     }
     // Held to the quote, or to the price a `quote_exceeded` reply named and the user approved: the desktop
     // measures the media first and runs nothing above it, so a one-block floor cannot bill eighteen.
-    const held = Math.max(totalCents, input.approvedCredits ?? 0)
+    const approved = approvedSpend(ctx, input)
+    const held = Math.max(totalCents, approved.approvedCredits ?? 0)
     const result = await desktop.post<ToolRunAnswer>('/agent/generation/lip-sync', {
       projectId: input.projectId,
       sourceAssetId: input.sourceAssetId,
@@ -7127,7 +7155,7 @@ export const generateLipSync: Operation<{
       avatarModel: input.avatarModel,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
-      maxCredits: held,
+      ...heldBody(held, approved.quoteFingerprint),
       background: input.background,
     })
     if (result.quoteExceeded) return toolPriceChanged('lip-sync', held, result.quoteExceeded)
@@ -7246,7 +7274,8 @@ export const generateMotionTransfer: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     // Held to the quote, or to the approved price of a `quote_exceeded` reply, as the lip-sync run is.
-    const held = Math.max(totalCents, input.approvedCredits ?? 0)
+    const approved = approvedSpend(ctx, input)
+    const held = Math.max(totalCents, approved.approvedCredits ?? 0)
     const result = await desktop.post<ToolRunAnswer>('/agent/generation/motion-transfer', {
       projectId: input.projectId,
       sourceVideoAssetId: input.sourceVideoAssetId,
@@ -7256,7 +7285,7 @@ export const generateMotionTransfer: Operation<{
       prompt: input.prompt,
       // No estimatedCost: the desktop prices the media itself, in dollars.
       // This op's figure is CREDITS, which a 1.5.8 desktop recorded as dollars.
-      maxCredits: held,
+      ...heldBody(held, approved.quoteFingerprint),
       background: input.background,
     })
     if (result.quoteExceeded) return toolPriceChanged('motion transfer', held, result.quoteExceeded)
