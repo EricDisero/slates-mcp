@@ -35,6 +35,7 @@ export const CHATGPT_IMAGE_HOST = {
 
 import { MODEL_CAPABILITIES } from './model-capabilities.js'
 import { DEFAULT_IMAGE_SEAT, TOOL_SEAT, type BuiltInTool } from './generation-policy.js'
+import type { PromptingTipsKey } from './prompting-tips.js'
 
 /** Authoring presets only: these do not claim hosted ChatGPT API capabilities. */
 export const CHATGPT_FRAMING_RATIOS = MODEL_CAPABILITIES['gpt-image-2-6-sunburst'].aspectRatios
@@ -93,6 +94,19 @@ export interface ModelFact {
    * and to fail its build when a niche seat is named more often than the default.
    */
   tier: 'default' | 'specialist' | 'niche'
+  /**
+   * The model's entry in `PROMPTING_TIPS`, the user-facing tips page
+   * (slates.video/docs/prompting). Several seats share one (both GPT Image 2.6
+   * seats, the MiniMax H3 seats). `null` declares the model has none yet;
+   * slates-api's model-lifecycle check fails a fact without the field.
+   */
+  tipsKey: PromptingTipsKey | null
+  /**
+   * The registry rows a family-level fact speaks for, when its id is not their
+   * prefix (`kling-v3` for `kling-v3.0-std`). Any other row takes the fact whose
+   * id it equals or starts with followed by `-`, the longest such id winning.
+   */
+  variants?: readonly string[]
   // ── Reference caps — DERIVED, never typed. See `caps()` below. ──
   /** Max reference images (image models) — null if not applicable. */
   maxRefImages: number | null
@@ -223,6 +237,7 @@ export function multimodalRefModels(): string[] {
 export const MODEL_FACTS: ModelFact[] = [
   {
     id: 'nano-banana-2-1',
+    tipsKey: 'nano-banana',
     route: 'generate',
     tier: 'specialist',
     // Google's `gemini-nano-banana-2.1` (GA 2026-10-06), on fal as
@@ -238,6 +253,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'gpt-image-2-6-flare',
+    tipsKey: 'gpt-image-2-6',
     route: 'generate',
     tier: 'specialist',
     // GPT Image 2.6 replaced 2.5 on 2026-11-10 (Eric), seat for seat; stored
@@ -250,6 +266,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'gpt-image-2-6-sunburst',
+    tipsKey: 'gpt-image-2-6',
     route: 'generate',
     // The default image seat until 2026-11-16, when Seedream 5.5 took it (Eric).
     tier: 'specialist',
@@ -260,6 +277,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'flux-3',
+    tipsKey: null,
     route: 'generate',
     tier: 'specialist',
     // Black Forest Labs' FLUX 3 Image, replacing FLUX.2 Max 2026-10-23 (Eric).
@@ -270,6 +288,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'seedream-5-5',
+    tipsKey: null,
     route: 'generate',
     tier: 'default',
     // ByteDance's Seedream 5.5 on BytePlus ModelArk direct, replacing Seedream
@@ -283,6 +302,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'seedance-2',
+    tipsKey: 'seedance',
     route: 'generate',
     tier: 'specialist',
     label: 'Seedance 2.0',
@@ -293,6 +313,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'seedance-2.5',
+    tipsKey: 'seedance-2-5',
     route: 'generate',
     tier: 'default',
     label: 'Seedance 2.5',
@@ -304,6 +325,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'seedance-2.5-edit',
+    tipsKey: 'seedance-2-5-edit',
     route: 'edit',
     tier: 'default',
     label: 'Seedance 2.5 Edit',
@@ -314,6 +336,8 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'kling-v3',
+    variants: ['kling-v3.0-std', 'kling-v3.0-pro', 'kling-v3.0-omni', 'kling-v3.0-omni-pro'],
+    tipsKey: 'kling',
     route: 'generate',
     tier: 'specialist',
     label: 'Kling 3.0',
@@ -324,6 +348,8 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'kling-v3-edit',
+    variants: ['kling-v3.0-omni-edit', 'kling-v3.0-omni-pro-edit'],
+    tipsKey: 'kling-edit',
     route: 'edit',
     tier: 'specialist',
     label: 'Kling O3 Video Edit',
@@ -334,6 +360,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'kling-v4.0',
+    tipsKey: 'kling',
     route: 'generate',
     tier: 'specialist',
     // Added 2026-10-23 beside Kling 3.0, which stays the Kling seat (Eric). One
@@ -347,6 +374,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'omni-flash-1-2',
+    tipsKey: 'omni-flash',
     route: 'generate',
     tier: 'specialist',
     // Gemini Omni Flash 1.2 replaced 1.1 on 2026-11-10 (Eric), seat for seat;
@@ -359,6 +387,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'omni-flash-1-2-edit',
+    tipsKey: 'omni-flash-edit',
     route: 'edit',
     tier: 'specialist',
     label: 'Omni Flash 1.2 Edit',
@@ -369,6 +398,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'minimax-h3',
+    tipsKey: 'minimax-h3',
     route: 'generate',
     tier: 'specialist',
     label: 'MiniMax H3',
@@ -382,6 +412,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'minimax-h3-max',
+    tipsKey: 'minimax-h3',
     route: 'generate',
     tier: 'specialist',
     label: 'MiniMax H3 Max',
@@ -399,6 +430,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'minimax-h3-max-turbo',
+    tipsKey: 'minimax-h3',
     route: 'generate',
     tier: 'specialist',
     label: 'MiniMax H3 Max Turbo',
@@ -411,6 +443,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'wan-3.0',
+    tipsKey: 'wan-3',
     route: 'generate',
     tier: 'specialist',
     label: 'Wan 3.0',
@@ -421,6 +454,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'ltx-2-5',
+    tipsKey: 'ltx-2-5',
     route: 'generate',
     tier: 'specialist',
     label: 'LTX-2.5',
@@ -433,6 +467,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'ltx-2-5-pro',
+    tipsKey: 'ltx-2-5',
     route: 'generate',
     tier: 'specialist',
     label: 'LTX-2.5 Pro',
@@ -442,6 +477,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'seed-audio',
+    tipsKey: 'seed-audio',
     route: 'generate',
     tier: 'default',
     label: 'Seed Audio 1.0',
@@ -452,6 +488,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'eleven-sfx',
+    tipsKey: 'eleven-sfx',
     route: 'generate',
     tier: 'specialist',
     label: 'ElevenLabs Sound Effects v2',
@@ -461,6 +498,7 @@ export const MODEL_FACTS: ModelFact[] = [
   },
   {
     id: 'inworld-tts-2',
+    tipsKey: 'inworld-tts-2',
     route: 'generate',
     tier: 'specialist',
     label: 'Inworld Realtime TTS-2',
