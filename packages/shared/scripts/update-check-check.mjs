@@ -53,8 +53,16 @@ assert.equal(hits, 1, 'no second request inside the hour')
 assert.equal(await refreshLatestVersion('@x/y', { cacheFile, registryUrl: url, now: t0 + 2 * 60 * 60_000 }), '0.5.19', 'after an hour: refetch')
 assert.equal(hits, 2)
 assert.equal(await refreshLatestVersion('@nope/pkg', { cacheFile, registryUrl: url, now: t0 }), null, '404 yields null, not a throw')
+// A failed lookup is remembered: the CLI awaits this before every command, and a registry that
+// swallows the request would otherwise cost the full timeout each time.
+const afterFailure = hits
+assert.equal(await refreshLatestVersion('@nope/pkg', { cacheFile, registryUrl: url, now: t0 + 60_000 }), null)
+assert.equal(hits, afterFailure, 'no second request inside ten minutes of a failed one')
+assert.equal(await refreshLatestVersion('@nope/pkg', { cacheFile, registryUrl: url, now: t0 + 11 * 60_000 }), null)
+assert.equal(hits, afterFailure + 1, 'a failed lookup is retried after ten minutes')
 server.close()
 assert.equal(await refreshLatestVersion('@x/y', { cacheFile, registryUrl: url, now: t0 + 4 * 60 * 60_000 }), '0.5.19', 'dead registry yields the cached value')
+assert.equal(cachedLatestVersion('@x/y', cacheFile), '0.5.19', 'and a failed lookup keeps the version it knew')
 assert.equal(await refreshLatestVersion('@fresh/pkg', { cacheFile, registryUrl: 'http://127.0.0.1:1', now: t0 }), null, 'dead registry with no cache yields null')
 
-console.log('[update-check] compare, notice, cache round trip, hourly gate and offline fallback passed')
+console.log('[update-check] compare, notice, cache round trip, hourly gate, failed-lookup backoff and offline fallback passed')

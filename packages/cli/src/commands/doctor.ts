@@ -15,7 +15,7 @@ import {
 } from '@slatesvideo/shared'
 import { EXIT } from '../exit-codes.js'
 import { skillInstallTargets, inspectSkillInstallation } from './install-skills.js'
-import { CODEX_MCP_SETUP, inspectCodexMcpConfig } from './mcp-config.js'
+import { CODEX_MCP_SETUP, inspectCodexMcpConfig, inspectJsonMcpConfigs } from './mcp-config.js'
 
 // `slates doctor` — every setup precondition, in one command, each failure
 // printing its own fix.
@@ -250,19 +250,7 @@ export async function runDoctor(): Promise<void> {
   }
 
   // 6. MCP client configs — present is enough; `slates mcp` owns the detail.
-  const mcpConfigs = [
-    join(homedir(), '.claude.json'),
-    join(homedir(), 'AppData', 'Roaming', 'Claude', 'claude_desktop_config.json'),
-    join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json'),
-    join(homedir(), '.cursor', 'mcp.json'),
-  ].filter((p) => existsSync(p))
-  const wired = mcpConfigs.filter((p) => {
-    try {
-      return readFileSync(p, 'utf8').includes('slates')
-    } catch {
-      return false
-    }
-  })
+  const { files: mcpConfigs, configured: wired } = inspectJsonMcpConfigs()
   const codex = inspectCodexMcpConfig()
   checks.push({
     name: 'MCP client config',

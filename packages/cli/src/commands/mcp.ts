@@ -1,7 +1,7 @@
 import { join, delimiter } from 'node:path'
-import { homedir, platform } from 'node:os'
+import { platform } from 'node:os'
 import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs'
-import { CODEX_MCP_SETUP, inspectCodexMcpConfig } from './mcp-config.js'
+import { CODEX_MCP_SETUP, claudeDesktopConfigPath, cursorConfigPath, inspectCodexMcpConfig } from './mcp-config.js'
 
 interface McpOptions {
   write?: boolean
@@ -21,22 +21,6 @@ const SLATES_ENTRY = {
 }
 
 const MCP_JSON_SNIPPET = JSON.stringify({ mcpServers: { slates: SLATES_ENTRY } }, null, 2)
-
-function claudeDesktopConfigPath(): string {
-  const os = platform()
-  if (os === 'win32') {
-    const appData = process.env.APPDATA ?? join(homedir(), 'AppData', 'Roaming')
-    return join(appData, 'Claude', 'claude_desktop_config.json')
-  }
-  if (os === 'darwin') {
-    return join(homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json')
-  }
-  return join(homedir(), '.config', 'Claude', 'claude_desktop_config.json')
-}
-
-function cursorConfigPath(): string {
-  return join(homedir(), '.cursor', 'mcp.json')
-}
 
 function binaryOnPath(name: string): boolean {
   const pathVar = process.env.PATH ?? ''

@@ -261,7 +261,7 @@ console.log('agent-surface-lockstep-check')
     // Exactly ONE loop-level tool is allowed past the shared registry, and it
     // is UI protocol (the cost-approval card), not a capability. Anything else
     // appearing here is a capability the MCP surface will never see.
-    const extras = /const tools = \[\.\.\.opTools,\s*([A-Za-z0-9_,\s]*?)\]/.exec(ops)
+    const extras = /const tools = \[\.\.\.opTools,\s*([A-Za-z0-9_,\s()]*?)\]/.exec(ops)
     if (!extras) {
       fail(CHECK, `${desktopOpsPath}: could not find the buildTools() tool assembly — anchor moved, check is blind.`)
     } else {
@@ -269,7 +269,7 @@ console.log('agent-surface-lockstep-check')
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean)
-      if (names.length !== 1 || names[0] !== 'PRESENT_PLAN_TOOL') {
+      if (names.length !== 1 || !['PRESENT_PLAN_TOOL', 'presentPlanTool()'].includes(names[0])) {
         fail(
           CHECK,
           `${desktopOpsPath}: the desktop adds loop-level tools the MCP surface cannot see: ` +

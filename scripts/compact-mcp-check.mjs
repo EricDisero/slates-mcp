@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { ToolListChangedNotificationSchema, ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js'
+import { ToolListChangedNotificationSchema, ElicitRequestSchema, LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js'
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -69,10 +69,12 @@ const fixture = join(fixtureDir, 'fixture.mjs')
 writeFileSync(fixture, `import { ALL_OPERATIONS } from ${JSON.stringify(new URL('../packages/shared/dist/index.js', import.meta.url).href)};
 globalThis.fetch = async () => { throw Error('Network forbidden in MCP approval test') };
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_image').run = async input => input.confirm
-  ? {text: 'Completed fixture generation', data: {status: 'completed', assetId: 'fixture-only'}}
+  ? {text: 'Completed fixture generation', data: {status: 'completed', assetId: 'fixture-only', ...(input.prompt === 'warn' ? {prompt_warning: 'fixture warning'} : {})}}
   : input.prompt === 'clarify'
     ? {text: 'Clarify fixture prompt', data: {requires_clarification: true, confirm_sends_as_written: true, message: 'Pass confirm=true to send it as written.'}}
     : {text: 'Approve fixture spend', data: {requires_confirm: true}};
+// A finish op requires confirm, so it has no call that only quotes: whatever reaches run spends.
+ALL_OPERATIONS.find(o => o.id === 'slates_finish_draft').run = async () => ({text: 'Completed fixture finish', data: {status: 'completed', cost_credits: 500}});
 // The batch refuses a confirm that does not carry the fingerprint of the quote the user approved.
 ALL_OPERATIONS.find(o => o.id === 'slates_generate_from_shots').run = async input => input.confirm && input.fingerprint === 'quote-1'
   ? {text: 'Completed fixture batch', data: {results: [], total: 0}}
@@ -157,6 +159,20 @@ try {
     assert.equal(asked, 4, 'without asking the user')
     assert.equal(await textOf(generate(client, 'clarify', true)), SPENT, 'until the model claims confirm, when the user decides')
     assert.equal(asked, 5)
+
+    // An op whose confirm is required cannot quote itself, so the user is asked before it runs at all.
+    const finish = () => textOf(client.callTool({name: 'slates_finish_draft', arguments: {projectId: '8652884a-16ac-4531-b1f0-3d5ec5ea2b52', assetId: 'VID-A1', resolution: '1080p', confirm: true, maxCredits: 500}}))
+    answer = () => afterReading({action: 'decline'})
+    assert.match(await finish(), REFUSED, "a person's no stops an op that requires confirm")
+    assert.equal(asked, 6, 'the user is asked before a required-confirm op runs')
+    answer = () => ({action: 'accept', content: {confirm: true}})
+    assert.equal(await finish(), 'Completed fixture finish', 'and a yes runs it')
+
+    // A prompt warning reaches the host as a log message, not only inside the result the model reads.
+    const logged = []
+    client.setNotificationHandler(LoggingMessageNotificationSchema, (note) => { logged.push(note.params.data) })
+    assert.equal(await textOf(generate(client, 'warn', true)), SPENT)
+    assert.deepEqual(logged, ['fixture warning'], 'the server sends its warning to the host')
   })
   // D1: a prompt nobody answers. The model's confirm spends nothing, then or on the next call, and the next
   // call still asks: one unattended prompt must not switch the gate off for the connection.

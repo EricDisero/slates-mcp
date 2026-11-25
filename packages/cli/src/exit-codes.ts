@@ -11,6 +11,9 @@
 // Add codes; never renumber one.
 // ============================================================
 
+import { isDesktopDown } from '@slatesvideo/shared'
+import { SlatesCloudHttpError } from '@slatesvideo/shared/clients/cloud'
+
 export const EXIT = {
   /** The op ran and finished. */
   OK: 0,
@@ -28,15 +31,14 @@ export const EXIT = {
   NOT_SIGNED_IN: 6,
 } as const
 
-/** Map a thrown error to its exit code. Retrying a 5 or a 6 is pointless until
- *  the user does something; retrying a 1 might work. That distinction is the
- *  whole reason these exist. */
+/**
+ * Map a thrown error to its exit code, by the error's type and never its wording.
+ * Retrying a 5 or a 6 is pointless until the user does something; retrying a 1
+ * might work. That distinction is the whole reason these exist.
+ */
 export function exitFor(err: unknown): number {
-  const code = (err as { code?: unknown })?.code
-  if (code === 'DESKTOP_SERVER_MISSING') return EXIT.DESKTOP_UNREACHABLE
-  if (code === 'CLOUD_TOKEN_MISSING') return EXIT.NOT_SIGNED_IN
-  const message = err instanceof Error ? err.message : String(err)
-  if (/not reachable|AI tools|Agent Control|is not running/i.test(message)) return EXIT.DESKTOP_UNREACHABLE
-  if (/rejected the auth token|slates login|401/i.test(message)) return EXIT.NOT_SIGNED_IN
+  if (isDesktopDown(err)) return EXIT.DESKTOP_UNREACHABLE
+  if ((err as { code?: unknown } | null)?.code === 'CLOUD_TOKEN_MISSING') return EXIT.NOT_SIGNED_IN
+  if (err instanceof SlatesCloudHttpError && err.status === 401) return EXIT.NOT_SIGNED_IN
   return EXIT.ERROR
 }

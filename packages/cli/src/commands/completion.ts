@@ -1,6 +1,6 @@
 import { ALL_OPERATIONS, type Operation } from '@slatesvideo/shared'
 
-// `slates completion bash|zsh|pwsh` — op ids are long, there are 91 of them,
+// `slates completion bash|zsh|pwsh` — op ids are long, there are many of them,
 // and every one starts with the same eleven characters. Tab completion is the
 // difference between typing an id and remembering one.
 //

@@ -29,49 +29,59 @@ export interface AgentConnectionFile {
     port: number | null
     token: string | null
   }
-  /**
-   * The project `slates use` selected, filled into any op that takes
-   * `projectId` and was called without one.
-   *
-   * 🚨 CLI-OWNED, AND ONLY A DEFAULT. The desktop app owns the `desktop` half
-   * of this file and must never write here; an explicit `--projectId` always
-   * wins. It exists because every workspace op takes a UUID and an agent had to
-   * carry that UUID through the whole session by hand — which is exactly the
-   * kind of state a shell session is bad at holding.
-   */
-  defaultProjectId?: string | null
 }
 
 const EMPTY: AgentConnectionFile = {
   cloud: { token: null },
   desktop: { enabled: false, port: null, token: null },
-  defaultProjectId: null,
 }
 
-export function readConnection(): AgentConnectionFile {
-  if (!existsSync(CONNECTION_FILE)) return { ...EMPTY, cloud: { ...EMPTY.cloud }, desktop: { ...EMPTY.desktop } }
+/** A JSON object file as written, or {} when it is missing or unreadable. */
+function readJsonObject(file: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(readFileSync(CONNECTION_FILE, 'utf-8')) as Partial<AgentConnectionFile>
-    return {
-      cloud: { token: parsed.cloud?.token ?? null },
-      desktop: {
-        enabled: !!parsed.desktop?.enabled,
-        port: parsed.desktop?.port ?? null,
-        token: parsed.desktop?.token ?? null,
-      },
-      defaultProjectId: parsed.defaultProjectId ?? null,
-    }
+    const parsed = JSON.parse(readFileSync(file, 'utf-8')) as unknown
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
   } catch {
-    return { ...EMPTY, cloud: { ...EMPTY.cloud }, desktop: { ...EMPTY.desktop } }
+    return {}
   }
 }
 
+export function readConnection(): AgentConnectionFile {
+  const parsed = readJsonObject(CONNECTION_FILE) as Partial<AgentConnectionFile>
+  return {
+    cloud: { token: parsed.cloud?.token ?? null },
+    desktop: {
+      enabled: !!parsed.desktop?.enabled,
+      port: parsed.desktop?.port ?? null,
+      token: parsed.desktop?.token ?? null,
+    },
+  }
+}
+
+// ~/.slates/cli.json — what the CLI alone remembers: the project `slates use` selected, filled
+// into any op that takes `projectId` and was called without one. An explicit `--projectId` wins.
+//
+// Its own file because the desktop app rewrites the connection file whole on every start, sign-in
+// and agent-server toggle, which erased the default each time (2026-11-24). One writer per file.
+export const CLI_STATE_FILE = join(AGENT_DIR, 'cli.json')
+
 export function setDefaultProjectId(projectId: string | null): void {
-  writeConnection({ ...readConnection(), defaultProjectId: projectId })
+  mkdirSync(AGENT_DIR, { recursive: true, mode: 0o700 })
+  writeFileSync(CLI_STATE_FILE, JSON.stringify({ ...readJsonObject(CLI_STATE_FILE), defaultProjectId: projectId }, null, 2))
 }
 
 export function readDefaultProjectId(): string | null {
-  return readConnection().defaultProjectId ?? null
+  const state = readJsonObject(CLI_STATE_FILE)
+  if ('defaultProjectId' in state) return typeof state.defaultProjectId === 'string' ? state.defaultProjectId : null
+  // An earlier CLI kept it in the connection file. Carry a surviving one over once.
+  const legacy = readJsonObject(CONNECTION_FILE).defaultProjectId
+  if (typeof legacy !== 'string') return null
+  try {
+    setDefaultProjectId(legacy)
+  } catch {
+    // A read-only home still answers with the default it found.
+  }
+  return legacy
 }
 
 /**
@@ -105,7 +115,9 @@ export function writeConnection(data: AgentConnectionFile): void {
     chmodSync(AGENT_DIR, 0o700)
     if (existsSync(CONNECTION_FILE)) chmodSync(CONNECTION_FILE, 0o600)
   }
-  writeFileSync(CONNECTION_FILE, JSON.stringify(data, null, 2), { mode: 0o600 })
+  // Laid over the file as it stands: a field another writer added (a newer app or CLI) survives.
+  const merged = { ...readJsonObject(CONNECTION_FILE), cloud: data.cloud, desktop: data.desktop }
+  writeFileSync(CONNECTION_FILE, JSON.stringify(merged, null, 2), { mode: 0o600 })
 }
 
 export function setCloudToken(token: string | null): void {
@@ -136,6 +148,23 @@ export class MissingDesktopServerError extends Error {
       'Slates desktop is not running with its local server on. Open Slates → Settings → AI tools and connect (Send link, or Connect without the email link).'
     )
   }
+}
+
+/** The desktop's local server was configured and did not answer: the app is closed, or its port moved. */
+export class DesktopUnreachableError extends Error {
+  code = 'DESKTOP_UNREACHABLE'
+}
+
+/**
+ * Whether a failure means "open the Slates app", by the error's code and never its wording: the
+ * cloud's revoked-token message also names Settings → AI tools, and a host that matched on the
+ * words sent a signed-out user to open an app that was already open (2026-11-24).
+ */
+export function isDesktopDown(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code
+  if (code === 'DESKTOP_SERVER_MISSING' || code === 'DESKTOP_UNREACHABLE') return true
+  // Until clients/desktop.ts throws DesktopUnreachableError, its refused connection is a plain Error.
+  return err instanceof Error && err.message.startsWith('Slates desktop app is not reachable')
 }
 
 /** A short hash of a bearer token, so a file can name which login wrote it without holding the token. */

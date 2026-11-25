@@ -406,11 +406,19 @@ const strArray = (v: unknown): string[] =>
 /** The mutually exclusive TTS source fields, shared by readers and patch merging. */
 export const VOICE_SOURCE_FIELDS = ['voiceId', 'voiceReferenceAssetId', 'voiceDescription'] as const
 
-/** Setting a voice replaces the previous source; unrelated parameter edits preserve it. */
+/**
+ * Setting a voice replaces the previous source; unrelated parameter edits preserve it.
+ * A draft renders at 480p whatever is stored, so the 480p `readParams` filled in for it
+ * carries no choice: switching the draft off drops it (the model's default applies)
+ * unless the patch names a resolution, and draft on then off restores the params.
+ */
 export function mergeShotParams(existing: ShotParams, patch: Record<string, unknown>): ShotParams {
   const next = { ...existing }
   if (VOICE_SOURCE_FIELDS.some((k) => typeof patch[k] === 'string' && patch[k].trim())) {
     for (const k of VOICE_SOURCE_FIELDS) delete next[k]
+  }
+  if (existing.seedanceDraft && patch.seedanceDraft === false && patch.videoResolution === undefined && next.videoResolution === '480p') {
+    delete next.videoResolution
   }
   return readParams({ ...next, ...patch })
 }

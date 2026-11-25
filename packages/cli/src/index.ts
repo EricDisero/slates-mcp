@@ -55,7 +55,9 @@ program
   // Version handshake: one bounded registry lookup an hour, cached in
   // ~/.slates/update-check.json, printed to STDERR so JSON on stdout stays
   // clean and an agent driving the CLI still sees it. Fail-silent offline.
-  .hook('preAction', async () => {
+  .hook('preAction', async (_program, command) => {
+    // A completion script is sourced at every shell start and must not wait on the network.
+    if (command.name() === 'completion') return
     const notice = updateNotice(
       CLI_PKG_NAME,
       pkg.version,
@@ -118,7 +120,7 @@ program
 
 program
   .command('completion')
-  .description('Print a shell completion script for the 91 operation ids.')
+  .description('Print a shell completion script for every operation id.')
   .argument('[shell]', 'bash | zsh | pwsh')
   .action((shell: string | undefined) => runCompletion(shell))
 
@@ -126,7 +128,7 @@ program
   .command('run')
   .description('Invoke a Slates operation by id. `slates run --list` lists them; `slates run <op> --help` prints that op\'s flags.')
   .option('--list', 'List operation ids with a one-line summary', false)
-  .option('--full', 'With --list: print each op\'s complete description (large — 29 KB)', false)
+  .option('--full', 'With --list: print each op\'s complete description (large)', false)
   .option('--json', 'Emit structured JSON ({text, data, images: [{mimeType, bytes}]}). Image binary is omitted — use --save-images to write the files.', false)
   .option('--save-images <dir>', 'Write returned images into <dir> and print the paths')
   .option('--input <json>', 'JSON object of inputs — the only way to pass a NESTED object (Shot params/refs, batch updates). Merged under explicit flags.')
@@ -154,7 +156,7 @@ program
 
     const ops = ALL_OPERATIONS as readonly Operation<unknown>[]
     if (listFlag || !opId) {
-      // 🚨 IDS AND ONE SENTENCE, NOT 29 KB. `--list` printed every description
+      // 🚨 IDS AND ONE SENTENCE. `--list` printed every description
       // in full — including the generated capability tables — and not one
       // parameter name, so the one command that was supposed to teach the
       // surface was unreadable and taught nothing. `--full` keeps the old

@@ -122,6 +122,8 @@ async function fastCheck() {
     ['slates_get_reframe_report', { projectId, timelineId, clipId, aspect: 'catalog-aspect' }, 'GET', '/agent/timeline/reframe-report'],
     ['slates_reframe_clip', { projectId, timelineId, clipId, aspect: 'catalog-aspect', framing: null }, 'POST', '/agent/timeline/reframe'],
     ['slates_reframe_clip', { projectId, timelineId, clipId, aspect: 'catalog-aspect', framing: { mode: 'fit', focusX: 0.7, zoom: 2 } }, 'POST', '/agent/timeline/reframe'],
+    // Every follow form stands alone, as the description and the framing param promise.
+    ...['face', 'off', { maskId: 'mask-1' }].map(follow => ['slates_reframe_clip', { projectId, timelineId, clipId, aspect: 'catalog-aspect', follow }, 'POST', '/agent/timeline/reframe']),
     ['slates_update_timeline_settings', { projectId, timelineId, delivery: null }, 'POST', '/agent/timeline/delivery'],
     ['slates_update_timeline_settings', { projectId, timelineId, delivery: { formats: ['catalog-aspect'] }, masterVolume: 1 }, 'POST', '/agent/timeline/update-settings'],
     ['slates_save_timeline', { projectId, timelineId, name: 'Cut', taxonomy: null, gridBinding: { familyId: 'family', slots: { hook: { key: 'choice', choicePosition: 0 } } } }, 'POST', '/agent/timelines'],
@@ -143,6 +145,8 @@ async function fastCheck() {
     await assert.rejects(() => byId.get(name).run(byId.get(name).input.parse(input), { ...ctx, desktop: () => refusing }), /Update Slates/)
     assert.equal(calls.length, before, 'refusal must precede transport')
   }
+  assert.throws(() => byId.get('slates_reframe_clip').input.parse({ projectId, timelineId, clipId, aspect: 'catalog-aspect' }),
+    /Send framing \(null resets it\) or follow/, 'reframe needs framing or follow, refused by the schema every host parses')
   for (const id of featureIds) {
     const op = byId.get(id)
     assert.equal(op.billable, false, `${id} must be non-billable`)

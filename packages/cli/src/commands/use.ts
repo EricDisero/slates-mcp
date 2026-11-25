@@ -9,8 +9,8 @@ import { EXIT, exitFor } from '../exit-codes.js'
 //
 // Every workspace op takes `projectId`, and an agent shelling out had to carry
 // that UUID through the whole session by hand. A shell session is bad at
-// holding state, so it went in the connection file, where the next command can
-// read it. An explicit `--projectId` always wins; this only fills an omission.
+// holding state, so it goes in the CLI's own file (`CLI_STATE_FILE`), where the
+// next command can read it. An explicit `--projectId` always wins; this only fills an omission.
 
 interface ProjectRow {
   id: string

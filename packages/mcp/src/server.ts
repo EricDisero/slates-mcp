@@ -42,8 +42,10 @@ import {
   updateNotice,
   readMcpLauncher,
   setDesktopClientIdentity,
+  isDesktopDown,
   type Operation,
 } from '@slatesvideo/shared'
+import { DECLINED_TEXT, confirmGate, runWithConsent } from './confirm-gate.js'
 
 // Slates MCP server. Stdio transport. Wires every operation in
 // @slatesvideo/shared as an MCP tool. Both the desktop server and the
@@ -156,6 +158,8 @@ const server = new Server(
 // Code and nothing measurable in Codex. Legacy --tools=compact and
 // --tools=flat flags remain accepted; every launch exposes the same full list.
 const TOOLS = toolDefinitions(ops, { surface: 'mcp' })
+/** Who asks the user before each op runs, read off the same rendered schema the host was sent. */
+const CONFIRM_GATES = new Map(TOOLS.map((tool) => [tool.name, confirmGate(tool.inputSchema)]))
 
 /**
  * Output schemas for the ops whose result shape is STABLE.
@@ -235,9 +239,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   })),
 }))
 
-/** Fire-and-forget: a host that has not enabled logging must not break a call. */
+/** Fire-and-forget. The SDK drops it below the level the host asked for, and a failed send must not break a call. */
 function warn(message: string): void {
-  if (!server.getClientCapabilities()?.['logging' as never]) return
   void server.sendLoggingMessage({ level: 'warning', logger: 'slates', data: message }).catch(() => {})
 }
 
@@ -255,13 +258,6 @@ const HUMAN_ANSWER_MS = 500
 /** The question is a form, so a host that declares only `url` elicitation counts as a host without elicitation. */
 function clientSupportsElicitation(): boolean {
   return !!server.getClientCapabilities()?.elicitation?.form
-}
-
-/** Does this op actually have a `confirm` gate to satisfy? */
-function opTakesConfirm(op: Operation<unknown>): boolean {
-  const def = (op.input as unknown as { _def?: { shape?: () => Record<string, unknown> } })._def
-  const shape = typeof def?.shape === 'function' ? def.shape() : undefined
-  return !!shape && 'confirm' in shape
 }
 
 /** The host advertised elicitation and has no such method: its text path is all this connection has. */
@@ -345,59 +341,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       ticker.unref?.()
     }
 
-    // 🚨 A MODEL'S `confirm: true` IS NOT THE USER'S YES. A prompt-injected agent can send it on its first
-    // call, so where the host can ask the user, the op runs without it and the gate below asks. On a host
-    // with no form elicitation, the CLI among them, nobody is asked: a spend there is the model's word and
-    // no one's approval, and the desktop's checks are all that stands behind it.
-    const canAskUser = opTakesConfirm(op) && clientSupportsElicitation() && !elicitationFailed
-    const claimed = canAskUser && (args as { confirm?: unknown }).confirm === true
-
-    const runOp = (patch?: Record<string, unknown>) =>
-      call.run({ ...defaultContext(), signal: extra?.signal, guidesRead }, patch as never)
-
-    let result
+    // On a host with no form elicitation, the CLI among them, nobody is asked: a spend there is the model's
+    // word and no one's approval, and the desktop's checks are all that stands behind it.
+    let outcome
     try {
-      result = await runOp(claimed ? { confirm: undefined } : undefined)
+      outcome = await runWithConsent({
+        opId: op.id,
+        gate: CONFIRM_GATES.get(op.id) ?? 'none',
+        args: args as Record<string, unknown>,
+        hostCanAsk: clientSupportsElicitation() && !elicitationFailed,
+        run: (patch) => call.run({ ...defaultContext(), signal: extra?.signal, guidesRead }, patch as never),
+        ask: elicitConfirm,
+      })
     } finally {
       if (ticker) clearInterval(ticker)
     }
-
+    if ('declined' in outcome) return { content: [{ type: 'text', text: DECLINED_TEXT }] }
+    const result = outcome
     let data = result.data as Record<string, unknown> | undefined
-
-    // The one place the server can ask the USER instead of the model.
-    //
-    // 🚨 GATED ON THE OP HAVING A `confirm` INPUT, not merely on the flag.
-    // `slates_estimate_generation_cost` returns `requires_confirm: true` as
-    // INFORMATION — "the generation this quotes will trip the gate" — and takes
-    // no `confirm` param at all. Eliciting there would ask the user to approve
-    // a spend that is not happening, on a read-only pre-flight quote, and then
-    // re-run the quote with a parameter it does not have.
-    //
-    // `confirm_sends_as_written` is the one clarification confirm answers: without this, a claimed confirm
-    // would come back the same clarification forever, with nobody asked.
-    if (canAskUser && (data?.requires_confirm === true || (claimed && data?.confirm_sends_as_written === true))) {
-      const answer = await elicitConfirm(
-        typeof data.message === 'string' ? data.message : result.text
-      )
-      if (answer === false) {
-        return {
-          content: [{ type: 'text', text: 'The user declined or did not answer, so nothing ran. Do not re-call without new instructions.' }],
-        }
-      }
-      if (answer === true) {
-        // A quote that carries a fingerprint (`slates_generate_from_shots`) is
-        // fired only with it: the user approved THAT quote, and a changed
-        // recipe must still refuse.
-        const fingerprint = typeof data.fingerprint === 'string' ? { fingerprint: data.fingerprint } : {}
-        result = await runOp({ ...fingerprint, confirm: true })
-        data = result.data as Record<string, unknown> | undefined
-      } else if (claimed) {
-        // null → no person answered, so this call stands as it would on a host with no elicitation: the
-        // model's own confirm and fingerprint run, and without a confirm the quote goes back to the model.
-        result = await runOp()
-        data = result.data as Record<string, unknown> | undefined
-      }
-    }
 
     if (typeof data?.prompt_warning === 'string' && data.prompt_warning) {
       warn(data.prompt_warning)
@@ -435,7 +396,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    if (/not reachable|is not running|AI tools|Agent Control/i.test(message)) warn(message)
+    if (isDesktopDown(err)) warn(message)
     return {
       content: [{ type: 'text', text: `Error: ${message}` }],
       isError: true,

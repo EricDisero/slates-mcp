@@ -1,6 +1,6 @@
 // Exercise the published operation functions against a fake desktop transport.
 import assert from 'node:assert/strict'
-import { createShot, updateShot, duplicateShot, getShot, generateFromShots, TTS_MODEL } from '../packages/shared/dist/operations/index.js'
+import { createShot, updateShot, duplicateShot, getShot, splitShot, mergeShots, generateFromShots, TTS_MODEL } from '../packages/shared/dist/operations/index.js'
 import { audioCostKey } from '../packages/shared/dist/operations/index.js'
 import { mergeShotParams } from '../packages/shared/dist/prompts/shot-spec.js'
 
@@ -10,7 +10,7 @@ const requests = []
 const desktop = {
   requireCapability: async () => {},
   get: async (path, query) => {
-    if (path === '/agent/shots/get') return { shot: { projectId } }
+    if (path === '/agent/shots/get') return { shot: { id: 'shot-a1', projectId } }
     assert.equal(path, '/agent/assets')
     assert.equal(query.projectId, projectId)
     return { assets: [{ id: assetId, projectId, code: 'AUD-S1', type: 'audio', label: 'Voice' }] }
@@ -55,3 +55,59 @@ assert.equal(batch.data.succeeded, 1, 'a priced TTS batch reaches the shared gen
 const stale = await generateFromShots.run({ shotIds: ['shot'], confirm: true, fingerprint: 'stale' }, ctx)
 assert.equal(stale.data.requires_confirm, true, 'changed quote never reaches generation')
 console.log('TTS Shot quotes: get and batch use the text bucket without requiring duration.')
+
+// Shot refs: a SHOT-A code is unique per project only. Project B's SHOT-A1 is the
+// newest, so a lookup without a project lands there; every op must scope to A.
+const otherProject = '33333333-3333-4333-8333-333333333333'
+const shotsByProject = {
+  [projectId]: { id: 'a-shot', code: 'SHOT-A1', projectId, model: 'seedance-2.5', params: {} },
+  [otherProject]: { id: 'b-shot', code: 'SHOT-A1', projectId: otherProject, model: 'seedance-2.5', params: {} },
+}
+const sent = []
+const twoProjects = {
+  requireCapability: async () => {},
+  get: async (path, query) => {
+    if (path === '/agent/shots/get') return { shot: shotsByProject[query.projectId ?? otherProject] }
+    if (path === '/agent/shots/quote') return { fingerprint: 'f', items: JSON.parse(query.input).shotIds.map((shotId) => ({ shotId, credits: 1 })) }
+    if (path === '/agent/assets') return { assets: [{ id: assetId, projectId, code: 'IMG-A8', type: 'image', label: 'Poster' }] }
+    if (path === '/agent/shots') return { shots: [] }
+    throw new Error('unexpected GET ' + path)
+  },
+  post: async (path, body) => { sent.push({ path, body }); return { shot: { id: 'a-shot' }, first: {}, second: {} } },
+}
+const scoped = { desktop: () => twoProjects }
+await updateShot.run({ projectId, shotId: 'SHOT-A1', name: 'Renamed', posterAssetId: 'IMG-A8' }, scoped)
+assert.equal(sent.at(-1).body.id, 'a-shot', 'update_shot resolves a code inside its own project')
+assert.equal(sent.at(-1).body.data.posterAssetId, assetId, 'a poster badge code resolves to its asset id')
+await duplicateShot.run({ projectId, shotId: 'SHOT-A1' }, scoped)
+assert.equal(sent.at(-1).body.id, 'a-shot')
+await splitShot.run({ projectId, shotId: 'SHOT-A1' }, scoped)
+assert.equal(sent.at(-1).body.id, 'a-shot')
+await mergeShots.run({ projectId, firstId: 'SHOT-A1', secondId: 'SHOT-A1' }, scoped)
+assert.deepEqual([sent.at(-1).body.firstId, sent.at(-1).body.secondId], ['a-shot', 'a-shot'])
+assert.equal((await getShot.run({ projectId, shotId: 'SHOT-A1' }, scoped)).data.id, 'a-shot')
+assert.equal((await generateFromShots.run({ projectId, shotIds: ['SHOT-A1'] }, scoped)).data.items[0].shotId, 'a-shot')
+// A Shot the desktop finds in another project is refused, never written or billed.
+const leaky = { desktop: () => ({ ...twoProjects, get: async (path, query) => path === '/agent/shots/get' ? { shot: shotsByProject[otherProject] } : twoProjects.get(path, query) }) }
+await assert.rejects(updateShot.run({ projectId, shotId: 'SHOT-A1', name: 'x' }, leaky), /another project/)
+await assert.rejects(generateFromShots.run({ shotIds: ['a-shot', 'SHOT-A1'] }, {
+  desktop: () => ({ ...twoProjects, get: async (path, query) => path === '/agent/shots/get'
+    ? { shot: query.id === 'a-shot' ? shotsByProject[projectId] : shotsByProject[otherProject] } : twoProjects.get(path, query) }),
+}), /2 projects/)
+console.log('Shot refs: codes resolve in their own project for update, duplicate, split, merge, get and generate; a mixed batch is refused.')
+
+// An edit that names no model is gated against the stored Shot's model, as create is.
+sent.length = 0
+for (const run of [
+  () => createShot.run({ projectId, prompt: 'Hello', model: 'seedance-2.5', params: { aspectRatio: '4:5' } }, scoped),
+  () => updateShot.run({ projectId, shotId: 'SHOT-A1', params: { aspectRatio: '4:5' } }, scoped),
+  () => duplicateShot.run({ projectId, shotId: 'SHOT-A1', params: { aspectRatio: '4:5' } }, scoped),
+]) assert.equal((await run()).data.requires_clarification, true, 'seedance-2.5 refuses 4:5 on create, update and duplicate')
+assert.equal(sent.length, 0, 'a refused recipe is never saved')
+
+// Switching a Seedance draft off returns the Shot to its model's default resolution.
+const drafted = mergeShotParams({}, { seedanceDraft: true })
+assert.equal(drafted.videoResolution, '480p')
+assert.equal(mergeShotParams(drafted, { seedanceDraft: false }).videoResolution, undefined, 'draft off drops the implied 480p')
+assert.equal(mergeShotParams(drafted, { seedanceDraft: false, videoResolution: '480p' }).videoResolution, '480p', 'a named 480p stays')
+console.log('Shot capability gate on stored models, and draft off restores the resolution.')

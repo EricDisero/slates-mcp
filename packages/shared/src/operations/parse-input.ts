@@ -34,18 +34,32 @@ export function flattenZodError(err: z.ZodError, indent = ''): string {
 
 const NUMERIC = /^\s*-?\d+(\.\d+)?\s*$/
 
+/** Every issue that names a wrong scalar type, with the type the schema wanted; a union's branches included. */
+function* scalarIssues(err: z.ZodError): Generator<{ path: (string | number)[]; expected: string }> {
+  for (const issue of err.issues) {
+    if (issue.code === 'invalid_union') for (const branch of issue.unionErrors) yield* scalarIssues(branch)
+    else if (issue.code === 'invalid_type') yield { path: issue.path, expected: issue.expected }
+    // `fps: 24 | 30 | 60` reports each literal it is not, never "expected number".
+    else if (issue.code === 'invalid_literal') yield { path: issue.path, expected: typeof issue.expected }
+  }
+}
+
 /**
  * A model or a shell sends `"5"` or `"true"` where the schema wants a number or
  * a boolean. The intent is unambiguous, so it is repaired at the exact path Zod
- * named and nowhere else. Returns a repaired copy, or null when nothing was
- * repairable.
+ * named and nowhere else. Only `"true"` and `"false"` are booleans: `"on"` or
+ * `"yes"` stays a string and fails the schema by name. Returns a repaired copy,
+ * or null when nothing was repairable.
+ *
+ * This is the only scalar coercion any host has. The CLI once ran its own
+ * first, which turned `--sound on` into `false` without a word (2026-11-24).
  */
 function repairScalars(value: unknown, err: z.ZodError): unknown | null {
   if (typeof value !== 'object' || value === null) return null
   const copy = structuredClone(value) as Record<string | number, unknown>
   let changed = false
-  for (const issue of err.issues) {
-    if (issue.code !== 'invalid_type' || issue.path.length === 0) continue
+  for (const issue of scalarIssues(err)) {
+    if (issue.path.length === 0) continue
     let parent: unknown = copy
     for (const p of issue.path.slice(0, -1)) {
       parent = typeof parent === 'object' && parent !== null ? (parent as Record<PropertyKey, unknown>)[p] : undefined

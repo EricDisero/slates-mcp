@@ -9,7 +9,9 @@
 // restarts, a global install nobody re-runs, or skill files copied months ago.
 //
 // HOW IT WORKS. One small registry GET (`/<pkg>/latest`), cached on disk in
-// ~/.slates/update-check.json and refreshed at most once an hour. Readers are
+// ~/.slates/update-check.json and refreshed at most once an hour; a lookup that
+// failed is remembered too and retried after ten minutes, so a network that
+// swallows the request costs one wait, not one per command. Readers are
 // SYNCHRONOUS and disk-only so the MCP server can put the notice into its
 // `instructions` at construction time without delaying startup; the refresh
 // runs in the background for the NEXT launch. The CLI awaits the refresh
@@ -23,6 +25,7 @@ import { AGENT_DIR } from './auth.js'
 
 export const UPDATE_CACHE_FILE = join(AGENT_DIR, 'update-check.json')
 const REFRESH_AFTER_MS = 60 * 60 * 1000
+const RETRY_FAILED_AFTER_MS = 10 * 60 * 1000
 const FETCH_TIMEOUT_MS = 2500
 // The registry's answer and the cache are both outside text, and the notice lands in the MCP
 // instructions, a channel the model treats as the product's own words. So only a plain release
@@ -30,7 +33,8 @@ const FETCH_TIMEOUT_MS = 2500
 const VERSION_RE = /^\d+\.\d+\.\d+$/
 const MAX_VERSION_LENGTH = 32
 
-type UpdateCache = Record<string, { latest: string; checkedAt: number }>
+/** `failed` marks a lookup that got no version; `latest` is then the last one known, or null. */
+type UpdateCache = Record<string, { latest: string | null; checkedAt: number; failed?: true }>
 
 /** Numeric semver compare on the release segments; a prerelease suffix is ignored. */
 export function compareVersions(a: string, b: string): number {
@@ -82,7 +86,13 @@ export async function refreshLatestVersion(
   const now = options.now ?? Date.now()
   const cache = readCache(cacheFile)
   const entry = cache[pkgName]
-  if (entry && now - entry.checkedAt < REFRESH_AFTER_MS) return entry.latest
+  if (entry && now - entry.checkedAt < (entry.failed ? RETRY_FAILED_AFTER_MS : REFRESH_AFTER_MS)) return entry.latest ?? null
+  const known = typeof entry?.latest === 'string' ? entry.latest : null
+  const failed = (): string | null => {
+    cache[pkgName] = { latest: known, checkedAt: now, failed: true }
+    writeCache(cacheFile, cache)
+    return known
+  }
   const registryUrl = options.registryUrl ?? 'https://registry.npmjs.org'
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
@@ -94,14 +104,14 @@ export async function refreshLatestVersion(
       signal: controller.signal,
       headers: { accept: 'application/json' },
     })
-    if (!res.ok) return entry?.latest ?? null
+    if (!res.ok) return failed()
     const body = (await res.json()) as { version?: unknown }
-    if (typeof body.version !== 'string') return entry?.latest ?? null
+    if (typeof body.version !== 'string') return failed()
     cache[pkgName] = { latest: body.version, checkedAt: now }
     writeCache(cacheFile, cache)
     return body.version
   } catch {
-    return entry?.latest ?? null
+    return failed()
   } finally {
     clearTimeout(timer)
   }

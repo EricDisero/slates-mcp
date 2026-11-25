@@ -1413,7 +1413,7 @@ export const reorderPins: Operation<{ projectId: string; assetIds: string[] }> =
   async run(input, ctx) {
     await ctx.desktop().requireCapability('reorder', 'reordering folders and pins')
     const resolved = await resolveAssetRefs(ctx, input.projectId, input.assetIds)
-    return ok(await ctx.desktop().post('/agent/pins/reorder', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.get(r)!.id) }))
+    return ok(await ctx.desktop().post('/agent/pins/reorder', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.id(r)) }))
   },
 }
 
@@ -1524,7 +1524,7 @@ export const getAsset: Operation<{ projectId: string; assetId: string }> = {
   input: z.object({ projectId: z.string().uuid(), assetId: z.string().min(1) }).strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('asset-detail', 'reading one asset in full')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     return ok(await ctx.desktop().get('/agent/assets/get', { id }))
   },
 }
@@ -1542,8 +1542,8 @@ export const linkAssetSource: Operation<{ projectId: string; assetId: string; im
     const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
     return ok(
       await ctx.desktop().post('/agent/assets/link-source', {
-        assetId: resolved.get(input.assetId)!.id,
-        imageAssetId: input.imageAssetId ? resolved.get(input.imageAssetId)!.id : null,
+        assetId: resolved.id(input.assetId),
+        imageAssetId: input.imageAssetId ? resolved.id(input.imageAssetId) : null,
       })
     )
   },
@@ -1567,7 +1567,7 @@ export const transcribeAsset: Operation<{ projectId: string; assetId: string; fo
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('transcripts', 'transcripts')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     const r = await ctx.desktop().post<TranscribeResult>('/agent/assets/transcribe', { assetId: id, ...(input.force ? { force: true } : {}) })
     const what = r.noSpeech ? 'No speech in this asset.' : r.reused ? 'Reused the stored transcript.' : 'Transcribed.'
     const models = r.downloadedModelsMB ? ` Downloaded ${r.downloadedModelsMB} MB of speech models first.` : ''
@@ -1587,7 +1587,7 @@ export const getAssetTranscript: Operation<{ projectId: string; assetId: string 
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('transcripts', 'transcripts')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     return ok(await ctx.desktop().get('/agent/assets/transcript', { assetId: id }))
   },
 }
@@ -1607,7 +1607,7 @@ export const editAssetTranscript: Operation<{ projectId: string; assetId: string
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('transcript-edit', 'transcript editing')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     const r = await ctx.desktop().post<{ changed: { corrected: number; added: number; removed: number }; recaptioned: string[] }>('/agent/assets/transcript/edit', {
       assetId: id, text: input.text, ...(input.recaption === false ? { recaption: false } : {}),
     })
@@ -1661,7 +1661,7 @@ type BeatTargetInput = { projectId: string; assetId?: string; clipId?: string }
 async function beatTargetBody(ctx: OperationContext, input: BeatTargetInput): Promise<{ projectId: string; assetId?: string; clipId?: string }> {
   if (input.clipId) return { projectId: input.projectId, clipId: input.clipId }
   if (!input.assetId) throw new Error('Name assetId or clipId.')
-  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id }
+  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId) }
 }
 
 type BeatGridAnswer = {
@@ -1871,7 +1871,7 @@ async function maskTargetBody(ctx: OperationContext, input: MaskTargetInput & { 
   // A mask id is unique: the desktop finds its file.
   if (!input.assetId && input.maskId) return { projectId: input.projectId }
   if (!input.assetId) throw new Error('Name assetId or clipId (or maskId, to read or change one mask).')
-  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id }
+  return { projectId: input.projectId, assetId: (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId) }
 }
 
 export const getSubjectMask: Operation<MaskTargetInput & { maskId?: string; sheet?: boolean; boxes?: boolean; waitSeconds?: number }> = {
@@ -2108,7 +2108,7 @@ export const extractVideoFrame: Operation<{ projectId: string; assetId: string; 
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('frame-extract', 'extracting a frame')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     return ok(await ctx.desktop().post('/agent/assets/extract-frame', { assetId: id, at: input.at ?? 'first' }))
   },
 }
@@ -2453,7 +2453,13 @@ export const estimateGenerationCost: Operation<{
       // billed `high`, so the op the doctrine tells agents to call before every
       // generation quoted 1 cr for a 2 cr job. Four separate copies of one
       // default is what made that possible; there are now none.
-      if (img) key = imageCostKey(img, input.resolution ?? defaultImageResolutionFor(img), input.quality, input.aspectRatio, input.referenceImages ?? 0)
+      if (img) {
+        // The gate generation runs, so a quote never prices what generation refuses.
+        const resolution = input.resolution ?? defaultImageResolutionFor(img)
+        const capErr = assertImageCapabilities({ model: img, aspectRatio: input.aspectRatio, resolution })
+        if (capErr) return ok(capErr)
+        key = imageCostKey(img, resolution, input.quality, input.aspectRatio, input.referenceImages ?? 0)
+      }
     }
     // 2a) audio base id → seconds. Both surfaces bill per second, so a
     //     duration is always required. Runs BEFORE the video resolver: it is
@@ -2528,6 +2534,14 @@ export const estimateGenerationCost: Operation<{
           message: 'Kling O3 edit bills per second of output (≈ the source clip length, rounded up) — pass duration.',
         })
       }
+      const clip = editClipBounds(input.model)
+      if (input.duration < clip.min || input.duration > clip.max) {
+        return ok({
+          requires_clarification: true,
+          missing: ['duration'],
+          message: `${input.model} edits clips of ${clip.min}-${clip.max} seconds; ${input.duration}s is outside that, and slates_edit_video refuses it. Trim the source or pick another edit engine.`,
+        })
+      }
       key = klingEditCostKey(input.model, input.duration)
     }
     // 3) video base id (or cost-key spelling) → the same forgiving resolver
@@ -2575,6 +2589,12 @@ export const estimateGenerationCost: Operation<{
 
     await loadDynamicPrice(ctx, byKey, key)
     const perCredits = key != null ? byKey.get(key) : undefined
+    if (key != null && perCredits == null && key !== input.model) {
+      // The model is known and these parameters built a key the price list lacks: name the key, not the model.
+      throw new Error(
+        `No price for ${key}: ${input.model} has no row with these parameters. Check duration, resolution, quality and the reference counts against slates_generate_* for this model, or pass an exact registry cost key from slates_list_available_models.`
+      )
+    }
     if (key == null || perCredits == null) {
       // Every id in the error comes from the SSOT arrays. The image half was
       // hand-typed and named three of six, so an agent that mis-spelled
@@ -2699,6 +2719,27 @@ interface ResolvedAssetRef {
   label: string | null
 }
 
+const noAssetMatching = (ref: string): string =>
+  `No asset matching "${ref}" in this project. Codes resolve at call time — ` +
+  `call slates_list_assets (search: "${ref}") to see what actually exists, then pass the exact code or id. Never guess.`
+
+/**
+ * What `resolveAssetRefs` returns. `id(ref)` and `row(ref)` throw the teaching
+ * error instead of handing back undefined, so a caller cannot reach a bare
+ * TypeError the way `.id(ref)` did on a blank ref (2026-11-24).
+ * `scripts/image-op-guards-check.mjs` refuses `.id(…)` in the ops.
+ */
+class AssetRefs extends Map<string, ResolvedAssetRef> {
+  row(ref: string): ResolvedAssetRef {
+    const row = this.get(ref)
+    if (!row) throw new Error(noAssetMatching(ref))
+    return row
+  }
+  id(ref: string): string {
+    return this.row(ref).id
+  }
+}
+
 /**
  * Resolve asset references that may be UUIDs OR badge codes ("IMG-A8",
  * "vid-v3", bare "A8"). Codes resolve against the project's asset list AT
@@ -2706,16 +2747,19 @@ interface ResolvedAssetRef {
  * user creates assets in the Slates UI mid-chat; an agent that guesses or
  * reuses a nearby UUID for a code it never looked up burns real dollars on
  * the wrong start frame (observed live: "use A8" generated from A5).
- * Unknown codes throw a teaching error; unknown UUIDs pass through for the
- * desktop route to validate.
+ * Unknown codes and blank refs throw a teaching error; unknown UUIDs pass
+ * through for the desktop route to validate.
  */
 async function resolveAssetRefs(
   ctx: OperationContext,
   projectId: string,
   refs: string[]
-): Promise<Map<string, ResolvedAssetRef>> {
-  const out = new Map<string, ResolvedAssetRef>()
-  const pending = [...new Set(refs.filter((r) => typeof r === 'string' && r.trim().length > 0))]
+): Promise<AssetRefs> {
+  const out = new AssetRefs()
+  if (refs.some((r) => typeof r === 'string' && r.trim().length === 0)) {
+    throw new Error('An asset reference is blank. Pass an asset code (IMG-A8) or id: call slates_list_assets to see what exists.')
+  }
+  const pending = [...new Set(refs.filter((r) => typeof r === 'string'))]
   if (pending.length === 0) return out
   const { assets } = await ctx.desktop().get<{ assets: unknown[] }>('/agent/assets', { projectId })
   const rows = (assets ?? []).map(compactAsset)
@@ -2741,12 +2785,7 @@ async function resolveAssetRefs(
       const prefixed = norm.startsWith('A') ? `IMG-${norm}` : norm.startsWith('V') ? `VID-${norm}` : `AUD-${norm}`
       row = byCode.get(prefixed)
     }
-    if (!row) {
-      throw new Error(
-        `No asset matching "${ref}" in this project. Codes resolve at call time — ` +
-          `call slates_list_assets (search: "${ref}") to see what actually exists, then pass the exact code or id. Never guess.`
-      )
-    }
+    if (!row) throw new Error(noAssetMatching(ref))
     out.set(ref, {
       id: String(row.id),
       code: (row.code as string | null) ?? null,
@@ -2977,7 +3016,7 @@ export const generateChatGptImage: Operation<{
     if (input.folderId !== undefined) await desktop.requireCapability('media-folder', 'choosing the folder a result lands in')
     const refs = await resolveAssetRefs(ctx, input.projectId, input.referenceAssetIds ?? [])
     const result = await desktop.post<Record<string, unknown>>('/agent/generation/chatgpt-image', {
-      ...input, referenceAssetIds: (input.referenceAssetIds ?? []).map(id => refs.get(id)!.id),
+      ...input, referenceAssetIds: (input.referenceAssetIds ?? []).map(id => refs.id(id)),
     })
     return ok(result, JSON.stringify(result) + '\n' + describeResolvedRefs((input.referenceAssetIds ?? []).map(ref => ({ ref, role: 'reference image' })), refs))
   },
@@ -3019,8 +3058,8 @@ export const saveExternalImage: Operation<{
     ])
     const result = await desktop.post<{ asset: unknown }>('/agent/assets/external-image', {
       ...input,
-      assetId: input.assetId ? refs.get(input.assetId)!.id : undefined,
-      referenceAssetIds: (input.referenceAssetIds ?? []).map(id => refs.get(id)!.id),
+      assetId: input.assetId ? refs.id(input.assetId) : undefined,
+      referenceAssetIds: (input.referenceAssetIds ?? []).map(id => refs.id(id)),
     })
     return ok(result, JSON.stringify(result) + '\n' + describeResolvedRefs(
       (input.referenceAssetIds ?? []).map(ref => ({ ref, role: 'reference image' })), refs,
@@ -3117,7 +3156,7 @@ export const updateAsset: Operation<{ projectId: string; assetId: string; label?
     const proxying = input.proxy !== undefined || input.playOriginal !== undefined
     if (naming) await desktop.requireCapability('asset-naming', 'naming an asset')
     if (proxying) await desktop.requireCapability('proxies', "a clip's proxy")
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     const result: Record<string, unknown> = {}
     if (naming) {
       const { asset } = await desktop.post<{ asset: Record<string, unknown> }>('/agent/assets/update', {
@@ -3229,7 +3268,7 @@ export const pinReferences: Operation<{ projectId: string; assetIds: string[] }>
   async run(input, ctx) {
     await ctx.desktop().requireCapability('pins', 'pinned references')
     const resolved = await resolveAssetRefs(ctx, input.projectId, input.assetIds)
-    return ok(await ctx.desktop().post('/agent/pins', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.get(r)!.id) }))
+    return ok(await ctx.desktop().post('/agent/pins', { projectId: input.projectId, assetIds: input.assetIds.map((r) => resolved.id(r)) }))
   },
 }
 
@@ -3240,7 +3279,7 @@ export const unpinReference: Operation<{ projectId: string; assetId: string }> =
   async run(input, ctx) {
     await ctx.desktop().requireCapability('pins', 'pinned references')
     const resolved = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
-    return ok(await ctx.desktop().post('/agent/pins/remove', { projectId: input.projectId, assetId: resolved.get(input.assetId)!.id }))
+    return ok(await ctx.desktop().post('/agent/pins/remove', { projectId: input.projectId, assetId: resolved.id(input.assetId) }))
   },
 }
 
@@ -4032,15 +4071,82 @@ export type GptBackgroundId = GptBackground
  * value no model accepts. It used to be a hand-typed eleven-value list whose
  * `9:21` exists in ZERO models; that phantom is gone by construction.
  *
- * ⚠️ STILL A UNION, NOT A PER-MODEL CHECK. GPT Image takes five of these
- * ten and the other five would be accepted here. The image param surface has
- * not been audited (aspect ratios, resolution classes, per-model reference
- * caps) — that audit is the named follow-up in
- * `second-brain/plans/2026-08-16-slates-model-capability-ssot.md` §5. The machinery
- * to close it already exists: call `checkAspectRatio(model, ratio)` the way
- * `assertVideoCapabilities` does below.
+ * It is the union, so the per-model narrowing is `assertImageCapabilities`
+ * below, which every image entry point runs.
  */
 const IMAGE_ASPECT_RATIOS = aspectRatioUnion(IMAGE_MODELS)
+
+type Clarification = { requires_clarification: true; missing: string[]; message: string }
+
+/**
+ * The per-model image gate: the aspect ratio and the resolution rung the seat
+ * declares in `MODEL_CAPABILITIES`. Generate, edit, the estimate and a saved
+ * image Shot all run this one function, so a quote, a recipe and a generation
+ * cannot disagree about what a seat takes.
+ *
+ * Why: GPT Image takes five of the union's ratios. A 4:5 or 21:9 ask passed,
+ * was quoted at the 16:9 key, and the desktop's size table rendered a 16:9
+ * frame for it and billed it (2026-11-24). An off-ladder rung built a cost key
+ * the registry lacks and failed as "Unknown model", or, on Seedream, quoted the
+ * default rung's price for a rung generation then refused.
+ */
+export function assertImageCapabilities(
+  input: { model: string; aspectRatio?: string; resolution?: string },
+  field: { resolution: string } = { resolution: 'resolution' }
+): Clarification | null {
+  const ratioErr = checkAspectRatio(input.model, input.aspectRatio, AGENT_ROUTE_PROVIDER)
+  if (ratioErr) return { requires_clarification: true, missing: ['aspectRatio'], message: ratioErr }
+  const rungs: readonly string[] = MODEL_CAPABILITIES[input.model]?.imageResolutions ?? []
+  if (input.resolution && rungs.length > 0 && !rungs.includes(input.resolution)) {
+    return {
+      requires_clarification: true,
+      missing: [field.resolution],
+      message: `${input.model} accepts ${rungs.join(', ')}, not ${input.resolution}. Pick one of those, or switch to a model that renders ${input.resolution}.`,
+    }
+  }
+  return null
+}
+
+/**
+ * The image params that only some calls consume, each with the condition under
+ * which it reaches the request. A param set where its condition fails was
+ * dropped while the generation ran and billed: reference URLs beside a
+ * projectId, a transparent background on a seat without one (2026-11-24).
+ * Generate and edit both run this table, and `scripts/image-op-guards-check.mjs`
+ * proves every row refuses.
+ */
+function droppedImageParams(
+  model: string,
+  input: { projectId?: string; referenceImageUrls?: string[]; backgroundMode?: GptBackgroundId; folderId?: string | null }
+): Clarification | null {
+  const rows: Array<{ param: string; set: boolean; consumed: boolean; why: string }> = [
+    {
+      param: 'referenceImageUrls',
+      set: (input.referenceImageUrls?.length ?? 0) > 0,
+      consumed: !input.projectId,
+      why: 'URLs reach the headless path only. With a projectId, upload each picture with slates_upload_reference_image and pass referenceAssetIds, or drop projectId for a headless run.',
+    },
+    {
+      param: 'backgroundMode',
+      set: input.backgroundMode !== undefined && input.backgroundMode !== 'auto',
+      consumed: takesBackgroundMode(model),
+      why: `${model} has no background control, so the picture would come back opaque. Seats that take it: ${IMAGE_MODELS.filter(takesBackgroundMode).join(', ')}.`,
+    },
+    {
+      param: 'folderId',
+      set: input.folderId !== undefined && input.folderId !== null,
+      consumed: !!input.projectId,
+      why: 'A folder belongs to a project. Pass the projectId it lives in, or drop folderId.',
+    },
+  ]
+  const dropped = rows.filter((r) => r.set && !r.consumed)
+  if (dropped.length === 0) return null
+  return {
+    requires_clarification: true,
+    missing: dropped.map((r) => r.param),
+    message: `Nothing ran. ${dropped.map((r) => `${r.param}: ${r.why}`).join(' ')}`,
+  }
+}
 
 // Registry cost-key for an image model+resolution. Mirrors imageCreditKey()
 // in slate/src/shared/pricing.ts — MUST byte-match it (the same hard rule as
@@ -4209,8 +4315,6 @@ export const generateImage: Operation<{
     folderId: z.string().uuid().nullable().optional().describe(`${FOLDER_DESCRIBE} Needs projectId.`),
   }),
   async run(input, ctx) {
-    // A desktop before the folder rule ignores folderId and files at the root.
-    if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // Clarification gate: aspectRatio + resolution must be deliberate.
     // Mirrors the cost confirm gate — defaults silently wasted credits
     // (1:1 when user wanted 16:9, 4k when 1k would have done). The LLM
@@ -4226,6 +4330,10 @@ export const generateImage: Operation<{
       ? await defaultImageSeatFor(() => ctx.desktop(), input.model, `${input.model ?? DEFAULT_IMAGE_MODEL} generation`)
       : { model: input.model ?? HEADLESS_IMAGE_MODEL, note: '' }
     const imageModel: ImageModelId = seat.model
+    const dropped = droppedImageParams(imageModel, input)
+    if (dropped) return ok(dropped)
+    // A desktop before the folder rule ignores folderId and files at the root.
+    if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     requireGuideRead(ctx, imageModel)
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
@@ -4247,11 +4355,8 @@ export const generateImage: Operation<{
       })
     }
     const resolution = input.resolution
-    const resolutions = MODEL_CAPABILITIES[imageModel]?.imageResolutions ?? []
-    if (resolution && !resolutions.includes(resolution)) {
-      return ok({ requires_clarification: true, missing: ['resolution'],
-        message: `${imageModel} accepts ${resolutions.join(', ')}.` })
-    }
+    const capErr = assertImageCapabilities({ model: imageModel, aspectRatio: input.aspectRatio, resolution })
+    if (capErr) return ok(capErr)
     // Only HEADLESS_IMAGE_MODEL has a headless path — everything else routes
     // through the desktop generation pipeline, which needs a project.
     if (imageModel !== HEADLESS_IMAGE_MODEL && !input.projectId) {
@@ -4570,7 +4675,7 @@ export const generateImage: Operation<{
     let imagesPayload: Array<{ url?: string }> | undefined =
       proxyResult.data?.images
     if (!imagesPayload && proxyResult.jobId) {
-      const completed = await pollProxyJob(cloud, proxyResult.jobId)
+      const completed = await pollProxyJob(cloud, proxyResult.jobId, { signal: ctx.signal })
       imagesPayload = completed.images
     }
 
@@ -4580,18 +4685,23 @@ export const generateImage: Operation<{
     if (urls.length === 0) {
       throw new Error('Generation completed but returned no image URLs.')
     }
+    // The credits are spent by now, so a URL that will not download is
+    // reported with its link rather than thrown away or inlined as an error page.
     const images: Array<{ data: string; mimeType: string }> = []
+    const notInlined: string[] = []
     for (const url of urls) {
-      const r = await fetch(url)
-      const buf = Buffer.from(await r.arrayBuffer())
-      const mt = r.headers.get('content-type') || 'image/png'
-      images.push({ data: buf.toString('base64'), mimeType: mt })
+      const img = await inlineResultImage(url)
+      if (img) images.push(img)
+      else notInlined.push(url)
     }
     return {
       text:
-        `${IMAGE_INLINE_REVIEW} ` +
+        (images.length > 0 ? `${IMAGE_INLINE_REVIEW} ` : '') +
         (promptWarning ? `${promptWarning} ` : '') +
         `Generated ${urls.length} image(s) for ${fmtCredits(totalCents)}. ` +
+        (notInlined.length > 0
+          ? `${notInlined.length} of them could not be attached here; they are paid for and at data.urls (${notInlined.join(' ')}). Open those links before describing them, and do not generate them again. `
+          : '') +
         `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`,
       images,
       data: {
@@ -4613,20 +4723,54 @@ interface ProxyJobStatus {
   error?: string
 }
 
-async function pollProxyJob(
+/** One result URL as an inline image, or null when it does not answer with an image. */
+async function inlineResultImage(url: string): Promise<{ data: string; mimeType: string } | null> {
+  try {
+    const r = await fetch(url)
+    const mimeType = r.headers.get('content-type') || 'image/png'
+    if (!r.ok || !mimeType.startsWith('image/')) return null
+    return { data: Buffer.from(await r.arrayBuffer()).toString('base64'), mimeType }
+  } catch {
+    return null
+  }
+}
+
+/** Poll statuses that cannot change by asking again: a lost login, no credits, no access, no such job. */
+const PROXY_POLL_FINAL_STATUSES = new Set([401, 402, 403, 404])
+/** Poll failures in a row (network or 5xx) before the poller stops and says so. */
+const PROXY_POLL_MAX_FAILURES = 10
+
+/**
+ * Wait for a headless proxy job. The job is submitted and its credits held
+ * before this runs, so every way out but `completed` and `failed` names the
+ * job and tells the caller not to start another: a retry is a second paid job.
+ * It used to swallow every poll error for five minutes and then throw a bare
+ * timeout with no job id (2026-11-24).
+ */
+export async function pollProxyJob(
   cloud: { get<T>(path: string): Promise<T> },
   jobId: string,
-  options: { intervalMs?: number; timeoutMs?: number } = {}
+  options: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}
 ): Promise<{ images?: Array<{ url?: string }> }> {
   const intervalMs = options.intervalMs ?? 3000
   const timeoutMs = options.timeoutMs ?? 5 * 60 * 1000
+  const held = (why: string) =>
+    `${why} Job ${jobId} was submitted and its credits are held; it may still complete. ` +
+    'Do not call slates_generate_image again for this picture: that starts a second paid job.'
   const start = Date.now()
+  let failures = 0
   while (Date.now() - start < timeoutMs) {
     await new Promise((r) => setTimeout(r, intervalMs))
+    if (options.signal?.aborted) throw new OperationCancelledError(held('Stopped waiting.'))
     let status: ProxyJobStatus
     try {
       status = await cloud.get<ProxyJobStatus>(`/proxy/jobs/${jobId}`)
-    } catch {
+      failures = 0
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      const code = (err as { status?: unknown }).status
+      if (typeof code === 'number' && PROXY_POLL_FINAL_STATUSES.has(code)) throw new Error(held(`Polling stopped: ${message}.`))
+      if (++failures >= PROXY_POLL_MAX_FAILURES) throw new Error(held(`Polling failed ${failures} times in a row: ${message}.`))
       continue
     }
     if (status.status === 'completed') return status.data ?? {}
@@ -4634,7 +4778,7 @@ async function pollProxyJob(
       throw new Error(status.error ?? 'Generation failed')
     }
   }
-  throw new Error(`Generation timed out after ${Math.round(timeoutMs / 1000)}s.`)
+  throw new Error(held(`Still running after ${Math.round(timeoutMs / 1000)}s.`))
 }
 
 // ── Edit image ──────────────────────────────────────────────────
@@ -4689,8 +4833,12 @@ export const editImage: Operation<{
         ? await defaultImageSeatFor(() => desktop, undefined, 'image editing')
         : { model: toolModelFor('image-edit') as ImageModelId, note: '' }
     const editModel = seat.model
-    requireGuideRead(ctx, editModel)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
+    // The same gates as slates_generate_image, from the same functions.
+    const refusal = droppedImageParams(editModel, input) ??
+      assertImageCapabilities({ model: editModel, aspectRatio: input.aspectRatio, resolution })
+    if (refusal) return ok(refusal)
+    requireGuideRead(ctx, editModel)
     let sentModel: string = editModel
     if (isGptImageModel(editModel)) {
       // Like generateImage; this site was missed once already. A desktop that
@@ -4878,7 +5026,7 @@ export const extractGridCells: Operation<{
     await desktop.requireCapability('grid-extract', 'extracting grid cells')
     if (input.background) await desktop.requireCapability('background-generation', 'background generation')
     const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId, ...(input.referenceAssetIds ?? [])])
-    const grid = refs.get(input.assetId)!
+    const grid = refs.row(input.assetId)
     const request = {
       projectId: input.projectId,
       assetId: grid.id,
@@ -4887,7 +5035,7 @@ export const extractGridCells: Operation<{
       resolution: input.resolution,
       aspectRatio: input.aspectRatio,
       prompt: input.prompt,
-      referenceAssetIds: input.referenceAssetIds?.map((r) => refs.get(r)!.id),
+      referenceAssetIds: input.referenceAssetIds?.map((r) => refs.id(r)),
     }
     // The desktop prices it: the viewer's own `imageCost`, for this seat, rung and cell count. The desktop also
     // refuses what the viewer would (not a grid, a cell the grid lacks, a seat it does not offer) before any spend.
@@ -5427,6 +5575,24 @@ function resolveVideoModel(raw: string): {
   return null
 }
 
+type SpokenTextFields = { spoken: string; clips: string }
+const GENERATE_VIDEO_SPOKEN_FIELDS: SpokenTextFields = { spoken: 'audioReferenceSpokenText', clips: 'audioReferenceAssetIds' }
+const SHOT_SPOKEN_FIELDS: SpokenTextFields = { spoken: 'audioRefSpokenText', clips: 'refs["audio-reference"]' }
+
+/** The pairing rule for a positional spoken-text array: present only beside its
+ *  clips, at the same length. Returns the refusal, or null when it pairs. */
+function spokenTextMisalignment(
+  assetIds: readonly string[] | undefined,
+  spoken: readonly string[] | undefined,
+  fields: SpokenTextFields
+): string | null {
+  if (spoken === undefined || spoken.length === (assetIds?.length ?? 0)) return null
+  return (
+    `${fields.spoken} pairs by position with ${fields.clips}, so send both together and at the same length ` +
+    `(${spoken.length} line(s) vs ${assetIds?.length ?? 0} clip(s)). Use "" for a clip with no speech.`
+  )
+}
+
 /**
  * Pair each reference-audio asset id with the words spoken in it.
  *
@@ -5442,11 +5608,18 @@ function resolveVideoModel(raw: string): {
  * address different clips depending on which shape the caller used. Blank
  * entries are dropped rather than sent as empty strings — a clip with no
  * speech has no line, which is not the same as a line that is empty.
+ *
+ * A misaligned array would attach one clip's line to another and send the
+ * model the wrong words with nothing on screen to say so, so it is refused
+ * here, for every model and every caller, rather than truncated.
  */
 function spokenTextByAssetId(
   assetIds: string[] | undefined,
-  spoken: string[] | undefined
+  spoken: string[] | undefined,
+  fields: SpokenTextFields = GENERATE_VIDEO_SPOKEN_FIELDS
 ): Record<string, string> | undefined {
+  const misaligned = spokenTextMisalignment(assetIds, spoken, fields)
+  if (misaligned) throw new Error(misaligned)
   if (!assetIds?.length || !spoken?.length) return undefined
   const out: Record<string, string> = {}
   assetIds.forEach((id, i) => {
@@ -5688,6 +5861,9 @@ export const generateVideo: Operation<{
     // sees the resolved model and any params a cost key back-filled.
     const capErr = assertVideoCapabilities(input)
     if (capErr) return ok(capErr)
+    // Every model reads the spoken text, so its pairing is checked before any model's shape block.
+    const spokenErr = spokenTextMisalignment(input.audioReferenceAssetIds, input.audioReferenceSpokenText, GENERATE_VIDEO_SPOKEN_FIELDS)
+    if (spokenErr) return ok({ requires_clarification: true, missing: [], message: spokenErr })
 
     // Omni Flash 1.2's SHAPE constraints. Frames ride image-to-video (a start
     // frame and an optional end frame, 10s or less with the end frame);
@@ -5900,23 +6076,6 @@ export const generateVideo: Operation<{
           requires_clarification: true,
           missing: [],
           message: `${input.model} takes at most ${maxTotal} reference files across all modalities (you passed ${refImages + refMedia}).`,
-        })
-      }
-      // A misaligned spoken-text array would attach one clip's line to another
-      // and send the model the wrong words with nothing on screen to say so.
-      // Refuse rather than truncate: the whole point of the field is that the
-      // WORDS are exact.
-      if (
-        input.audioReferenceSpokenText &&
-        input.audioReferenceSpokenText.length !== (input.audioReferenceAssetIds?.length ?? 0)
-      ) {
-        return ok({
-          requires_clarification: true,
-          missing: [],
-          message:
-            `audioReferenceSpokenText must be the same length as audioReferenceAssetIds ` +
-            `(${input.audioReferenceSpokenText.length} vs ${input.audioReferenceAssetIds?.length ?? 0}) ` +
-            `— it pairs by position. Use "" for a clip with no speech.`,
         })
       }
       // fal: "Audio cannot be the only reference input; provide at least one
@@ -7008,6 +7167,9 @@ export const editVideo: Operation<{
     // Source-clip window, read from the capability SSOT per engine — never a
     // model-id ternary. (Kling 3–15s, Omni Flash 1.2 3–15s, Seedance 2.5 4–30s.)
     const { min: minClipSeconds, max: maxClipSeconds } = editClipBounds(model)
+    // The enum is the union of the engines' rows, so each engine's own row decides; Kling's output follows the source clip.
+    const resErr = isSeedanceEdit || isOmniFlashEdit ? checkVideoResolution(model, input.videoResolution) : null
+    if (resErr) return ok({ requires_clarification: true, missing: ['videoResolution'], message: resErr })
 
     if (!EDIT_VIDEO_ELEMENT_MODELS.includes(model) && ((input.characterAssetIds?.length ?? 0) > 0 || (input.styleAssetIds?.length ?? 0) > 0)) {
       throw new Error(
@@ -7529,6 +7691,8 @@ const reframeClipInput = reframeReportInput.extend({ clipId: z.string().uuid(), 
   focusY: z.number().min(0).max(1).optional(), zoom: z.number().min(1).optional(),
 }).strict().nullable().optional().describe('Normalized focus and zoom for this clip/aspect. Null resets the override; the desktop binds it to the current take. Required unless follow is set.'),
   follow: z.union([z.enum(['face', 'off']), z.object({ maskId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/) }).strict()]).optional().describe('"face" finds the face in the clip and keys its focusX/focusY to it (smooth, held where the face is lost; every format draws those keys, each keyframe editable by hand or with slates_set_clip_keyframes); { maskId } follows one of the clip\'s subject masks instead (slates_get_subject_mask lists them); "off" removes those keys. Runs on the computer and spends nothing.') })
+  // Every follow form stands alone; the rule lives in the schema so each host applies it before run().
+  .refine((d) => d.framing !== undefined || d.follow !== undefined, { message: 'Send framing (null resets it) or follow', path: ['framing'] })
 export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
   id: 'slates_reframe_clip', description: 'Set or reset a clip framing override for one delivery aspect and return the desktop computed framing report. Changes focus, fill/fit and zoom without duplicating the timeline or generating media. follow: "face" makes a vertical cut follow a talking head, or { maskId } a subject mask (framing, when sent too, lands first) and answers follow: the clip keyframes, samples, found, still and the lost spans in seconds. Requires ad-variant-export, and reframe-follow for follow; update Slates on capability refusal.',
   billable: false,
@@ -7537,7 +7701,6 @@ export const reframeClip: Operation<z.infer<typeof reframeClipInput>> = {
     await ctx.desktop().requireCapability('ad-variant-export', 'clip delivery reframing')
     if (input.follow) await ctx.desktop().requireCapability('reframe-follow', 'following a face')
     if (typeof input.follow === 'object') await ctx.desktop().requireCapability('subject-follow', 'following a subject mask')
-    else if (input.framing === undefined) throw new Error('Send framing (null resets it) or follow')
     return ok(await ctx.desktop().post('/agent/timeline/reframe', input))
   },
 }
@@ -7738,19 +7901,22 @@ export const upscaleImage: Operation<{ projectId: string; assetId: string; facto
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('image-upscale', 'picture upscale')
-    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     const quote = await desktop.get<UpscaleQuote>('/agent/generation/upscale-quote', { projectId: input.projectId, assetId: id, factor: String(input.factor) })
     if (quote.credits === null) throw new Error(quote.refused ?? 'This picture cannot be upscaled at that size.')
     const name = quote.code ?? id
     const size = `${quote.width}x${quote.height} to ${quote.outWidth}x${quote.outHeight}`
+    // Minted here, before the confirm gate, and handed back with the quote: the
+    // confirmed call and any retry of it then carry one id, so a retry after a
+    // dropped connection waits on the same run instead of paying again.
+    const requestId = input.requestId ?? randomUUID()
     if (quote.credits > CONFIRM_CREDITS && !input.confirm) {
       return ok({
         requires_confirm: true, estimated_credits: quote.credits, estimated_cents: quote.credits, factor: quote.factor,
-        width: quote.width, height: quote.height, outWidth: quote.outWidth, outHeight: quote.outHeight,
-        message: `Cost: ${fmtCredits(quote.credits)} to upscale ${name} ${quote.factor}x (${size}). Re-call with confirm=true after the user explicitly OKs the spend.`,
+        width: quote.width, height: quote.height, outWidth: quote.outWidth, outHeight: quote.outHeight, requestId,
+        message: `Cost: ${fmtCredits(quote.credits)} to upscale ${name} ${quote.factor}x (${size}). Re-call with confirm=true and requestId=${requestId} after the user explicitly OKs the spend, and keep that requestId on any retry.`,
       })
     }
-    const requestId = input.requestId ?? randomUUID()
     const r = await desktop.post<{ status?: string; generationId?: string; asset?: { id: string; code: string | null; filePath: string; width: number; height: number }; credits?: number; cost_credits?: number }>(
       '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits, requestId })
     if (!r.asset) return ok({ ...r, requestId }, `The upscale of ${name} under this requestId is still running; check slates_get_generation_status with ${r.generationId ?? requestId}. Do not start it again with a new requestId.`)
@@ -7798,8 +7964,8 @@ export const resolveReviewNote: Operation<{
   async run(input, ctx) {
     await ctx.desktop().requireCapability('review-mode', 'Review mode')
     const refs = [...new Set(input.replies.flatMap((r) => r.assetIds ?? []))]
-    const resolved = refs.length ? await resolveAssetRefs(ctx, input.projectId, refs) : new Map<string, { id: string }>()
-    const replies = input.replies.map((r) => (r.assetIds ? { ...r, assetIds: r.assetIds.map((a) => resolved.get(a)!.id) } : r))
+    const resolved = refs.length ? await resolveAssetRefs(ctx, input.projectId, refs) : new AssetRefs()
+    const replies = input.replies.map((r) => (r.assetIds ? { ...r, assetIds: r.assetIds.map((a) => resolved.id(a)) } : r))
     return ok(await ctx.desktop().post('/agent/review/resolve', { projectId: input.projectId, replies }))
   },
 }
@@ -8025,7 +8191,7 @@ async function resolvePassAssets<T extends { params?: Record<string, unknown>; r
   const refs = [...named.map((k) => params[k] as string), ...(input.referenceAssetIds ?? [])]
   if (!refs.length) return input
   const resolved = await resolveAssetRefs(ctx, projectId, refs)
-  const id = (ref: string): string => resolved.get(ref)!.id
+  const id = (ref: string): string => resolved.id(ref)
   return {
     ...input,
     ...(input.params ? { params: { ...params, ...Object.fromEntries(named.map((k) => [k, id(params[k] as string)])) } } : {}),
@@ -9824,7 +9990,7 @@ export const createLibraryItem: Operation<{
     return ok(
       await ctx.desktop().post('/agent/library/items/update', {
         id: created.item.id,
-        data: { imageAssetId: resolved.get(imageAssetId)!.id },
+        data: { imageAssetId: resolved.id(imageAssetId) },
       })
     )
   },
@@ -9867,7 +10033,7 @@ export const updateLibraryItem: Operation<{
     const refs = [input.imageAssetId, input.voiceAssetId, ...(input.extraAssetIds ?? [])].filter((r): r is string => typeof r === 'string')
     const resolved = await resolveAssetRefs(ctx, input.projectId, refs)
     const asset = (ref: string | null | undefined): string | null | undefined =>
-      typeof ref === 'string' ? resolved.get(ref)!.id : ref
+      typeof ref === 'string' ? resolved.id(ref) : ref
     return ok(
       await ctx.desktop().post('/agent/library/items/update', {
         id: input.itemId,
@@ -9881,7 +10047,7 @@ export const updateLibraryItem: Operation<{
           // explicit null is the clear.
           ...(input.imageAssetId !== undefined ? { imageAssetId: asset(input.imageAssetId) } : {}),
           ...(input.voiceAssetId !== undefined ? { voiceAssetId: asset(input.voiceAssetId) } : {}),
-          ...(input.extraAssetIds !== undefined ? { extraAssetIds: input.extraAssetIds.map((ref) => resolved.get(ref)!.id) } : {}),
+          ...(input.extraAssetIds !== undefined ? { extraAssetIds: input.extraAssetIds.map((ref) => resolved.id(ref)) } : {}),
           ...(input.palette !== undefined ? { palette: input.palette } : {}),
         },
       })
@@ -10050,7 +10216,7 @@ export const getReferenceBreakdown: Operation<{ projectId: string; assetId: stri
     .strict(),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('reference-breakdown', 'breaking a reference ad into shots')
-    const assetId = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id
+    const assetId = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
     return ok(await ctx.desktop().get('/agent/reference/breakdown', { projectId: input.projectId, assetId }))
   },
 }
@@ -10132,7 +10298,7 @@ export const breakDownReference: Operation<{
     if ([input.assetId, input.filePath, input.url].filter(Boolean).length !== 1) {
       throw new Error('Give exactly one of assetId (a video or picture in the project), filePath or url.')
     }
-    const assetId = input.assetId ? (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).get(input.assetId)!.id : input.assetId
+    const assetId = input.assetId ? (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId) : input.assetId
     // Every Shot is stored under this id, as the desktop knows it (`desktopModelId`).
     const seat = await desktopModelId(ctx.desktop(), input.model, `a breakdown's Shots on ${input.model}`)
     const r = await ctx.desktop().post<{
@@ -10469,9 +10635,8 @@ const shotRefsSchemaTerse = z
   .describe(SEE_CREATE_SHOT + SHOT_REFS_LEAD)
 
 // The full ratio vocabulary a Shot can hold — image OR video, because a Shot is
-// any generation. Per-model narrowing happens at create time for video (the same
-// `assertVideoCapabilities` gate `slates_generate_video` uses) and at generate
-// time for everything.
+// any generation. Per-model narrowing happens at save time through
+// `assertShotCapabilities`, the same gates the generate ops run.
 const SHOT_ASPECT_RATIOS = [...new Set([...VIDEO_ASPECT_RATIOS, ...IMAGE_ASPECT_RATIOS])]
 
 // 🚨 THE PER-MODEL CAPABILITY TABLES ARE DELIBERATELY NOT REPEATED HERE.
@@ -10654,38 +10819,19 @@ function shotParamsPatch(p: ShotOpParams | undefined): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   if (!p) return out
   for (const [k, v] of Object.entries(p)) if (v !== undefined) out[k] = v
-  if (p.seedanceDraft && p.videoResolution === undefined) out.videoResolution = '480p'
   return out
 }
 
-/**
- * `audioRefSpokenText` pairs POSITIONALLY with the audio references, so it can
- * only be sent alongside them.
- *
- * Refused rather than truncated or silently re-keyed: the whole point of the
- * field is that the WORDS are exact, and a misaligned array attaches one clip's
- * line to another clip with nothing on screen to say so. Same rule
- * `slates_generate_video` already applies.
- */
+/** `audioRefSpokenText` pairs by position with the audio references: the
+ *  `slates_generate_video` rule, as a clarification before anything is written. */
 function checkSpokenTextAlignment(input: ShotOpRefs): OperationResult | null {
-  if (input.audioRefSpokenText === undefined) return null
-  const clips = input.refs?.['audio-reference']
-  if (!clips || clips.length !== input.audioRefSpokenText.length) {
-    return ok({
-      requires_clarification: true,
-      missing: ['refs["audio-reference"]'],
-      message:
-        `audioRefSpokenText pairs by position with refs["audio-reference"], so send both together ` +
-        `and at the same length (${input.audioRefSpokenText.length} line(s) vs ${clips?.length ?? 0} clip(s)). ` +
-        `Use "" for a clip with no speech.`,
-    })
-  }
-  return null
+  const message = spokenTextMisalignment(input.refs?.['audio-reference'], input.audioRefSpokenText, SHOT_SPOKEN_FIELDS)
+  return message ? ok({ requires_clarification: true, missing: [SHOT_SPOKEN_FIELDS.clips], message }) : null
 }
 
 /** Every asset reference a Shot input carries, flat, for one `resolveAssetRefs`
  *  pass. Derived from the role list so a new role resolves badge codes too. */
-function shotRefInputs(input: ShotOpRefs & { params?: ShotOpParams }): Array<{ ref: string; role: string }> {
+function shotRefInputs(input: ShotOpRefs & { params?: ShotOpParams; posterAssetId?: string | null }): Array<{ ref: string; role: string }> {
   const out: Array<{ ref: string; role: string }> = []
   for (const role of ORDERED_ATTACHMENT_ROLES) {
     for (const r of input.refs?.[role] ?? []) out.push({ ref: r, role })
@@ -10693,6 +10839,7 @@ function shotRefInputs(input: ShotOpRefs & { params?: ShotOpParams }): Array<{ r
   if (input.firstFrameAssetId) out.push({ ref: input.firstFrameAssetId, role: 'first frame' })
   if (input.lastFrameAssetId) out.push({ ref: input.lastFrameAssetId, role: 'last frame' })
   if (input.params?.voiceReferenceAssetId) out.push({ ref: input.params.voiceReferenceAssetId, role: 'voice reference' })
+  if (input.posterAssetId) out.push({ ref: input.posterAssetId, role: 'poster' })
   return out
 }
 
@@ -10707,8 +10854,8 @@ function shotRefInputs(input: ShotOpRefs & { params?: ShotOpParams }): Array<{ r
 async function buildShotSpecInput(
   ctx: OperationContext,
   projectId: string,
-  input: ShotOpRefs & { prompt?: string; model?: string; params?: ShotOpParams }
-): Promise<{ spec: Record<string, unknown>; refEcho: string; seatNote: string }> {
+  input: ShotOpRefs & { prompt?: string; model?: string; params?: ShotOpParams; posterAssetId?: string | null }
+): Promise<{ spec: Record<string, unknown>; refEcho: string; seatNote: string; posterAssetId: string | null | undefined }> {
   // The Shot is stored and drafted on the desktop under this id (`desktopModelId`).
   const seat = await desktopModelId(ctx.desktop(), input.model, `a Shot on ${input.model}`, input.params?.duration)
   const refInputs = shotRefInputs(input)
@@ -10721,12 +10868,7 @@ async function buildShotSpecInput(
   // Positional in, KEYED out — the same re-keying `slates_generate_video` does,
   // and for the same reason: an index means different clips depending on how the
   // list was assembled, while an asset id cannot drift.
-  const audioIds = refs['audio-reference'] ?? []
-  const spoken: Record<string, string> = {}
-  ;(input.audioRefSpokenText ?? []).forEach((text, i) => {
-    const id = audioIds[i]
-    if (id && text?.trim()) spoken[id] = text.trim()
-  })
+  const spoken = spokenTextByAssetId(refs['audio-reference'], input.audioRefSpokenText, SHOT_SPOKEN_FIELDS) ?? {}
   return {
     spec: {
       prompt: input.prompt,
@@ -10751,6 +10893,8 @@ async function buildShotSpecInput(
     },
     refEcho: describeResolvedRefs(refInputs, resolvedRefs),
     seatNote: seat.note,
+    // null resets the poster to its default; undefined leaves it alone.
+    posterAssetId: input.posterAssetId === undefined ? undefined : rid(input.posterAssetId ?? undefined),
   }
 }
 
@@ -10805,18 +10949,24 @@ function namedSpecPatch(
 /**
  * The capability gate, applied to a SAVED recipe.
  *
- * It enforces exactly what the matching generate op enforces and no more: video
- * goes through `assertVideoCapabilities` (the MODEL_CAPABILITIES SSOT), image
- * does not, because `slates_generate_image`'s own per-model ratio check is the
- * named open follow-up in the capability plan. A Shot that refused what
- * `slates_generate_image` accepts would be a THIRD opinion about the same
- * model, which is worse than the gap.
+ * It enforces exactly what the matching generate op enforces and no more, from
+ * the same functions: `assertVideoCapabilities` for a video seat,
+ * `assertImageCapabilities` for an image seat. A Shot that refused what the
+ * generate op accepts, or saved what it refuses, would be a third opinion
+ * about the same model.
  */
 function assertShotCapabilities(
   model: string | undefined,
   params: ShotOpParams | undefined
 ): OperationResult | null {
   if (params?.seedanceDraft && model) draftResolution(model, params.videoResolution)
+  if (model && (IMAGE_MODELS as readonly string[]).includes(model)) {
+    const err = assertImageCapabilities(
+      { model, aspectRatio: params?.aspectRatio, resolution: params?.imageResolution },
+      { resolution: 'imageResolution' }
+    )
+    return err ? ok(err) : null
+  }
   if (!model || !(VIDEO_MODELS as readonly string[]).includes(model)) return null
   const err = assertVideoCapabilities({
     model,
@@ -10827,11 +10977,50 @@ function assertShotCapabilities(
   return err ? ok(err) : null
 }
 
-async function requireDraftShotDesktop(desktop: SlatesDesktopClient, model: string | undefined, params: ShotOpParams | undefined, shotId?: string) {
+const SHOT_PROJECT_DESCRIBE = "The Shot's project. A SHOT-A code is unique only within its project, so pass this with a code."
+
+/**
+ * The Shot a ref names, read at most once per call. A SHOT-A code is unique only
+ * within its project, so it resolves against `projectId` whenever the caller has
+ * one, and a Shot that lives in another project is refused rather than edited,
+ * priced or billed.
+ */
+function shotReader(desktop: SlatesDesktopClient, ref: string, projectId?: string): () => Promise<ShotDetail> {
+  let read: Promise<ShotDetail> | undefined
+  return () =>
+    (read ??= desktop
+      .get<{ shot: ShotDetail }>('/agent/shots/get', projectId ? { id: ref, projectId } : { id: ref })
+      .then(({ shot }) => {
+        if (projectId && shot.projectId && shot.projectId !== projectId) {
+          throw new Error(`${ref} is a Shot of another project, not ${projectId}. Pass the Shot's id, or its code in this project.`)
+        }
+        return shot
+      }))
+}
+
+/** The row id to send for a Shot ref: an id as given, a code resolved through its reader. */
+async function shotRowId(ref: string, read: () => Promise<ShotDetail>): Promise<string> {
+  return UUID_RE.test(ref.trim()) ? ref : (await read()).id
+}
+
+/** Params whose legality depends on the Shot's model. */
+const MODEL_BOUND_SHOT_PARAMS = ['aspectRatio', 'videoResolution', 'imageResolution', 'duration', 'seedanceDraft'] as const
+
+/** An edit that names no model is checked against the stored Shot's, the gate create runs. */
+async function assertStoredShotCapabilities(
+  model: string | undefined,
+  params: ShotOpParams | undefined,
+  read: () => Promise<ShotDetail>
+): Promise<OperationResult | null> {
+  if (model !== undefined || !MODEL_BOUND_SHOT_PARAMS.some((k) => params?.[k] !== undefined)) return null
+  return assertShotCapabilities((await read()).model ?? undefined, params)
+}
+
+async function requireDraftShotDesktop(desktop: SlatesDesktopClient, model: string | undefined, params: ShotOpParams | undefined, read?: () => Promise<ShotDetail>) {
   if (params?.seedanceDraft) {
     await desktop.requireCapability('seedance-drafts', 'saving a Seedance 2.5 draft')
   } else if (params?.videoResolution === '4k') {
-    const target = model ?? (shotId ? (await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: shotId })).shot.model : undefined)
+    const target = model ?? (read ? (await read()).model : undefined)
     if (target === 'seedance-2.5') await desktop.requireCapability('seedance-drafts', 'saving a native 4K Seedance Shot')
   }
 }
@@ -11093,19 +11282,22 @@ export const updateShot: Operation<
     if (alignErr) return alignErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    await requireDraftShotDesktop(desktop, input.model, input.params, input.shotId)
-    const { spec, seatNote } = await buildShotSpecInput(ctx, input.projectId, input)
+    const read = shotReader(desktop, input.shotId, input.projectId)
+    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read)
+    if (storedErr) return storedErr
+    await requireDraftShotDesktop(desktop, input.model, input.params, read)
+    const { spec, seatNote, posterAssetId } = await buildShotSpecInput(ctx, input.projectId, input)
     // Only send the halves the caller actually named; the route merges a PARTIAL
     // spec over the stored one, so an omitted field is never silently cleared.
     const patch = namedSpecPatch(input, spec)
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/update', {
-      id: input.shotId,
+      id: await shotRowId(input.shotId, read),
       data: {
         name: input.name,
         ...(Object.keys(patch).length > 0 ? { spec: patch } : {}),
         attachFrameId: input.attachFrameId,
         detachFrameId: input.detachFrameId,
-        posterAssetId: input.posterAssetId,
+        posterAssetId,
       },
     })
     // An edit to framing changes the counts, and the agent read them BEFORE it
@@ -11117,6 +11309,7 @@ export const updateShot: Operation<
 
 export const duplicateShot: Operation<{
   shotId: string
+  projectId?: string
   name?: string
   prompt?: string
   model?: string
@@ -11128,6 +11321,7 @@ export const duplicateShot: Operation<{
     'Fork a saved Shot, changing the prompt, the model or any param on the COPY in the same call — make one, fork it five times, change one thing on each. The original is never touched.',
   input: z.object({
     shotId: z.string().describe('The Shot id, or its SHOT-A code.'),
+    projectId: z.string().uuid().optional().describe(SHOT_PROJECT_DESCRIBE),
     name: z.string().max(120).optional().describe('Name for the copy (default: the original plus "copy").'),
     prompt: z.string().max(4000).optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
     model: z.string().optional().describe('Point the copy at a different model — the A/B lever. The prompt is NOT rewritten, and the copy records which model it was written for.'),
@@ -11139,7 +11333,10 @@ export const duplicateShot: Operation<{
     if (capErr) return capErr
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
-    await requireDraftShotDesktop(desktop, input.model, input.params, input.shotId)
+    const read = shotReader(desktop, input.shotId, input.projectId)
+    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read)
+    if (storedErr) return storedErr
+    await requireDraftShotDesktop(desktop, input.model, input.params, read)
     // Only the halves actually named. The route merges two levels deep, so an
     // omitted param on the copy keeps the original's value rather than clearing it.
     const spec: Record<string, unknown> = {}
@@ -11149,15 +11346,14 @@ export const duplicateShot: Operation<{
     if (input.params !== undefined) {
       const voiceRef = input.params.voiceReferenceAssetId
       if (voiceRef && !UUID_RE.test(voiceRef)) {
-        const { shot } = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
-        const built = await buildShotSpecInput(ctx, shot.projectId, { params: input.params })
+        const built = await buildShotSpecInput(ctx, (await read()).projectId, { params: input.params })
         spec.params = built.spec.params
       } else {
         spec.params = shotParamsPatch(input.params)
       }
     }
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/duplicate', {
-      id: input.shotId,
+      id: await shotRowId(input.shotId, read),
       name: input.name,
       ...(Object.keys(spec).length > 0 ? { spec } : {}),
       frameId: input.frameId,
@@ -11316,19 +11512,20 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
  *  desktop's 12,000-character result cap with the totals and the variety report. */
 const SHOT_ROWS_CHARS = 8000
 
-export const getShot: Operation<{ shotId: string }> = {
+export const getShot: Operation<{ shotId: string; projectId?: string }> = {
   id: 'slates_get_shot',
   description:
     'Read one Shot in full — the COMPOSED prompt the request will actually carry, its numbered references, anything it points at that no longer exists, its exact credit quote, and its place on the board (2C, as the window shows it). Audit your own work here before firing.',
   input: z.object({
     shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
+    projectId: z.string().uuid().optional().describe(SHOT_PROJECT_DESCRIBE),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
     // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
     await desktop.requireCapability('board-quote', 'Shot prices')
-    const r = await desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id: input.shotId })
+    const r = { shot: await shotReader(desktop, input.shotId, input.projectId)() }
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: r.shot.projectId, shotIds: [r.shot.id] }) })
     const q = quote.items[0]
 
@@ -11389,12 +11586,13 @@ export const usePicturesAsFirstFrames: Operation<{ projectId: string; shotIds?: 
  * either row is rewritten. That property is what keeps a finished script
  * finished, and it is the acceptance test for anything added here later.
  */
-export const splitShot: Operation<{ shotId: string; caret?: number }> = {
+export const splitShot: Operation<{ shotId: string; projectId?: string; caret?: number }> = {
   id: 'slates_split_shot',
   description:
     'Split one Shot into two at a caret in its line. The text after the caret moves to the new Shot, which INHERITS the model, params and references and lands directly after it in the scene. A mid-sentence split marks the second row as continuing the first — one sentence, two cuts, which is the signature voiceover move. Takes stay with the first row. Omit the caret to add a sibling cut with the same visuals and no words moved.',
   input: z.object({
     shotId: z.string().describe('The Shot id, or its SHOT-A code.'),
+    projectId: z.string().uuid().optional().describe(SHOT_PROJECT_DESCRIBE),
     caret: z
       .number()
       .int()
@@ -11408,7 +11606,7 @@ export const splitShot: Operation<{ shotId: string; caret?: number }> = {
     const r = await desktop.post<{
       first: Record<string, unknown>
       second: Record<string, unknown>
-    }>('/agent/shots/split', { id: input.shotId, caret: input.caret })
+    }>('/agent/shots/split', { id: await shotRowId(input.shotId, shotReader(desktop, input.shotId, input.projectId)), caret: input.caret })
     return ok(
       r,
       `Split into ${(r.first?.code as string) || 'the first Shot'} and ` +
@@ -11476,20 +11674,21 @@ export const refileTake: Operation<{ assetId: string; fromShotId?: string | null
   },
 }
 
-export const mergeShots: Operation<{ firstId: string; secondId: string }> = {
+export const mergeShots: Operation<{ firstId: string; secondId: string; projectId?: string }> = {
   id: 'slates_merge_shots',
   description:
     "Merge two adjacent Shots into one. Texts join, references union, the FIRST Shot's model and params win, and the durations SUM — which may exceed the model's window, in which case it is shown and never blocked. Lossy in one direction: the second Shot's model and params are discarded. There is no undo op; the user can press Ctrl+Z in the app straight after, and the takes stay as the history.",
   input: z.object({
     firstId: z.string().describe('The Shot that survives — its model and params win. Id or SHOT-A code.'),
     secondId: z.string().describe('The Shot folded into it. Id or SHOT-A code.'),
+    projectId: z.string().uuid().optional().describe("The Shots' project. A SHOT-A code is unique only within its project, so pass this with codes."),
   }),
   async run(input, ctx) {
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
     const r = await desktop.post<{ shot: Record<string, unknown> }>('/agent/shots/merge', {
-      firstId: input.firstId,
-      secondId: input.secondId,
+      firstId: await shotRowId(input.firstId, shotReader(desktop, input.firstId, input.projectId)),
+      secondId: await shotRowId(input.secondId, shotReader(desktop, input.secondId, input.projectId)),
     })
     return ok(
       r.shot,
@@ -11558,7 +11757,7 @@ async function resolveVariationRefs(input: z.infer<typeof variationSchema>, ctx:
   if (!input.assetOverrides?.length) return input
   const { storyboard } = await ctx.desktop().get<{ storyboard: { projectId: string } }>('/agent/storyboards/get', { id: input.storyboardId })
   const assets = await resolveAssetRefs(ctx, storyboard.projectId, input.assetOverrides.flatMap(o => [o.from, o.to]))
-  return { ...input, assetOverrides: input.assetOverrides.map(o => ({ from: assets.get(o.from)!.id, to: assets.get(o.to)!.id })) }
+  return { ...input, assetOverrides: input.assetOverrides.map(o => ({ from: assets.id(o.from), to: assets.id(o.to) })) }
 }
 
 export const getScriptUses: Operation<{ sectionId: string }> = {
@@ -11585,7 +11784,7 @@ export const reuseShotTake: Operation<{ projectId: string; shotId: string; asset
     await ctx.desktop().requireCapability('script-documents', 'script documents')
 
     const assets = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
-    return ok(await ctx.desktop().post('/agent/shots/reuse-take', { ...input, assetId: assets.get(input.assetId)!.id }))
+    return ok(await ctx.desktop().post('/agent/shots/reuse-take', { ...input, assetId: assets.id(input.assetId) }))
   },
 }
 
@@ -11799,6 +11998,7 @@ const DRAFT_INPUT = z
 
 export const generateFromShots: Operation<{
   shotIds: string[]
+  projectId?: string
   confirm?: boolean
   fingerprint?: string
   draft?: { model?: ImageModelId }
@@ -11809,6 +12009,7 @@ export const generateFromShots: Operation<{
     'Generate results for saved Shots, spending credits. Call without confirm for the itemized prices the Generate panel shows and a fingerprint; show the user the total and wait for their OK, then pass confirm with that fingerprint. Changed recipes require a fresh price. Runs sequentially; after a timeout inspect generations (slates_list_generations, status processing) instead of re-firing. Pass draft to generate previews instead: one picture for each Shot that has none, kept as a take of that Shot; the Shot\'s recipe does not change.',
   input: z.object({
     shotIds: z.array(z.string()).min(1).max(20),
+    projectId: z.string().uuid().optional().describe("The Shots' project. A SHOT-A code is unique only within its project, so pass this with codes."),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM + " Pass it with the quote's fingerprint."),
     fingerprint: z.string().optional(),
     draft: DRAFT_INPUT.describe(
@@ -11821,16 +12022,24 @@ export const generateFromShots: Operation<{
     // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
     await desktop.requireCapability('board-quote', 'Shot prices')
     // Resolved first so a SHOT-A code fails here, not halfway through a billed run.
-    const details = await Promise.all(input.shotIds.map((id) => desktop.get<{ shot: ShotDetail }>('/agent/shots/get', { id })))
+    const details = await Promise.all(input.shotIds.map((id) => shotReader(desktop, id, input.projectId)()))
+    // One quote, one board: Shots from two projects are never priced or billed together.
+    const projects = new Set(details.map((shot) => shot.projectId))
+    if (projects.size > 1) {
+      throw new Error(
+        `These Shots belong to ${projects.size} projects (${details.map((s) => `${s.code ?? s.id}: ${s.projectId}`).join(', ')}). ` +
+          'Pass projectId so each SHOT-A code resolves in that project, or generate each project\'s Shots separately.'
+      )
+    }
     // Older desktops drop the draft flag when reading a saved recipe. Its persisted 480p
     // resolution survives, so require a capable desktop before firing an ambiguous video Shot.
-    if (!input.draft && details.some(({ shot }) => shot.model === 'seedance-2.5' &&
+    if (!input.draft && details.some((shot) => shot.model === 'seedance-2.5' &&
       (shot.params?.seedanceDraft || ['480p', '4k'].includes(String(shot.params?.videoResolution))))) {
       await desktop.requireCapability('seedance-drafts', 'generating saved Seedance 2.5 preview or 4K Shots')
     }
     const { draft, note: seatNote } = await desktopDraft(desktop, input.draft)
     const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
-      input: JSON.stringify({ projectId: details[0].shot.projectId, shotIds: details.map((d) => d.shot.id), draft }),
+      input: JSON.stringify({ projectId: details[0].projectId, shotIds: details.map((d) => d.id), draft }),
     })
     for (const model of new Set(quote.items.map((i) => i.model))) requireGuideRead(ctx, model)
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
@@ -11918,7 +12127,7 @@ export const quoteDraftFinish: Operation<z.infer<typeof draftFinishInput>> = {
     const desktop = ctx.desktop()
     await desktop.requireCapability('seedance-drafts', 'finishing draft takes')
     const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
-    return ok(await desktop.get('/agent/assets/quote-draft-finish', { ...input, assetId: refs.get(input.assetId)!.id }))
+    return ok(await desktop.get('/agent/assets/quote-draft-finish', { ...input, assetId: refs.id(input.assetId) }))
   },
 }
 
@@ -11933,7 +12142,7 @@ export const finishDraft: Operation<z.infer<typeof paidDraftFinishInput>> = {
     await desktop.requireCapability('seedance-drafts', 'finishing draft takes')
     const refs = await resolveAssetRefs(ctx, input.projectId, [input.assetId])
     const receipt = await desktop.post<{ status: string; assetId?: string; generationId?: string; cost_credits: number }>(
-      '/agent/assets/finish-draft', { ...input, assetId: refs.get(input.assetId)!.id, background: true },
+      '/agent/assets/finish-draft', { ...input, assetId: refs.id(input.assetId), background: true },
     )
     if (!ctx.waitForCutFinish || receipt.status === 'completed') return ok(receipt)
     if (!receipt.generationId) throw new Error('The finish did not return a generation ID.')
@@ -12053,7 +12262,7 @@ export const editCut: Operation<{
   }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('cut-edit', 'editing a cut')
-    const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new Map<string, ResolvedAssetRef>()
+    const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new AssetRefs()
     return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.get(input.assetId)?.id : undefined }))
   },
 }

@@ -5,6 +5,7 @@ import {
   defaultContext,
   prepareOperation,
   readDefaultProjectId,
+  toolDefinition,
   type Operation,
 } from '@slatesvideo/shared'
 import { EXIT, exitFor } from '../exit-codes.js'
@@ -27,9 +28,9 @@ const RUN_COMMAND_VALUE_FLAGS = new Set(['--save-images', '--input', '--input-fi
 
 /**
  * Parse `--key value` pairs into an object. Repeated `--key` becomes an
- * array. Booleans accept `--flag` (true) and `--flag=false`. Numbers
- * auto-coerce when the Zod schema expects one — done at parse time
- * against the operation input shape.
+ * array. A bare `--flag` is true; every other value stays the string the shell
+ * sent, and the shared parse repairs a number or a `true`/`false` the op's
+ * schema asks for.
  *
  * 🚨 FLAGS CANNOT EXPRESS A NESTED OBJECT, AND THAT IS WHY `--input` EXISTS.
  * Every op with an object-shaped param was UNCALLABLE from the CLI: all eight
@@ -127,96 +128,53 @@ function assign(obj: Record<string, unknown>, key: string, value: unknown): void
   obj[key] = [existing, value]
 }
 
-// ── Zod introspection, shared by --help and the missing-object hint ──────────
+// ── The op's fields, read off the schema every host renders ──────────────────
+//
+// `toolDefinition()` is the one renderer: the MCP list, the Director and this
+// CLI all read the same JSON Schema. The CLI once walked the Zod object itself
+// and saw nothing behind a `.refine()`, so seven ops looked parameterless: no
+// help, no default project, no flag handling (2026-11-24).
 
-interface ZodLike {
-  _def?: {
-    typeName?: string
-    description?: string
-    shape?: () => Record<string, ZodLike>
-    innerType?: ZodLike
-    schema?: ZodLike
-    type?: ZodLike
-    values?: string[]
-    checks?: unknown[]
-  }
-  shape?: Record<string, ZodLike>
+interface FieldSchema {
+  type?: string | string[]
+  enum?: unknown[]
+  const?: unknown
+  description?: string
+  items?: FieldSchema
+  anyOf?: FieldSchema[]
 }
 
-const WRAPPERS = new Set([
-  'ZodOptional',
-  'ZodDefault',
-  'ZodNullable',
-  'ZodReadonly',
-  'ZodEffects',
-  'ZodCatch',
-  'ZodBranded',
-])
-
-function unwrap(t: ZodLike | undefined): ZodLike | undefined {
-  let cur = t
-  let depth = 0
-  while (cur?._def?.typeName && WRAPPERS.has(cur._def.typeName) && depth < 8) {
-    cur = cur._def.innerType ?? cur._def.schema
-    depth++
-  }
-  return cur
+interface OpFields {
+  properties: Record<string, FieldSchema>
+  required: ReadonlySet<string>
 }
 
-function isOptional(t: ZodLike | undefined): boolean {
-  let cur = t
-  let depth = 0
-  while (cur?._def?.typeName && depth < 8) {
-    if (cur._def.typeName === 'ZodOptional' || cur._def.typeName === 'ZodDefault') return true
-    if (!WRAPPERS.has(cur._def.typeName)) return false
-    cur = cur._def.innerType ?? cur._def.schema
-    depth++
-  }
-  return false
+function opFields(op: Operation<unknown>): OpFields {
+  const schema = toolDefinition(op).inputSchema as { properties?: Record<string, FieldSchema>; required?: string[] }
+  return { properties: schema.properties ?? {}, required: new Set(schema.required ?? []) }
 }
 
-function describeOf(t: ZodLike | undefined): string {
-  let cur = t
-  let depth = 0
-  while (cur?._def && depth < 8) {
-    if (cur._def.description) return cur._def.description
-    cur = cur._def.innerType ?? cur._def.schema
-    depth++
-    if (!cur) break
-  }
-  return ''
-}
-
-function objectShape(schema: unknown): Record<string, ZodLike> {
-  const z = schema as ZodLike
-  if (z?._def?.typeName !== 'ZodObject') return {}
-  return typeof z._def.shape === 'function' ? z._def.shape() : (z.shape ?? {})
+/** Every JSON type a field accepts, through `anyOf` and a `type` list. */
+function typesOf(field: FieldSchema | undefined): string[] {
+  if (!field) return []
+  const own = Array.isArray(field.type) ? field.type : field.type ? [field.type] : []
+  const literal = field.const !== undefined ? [field.const === null ? 'null' : typeof field.const] : []
+  return [...own, ...literal, ...(field.anyOf ?? []).flatMap(typesOf)]
 }
 
 /** A human type name plus, for an enum, its legal values. */
-function typeLabel(t: ZodLike | undefined): string {
-  const leaf = unwrap(t)
-  const name = leaf?._def?.typeName ?? ''
-  switch (name) {
-    case 'ZodString':
-      return 'string'
-    case 'ZodNumber':
-      return 'number'
-    case 'ZodBoolean':
-      return 'boolean'
-    case 'ZodEnum':
-      return `enum(${(leaf?._def?.values ?? []).join('|')})`
-    case 'ZodNativeEnum':
-      return 'enum'
-    case 'ZodArray':
-      return `${typeLabel(leaf?._def?.type)}[]`
-    case 'ZodObject':
-      return 'object'
-    case 'ZodUnion':
-      return 'union'
-    default:
-      return name.replace(/^Zod/, '').toLowerCase() || 'value'
+function typeLabel(field: FieldSchema): string {
+  if (field.enum) return `enum(${field.enum.join('|')})`
+  if (field.anyOf) {
+    const values = field.anyOf.filter((branch) => branch.type !== 'null')
+    if (values.length > 0 && values.every((branch) => branch.const !== undefined)) return `enum(${values.map((branch) => branch.const).join('|')})`
+    if (values.length === 1) return typeLabel(values[0])
+    return 'union'
   }
+  const type = Array.isArray(field.type) ? field.type.find((t) => t !== 'null') : field.type
+  if (type === 'array') return `${field.items ? typeLabel(field.items) : 'value'}[]`
+  if (type === 'integer') return 'number'
+  return type ?? 'value'
 }
 
 function firstSentence(text: string): string {
@@ -224,37 +182,37 @@ function firstSentence(text: string): string {
   return s.length > 200 ? `${s.slice(0, 197)}…` : s
 }
 
+/** The fields flags cannot express: an object, or a list of them. */
+function objectFieldsOf(properties: Record<string, FieldSchema>): string[] {
+  return Object.keys(properties).filter((key) => typesOf(properties[key]).includes('object'))
+}
+
 /**
  * `slates run <op> --help`.
  *
  * The only way to learn an op's parameters used to be `slates run --list`,
- * which printed all 91 descriptions — 29 KB, including the generated capability
- * tables — and not one parameter NAME. An agent shelling out had to guess the
+ * which printed every description in full, the generated capability tables
+ * included, and not one parameter NAME. An agent shelling out had to guess the
  * flags or go and read a skill.
  */
 export function printOpHelp(op: Operation<unknown>): void {
   console.log(`${op.id}\n`)
   console.log(`${op.description}\n`)
-  const shape = objectShape(op.input)
-  const keys = Object.keys(shape)
+  const { properties, required } = opFields(op)
+  const keys = Object.keys(properties)
   if (keys.length === 0) {
     console.log('Takes no parameters.')
     return
   }
   console.log('Parameters:')
-  const objectFields: string[] = []
   for (const key of keys) {
-    const node = shape[key]
-    const leaf = unwrap(node)
-    const required = !isOptional(node)
-    const label = typeLabel(node)
-    if (leaf?._def?.typeName === 'ZodObject') objectFields.push(key)
-    const desc = describeOf(node)
+    const field = properties[key]
     console.log(
-      `  --${key}${' '.repeat(Math.max(1, 26 - key.length))}${label}${required ? '  (required)' : ''}`
+      `  --${key}${' '.repeat(Math.max(1, 26 - key.length))}${typeLabel(field)}${required.has(key) ? '  (required)' : ''}`
     )
-    if (desc) console.log(`      ${firstSentence(desc)}`)
+    if (field.description) console.log(`      ${firstSentence(field.description)}`)
   }
+  const objectFields = objectFieldsOf(properties)
   if (objectFields.length > 0) {
     console.log(
       `\nNested object field(s): ${objectFields.join(', ')}. Flags cannot express these — ` +
@@ -281,18 +239,8 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
     return
   }
 
-  const raw = { ...readInputObject(opts.rawArgs), ...parseArgs(opts.rawArgs) }
-  const coerced = coerceForSchema(op.input, raw)
-
-  // `slates use <project>` writes a default. Filled ONLY when the op declares a
-  // projectId and the caller left it out — never overriding an explicit value.
-  const shape = objectShape(op.input)
-  if (coerced.projectId === undefined && 'projectId' in shape) {
-    const fallback = readDefaultProjectId()
-    if (fallback) coerced.projectId = fallback
-  }
-
-  const prepared = prepareOperation(op, coerced)
+  const { properties } = opFields(op)
+  const prepared = prepareOperation(op, buildOpInput(op, opts.rawArgs, readDefaultProjectId))
   if (!prepared.ok) {
     // One line per problem (the shared flattener), never Zod's issue JSON: an
     // agent shelling out pays a turn for every unreadable error.
@@ -300,9 +248,7 @@ export async function runOp(opts: RunOpOptions): Promise<void> {
     // An OBJECT field is the failure the flag parser structurally cannot fix,
     // so name the one thing that does fix it rather than leaving the caller to
     // guess why `--params.duration 8` did nothing.
-    const objectFields = Object.keys(shape).filter(
-      (k) => unwrap(shape[k])?._def?.typeName === 'ZodObject'
-    )
+    const objectFields = objectFieldsOf(properties)
     if (objectFields.length > 0) {
       console.error(
         `
@@ -382,73 +328,34 @@ function saveImages(images: Array<{ data: string; mimeType: string }>, dir: stri
   })
 }
 
-function coerceForSchema(schema: unknown, raw: Record<string, unknown>): Record<string, unknown> {
-  // Best-effort coercion for the strings produced by parseArgs.
-  // Zod's parse will reject unknown inputs anyway; this just improves
-  // the experience for the common cases (numbers, booleans).
-  // Values that arrived through --input are already typed, so they pass through.
-  const shape = objectShape(schema)
-  if (Object.keys(shape).length === 0) return raw
-
-  // Does the declared type allow null anywhere in its wrapper chain?
-  // (e.g. z.string().uuid().nullable() — so `--folderId null` → null.)
-  const isNullable = (t: ZodLike | undefined): boolean => {
-    let cur = t
-    let depth = 0
-    while (cur?._def?.typeName && depth < 8) {
-      if (cur._def.typeName === 'ZodNullable') return true
-      if (WRAPPERS.has(cur._def.typeName)) {
-        cur = cur._def.innerType ?? cur._def.schema
-        depth++
-        continue
-      }
-      break
-    }
-    return false
+/**
+ * The op's input from the command line: `--input` under the flags, then the two
+ * things only a shell needs. `--folderId null` is JSON null where the field
+ * allows it, and one `--ids a,b` is a list where the field is a list and
+ * nothing else. Then the default project, for an op that takes one.
+ *
+ * Numbers and booleans are not touched here: `prepareOperation` repairs them
+ * for every host the same way, and refuses `--sound on` by name.
+ */
+export function buildOpInput(
+  op: Operation<unknown>,
+  rawArgs: string[],
+  defaultProjectId: () => string | null
+): Record<string, unknown> {
+  const { properties } = opFields(op)
+  const input: Record<string, unknown> = { ...readInputObject(rawArgs) }
+  for (const [key, value] of Object.entries(parseArgs(rawArgs))) {
+    const types = typesOf(properties[key])
+    if (value === 'null' && types.includes('null')) input[key] = null
+    else if (types.includes('array') && !types.includes('string') && !Array.isArray(value)) {
+      input[key] = typeof value === 'string' ? value.split(',').map((part) => part.trim()).filter((part) => part.length > 0) : [value]
+    } else input[key] = value
   }
-
-  const coerceScalar = (fieldType: string, value: string): unknown => {
-    if (fieldType === 'ZodNumber') {
-      const n = Number(value)
-      return Number.isFinite(n) ? n : value
-    }
-    if (fieldType === 'ZodBoolean') return value === 'true' || value === '1'
-    return value
+  // `slates use <project>` writes a default. Filled ONLY when the op declares a
+  // projectId and the caller left it out — never overriding an explicit value.
+  if (input.projectId === undefined && Object.hasOwn(properties, 'projectId')) {
+    const fallback = defaultProjectId()
+    if (fallback) input.projectId = fallback
   }
-
-  const out: Record<string, unknown> = {}
-  for (const [key, value] of Object.entries(raw)) {
-    const declared = shape[key]
-    const leaf = unwrap(declared)
-    const fieldType = (leaf?._def?.typeName ?? '') as string
-
-    // `--folderId null` (or a bare `--folderId` → true is NOT null) → JS null
-    // for fields that actually allow null. Enables "move to project root",
-    // "clear character identity", etc. from the CLI.
-    if (value === 'null' && isNullable(declared)) {
-      out[key] = null
-      continue
-    }
-
-    // Array fields: a single `--ids X` produced a bare string; repeated
-    // `--ids X --ids Y` produced an array. Accept either, plus comma-split
-    // (`--ids a,b,c`). Coerce each element to the array's element type.
-    if (fieldType === 'ZodArray' && (typeof value !== 'object' || Array.isArray(value))) {
-      const elemType = (unwrap(leaf?._def?.type)?._def?.typeName ?? '') as string
-      const arr = Array.isArray(value)
-        ? value
-        : typeof value === 'string'
-          ? value.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
-          : [value]
-      out[key] = arr.map((v) => (typeof v === 'string' ? coerceScalar(elemType, v) : v))
-      continue
-    }
-
-    if (typeof value === 'string') {
-      out[key] = coerceScalar(fieldType, value)
-      continue
-    }
-    out[key] = value
-  }
-  return out
+  return input
 }
