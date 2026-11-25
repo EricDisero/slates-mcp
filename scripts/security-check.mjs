@@ -22,6 +22,7 @@ import { tmpdir, userInfo } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { desktopSource } from './desktop-source.mjs'
+import { clientCalls } from './desktop-double.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const home = mkdtempSync(join(tmpdir(), 'slates-security-'))
@@ -248,7 +249,7 @@ const fakeHost = (credits, assets = []) => {
     posted,
     ctx: {
       desktop: () => ({
-        requireCapability: async () => {},
+        ...clientCalls, requireCapability: async () => {},
         get: async () => ({ assets }),
         post: async (path) => { posted.push(path); return { ok: true } },
       }),
@@ -304,7 +305,7 @@ for (const [id, input, route] of sheets) {
 
 // The Seedance refusal is what a person is shown before a yes that spends, so it carries the price.
 {
-  const host = fakeHost(240)
+  const host = fakeHost(240, [{ id: projectId, type: 'image', code: 'IMG-A1' }])
   const result = await op('slates_generate_video').run({ projectId, model: 'seedance-2.5', prompt: 'remove the tripod from the bench', firstFrameAssetId: projectId, duration: 5, aspectRatio: '16:9' }, host.ctx)
   assert.equal(result.data.requires_clarification, true, 'a task-intent word stops the call')
   assert.equal(result.data.confirm_sends_as_written, true)

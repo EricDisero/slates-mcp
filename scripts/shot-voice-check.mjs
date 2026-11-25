@@ -3,12 +3,14 @@ import assert from 'node:assert/strict'
 import { createShot, updateShot, duplicateShot, getShot, splitShot, mergeShots, generateFromShots, TTS_MODEL } from '../packages/shared/dist/operations/index.js'
 import { audioCostKey } from '../packages/shared/dist/operations/index.js'
 import { mergeShotParams } from '../packages/shared/dist/prompts/shot-spec.js'
+import { clientCalls } from './desktop-double.mjs'
 
 const projectId = '11111111-1111-4111-8111-111111111111'
 const assetId = '22222222-2222-4222-8222-222222222222'
 const requests = []
 const desktop = {
   requireCapability: async () => {},
+  ...clientCalls,
   get: async (path, query) => {
     if (path === '/agent/shots/get') return { shot: { id: 'shot-a1', projectId } }
     assert.equal(path, '/agent/assets')
@@ -66,6 +68,7 @@ const shotsByProject = {
 const sent = []
 const twoProjects = {
   requireCapability: async () => {},
+  ...clientCalls,
   get: async (path, query) => {
     if (path === '/agent/shots/get') return { shot: shotsByProject[query.projectId ?? otherProject] }
     if (path === '/agent/shots/quote') return { fingerprint: 'f', items: JSON.parse(query.input).shotIds.map((shotId) => ({ shotId, credits: 1 })) }

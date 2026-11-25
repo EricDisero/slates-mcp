@@ -845,7 +845,7 @@ function zodDescriptions(op) {
     }
     const opsSrc = readFileSync(join(sharedRoot, 'src', 'operations', 'index.ts'), 'utf8')
     const called = new Set()
-    for (const m of opsSrc.matchAll(/desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs)) {
+    for (const m of opsSrc.matchAll(/desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request|quote)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs)) {
       // A templated path cannot be matched against a static route table; none
       // exist today, and one would be reported here rather than skipped.
       if (m[1].includes('${')) fail(CHECK, `op calls a templated desktop path this check cannot resolve: ${m[1]}`)
@@ -943,7 +943,7 @@ function zodDescriptions(op) {
       if (m) blocks.push({ name: m[1] ?? m[2], start: i })
     }
     blocks.forEach((b, k) => { b.body = lines.slice(b.start, blocks[k + 1]?.start ?? lines.length).join('\n') })
-    const callRe = /desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs
+    const callRe = /desktop(?:\(\))?\s*\.\s*(?:get|post|put|delete|request|quote)\s*(?:<[^(]*?>)?\s*\(\s*['"`]([^'"`]+)['"`]/gs
     const byName = new Map(blocks.map((b) => [b.name, b]))
     const routesOf = (b, seen = new Set()) => {
       if (seen.has(b.name)) return new Set()
@@ -962,13 +962,16 @@ function zodDescriptions(op) {
     for (const b of blocks) {
       const id = /\bid:\s*'(slates_[a-z0-9_]+)'/.exec(b.body)?.[1]
       if (!id) continue
-      const tokens = [...b.body.matchAll(/requireCapability\(\s*'([^']+)'/g)].map((x) => x[1])
+      // `hasCapability` gates too: the op asks for the token and takes an older route, or none, without it.
+      const tokens = [...b.body.matchAll(/(?:requireCapability|hasCapability)\(\s*'([^']+)'/g)].map((x) => x[1])
       const fresh = [...routesOf(b)].filter((p) => !oldRoutes.has(p))
       if (fresh.length && !tokens.some((t) => nowCaps.has(t) && !oldCaps.has(t))) {
         ungated.push(`${id} calls ${fresh.join(', ')}${tokens.length ? ` but checks only ${tokens.join(', ')}, which ${released} already advertises` : ' and checks no capability'}`)
       }
     }
-    const unknown = [...used].filter((t) => !nowCaps.has(t))
+    // A token an op only asks about (`hasCapability`) must be advertised too, or its newer route is never taken.
+    const asked = [...opsSrc.matchAll(/hasCapability\(\s*'([^']+)'/g)].map((x) => x[1])
+    const unknown = [...new Set([...used, ...asked])].filter((t) => !nowCaps.has(t))
     const doctorSrc = readFileSync(join(repoRoot, 'packages', 'cli', 'src', 'commands', 'doctor.ts'), 'utf8')
     const doctorList = /REQUIRED_CAPABILITIES[^=]*=\s*\[([\s\S]*?)\n\]/.exec(doctorSrc)?.[1] ?? ''
     const doctor = new Set([...doctorList.matchAll(/\[\s*'([^']+)'/g)].map((x) => x[1]))

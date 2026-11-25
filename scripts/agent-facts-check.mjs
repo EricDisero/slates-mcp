@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { ALL_OPERATIONS, bannedTokensForSkill, findBannedTokens, refusableBannedTokens, useBrainSource } from '../packages/shared/dist/index.js'
 import { brainOrSkip } from './brain-source.mjs'
+import { clientCalls } from './desktop-double.mjs'
 
 // The guides are the brain's (slates-api brain/), held as a member's server holds them, here and in any server this spawns.
 const brain = brainOrSkip('agent-facts')
@@ -72,7 +73,7 @@ const shots = [
   { id: '55565a63-8c57-461d-b2e3-089e766d20b6', code: null, name: 'Pull back', model: null },
 ]
 const desktop = {
-  requireCapability: async () => {},
+  ...clientCalls, requireCapability: async () => {},
   get: async (route) => route === '/agent/shots'
     ? { shots: shots.map((s) => ({ referenceCount: 0, cuts: 1, runtimeSeconds: 8, sceneName: 'Scene 1', position: 0, continues: false, ...s })), variety: null, varietySummary: '' }
     : { items: shots.map((s) => ({ shotId: s.id, name: s.name, code: s.code, model: s.model, credits: s.model ? 148 : null })) },
@@ -85,7 +86,7 @@ assert.match(listed.text, /\n— · "Pull back" · no model · unpriced · id 55
 // desktop's 12,000-character result cap, saying how many were left out and how to get them.
 const many = Array.from({ length: 150 }, (_, i) => ({ id: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, code: `SHOT-${i}`, place: `${i}A`, name: `A long descriptive shot name number ${i}`, model: 'seedance-2' }))
 const bigDesktop = {
-  requireCapability: async () => {},
+  ...clientCalls, requireCapability: async () => {},
   get: async (route) => route === '/agent/shots'
     ? { shots: many.map((s) => ({ referenceCount: 0, cuts: 1, runtimeSeconds: 8, sceneName: 'Scene 1', position: 0, continues: false, ...s })),
         variety: { cuts: 150, generations: 150, runtimeSeconds: 1200, cutsWithoutDuration: 0, shotSizes: [{ bucket: 'wide', count: 90 }], cameraMoves: [], runs: [], overLongLines: [], words: 40, wordBudget: 3180 },
@@ -111,7 +112,7 @@ console.log('agent-facts: an unknown tool name answers with the closest real too
 // ── 4. The image review names the framing check (fix-after-review.2 and .6) ──
 // Twice the agent had the pixels of a lighthouse cut off at the top and called it on brief.
 const imageDesktop = {
-  requireCapability: async () => {},
+  ...clientCalls, requireCapability: async () => {},
   post: async (route) => { assert.equal(route, '/agent/generation/image'); return { success: true, asset: { id: 'a1', code: 'IMG-A21' } } },
   get: async (route) => { assert.equal(route, '/agent/assets/image'); return { data: 'AAAA', mimeType: 'image/jpeg', bytes: 3 } },
 }

@@ -46,10 +46,12 @@ export {
   getModelCapability, aspectRatiosFor, videoResolutionsFor, defaultVideoResolutionFor,
   durationsFor, durationValuesFor, aspectRatioUnion, videoResolutionUnion, durationBounds,
   checkAspectRatio, checkVideoResolution, checkDuration, checkReferenceShape,
+  checkVideoParams, checkReferenceSeconds, checkFramesWithReferenceMedia, billedReferenceSeconds, referenceClipInBounds, referenceSecondsBounds,
+  REFERENCE_SECONDS_TOLERANCE, maxIngredientImagesFor, aspectRatioApplies,
   maxReferenceVideosFor, lastFrameMaxSecondsFor,
   describeAspectRatios, describeVideoResolutions, describeDurations, describeReferenceImageCaps,
   type AspectRatio, type VideoResolution, type ModelCapability,
-  type DurationCapability, type VideoResolutionCapability,
+  type DurationCapability, type VideoResolutionCapability, type ReferenceSecondsVerdict,
 } from './prompts/model-capabilities.js'
 // 🚨 AGENT GUIDANCE SSOT — the working method, the hard rules and the guide
 // index, as ONE string both surfaces consume: the desktop Studio Agent's whole

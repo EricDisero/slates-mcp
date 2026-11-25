@@ -7,7 +7,8 @@
 //   2. a param a call would drop is refused (reference URLs beside a projectId,
 //      a transparent background on a seat without one, a folder with no project);
 //   3. the headless poller names the job and stops on a status that cannot change;
-//   4. a headless result URL that does not answer with an image keeps its link;
+//   4. a headless result URL that does not answer with an image keeps its link, and a headless
+//      submit carries an id the server keeps the job under, so a lost answer is asked for by it;
 //   5. a blank asset ref gets the teaching error, and no op reaches a bare
 //      `.get(ref)!.id` again (static);
 //   6. the upscale quote hands back the requestId the confirmed call and its
@@ -18,6 +19,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { clientCalls } from './desktop-double.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -53,7 +55,9 @@ const pricedCloud = (credits) => ({
   post: async (path) => assert.fail(`unexpected cloud write ${path}`),
 })
 const desktop = {
-  requireCapability: async () => {},
+  ...clientCalls, requireCapability: async () => {},
+  // A desktop before 'edit-image-quote': the op prices an edit by its own key and asks the desktop nothing.
+  hasCapability: async () => false,
   get: async (path) => assert.fail(`unexpected desktop read ${path}`),
   post: async (path) => assert.fail(`unexpected desktop write ${path}`),
 }
@@ -76,7 +80,7 @@ for (const model of IMAGE_MODELS) {
     const edit = await call('slates_edit_image', { projectId, sourceAssetId: assetId, prompt: 'red jacket', editModel: model, aspectRatio, resolution: rung }, ctx)
     assert.equal(refused(edit, 'aspectRatio'), !legal, `edit ${model} ${aspectRatio}`)
     const shot = await call('slates_create_shot', { projectId, model, prompt: 'a lighthouse', params: { aspectRatio } }, {
-      cloud: ctx.cloud, desktop: () => ({ ...desktop, requireCapability: async () => { throw new Error('reached the desktop') } }),
+      cloud: ctx.cloud, desktop: () => ({ ...desktop, ...clientCalls, requireCapability: async () => { throw new Error('reached the desktop') } }),
     }).catch((e) => ({ error: e.message }))
     assert.equal(refused(shot, 'aspectRatio'), !legal, `shot ${model} ${aspectRatio}: ${JSON.stringify(shot)}`)
     cells += 4
@@ -105,7 +109,7 @@ for (const model of shared.VIDEO_MODELS) {
 // slates_get_asset names its project, so the desktop refuses an asset id from another one.
 {
   const seen = []
-  const d = { requireCapability: async () => {}, get: async (path, query) => {
+  const d = { ...clientCalls, requireCapability: async () => {}, get: async (path, query) => {
     seen.push([path, query])
     return path === '/agent/assets' ? { assets: [{ id: assetId, code: 'IMG-A1' }] } : { asset: { id: assetId } }
   } }
@@ -148,6 +152,29 @@ try {
   assert.equal(headless.images.length, 0, 'an error page is never inlined as an image')
   assert.deepEqual(headless.data.urls, [url])
   assert.match(headless.text, /could not be attached/)
+
+  // The submit's answer is lost after the server took the job: the op asks for the job by the id it sent.
+  const realSetTimeout = globalThis.setTimeout
+  globalThis.setTimeout = (fn, _ms, ...args) => realSetTimeout(fn, 0, ...args)
+  let sent
+  const asked = []
+  const lost = await call('slates_generate_image', { prompt: 'a lighthouse', aspectRatio: '1:1' }, {
+    desktop,
+    cloud: () => ({
+      get: async (path) => {
+        if (path.startsWith('/proxy/generations/')) return (asked.push(path), { success: true, jobId: 'job-kept' })
+        if (path === '/proxy/jobs/job-kept') return { status: 'completed', data: { images: [{ url }] } }
+        return pricedCloud(1).get(path)
+      },
+      post: async (_path, body) => {
+        sent = body
+        throw new Error('slates-api /proxy/generate timed out.')
+      },
+    }),
+  }).finally(() => { globalThis.setTimeout = realSetTimeout })
+  assert.match(sent.generationId ?? '', /^[0-9a-f-]{36}$/, 'the headless submit carries a generationId')
+  assert.deepEqual(asked, [`/proxy/generations/${sent.generationId}`])
+  assert.deepEqual(lost.data.urls, [url], 'the job the server kept is delivered')
 } finally {
   globalThis.fetch = realFetch
 }
@@ -159,7 +186,9 @@ await assert.rejects(call('slates_get_asset', { projectId, assetId: ' ' }, ctx),
 let sentId
 const upscaleDesktop = {
   ...desktop,
-  get: async () => ({ assetId, code: 'IMG-A1', factor: 2, width: 1000, height: 1000, outWidth: 2000, outHeight: 2000, credits: CONFIRM_CREDITS + 1 }),
+  get: async (path) => path === '/agent/assets'
+    ? { assets: [{ id: assetId, code: 'IMG-A1' }] }
+    : { assetId, code: 'IMG-A1', factor: 2, width: 1000, height: 1000, outWidth: 2000, outHeight: 2000, credits: CONFIRM_CREDITS + 1 },
   post: async (_path, body) => { sentId = body.requestId; return { asset: { id: 'new', code: 'IMG-A2', filePath: 'x', width: 2000, height: 2000 } } },
 }
 const quote = await call('slates_upscale_image', { projectId, assetId, factor: 2 }, { cloud: ctx.cloud, desktop: () => upscaleDesktop })

@@ -4,7 +4,7 @@ import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
 import { discoverGuides, guideCatalog, type GuideCatalogEntry } from '../prompts/guide-discovery.js'
 import { retrieveGuide, servedDepth, type GuideDepth } from '../prompts/guide-retrieval.js'
 import { BRAIN_ROUTER, MY_BRAIN_TOPIC, ROUTER_ALIASES } from '../prompts/brain.js'
-import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
+import { MINIMAX_MAX_REFERENCE, minimaxMaxReferenceTokens, MODEL_CAPABILITIES, RETIRED_MODELS, retiredModelOfKey, checkReferenceShape, checkReferenceSeconds, checkFramesWithReferenceMedia, checkVideoParams, GPT_QUALITY_TIERS, DEFAULT_GPT_QUALITY, GPT_BACKGROUNDS, seedream55CostKey, type GptQuality, type GptBackground } from '../prompts/model-capabilities.js'
 // Operations layer — the ONE place every Slates agent tool is defined.
 // Both the MCP server and the CLI register these as their tool / command
 // surface. Every operation:
@@ -56,7 +56,8 @@ import {
   AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
   aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
-  checkAspectRatio, checkVideoResolution, checkDuration,
+  maxIngredientImagesFor, maxReferenceVideosFor,
+  checkAspectRatio, checkVideoResolution,
   describeAspectRatios, describeVideoResolutions, describeDurations,
   describeReferenceImageCaps,
   type AspectRatio, type VideoResolution,
@@ -445,6 +446,15 @@ export const TTS_VOICE_CLONE = (() => {
 function creditCost(m: { cost_credits?: number; cost_cents?: number } | undefined): number {
   if (!m) return 0
   return m.cost_credits ?? m.cost_cents ?? 0
+}
+
+/**
+ * A key's list price: what the desktop quotes, so the unit a desktop ceiling
+ * (`maxCredits`) is held in. `creditCost` is what the account is debited; the
+ * registry sends `list_credits` only where its tier pays something else.
+ */
+function listCredits(m: { cost_credits?: number; cost_cents?: number; list_credits?: number } | undefined): number {
+  return m?.list_credits ?? creditCost(m)
 }
 
 function fmtCredits(credits: number): string {
@@ -2380,6 +2390,7 @@ export const estimateGenerationCost: Operation<{
   seedanceFace?: boolean
   seedanceRealFace?: boolean
   referenceImages?: number
+  videoReferenceSecondsEach?: number[]
   videoRefSeconds?: number
   audioRefSeconds?: number
 }> = {
@@ -2405,7 +2416,7 @@ export const estimateGenerationCost: Operation<{
       `${TTS_MODEL} only — the LENGTH OF THE TEXT to speak (${TTS_BUCKET_CHARS}-char buckets).`
     ),
     videoResolution: zEnum(VIDEO_RESOLUTIONS).optional().describe(
-      'Video only. Omitted, each model quotes at its own default. Per-model ladders: see slates_generate_video\'s videoResolution.'
+      'Video only. Omitted, each model quotes at its own default. Ladders: see slates_generate_video\'s videoResolution.'
     ),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe('Image only. Omit for the model default; pass the same value to generation.'),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
@@ -2414,10 +2425,11 @@ export const estimateGenerationCost: Operation<{
     seedanceDraft: z.boolean().optional().describe('Create a finishable Seedance 2.5 preview at 480p.'),
     seedanceFace: z.boolean().optional().describe('Seedance Face row, for an AI character\'s face.'),
     seedanceRealFace: z.boolean().optional().describe('Seedance with a consented real person (premium key).'),
-    videoRefSeconds: z.number().nonnegative().optional().describe('Combined reference-video seconds, measured from the clips.'),
-    audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, including attached character voices.'),
+    videoReferenceSecondsEach: z.array(z.number().nonnegative()).optional().describe('Seconds of each reference video, one per clip. Never the sum.'),
+    videoRefSeconds: z.number().nonnegative().optional().describe('DEPRECATED: one clip.'),
+    audioRefSeconds: z.number().nonnegative().optional().describe('Combined reference-audio seconds, attached voices too.'),
     referenceImages: z.number().int().min(0).optional().describe(
-      `MiniMax H3 rows and seedream-5-5 — how many reference IMAGES the generation will carry. They are a paid dimension of the cost key, so a quote that omits this UNDER-REPORTS a reference-heavy job. seedream-5-5 pays for every input image, @mention pictures included, and an edit's source picture counts as one. The MiniMax allowances differ: minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}; start/end frames are free on both rows and are not reference images. Ignored by every other model.`
+      `MiniMax H3 and seedream-5-5: how many reference IMAGES the generation carries. A paid dimension of the cost key: a quote without it UNDER-REPORTS a reference-heavy job. seedream-5-5 pays for every input image, @mention pictures included, and an edit's source picture counts as one. minimax-h3 gives ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3']} free, minimax-h3-max ${MINIMAX_FREE_REF_IMAGES_BY_MODEL['minimax-h3-max']}; start/end frames are free and are not reference images. Ignored by every other model.`
     ),
   }),
   async run(input, ctx) {
@@ -2563,6 +2575,8 @@ export const estimateGenerationCost: Operation<{
           duration,
         })
         if (capErr) return ok(capErr)
+        const refErr = referenceSecondsRefusal(resolved.model, referenceVideoClips(input))
+        if (refErr) return ok(refErr)
         key = videoCostKey({
           model: resolved.model,
           duration,
@@ -2579,7 +2593,7 @@ export const estimateGenerationCost: Operation<{
           seedanceFace: input.seedanceFace ?? resolved.seedanceFace,
           seedanceRealFace: input.seedanceRealFace ?? resolved.seedanceRealFace,
           referenceImages: input.referenceImages ?? resolved.referenceImages,
-          videoRefSeconds: input.videoRefSeconds, audioRefSeconds: input.audioRefSeconds,
+          videoReferenceSecondsEach: referenceVideoClips(input), audioRefSeconds: input.audioRefSeconds,
         })
       }
     }
@@ -2701,6 +2715,8 @@ function compactAsset(a: unknown): Record<string, unknown> {
       prompt: typeof r.prompt === 'string' ? r.prompt : null,
     }),
     type: r.type,
+    // A clip's measured length in seconds: what reference seconds are billed and capped on.
+    ...(typeof r.duration === 'number' && r.duration > 0 ? { duration: Math.round(r.duration * 100) / 100 } : {}),
     // Only when it IS one. A compact row pays for every key on every asset,
     // and "not a favorite" is the default the app writes — absent says it.
     ...(r.isFavorite === true ? { isFavorite: true } : {}),
@@ -2744,13 +2760,18 @@ class AssetRefs extends Map<string, ResolvedAssetRef> {
  * user creates assets in the Slates UI mid-chat; an agent that guesses or
  * reuses a nearby UUID for a code it never looked up burns real dollars on
  * the wrong start frame (observed live: "use A8" generated from A5).
- * Unknown codes and blank refs throw a teaching error; unknown UUIDs pass
- * through for the desktop route to validate.
+ * Unknown codes and blank refs throw a teaching error, and so does a UUID that
+ * is not in the named project: an id copied from another project never reaches
+ * a route as this project's asset. Two cases let a UUID through for the route
+ * to validate: no project was named (the route falls back to the open one), or
+ * the caller says the reference may cross projects (`anyProject`, a timeline
+ * clip, the one cross-project reference Slates allows).
  */
 async function resolveAssetRefs(
   ctx: OperationContext,
-  projectId: string,
-  refs: string[]
+  projectId: string | undefined,
+  refs: string[],
+  scope: { anyProject?: boolean } = {}
 ): Promise<AssetRefs> {
   const out = new AssetRefs()
   if (refs.some((r) => typeof r === 'string' && r.trim().length === 0)) {
@@ -2768,6 +2789,7 @@ async function resolveAssetRefs(
     const raw = ref.trim()
     if (UUID_RE.test(raw)) {
       const row = byId.get(raw.toLowerCase())
+      if (!row && projectId && !scope.anyProject) throw new Error(noAssetMatching(ref))
       out.set(ref, {
         id: raw,
         code: row ? ((row.code as string | null) ?? null) : null,
@@ -4104,6 +4126,26 @@ export function assertImageCapabilities(
   return null
 }
 
+/** Reference images an image model reads in one request, from its capability row. */
+const imageReferenceCap = (model: string): number => MODEL_CAPABILITIES[model]?.maxRefImages ?? 0
+
+/**
+ * The refusal for more references than the model reads. The desktop sends the
+ * first `cap` and leaves the rest out, so a call over the cap would run, and
+ * bill, without references the caller named. `cap` comes from the capability
+ * row, never a typed number.
+ */
+function referenceCapRefusal(model: string, count: number, cap: number, param: string, what = 'reference images'): Clarification | null {
+  if (count <= cap) return null
+  return {
+    requires_clarification: true,
+    missing: [param],
+    message: cap > 0
+      ? `Nothing ran. ${model} reads at most ${cap} ${what} and this call names ${count}. Remove ${count - cap}, or pick a model that reads more.`
+      : `Nothing ran. ${model} reads no ${what}. Remove them, or pick a model that reads them.`,
+  }
+}
+
 /**
  * The image params that only some calls consume, each with the condition under
  * which it reaches the request. A param set where its condition fails was
@@ -4304,8 +4346,8 @@ export const generateImage: Operation<{
       `Pick from the use case: cinematic 16:9 · TikTok/Reels 9:16 · IG square 1:1 · ultra-wide 21:9. 1:1 costs most on GPT Image. Per model: ${describeAspectRatios(IMAGE_MODELS)}`
     ),
     count: z.number().int().min(1).max(MAX_IMAGE_VARIATIONS).optional().describe(`Variations of this one prompt: every image gets the same prompt, so different subjects are separate calls. Up to ${MAX_IMAGE_VARIATIONS} with projectId; headless caps at ${HEADLESS_BATCH_CAP}. A 2x2 or 3x3 grid in one picture is a Shot's or the prompt box's Grid (params.gridMode), not count.`),
-    referenceImageUrls: z.array(z.string().url()).max(14).optional().describe(`Headless (no projectId) ${HEADLESS_IMAGE_MODEL} only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.`),
-    referenceAssetIds: z.array(z.string()).max(16).optional().describe(`Project assets as references — UUIDs or badge codes ("IMG-A8"), resolved at call time. Requires projectId. Caps: ${describeReferenceImageCaps(IMAGE_MODELS)}. Label every reference role in the prompt.`),
+    referenceImageUrls: z.array(z.string().url()).max(imageReferenceCap(HEADLESS_IMAGE_MODEL)).optional().describe(`Headless (no projectId) ${HEADLESS_IMAGE_MODEL} only. With a projectId, upload via slates_upload_reference_image. Label every image role in the prompt.`),
+    referenceAssetIds: z.array(z.string()).max(Math.max(...IMAGE_MODELS.map(imageReferenceCap))).optional().describe(`Project assets as references — UUIDs or badge codes ("IMG-A8"), resolved at call time. Requires projectId. Caps: ${describeReferenceImageCaps(IMAGE_MODELS)}; over a model's cap is refused, never trimmed. Label every reference role in the prompt.`),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     approvedCredits: z.number().int().positive().optional().describe('Only after a reply with `quote_exceeded`: the credits that reply named, once the user has approved them. The desktop counts @mention pictures as paid inputs on seedream-5-5 and runs nothing above the approved total.'),
@@ -4397,6 +4439,10 @@ export const generateImage: Operation<{
           `count above ${HEADLESS_BATCH_CAP} needs a projectId. The headless path is one request and ${HEADLESS_IMAGE_MODEL} caps it at ${HEADLESS_BATCH_CAP}; with a projectId the desktop fires them as separate generations and the limit is ${MAX_IMAGE_VARIATIONS}.`,
       })
     }
+    // Past the model's cap the desktop sends the first ones and leaves the rest out, so the picture
+    // would be made without references the caller named: refused here, before any spend.
+    const overCap = referenceCapRefusal(imageModel, referenceAssetIds.length + (input.referenceImageUrls?.length ?? 0), imageReferenceCap(imageModel), input.referenceImageUrls?.length ? 'referenceImageUrls' : 'referenceAssetIds')
+    if (overCap) return ok(overCap)
     let refEcho = ''
     if (referenceAssetIds.length > 0) {
       await ctx.desktop().requireCapability('image-references', 'reference images on image generation')
@@ -4514,7 +4560,7 @@ export const generateImage: Operation<{
         ...(referenceAssetIds.length > 0 ? { referenceAssetIds } : {}),
         // The desktop adds @mention pictures this op cannot see; on a seat that bills
         // each input it runs nothing above what the user was quoted or approved.
-        ...(billsEachInputImage(sentModel) ? { maxCredits: Math.max(totalCents, input.approvedCredits ?? 0) } : {}),
+        ...(billsEachInputImage(sentModel) ? { maxCredits: Math.max(listCredits(entry) * (input.count ?? 1), input.approvedCredits ?? 0) } : {}),
         ...folderBody(input.folderId),
         background: input.background,
       })
@@ -4575,6 +4621,9 @@ export const generateImage: Operation<{
         }
       }
       const requestedCount = input.count ?? 1
+      // Each image is its own billed request and a failed one is refunded, so a partial batch cost the
+      // saved images, not the quoted total.
+      const chargedCents = partialFailure ? creditCost(entry) * assetList.length : totalCents
       return {
         // The pixels are ALREADY here when the disk read worked, so the
         // review pointer says "look at what you have", not "call another op".
@@ -4584,6 +4633,7 @@ export const generateImage: Operation<{
           (promptWarning ? `${promptWarning} ` : '') +
           (partialFailure
           ? `Partial result: ${assetList.length} of ${requestedCount} image(s) saved into project ${input.projectId} ` +
+            `for ${fmtCredits(chargedCents)}, not the ${fmtCredits(totalCents)} quoted ` +
             `(error on the rest: ${result.error ?? 'unknown error'}). ` +
             `The saved assets are in data.assets — re-generate only the missing count, don't redo the whole batch. ` +
             `Prompt: "${input.prompt.slice(0, 60)}${input.prompt.length > 60 ? '...' : ''}"`
@@ -4600,15 +4650,15 @@ export const generateImage: Operation<{
           projectId: input.projectId,
           aspectRatio: input.aspectRatio,
           resolution,
-          cost_cents: totalCents,
-          cost_credits: totalCents,
+          cost_cents: chargedCents,
+          cost_credits: chargedCents,
           // Compact refs only — the full rows (prompt/settings/paths) were a
           // multi-KB leak per generation and everything needed downstream is
           // the id/code/label.
           assets: assetList.map(compactAsset),
           generationIds: result.generationIds ?? (result.generationId ? [result.generationId] : []),
           ...(partialFailure
-            ? { partial: true, error: result.error ?? 'unknown error', requested_count: requestedCount }
+            ? { partial: true, error: result.error ?? 'unknown error', requested_count: requestedCount, quoted_credits: totalCents }
             : {}),
         },
       }
@@ -4626,12 +4676,12 @@ export const generateImage: Operation<{
     const endpoint = hasReferenceImages
       ? 'google/nano-banana-2.1/edit'
       : 'google/nano-banana-2.1'
-    const proxyResult = await cloud.post<{
-      success: boolean
-      data?: { images?: Array<{ url?: string }> }
-      jobId?: string
-      error?: string
-    }>('/proxy/generate', {
+    // The server keeps the job a submit bought under this id, so an answer lost on the way back is asked for by
+    // it (below) instead of the call failing with the credits spent.
+    const generationId = randomUUID()
+    type ProxySubmit = { success: boolean; data?: { images?: Array<{ url?: string }> }; jobId?: string; error?: string }
+    const proxyResult = await cloud.post<ProxySubmit>('/proxy/generate', {
+      generationId,
       provider: 'fal',
       type: 'image',
       model: costKey,
@@ -4664,6 +4714,10 @@ export const generateImage: Operation<{
           ? { image_urls: input.referenceImageUrls }
           : {}),
       },
+    }).catch(async (error: unknown): Promise<ProxySubmit> => {
+      const held = await cloud.get<{ jobId?: string }>(`/proxy/generations/${generationId}`).catch(() => null)
+      if (!held?.jobId) throw error
+      return { success: true, jobId: held.jobId }
     })
     if (!proxyResult.success) {
       throw new Error(proxyResult.error ?? 'Generation failed')
@@ -4781,7 +4835,7 @@ export async function pollProxyJob(
 // ── Edit image ──────────────────────────────────────────────────
 
 /** References an edit carries beside the source, which is image 1 of the same request. */
-const editReferenceCap = (model: string): number => Math.max(0, (MODEL_CAPABILITIES[model]?.maxRefImages ?? 1) - 1)
+const editReferenceCap = (model: string): number => Math.max(0, imageReferenceCap(model) - 1)
 /** The models a 1.5.8 desktop sends edit references on, frozen with that build: on every other model it drops them and bills the edit in full. */
 const LEGACY_EDIT_REFERENCE_MODELS: readonly string[] = ['nano-banana-2', 'nano-banana-2-lite', 'nano-banana-pro'] // 1.5.8's ids, retired since
 
@@ -4801,7 +4855,7 @@ export const editImage: Operation<{
   id: 'slates_edit_image',
   billable: true,
   description:
-    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the model the app\'s Edit box opens on). Every model also takes referenceAssetIds, up to its reference cap less one: the source is image 1 of the request. Use slates-edit-and-iterate for missing edit craft; reuse current guidance already in context. ' +
+    'Surgically edit an image asset with a text instruction (e.g. \'make the jacket red\') instead of regenerating from scratch — use when ~90% of the image is already right. The result is a NEW asset (prompt prefixed \'[Edit]\'); the source is untouched. Default model ' + toolModelFor('image-edit') + ' (the image-edit tool seat, the model the app\'s Edit box opens on). Every model also takes referenceAssetIds, up to its reference cap less one: the source is image 1 of the request, and more than that is refused. Use slates-edit-and-iterate for missing edit craft; reuse current guidance already in context. ' +
     CONFIRM_GATE_SENTENCE,
   input: z.object({
     projectId: z.string().uuid(),
@@ -4812,7 +4866,7 @@ export const editImage: Operation<{
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe(`Omit for the model's default. Per model: ${IMAGE_MODELS.map((m) => `${m} ${(MODEL_CAPABILITIES[m]?.imageResolutions ?? []).join('/')}`).join(', ')}.`),
     quality: z.enum(GPT_QUALITY_TIERS).optional().describe(`GPT Image tier; default ${DEFAULT_GPT_QUALITY}.`),
     backgroundMode: z.enum(GPT_BACKGROUNDS).optional().describe(`${IMAGE_MODELS.filter(takesBackgroundMode).join(', ')} only. transparent = alpha channel (PNG). Free.`),
-    aspectRatio: z.string().optional(),
+    aspectRatio: zEnum(IMAGE_ASPECT_RATIOS).optional().describe("Omit to keep the source picture's shape: the edit runs at the nearest ratio the model takes, and the reply names it. Each model's ratios: slates_generate_image's aspectRatio. A price dimension on GPT Image."),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
   }),
@@ -4848,18 +4902,33 @@ export const editImage: Operation<{
     if (input.referenceAssetIds?.length && !LEGACY_EDIT_REFERENCE_MODELS.includes(editModel)) {
       await desktop.requireCapability('edit-references-all-models', `references on a ${editModel} edit`)
     }
-    // Past the model's cap the desktop sends the first ones and says so in its reply (`note`).
-    const referencesOver = (input.referenceAssetIds?.length ?? 0) - editReferenceCap(editModel)
-    // Nano Banana and GPT Image edits charge the same key as gen; FLUX routes to
-    // a dedicated edit endpoint priced under an '-edit' key; Seedream 5.5 bills
-    // every input image, the source included, so its key counts them.
-    // Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts, which
-    // this package cannot import: change both together.
-    const editInputs = 1 + Math.min(input.referenceAssetIds?.length ?? 0, editReferenceCap(editModel))
-    const costKey =
+    // Past the model's cap the desktop sends the first ones and leaves the rest out: refused, never trimmed.
+    const overCap = referenceCapRefusal(editModel, input.referenceAssetIds?.length ?? 0, editReferenceCap(editModel), 'referenceAssetIds', 'references beside the source')
+    if (overCap) return ok(overCap)
+    const request = {
+      projectId: input.projectId,
+      sourceAssetId: input.sourceAssetId,
+      editModel: sentModel,
+      referenceAssetIds: input.referenceAssetIds,
+      resolution,
+      ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY } : {}),
+      aspectRatio: input.aspectRatio,
+    }
+    // The desktop prices the edit off the source picture: a ratio left out follows the picture's own
+    // shape, and on GPT Image the ratio is part of the key, so only the desktop knows which key bills.
+    // A desktop before 'edit-image-quote' prices a missing ratio at the 16:9 key, as this op did.
+    const quote = await desktop.hasCapability('edit-image-quote')
+      ? await desktop.post<{ costKey: string; credits: number; aspectRatio?: string }>('/agent/generation/edit-image-quote', { request })
+      : null
+    const aspectRatio = quote?.aspectRatio ?? input.aspectRatio
+    // The older desktop's key. Nano Banana and GPT Image edits charge the same key as gen; FLUX routes
+    // to a dedicated edit endpoint priced under an '-edit' key; Seedream 5.5 bills every input image,
+    // the source included. Mirrors `editCreditKey` in the desktop's src/shared/imageEdit.ts.
+    const legacyKey = (): string =>
       editModel === 'flux-3'
         ? `${imageCostKey(editModel, resolution)}-edit`
-        : imageCostKey(editModel, resolution, input.quality, input.aspectRatio, editInputs)
+        : imageCostKey(editModel, resolution, input.quality, input.aspectRatio, 1 + (input.referenceAssetIds?.length ?? 0))
+    const costKey = quote?.costKey ?? legacyKey()
     const cloud = ctx.cloud()
     const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
     const entry = registry.models.find((m) => m.model === costKey) ??
@@ -4876,8 +4945,8 @@ export const editImage: Operation<{
         estimated_credits: totalCents,
         source_ref: sourceRef,
         message:
-          `Cost: ${fmtCredits(totalCents)} to edit ${sourceRef} with ${editModel} (${costKey}). ` +
-          (referencesOver > 0 ? `${editModel} takes ${editReferenceCap(editModel)} references beside the source; ${referencesOver} would not be sent. ` : '') +
+          `Cost: ${fmtCredits(totalCents)} to edit ${sourceRef} with ${editModel} (${costKey})` +
+          (aspectRatio && !input.aspectRatio ? `, at ${aspectRatio}, the ratio nearest the picture's shape. ` : '. ') +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
       })
@@ -4893,15 +4962,11 @@ export const editImage: Operation<{
       /** References past the model's cap that the desktop left out, in words. */
       note?: string
     }>('/agent/generation/edit-image', {
-      projectId: input.projectId,
-      sourceAssetId: input.sourceAssetId,
+      ...request,
+      // The ratio the quote named, so the run bills the key that was confirmed.
+      aspectRatio,
       prompt: input.prompt,
-      editModel: sentModel,
-      referenceAssetIds: input.referenceAssetIds,
-      resolution,
-      ...(isGptImageModel(editModel) ? { gptQuality: input.quality ?? DEFAULT_GPT_QUALITY } : {}),
       ...(takesBackgroundMode(editModel) ? { gptBackground: input.backgroundMode } : {}),
-      aspectRatio: input.aspectRatio,
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Image edit failed')
@@ -4950,6 +5015,7 @@ export const editImage: Operation<{
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
         resolution,
+        ...(aspectRatio ? { aspectRatio } : {}),
         cost_cents: totalCents,
         cost_credits: totalCents,
         asset: result.asset,
@@ -5036,7 +5102,7 @@ export const extractGridCells: Operation<{
     }
     // The desktop prices it: the viewer's own `imageCost`, for this seat, rung and cell count. The desktop also
     // refuses what the viewer would (not a grid, a cell the grid lacks, a seat it does not offer) before any spend.
-    const quote = await desktop.get<ExtractQuote>('/agent/generation/extract-quote', { request: JSON.stringify(request) })
+    const quote = await desktop.quote<ExtractQuote>('/agent/generation/extract-quote', 'request', request)
     const gridName = grid.code ?? grid.id
     if (quote.credits > CONFIRM_CREDITS && !input.confirm) {
       return ok({
@@ -5134,30 +5200,58 @@ function assertVideoCapabilities(input: {
   environmentAssetIds?: string[]
   styleAssetIds?: string[]
 }): { requires_clarification: true; missing: string[]; message: string } | null {
-  const freeRefs =
-    (input.ingredientAssetIds?.length ?? 0) +
-    (input.characterAssetIds?.length ?? 0) +
-    (input.environmentAssetIds?.length ?? 0) +
-    (input.styleAssetIds?.length ?? 0)
-  const promptMode =
-    freeRefs > 0 && !input.firstFrameAssetId && !input.lastFrameAssetId ? 'ingredients' : undefined
-
-  const ratioErr = checkAspectRatio(input.model, input.aspectRatio, AGENT_ROUTE_PROVIDER)
-  if (ratioErr) return { requires_clarification: true, missing: ['aspectRatio'], message: ratioErr }
-
-  const resErr = checkVideoResolution(input.model, input.videoResolution)
-  if (resErr) return { requires_clarification: true, missing: ['videoResolution'], message: resErr }
-
-  // Duration LAST: its legal window depends on the resolution, so a bad
-  // resolution must be reported first or the duration message names a window
-  // derived from a value the model never had.
-  const durErr = checkDuration(input.model, input.duration, {
+  // `checkVideoParams` is the verdict the desktop's composition check reads too
+  // (the prompt bar, the agent route and the handlers), so the op and the app
+  // refuse the same ratio, resolution, references-at-resolution and length.
+  const refusal = checkVideoParams(input.model, {
+    aspectRatio: input.aspectRatio,
     videoResolution: input.videoResolution,
-    promptMode,
+    duration: input.duration,
+    provider: AGENT_ROUTE_PROVIDER,
+    firstFrame: !!input.firstFrameAssetId,
+    lastFrame: !!input.lastFrameAssetId,
+    referenceImages:
+      (input.ingredientAssetIds?.length ?? 0) +
+      (input.characterAssetIds?.length ?? 0) +
+      (input.environmentAssetIds?.length ?? 0) +
+      (input.styleAssetIds?.length ?? 0),
   })
-  if (durErr) return { requires_clarification: true, missing: ['duration'], message: durErr }
+  return refusal
+    ? { requires_clarification: true, missing: [refusal.field === 'references' ? 'videoResolution' : refusal.field], message: refusal.message }
+    : null
+}
 
-  return null
+/** Each reference video's length, from whichever shape the caller used: the
+ *  per-clip list, plus the deprecated single value as one more clip. */
+function referenceVideoClips(input: { videoReferenceSecondsEach?: readonly number[]; videoReferenceSeconds?: number; videoRefSeconds?: number }): number[] {
+  const single = input.videoReferenceSeconds ?? input.videoRefSeconds
+  return [...(input.videoReferenceSecondsEach ?? []), ...(single ? [single] : [])]
+}
+
+/** The reference-seconds gate, on every model: `checkReferenceSeconds` is the
+ *  verdict the desktop, its handlers and the server's key derivation reach for
+ *  the same clips, so a set quoted here is never refused after confirm. */
+function referenceSecondsRefusal(model: string, clips: readonly number[]): { requires_clarification: true; missing: string[]; message: string } | null {
+  const error = checkReferenceSeconds(model, 'video', clips).error
+  return error
+    ? { requires_clarification: true, missing: [], message: error.replace(/Trim (it|a clip) first\./, 'Trim $1 first with slates_trim_video.') }
+    : null
+}
+
+/** The reply when a video prices above what was approved: nothing ran, and the new price is the one to approve. */
+function videoPriceChanged(model: string, costKey: string, credits: number, approved: number) {
+  return {
+    requires_confirm: true,
+    quote_exceeded: true,
+    model,
+    variant: costKey,
+    estimated_cents: credits,
+    estimated_credits: credits,
+    message:
+      `Nothing ran. This ${model} call now prices at ${fmtCredits(credits)} (${costKey}), above the ${fmtCredits(approved)} approved: ` +
+      `a reference measured longer, or the prompt names a character or look that brings a billed input. ` +
+      `Tell the user, and once they approve, re-call with confirm=true and approvedCredits=${credits}.`,
+  }
 }
 
 // Model → registry cost-key. Each provider's keys ship with their own
@@ -5188,9 +5282,11 @@ export function videoCostKey(input: {
   sound?: boolean
   seedanceFace?: boolean
   seedanceRealFace?: boolean
-  /** Seedance only: ceiled combined seconds of reference VIDEO inputs (motion
-   *  transfer / lip-sync on video / relocate). >0 bills the vref key on TOTAL
-   *  (input+output) seconds — the server re-derives this by probing the refs. */
+  /** Each reference video's measured length. Seedance and Wan 3.0 bill the vref
+   *  key on `billed` (each clip rounded up) plus the output; H3 Max prices
+   *  `actual` seconds as tokens. The server re-derives both by probing. */
+  videoReferenceSecondsEach?: readonly number[]
+  /** DEPRECATED: one reference video's length, read as a single clip. */
   videoRefSeconds?: number
   /** MiniMax H3 base only: how many reference IMAGES the request carries. Past
    *  the fifth, fal charges per image, so it is a KEY DIMENSION — omit it on a
@@ -5199,13 +5295,14 @@ export function videoCostKey(input: {
   referenceImages?: number
   audioRefSeconds?: number
 }): string {
+  const refVideo = checkReferenceSeconds(input.model, 'video', referenceVideoClips(input))
   // EXACT-ID MAP, NEVER A PREFIX: 'minimax-h3-max' starts with 'minimax-h3'.
   // Mirrors minimaxCreditKey() in slate/src/shared/pricing.ts.
   if (MINIMAX_MODELS.has(input.model)) {
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
     if (input.model === 'minimax-h3-max') {
       const tokens = minimaxMaxReferenceTokens({ imagePixels: (input.referenceImages ?? 0) * MINIMAX_MAX_REFERENCE.normalizedImageEdge ** 2,
-        videoSeconds: input.videoRefSeconds ?? 0, audioSeconds: input.audioRefSeconds ?? 0, resolution: res ?? '' })
+        videoSeconds: refVideo.actual, audioSeconds: input.audioRefSeconds ?? 0, resolution: res ?? '' })
       return `${input.model}-${res}-${input.duration}s${tokens ? `-rt${tokens}` : ''}`
     }
     const k = minimaxRefSurchargeCount(input.model, input.referenceImages)
@@ -5236,16 +5333,13 @@ export function videoCostKey(input: {
     const v25 = input.model.startsWith('seedance-2.5')
     const res = input.videoResolution ?? (v25 ? '720p' : '1080p')
     const face = input.seedanceRealFace ? '-realface' : input.seedanceFace ? '-face' : ''
-    const vrefSecs = input.videoRefSeconds ?? 0
-    if (vrefSecs > 0) {
-      // ceil(x - 0.05) matches the server's probe rounding — quote = bill.
-      const maxTotal = v25 ? SEEDANCE_25_VREF_MAX_TOTAL : SEEDANCE_20_VREF_MAX_TOTAL
+    if (refVideo.billed > 0) {
       // EvoLink (the AI-face rail) bills a reference on max(input, output) +
       // output on 2.0 and 2.5. Mirrors seedanceBilledRefSeconds in slate pricing.ts.
-      const inSecs = Math.ceil(vrefSecs - 0.05)
-      const billedIn = face === '-face' ? Math.max(inSecs, input.duration) : inSecs
-      const total = Math.min(maxTotal, Math.max(6, billedIn + input.duration))
-      return `${input.model}${face}-vref-${res}-${total}s`
+      // Never clamped: a total past the last priced key is no price at all, and
+      // `referenceSecondsRefusal` has already refused a set outside the row's bounds.
+      const billedIn = face === '-face' ? Math.max(refVideo.billed, input.duration) : refVideo.billed
+      return `${input.model}${face}-vref-${res}-${billedIn + input.duration}s`
     }
     return `${input.model}${face}-${res}-${input.duration}s`
   }
@@ -5290,11 +5384,9 @@ export function videoCostKey(input: {
     // T = in + out. Sound on or off, reference images and reference audio do
     // not move the price.
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
-    const vrefSecs = input.videoRefSeconds ?? 0
-    if (vrefSecs > 0) {
-      // ceil(x - 0.05) matches the server's probe rounding, so quote = bill. Never clamped: a clamp bills a
-      // longer clip at a shorter one's price.
-      return `wan-3.0-vref-${res}-${Math.ceil(vrefSecs - 0.05) + input.duration}s`
+    if (refVideo.billed > 0) {
+      // Never clamped: a clamp bills a longer clip at a shorter one's price.
+      return `wan-3.0-vref-${res}-${refVideo.billed + input.duration}s`
     }
     return `wan-3.0-${res}-${input.duration}s`
   }
@@ -5322,10 +5414,6 @@ export function omniFlashEditCostKey(duration: number, videoResolution?: VideoRe
   return `omni-flash-1-2-edit-${res}-${duration}s`
 }
 
-/** Max billed (input + output) seconds on a Seedance video-reference gen.
- *  2.0: refs 2–15s + output 4–15s. 2.5: refs to 30s + output to 30s. */
-const SEEDANCE_20_VREF_MAX_TOTAL = 30
-const SEEDANCE_25_VREF_MAX_TOTAL = 60
 /** Seedance 2.5 source-clip bounds for the edit task type — READ from the
  *  capability SSOT, not typed. Kept as named exports because published builds
  *  import them. */
@@ -5689,6 +5777,7 @@ export const generateVideo: Operation<{
   negativePrompt?: string
   background?: boolean
   confirm?: boolean
+  approvedCredits?: number
   folderId?: string | null
 }> = {
   id: 'slates_generate_video',
@@ -5744,10 +5833,10 @@ export const generateVideo: Operation<{
     // WHY here, you are writing the skill in the wrong file.
     firstFrameAssetId: z.string().optional().describe('Starting frame for image-to-video (UUID or badge code, resolved at call time).'),
     lastFrameAssetId: z.string().optional().describe('Ending frame. Pairs with firstFrameAssetId.'),
-    ingredientAssetIds: z.array(z.string()).max(30).optional().describe(
+    ingredientAssetIds: z.array(z.string()).max(Math.max(...VIDEO_MODELS.map((m) => maxIngredientImagesFor(m)))).optional().describe(
       // Caps DERIVED from MODEL_CAPABILITIES — the hand-typed list omitted
       // kling-v3.0-omni-pro entirely and read as if 7 were an Omni Flash-only rule.
-      `Visual reference / ingredient assets. Cap per model, combined across the ingredient/character/environment/style params: ${describeReferenceImageCaps(VIDEO_MODELS)}. 2-4 strong references beat both extremes.`
+      `Visual reference / ingredient assets. Cap per model, combined across the ingredient/character/environment/style params: ${describeReferenceImageCaps(VIDEO_MODELS)}. Over the cap is REFUSED, never trimmed. 2-4 strong references beat both extremes.`
     ),
     characterAssetIds: z.array(z.string()).optional().describe('Character sheet assets — keeps a character consistent.'),
     environmentAssetIds: z.array(z.string()).optional().describe('Location references — keeps a location consistent.'),
@@ -5763,7 +5852,7 @@ export const generateVideo: Operation<{
       `Reference VIDEOS, cited in the prompt as "video 1", "video 2"… in the order given. ${multimodalRefModels().join(' / ')} only; per-model caps are on audioReferenceAssetIds. On Seedance and Wan 3.0, billing switches to the vref key (input+output seconds); Omni Flash caps each clip at ${omniFlashRefClipMax}s. Pass videoReferenceSecondsEach. Over the cap is REFUSED, never trimmed.`
     ),
     videoReferenceSecondsEach: z.array(z.number()).optional().describe(
-      'REQUIRED with videoReferenceAssetIds, same order and length: each clip\'s duration in seconds. Feeds the vref cost key; the server re-probes and corrects an understated value upward.'
+      "Each clip's duration in seconds (slates_list_assets shows it), same order and length as videoReferenceAssetIds. The desktop measures every clip for the quote; a desktop before that needs these."
     ),
     audioReferenceAssetIds: z.array(z.string()).optional().describe(
       `Reference AUDIO, cited as "audio 1", "audio 2"… in the order given. ${multimodalRefModels().join(' / ')} only. No surcharge on Seedance; on H3 Max, audio counts toward the reference-token pool. ${multimodalRefModels().map(multimodalRefSummary).join(' ')}`
@@ -5781,6 +5870,7 @@ export const generateVideo: Operation<{
     negativePrompt: z.string().optional(),
     background: z.boolean().optional().describe(BACKGROUND_DESCRIBE),
     confirm: z.boolean().optional().describe(CONFIRM_PARAM),
+    approvedCredits: z.number().int().positive().optional().describe('With confirm=true: the credits the pre-flight named and the user approved. A call that now prices higher runs nothing and answers with the new price.'),
     folderId: folderIdField,
   }),
   async run(input, ctx) {
@@ -5881,7 +5971,7 @@ export const generateVideo: Operation<{
         (input.environmentAssetIds?.length ?? 0) +
         (input.styleAssetIds?.length ?? 0)
       const hasRefs = imageRefs + videoRefs > 0
-      const refCount = imageRefs + (hasRefs && input.firstFrameAssetId ? 1 : 0)
+      const refCount = imageRefs + (hasRefs && input.firstFrameAssetId && getModelCapability(input.model)?.firstFrameRidesAsReference ? 1 : 0)
       // Only the lengths given; a missing one is asked for below, before the quote.
       const refSeconds = [
         ...(input.videoReferenceAssetId && input.videoReferenceSeconds != null ? [input.videoReferenceSeconds] : []),
@@ -5925,8 +6015,6 @@ export const generateVideo: Operation<{
       const audioRefs = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
       const refImages = imageRefs
       const refAll = refImages + videoRefs + audioRefs
-      const videoSecs = [input.videoReferenceSeconds ?? 0, ...(input.videoReferenceSecondsEach ?? [])].reduce((n, d) => n + (d > 0 ? d : 0), 0)
-      const maxVideoSecs = cap?.maxReferenceVideoSeconds ?? 15
       const overCap = (
         [
           [refImages, cap?.maxIngredientImages, 'reference images'],
@@ -5942,13 +6030,28 @@ export const generateVideo: Operation<{
             ? 'Wan 3.0 needs a start frame (firstFrameAssetId) with a last frame.'
             : overCap
               ? `Wan 3.0 takes at most ${overCap[1]} ${overCap[2]} (you passed ${overCap[0]}).`
-              : videoSecs > maxVideoSecs + 0.05
-                ? `Wan 3.0 takes at most ${maxVideoSecs}s of reference video in total (you passed ${videoSecs.toFixed(1)}s). Trim a clip first with slates_trim_video.`
-                : null
+              : null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
       }
     }
+
+    // Reference-video seconds, every model: each clip's window and the combined
+    // total, before the quote. A missing length is asked for further down.
+    const referenceClips = referenceVideoClips({
+      videoReferenceSecondsEach: input.videoReferenceSecondsEach,
+      videoReferenceSeconds: input.videoReferenceAssetId ? input.videoReferenceSeconds : undefined,
+    })
+    const refSecondsErr = referenceSecondsRefusal(input.model, referenceClips)
+    if (refSecondsErr) return ok(refSecondsErr)
+    // Frames beside reference video or audio, every model: the verdict the desktop's composer reaches.
+    const framesErr = checkFramesWithReferenceMedia(input.model, {
+      firstFrame: !!input.firstFrameAssetId,
+      lastFrame: !!input.lastFrameAssetId,
+      referenceVideos: (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0),
+      referenceAudio: (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0),
+    })
+    if (framesErr) return ok({ requires_clarification: true, missing: [], message: framesErr })
 
     // Kling 4.0's SHAPE constraint: FRAMES, NEVER REFERENCES. Only fal's
     // `kling/v4/image-to-video` (start frame plus an optional end frame) and
@@ -6088,6 +6191,29 @@ export const generateVideo: Operation<{
       }
     }
 
+    // Reference counts, every model, from its capability row. The desktop sends the first `cap`
+    // pictures and leaves the rest out, so a call over a cap would run, and bill, without references
+    // the caller named: refused here, before the quote. The blocks above word their own model's caps.
+    {
+      const cap = getModelCapability(input.model)
+      const images =
+        (input.ingredientAssetIds?.length ?? 0) + (input.characterAssetIds?.length ?? 0) +
+        (input.environmentAssetIds?.length ?? 0) + (input.styleAssetIds?.length ?? 0)
+      const videos = (input.videoReferenceAssetIds?.length ?? 0) + (input.videoReferenceAssetId ? 1 : 0)
+      const audio = (input.audioReferenceAssetIds?.length ?? 0) + (input.audioReferenceAssetId ? 1 : 0)
+      // Beside references a start frame rides as reference image 1 on some rows and uses a slot.
+      const frameSlot = input.firstFrameAssetId && images + videos > 0 && cap?.firstFrameRidesAsReference ? 1 : 0
+      const overCap =
+        referenceCapRefusal(input.model, images, Math.max(0, maxIngredientImagesFor(input.model, input.videoResolution) - frameSlot), 'ingredientAssetIds',
+          frameSlot ? 'reference images beside a start frame, which uses one slot' : 'reference images') ??
+        referenceCapRefusal(input.model, videos, maxReferenceVideosFor(input.model, input.duration), 'videoReferenceAssetIds', 'reference videos on a clip this long') ??
+        referenceCapRefusal(input.model, audio, cap?.maxReferenceAudio ?? 0, 'audioReferenceAssetIds', 'reference audio clips') ??
+        (cap?.maxReferenceFilesTotal
+          ? referenceCapRefusal(input.model, images + frameSlot + videos + audio, cap.maxReferenceFilesTotal, 'ingredientAssetIds', 'reference files across images, video and audio')
+          : null)
+      if (overCap) return ok(overCap)
+    }
+
     // Resolve every asset reference (UUID or badge code) against the
     // project AT CALL TIME. Codes the user just spoke ("a8 is the one")
     // resolve to whatever exists NOW — including assets created in the UI
@@ -6155,13 +6281,16 @@ export const generateVideo: Operation<{
       // a local literal had already lost 'continue the story'.
       intentHits = hasRefs ? seedanceTaskIntentWords(input.prompt) : []
     }
-    // The quote needs a length for EVERY reference clip, in both shapes. A
-    // missing one doesn't fail the generation (the server probes and corrects
-    // upward) — it silently under-quotes, which is worse than asking.
-    // Wan 3.0 bills reference video seconds on top of output seconds too, and
-    // Omni Flash's per-clip cap needs every length to check.
+    // A desktop with 'video-quote' prices the composition it will send: it resolves every reference,
+    // prompt @mentions included, and measures each clip itself, so the caller's seconds are not needed.
+    const desktop = ctx.desktop()
+    const desktopQuotes = await desktop.hasCapability('video-quote')
+    // An older desktop quotes H3 Max only, so this op builds the key and needs a length for EVERY
+    // reference clip, in both shapes. A missing one does not fail the generation (the server probes
+    // and corrects upward): it under-quotes, which is worse than asking. Wan 3.0 bills reference video
+    // seconds on top of output seconds too, and Omni Flash's per-clip cap needs every length to check.
     const isSeedance = input.model.startsWith('seedance')
-    const needsRefSeconds = isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash-1-2'
+    const needsRefSeconds = !desktopQuotes && (isSeedance || input.model === 'wan-3.0' || input.model === 'omni-flash-1-2')
     if (input.videoReferenceAssetId && needsRefSeconds && !input.videoReferenceSeconds) {
       return ok({
         requires_clarification: true,
@@ -6184,34 +6313,73 @@ export const generateVideo: Operation<{
     }
     // A desktop without Omni Flash 1.2 gets the 1.1 seat at the same price (`desktopModelId`), resolved before the
     // quote so a job it cannot run is refused before the agent is asked to confirm it.
-    const seat = await desktopModelId(ctx.desktop(), input.model as string, `${input.model} generation`, input.duration)
-    const cloud = ctx.cloud()
-    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
-    const costKey = input.model === 'minimax-h3-max'
-      ? (await ctx.desktop().get<{ costKey: string }>('/agent/generation/video-quote', { request: JSON.stringify(input) })).costKey
-      : videoCostKey({
-      model: input.model as VideoModel,
+    const seat = await desktopModelId(desktop, input.model as string, `${input.model} generation`, input.duration)
+    // One body for the quote and the submission, so the desktop prices exactly what it will be sent.
+    const request = {
+      projectId: input.projectId,
+      model: seat.model,
+      prompt: input.prompt,
+      aspectRatio: input.aspectRatio,
       duration: input.duration,
       videoResolution: input.videoResolution,
+      firstFrameAssetId: input.firstFrameAssetId,
+      lastFrameAssetId: input.lastFrameAssetId,
+      ingredientAssetIds: input.ingredientAssetIds ?? [],
+      characterAssetIds: input.characterAssetIds ?? [],
+      environmentAssetIds: input.environmentAssetIds ?? [],
+      styleAssetIds: input.styleAssetIds ?? [],
+      // Both shapes on the wire. The route merges and dedupes them, so an old
+      // client sending only the singular and a new one sending only the plural
+      // reach the identical handler params.
+      videoReferenceAssetId: input.videoReferenceAssetId,
+      audioReferenceAssetId: input.audioReferenceAssetId,
+      videoReferenceAssetIds: input.videoReferenceAssetIds,
+      audioReferenceAssetIds: input.audioReferenceAssetIds,
+      // The route keys this by ASSET ID, not by position, because its own
+      // singular/plural merge appends to the END of the list — an index would
+      // mean different clips depending on which shape the caller used. The op
+      // takes the friendlier positional array and re-keys it here, AFTER
+      // `rids()` has resolved badge codes, so the keys are the ids the route
+      // will resolve. A blank entry is dropped rather than sent as "".
+      audioReferenceSpokenText: spokenTextByAssetId(
+        input.audioReferenceAssetIds,
+        input.audioReferenceSpokenText
+      ),
       sound: input.sound,
+      audioLanguage: input.audioLanguage,
+      generateMusic: input.generateMusic,
       seedanceFace: input.seedanceFace,
       seedanceRealFace: input.seedanceRealFace,
-      // MiniMax H3 base: reference images past the fifth are a PAID key
-      // dimension. Counted from the same four arrays the request sends, so the
-      // quote and the server's own re-derivation see the same number.
-      referenceImages: minimaxRefImageCount(input),
-      // Σ ceil(d - 0.05) over every reference clip, both shapes — the same
-      // expression the desktop's estimateCost and the handler's key builder
-      // use. Quoting only the singular would understate a multi-clip call.
-      videoRefSeconds:
-        (input.videoReferenceAssetId && input.videoReferenceSeconds
-          ? Math.ceil(input.videoReferenceSeconds - 0.05)
-          : 0) +
-        (input.videoReferenceSecondsEach ?? []).reduce(
-          (n, d) => n + (d > 0 ? Math.ceil(d - 0.05) : 0),
-          0
-        ),
-    })
+      seedanceDraft: input.seedanceDraft,
+      realFaceConsent: input.realFaceConsent,
+      negativePrompt: input.negativePrompt,
+      ...folderBody(input.folderId),
+    }
+    const cloud = ctx.cloud()
+    const registry = await cloud.get<ModelRegistryResponse>('/api/agent/models')
+    // The desktop's quote: the key its handler bills and its credits, which the submission below is
+    // held to (`maxCredits`). Null on a desktop before 'video-quote'.
+    const quote = desktopQuotes
+      ? await desktop.quote<{ costKey: string; credits: number }>('/agent/generation/video-quote', 'request', request)
+      : null
+    const costKey = quote?.costKey ?? (input.model === 'minimax-h3-max'
+      // The older desktop's one quote: H3 Max, whose reference tokens only it can count.
+      ? (await desktop.quote<{ costKey: string }>('/agent/generation/video-quote', 'request', request)).costKey
+      : videoCostKey({
+          model: input.model as VideoModel,
+          duration: input.duration,
+          videoResolution: input.videoResolution,
+          sound: input.sound,
+          seedanceFace: input.seedanceFace,
+          seedanceRealFace: input.seedanceRealFace,
+          // MiniMax H3 base: reference images past the fifth are a PAID key
+          // dimension. Counted from the same four arrays the request sends, so the
+          // quote and the server's own re-derivation see the same number.
+          referenceImages: minimaxRefImageCount(input),
+          // Every reference clip, both shapes: quoting only the singular would
+          // understate a multi-clip call.
+          videoReferenceSecondsEach: referenceClips,
+        }))
     // Hard consent gate, checked before any spend: the real-face route is
     // consent-attested by design (the desktop enforces it too).
     if (input.seedanceRealFace && !input.realFaceConsent) {
@@ -6233,6 +6401,11 @@ export const generateVideo: Operation<{
       )
     }
     const totalCents = creditCost(entry)
+    // The price the user approved binds the call that spends: a reference re-measured longer or a
+    // character that gained a billed picture since the pre-flight is asked about again, never run.
+    if (input.confirm && input.approvedCredits != null && totalCents > input.approvedCredits) {
+      return ok(videoPriceChanged(input.model, costKey, totalCents, input.approvedCredits))
+    }
     if (intentHits.length > 0 && !input.confirm) {
       return ok({
         requires_clarification: true,
@@ -6291,7 +6464,7 @@ export const generateVideo: Operation<{
           `${fmtCredits(totalCents)}.` +
           refSummary +
           (promptWarning ? `\n\n${promptWarning}` : '') +
-          `\n\nWhen ready, re-call slates_generate_video with confirm=true and the (possibly revised) prompt.`,
+          `\n\nWhen ready, re-call slates_generate_video with confirm=true, approvedCredits=${totalCents} and the (possibly revised) prompt.`,
         images: refImages,
         data: {
           requires_confirm: true,
@@ -6312,7 +6485,6 @@ export const generateVideo: Operation<{
       }
     }
 
-    const desktop = ctx.desktop()
     if (input.background) {
       await desktop.requireCapability('background-generation', 'background generation')
     }
@@ -6323,47 +6495,16 @@ export const generateVideo: Operation<{
       generationId?: string
       generationIds?: string[]
       error?: string
+      quoteExceeded?: { credits: number; costKey: string }
     }>('/agent/generation/video', {
-      projectId: input.projectId,
-      model: seat.model,
-      prompt: input.prompt,
-      aspectRatio: input.aspectRatio,
-      duration: input.duration,
-      videoResolution: input.videoResolution,
-      firstFrameAssetId: input.firstFrameAssetId,
-      lastFrameAssetId: input.lastFrameAssetId,
-      ingredientAssetIds: input.ingredientAssetIds ?? [],
-      characterAssetIds: input.characterAssetIds ?? [],
-      environmentAssetIds: input.environmentAssetIds ?? [],
-      styleAssetIds: input.styleAssetIds ?? [],
-      // Both shapes on the wire. The route merges and dedupes them, so an old
-      // client sending only the singular and a new one sending only the plural
-      // reach the identical handler params.
-      videoReferenceAssetId: input.videoReferenceAssetId,
-      audioReferenceAssetId: input.audioReferenceAssetId,
-      videoReferenceAssetIds: input.videoReferenceAssetIds,
-      audioReferenceAssetIds: input.audioReferenceAssetIds,
-      // The route keys this by ASSET ID, not by position, because its own
-      // singular/plural merge appends to the END of the list — an index would
-      // mean different clips depending on which shape the caller used. The op
-      // takes the friendlier positional array and re-keys it here, AFTER
-      // `rids()` has resolved badge codes, so the keys are the ids the route
-      // will resolve. A blank entry is dropped rather than sent as "".
-      audioReferenceSpokenText: spokenTextByAssetId(
-        input.audioReferenceAssetIds,
-        input.audioReferenceSpokenText
-      ),
-      sound: input.sound,
-      audioLanguage: input.audioLanguage,
-      generateMusic: input.generateMusic,
-      seedanceFace: input.seedanceFace,
-      seedanceRealFace: input.seedanceRealFace,
-      seedanceDraft: input.seedanceDraft,
-      realFaceConsent: input.realFaceConsent,
-      negativePrompt: input.negativePrompt,
-      ...folderBody(input.folderId),
+      ...request,
+      // The desktop composes the request again and sends nothing that prices above its own quote.
+      ...(quote ? { maxCredits: quote.credits } : {}),
       background: input.background,
     })
+    if (result.quoteExceeded) {
+      return ok(videoPriceChanged(input.model, result.quoteExceeded.costKey, result.quoteExceeded.credits, totalCents))
+    }
     if (!result.success) {
       throw new Error(result.error ?? 'Generation failed')
     }
@@ -6653,7 +6794,7 @@ export const generateAudio: Operation<{
         return ok({
           requires_clarification: true,
           missing: ['durationSeconds'],
-          message: `Sound Effects needs a durationSeconds of ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}. It is billed per second and is never left for the model to pick (that would make the charge non-deterministic). Roughly: 0.5-1s for an impact, 2-4s for a whoosh, 8-22s for a loopable bed.`,
+          message: `Sound Effects needs a durationSeconds of ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}. It is billed per second and is never left for the model to pick (that would make the charge non-deterministic). Roughly: ${ELEVEN_SFX_MIN_SECONDS}s for an impact, 2-4s for a whoosh, 8-${ELEVEN_SFX_MAX_SECONDS}s for a loopable bed.`,
         })
       }
       if (input.prompt.length > 450) {
@@ -6872,13 +7013,33 @@ export const generateLipSync: Operation<{
     // Billed per 5s block of the output: the clip's length on a video source;
     // on a still, the voice track's — typed words at the desktop's reading pace
     // (`lipSyncEstimate`, 13 characters a second, so this quote is the Generate
-    // button's), an uploaded file unknown until the desktop measures it. Typed
+    // button's), an uploaded file measured by the desktop off disk. Typed
     // words on a still are two billed calls: the voice step adds one flat block.
+    const uploadOnStill = input.sourceType === 'image' && input.audioMethod === 'upload'
+    const desktopMeasures = uploadOnStill && await ctx.desktop().hasCapability('lip-sync-quote')
     const seconds = input.sourceType === 'video'
       ? await recordedSeconds(ctx.desktop(), input.projectId, input.sourceAssetId)
       : input.audioMethod === 'tts'
         ? (input.ttsText ?? '').trim().length / (13 * (input.ttsSpeed ?? 1))
-        : null
+        : desktopMeasures
+          ? (await ctx.desktop().post<{ seconds: number | null }>('/agent/generation/lip-sync-quote', {
+              request: {
+                projectId: input.projectId, sourceAssetId: input.sourceAssetId, audioMethod: input.audioMethod,
+                audioFilePath: input.audioFilePath, avatarModel: input.avatarModel,
+              },
+            })).seconds
+          : null
+    // The desktop could not read the file's length, so there is no price to confirm: one block would
+    // be a guess, and the run bills every 5s of the audio.
+    if (desktopMeasures && seconds == null) {
+      return ok({
+        requires_clarification: true,
+        missing: ['audioFilePath'],
+        message:
+          `Nothing ran. Slates could not read the length of ${input.audioFilePath}, and a lip-sync on a still is billed per 5s of its audio, so it cannot be priced. ` +
+          'Check the path and that the file plays (mp3, wav or m4a), then call again.',
+      })
+    }
     const voiceStep = input.sourceType === 'image' && input.audioMethod === 'tts'
     const { costKey, totalCents, blocks } = await quoteToolBlocks(ctx, stem, seconds, voiceStep)
     const length = `${blocks * TOOL_BLOCK_SECONDS}s${voiceStep ? ' + voice' : ''}`
@@ -6900,7 +7061,9 @@ export const generateLipSync: Operation<{
         estimated_credits: totalCents,
         source_ref: sourceRef,
         message:
-          `Cost: ${fmtCredits(totalCents)}${seconds == null ? ' or more' : ''} for ${length} lip-sync (${costKey}). ` +
+          (seconds == null
+            ? `Cost: at least ${fmtCredits(totalCents)}, one 5s block (${costKey}). This version of Slates cannot measure the audio before it runs, and each further 5s of it bills another block: tell the user the audio's length and that total before they approve, or update Slates (Settings → Check for Updates) for an exact price. `
+            : `Cost: ${fmtCredits(totalCents)} for ${length} lip-sync (${costKey}). `) +
           `Source: ${sourceRef}. ${audioPreview}. ` +
           `Re-call with confirm=true after the user explicitly OKs the spend. ` +
           `When discussing with the user, refer to the source by its code (matches the gallery badge).`,
@@ -6933,21 +7096,28 @@ export const generateLipSync: Operation<{
       background: input.background,
     })
     if (!result.success) throw new Error(result.error ?? 'Lip-sync generation failed')
+    // With no measured length the quote was one block, a floor: the charge is every 5s of the audio,
+    // so it is reported as unknown here, never as the floor.
+    const charged = seconds == null
+      ? { cost_cents: null, cost_credits: null, minimum_credits: totalCents }
+      : { cost_cents: totalCents, cost_credits: totalCents }
+    const chargedText = seconds == null
+      ? `at ${fmtCredits(totalCents)} per 5s of the audio (its length was not measured, so read the charge from the credit balance)`
+      : `for ${fmtCredits(totalCents)}`
     if (result.background) {
       const ids = result.generationIds ?? (result.generationId ? [result.generationId] : [])
       return backgroundSubmitted(`${length} lip-sync (${costKey})`, ids, {
         variant: costKey,
         projectId: input.projectId,
         sourceAssetId: input.sourceAssetId,
-        cost_cents: totalCents,
-        cost_credits: totalCents,
+        ...charged,
       })
     }
 
     return {
       text:
-        `Generated ${length} lip-sync (${costKey}) into project ${input.projectId} ` +
-        `for ${fmtCredits(totalCents)}. ` +
+        `Generated ${seconds == null ? 'a' : length} lip-sync (${costKey}) into project ${input.projectId} ` +
+        `${chargedText}. ` +
         (input.audioMethod === 'tts'
           ? `Spoken: "${(input.ttsText ?? '').slice(0, 60)}${(input.ttsText ?? '').length > 60 ? '...' : ''}"`
           : `Audio: ${input.audioFilePath}`),
@@ -6956,8 +7126,7 @@ export const generateLipSync: Operation<{
         projectId: input.projectId,
         sourceType: input.sourceType,
         sourceAssetId: input.sourceAssetId,
-        cost_cents: totalCents,
-        cost_credits: totalCents,
+        ...charged,
         asset: result.asset,
         generationId: result.generationId,
       },
@@ -11429,15 +11598,8 @@ export const listShots: Operation<{ projectId: string; storyboardId?: string; fr
     })
     const rows = r.shots ?? []
     const projectId = input.projectId
-    // The quote is a GET with every id in its query string, and Node refuses a
-    // request head over 16 KiB (about 345 ids), so a long board is quoted in
-    // chunks. Each Shot's price is its own; only this listing reads them.
-    const QUOTE_CHUNK = 150
-    const chunks: string[][] = []
-    for (let i = 0; i < rows.length; i += QUOTE_CHUNK) chunks.push(rows.slice(i, i + QUOTE_CHUNK).map(r => r.id))
     const quote = projectId && rows.length
-      ? { items: (await Promise.all(chunks.map((shotIds) =>
-          desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId, shotIds }) })))).flatMap((q) => q.items) }
+      ? await desktop.quote<DesktopShotQuote>('/agent/shots/quote', 'input', { projectId, shotIds: rows.map((r) => r.id) })
       : null
     let total = 0
     let unpriced = 0
@@ -11523,7 +11685,7 @@ export const getShot: Operation<{ shotId: string; projectId?: string }> = {
     // Prices come only from the desktop's quote; a 1.5.8 desktop has none.
     await desktop.requireCapability('board-quote', 'Shot prices')
     const r = { shot: await shotReader(desktop, input.shotId, input.projectId)() }
-    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', { input: JSON.stringify({ projectId: r.shot.projectId, shotIds: [r.shot.id] }) })
+    const quote = await desktop.quote<DesktopShotQuote>('/agent/shots/quote', 'input', { projectId: r.shot.projectId, shotIds: [r.shot.id] })
     const q = quote.items[0]
 
     return ok(
@@ -12035,8 +12197,8 @@ export const generateFromShots: Operation<{
       await desktop.requireCapability('seedance-drafts', 'generating saved Seedance 2.5 preview or 4K Shots')
     }
     const { draft, note: seatNote } = await desktopDraft(desktop, input.draft)
-    const quote = await desktop.get<DesktopShotQuote>('/agent/shots/quote', {
-      input: JSON.stringify({ projectId: details[0].projectId, shotIds: details.map((d) => d.id), draft }),
+    const quote = await desktop.quote<DesktopShotQuote>('/agent/shots/quote', 'input', {
+      projectId: details[0].projectId, shotIds: details.map((d) => d.id), draft,
     })
     for (const model of new Set(quote.items.map((i) => i.model))) requireGuideRead(ctx, model)
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
@@ -12089,7 +12251,7 @@ export const quoteBoard: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('board-quote', 'the board prices')
     const { draft, note } = await desktopDraft(desktop, input.draft)
-    const quote = await desktop.get('/agent/shots/quote', { input: JSON.stringify({ ...input, draft }) })
+    const quote = await desktop.quote('/agent/shots/quote', 'input', { ...input, draft })
     return note ? ok(quote, `${JSON.stringify(quote)}\n${note}`) : ok(quote)
   },
 }
@@ -12259,8 +12421,9 @@ export const editCut: Operation<{
   }),
   async run(input, ctx) {
     await ctx.desktop().requireCapability('cut-edit', 'editing a cut')
-    const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId]) : new AssetRefs()
-    return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.get(input.assetId)?.id : undefined }))
+    // A timeline clip is the one reference that may point into another project, so an id from one passes.
+    const refs = input.assetId ? await resolveAssetRefs(ctx, input.projectId, [input.assetId], { anyProject: true }) : new AssetRefs()
+    return ok(await ctx.desktop().post('/agent/timeline/cut', { ...input, assetId: input.assetId ? refs.id(input.assetId) : undefined }))
   },
 }
 

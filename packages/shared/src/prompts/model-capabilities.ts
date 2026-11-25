@@ -490,6 +490,26 @@ export interface ModelCapability {
   /** The longest output with a last frame, when shorter than `duration.max`
    *  (`lastFrameMaxSecondsFor`). Absent = the model's whole window. */
   lastFrameMaxSeconds?: number
+  /** How the combined reference-VIDEO cap is counted (`checkReferenceSeconds`).
+   *  'billed' sums each clip rounded up to a whole second, because the row's
+   *  video-reference key adds exactly that sum to the output and its key ladder
+   *  ends at the cap. Absent = 'actual', the measured seconds, which is what the
+   *  provider's own limit counts. Reference audio is always 'actual'. */
+  referenceVideoSecondsBasis?: 'actual' | 'billed'
+  /** Least combined reference-video seconds, when the row states one that is
+   *  not a per-clip floor. Absent = `referenceVideoDuration.min`, else none. */
+  minReferenceVideoSeconds?: number
+  /** Resolutions whose endpoint has no reference-image slot (`checkVideoParams`,
+   *  `maxIngredientImagesFor`). Absent = references at every resolution. */
+  noReferenceImagesAt?: VideoResolution[]
+  /** Whether a request with a start frame still carries the aspect ratio
+   *  (`aspectRatioApplies`). Absent = the frame decides the shape: the row's
+   *  image-to-video request has no ratio parameter. 'with-references' = only
+   *  when reference images ride with the frame. */
+  aspectRatioWithFirstFrame?: 'always' | 'with-references'
+  /** With references, a start frame is sent as reference image 1 and uses one
+   *  image slot. Absent = frames and reference media never travel together. */
+  firstFrameRidesAsReference?: boolean
 
   // ── Text-to-speech ──
   /**
@@ -643,6 +663,13 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // pro: ... The output video resolution is 1080P." The fal Standard endpoint
   // takes no resolution parameter, and every Standard and Omni render we
   // measured came back 1280x720 (2026-09-29). This row said 1080p until then.
+  //
+  // `noReferenceImagesAt: ['4k']` on all four: the 4K seats are sold as
+  // text-to-video and image-to-video only (fal has no 4K reference-to-video).
+  // `aspectRatioWithFirstFrame`: fal's v3 and O3 image-to-video schemas have no
+  // `aspect_ratio` (the frame decides); O3 reference-to-video, where a frame
+  // with reference images lands, takes the three-ratio enum (fal OpenAPI, read
+  // 2026-11-24).
   'kling-v3.0-std': {
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
@@ -650,6 +677,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // 3, not 5. The op claimed "Kling: 5-15" and refused legal 3-4s takes.
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
+    noReferenceImagesAt: ['4k'],
   },
 
   'kling-v3.0-pro': {
@@ -658,6 +686,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     videoResolution: { options: ['1080p', '4k'] },
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
+    noReferenceImagesAt: ['4k'],
   },
 
   'kling-v3.0-omni': {
@@ -667,6 +696,8 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     videoResolution: { options: ['720p', '4k'] },
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
+    noReferenceImagesAt: ['4k'],
+    aspectRatioWithFirstFrame: 'with-references',
   },
 
   'kling-v3.0-omni-pro': {
@@ -675,6 +706,8 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     videoResolution: { options: ['1080p', '4k'] },
     duration: { min: 3, max: 15, mode: 'continuous' },
     maxIngredientImages: 4,
+    noReferenceImagesAt: ['4k'],
+    aspectRatioWithFirstFrame: 'with-references',
   },
 
   // Kling O3 video-to-video edit (fal-only; the source clip is the canvas, so
@@ -749,6 +782,13 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     // No combined ceiling is published, so the total is the two arms summed.
     // Google: "Uploading audio inputs or audio references is unsupported".
     maxReferenceFilesTotal: 9,
+    // fal's v1.2 image-to-video takes `aspect_ratio` (16:9 / 9:16, default
+    // 16:9), so the ratio is a real parameter beside a start frame.
+    aspectRatioWithFirstFrame: 'always',
+    // fal's v1.2 reference-to-video takes `image_urls` and `reference_video_urls`
+    // together and has no frame slot: a start frame is sent as reference image 1
+    // beside reference images or reference videos, and a last frame is refused.
+    firstFrameRidesAsReference: true,
   },
 
   'omni-flash-1-2-edit': {
@@ -835,6 +875,12 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxReferenceFilesTotal: 12,
     maxReferenceVideoSeconds: 15,
     maxReferenceAudioSeconds: 15,
+    // The vref key bills each clip rounded up, and its ladder ends at the cap
+    // plus the longest output. Providers state "video refs combined 2-15s".
+    referenceVideoSecondsBasis: 'billed',
+    minReferenceVideoSeconds: 2,
+    // The frames task sends the chosen ratio (2.5 sends `adaptive` instead).
+    aspectRatioWithFirstFrame: 'always',
   },
 
   'seedance-2.5': {
@@ -849,6 +895,8 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxReferenceFilesTotal: 50,
     maxReferenceVideoSeconds: 30,
     maxReferenceAudioSeconds: 30,
+    referenceVideoSecondsBasis: 'billed',
+    minReferenceVideoSeconds: 2,
   },
 
   'seedance-2.5-edit': {
@@ -1275,11 +1323,143 @@ export function checkReferenceShape(
       ? `${name} takes ${s(long.max)} on a clip over ${long.aboveSeconds}s (up to ${cap.maxReferenceVideos} at ${long.aboveSeconds}s or less), and this has ${count}. Set ${long.aboveSeconds}s or less, or remove ${count - maxClips}.`
       : `${name} takes at most ${s(maxClips)}, and this has ${count}.`
   }
-  const bounds = cap.referenceVideoDuration
-  if (bounds && clips.some((sec) => !Number.isFinite(sec) || sec > bounds.max + 0.05 || sec < bounds.min)) {
-    return `Each ${name} reference video must be ${bounds.min}-${bounds.max}s long. Trim it first.`
+  return checkReferenceSeconds(model, 'video', clips, { label: name }).error
+}
+
+/**
+ * Frames beside reference video or audio. A reference endpoint has no frame
+ * parameters, so the pair is refused, never sent with one side dropped. A row
+ * that sends a first frame as reference image 1 (`firstFrameRidesAsReference`)
+ * carries it there, and only its last frame has no slot. A plain message naming
+ * `label`, or null. One function for the agent op, the desktop's composer and
+ * the handlers.
+ */
+export function checkFramesWithReferenceMedia(
+  model: string,
+  opts: { firstFrame?: boolean; lastFrame?: boolean; referenceVideos?: number; referenceAudio?: number; label?: string }
+): string | null {
+  const cap = MODEL_CAPABILITIES[model]
+  if (!cap || (opts.referenceVideos ?? 0) + (opts.referenceAudio ?? 0) === 0) return null
+  const name = opts.label ?? model
+  if (cap.firstFrameRidesAsReference) {
+    return opts.lastFrame ? `${name} takes a last frame only without references. Remove the last frame or the references.` : null
   }
-  return null
+  return opts.firstFrame || opts.lastFrame
+    ? `${name} takes first and last frames or reference video and audio, not both: its reference endpoint has no frame slots. Remove one side.`
+    : null
+}
+
+// ── Reference seconds: one rounding, one tolerance, one verdict ──────────────
+//
+// The agent op, the desktop's composition check, the generation handlers and
+// the server's key derivations all call the functions below, so a clip set one
+// layer accepts is never refused by the next.
+
+/** A probe reads a clip a few hundredths long (an "8 second" file measures
+ *  8.02), so that much over a whole second or over a ceiling is not counted. */
+export const REFERENCE_SECONDS_TOLERANCE = 0.05
+
+/** The whole seconds a reference-video key bills for these clips: each measured
+ *  clip rounds up on its own (4.3s bills 5, 8.02s bills 8), never the sum. A
+ *  length of zero or less is an unmeasured clip and adds nothing. */
+export function billedReferenceSeconds(clips: readonly number[]): number {
+  let total = 0
+  for (const sec of clips) {
+    if (Number.isFinite(sec) && sec > 0) total += Math.max(1, Math.ceil(sec - REFERENCE_SECONDS_TOLERANCE))
+  }
+  return total
+}
+
+/** The per-clip window, the least and most combined seconds a row takes for one
+ *  kind of reference, and how its combined cap is counted. `max` 0 = no cap. */
+export function referenceSecondsBounds(model: string, kind: 'video' | 'audio'): {
+  clip?: { min: number; max: number }
+  min: number
+  max: number
+  basis: 'actual' | 'billed'
+} {
+  const cap = MODEL_CAPABILITIES[model]
+  const clip = kind === 'video' ? cap?.referenceVideoDuration : cap?.referenceAudioDuration
+  return {
+    clip,
+    min: (kind === 'video' ? cap?.minReferenceVideoSeconds : undefined) ?? clip?.min ?? 0,
+    max: (kind === 'video' ? cap?.maxReferenceVideoSeconds : cap?.maxReferenceAudioSeconds) ?? 0,
+    basis: kind === 'video' ? (cap?.referenceVideoSecondsBasis ?? 'actual') : 'actual',
+  }
+}
+
+/** Whether one measured clip fits the row's per-clip window. The ceiling takes
+ *  the probe tolerance; the floor does not (a probe never reads short). A row
+ *  with no per-clip window takes any measured length. */
+export function referenceClipInBounds(model: string, kind: 'video' | 'audio', seconds: number): boolean {
+  if (!Number.isFinite(seconds) || seconds <= 0) return false
+  const { clip } = referenceSecondsBounds(model, kind)
+  return !clip || (seconds >= clip.min && seconds <= clip.max + REFERENCE_SECONDS_TOLERANCE)
+}
+
+export interface ReferenceSecondsVerdict {
+  /** Measured seconds, summed. */
+  actual: number
+  /** `billedReferenceSeconds` of the same clips. */
+  billed: number
+  /** A plain message naming the limit, or null when the clips fit. */
+  error: string | null
+}
+
+/**
+ * THE verdict on a request's reference clips of one kind, from each clip's
+ * length in seconds: every clip inside the row's per-clip window, and the
+ * combined length inside the row's bounds, counted on the row's own basis
+ * (`referenceVideoSecondsBasis`). A length of zero or less is a clip nobody has
+ * measured yet: it is skipped, unless `measured` says every clip was probed, in
+ * which case it is refused. A row with no bounds for the kind accepts.
+ */
+export function checkReferenceSeconds(
+  model: string,
+  kind: 'video' | 'audio',
+  clips: readonly number[],
+  opts: { label?: string; measured?: boolean } = {}
+): ReferenceSecondsVerdict {
+  const name = opts.label ?? model
+  const known = clips.filter((sec) => Number.isFinite(sec) && sec > 0)
+  const actual = known.reduce((n, sec) => n + sec, 0)
+  const billed = billedReferenceSeconds(known)
+  const verdict = (error: string | null): ReferenceSecondsVerdict => ({ actual, billed, error })
+  if (opts.measured && known.length < clips.length) {
+    return verdict(`A reference ${kind} clip could not be measured. Attach it again.`)
+  }
+  const { clip, min, max, basis } = referenceSecondsBounds(model, kind)
+  if (clip && known.some((sec) => !referenceClipInBounds(model, kind, sec))) {
+    return verdict(`Each ${name} reference ${kind === 'audio' ? 'audio clip' : kind} must be ${clip.min}-${clip.max}s long. Trim it first.`)
+  }
+  if (known.length === 0) return verdict(null)
+  const total = basis === 'billed' ? billed : actual
+  const shown = basis === 'billed' ? `${billed}s, each clip rounded up to a whole second` : `${actual.toFixed(1)}s`
+  if (max > 0 && total > max + (basis === 'billed' ? 0 : REFERENCE_SECONDS_TOLERANCE)) {
+    return verdict(`${name} takes at most ${max}s of reference ${kind} in total, and this has ${shown}. Trim a clip first.`)
+  }
+  if (total < min) {
+    return verdict(`${name} needs at least ${min}s of reference ${kind} in total, and this has ${shown}.`)
+  }
+  return verdict(null)
+}
+
+/** Reference images a request may carry at this resolution: none where the
+ *  row's endpoint for that resolution has no reference slot
+ *  (`noReferenceImagesAt`), else the row's `maxIngredientImages`. */
+export function maxIngredientImagesFor(model: string, videoResolution?: string): number {
+  const cap = MODEL_CAPABILITIES[model]
+  if (videoResolution && cap?.noReferenceImagesAt?.includes(videoResolution as VideoResolution)) return 0
+  return cap?.maxIngredientImages ?? 0
+}
+
+/** Whether the aspect ratio shapes this request. With a start frame the frame
+ *  decides, unless the row's frame request carries a ratio
+ *  (`aspectRatioWithFirstFrame`). */
+export function aspectRatioApplies(model: string, opts: { firstFrame?: boolean; referenceImages?: number } = {}): boolean {
+  if (!opts.firstFrame) return true
+  const rule = MODEL_CAPABILITIES[model]?.aspectRatioWithFirstFrame
+  return rule === 'always' || (rule === 'with-references' && (opts.referenceImages ?? 0) > 0)
 }
 
 /** Every legal whole-second duration. Mirrors `getAvailableDurations`. */
@@ -1347,30 +1527,73 @@ export function durationBounds(models: readonly string[]): { min: number; max: n
 export function checkAspectRatio(
   model: string,
   aspectRatio: string | undefined,
-  provider?: string
+  provider?: string,
+  label: string = model
 ): string | null {
   if (!aspectRatio) return null
   const legal = aspectRatiosFor(model, provider)
   if (legal.length === 0 || legal.includes(aspectRatio as AspectRatio)) return null
-  return `${model} does not accept aspectRatio "${aspectRatio}". It accepts ${legal.join(', ')}. Pick one of those, or switch to a model that takes the shape you want.`
+  return `${label} does not accept aspectRatio "${aspectRatio}". It accepts ${legal.join(', ')}. Pick one of those, or switch to a model that takes the shape you want.`
 }
 
-export function checkVideoResolution(model: string, videoResolution: string | undefined): string | null {
+export function checkVideoResolution(model: string, videoResolution: string | undefined, label: string = model): string | null {
   if (!videoResolution) return null
   const legal = videoResolutionsFor(model)
   if (legal.length === 0) return null
   if (legal.includes(videoResolution as VideoResolution)) return null
   const vr = MODEL_CAPABILITIES[model]?.videoResolution
   if (vr?.fixed) {
-    return `${model} renders at ${vr.fixed} only — it has no resolution parameter, so videoResolution "${videoResolution}" cannot apply. Drop the param.`
+    return `${label} renders at ${vr.fixed} only: it has no resolution parameter, so videoResolution "${videoResolution}" cannot apply. Drop the param.`
   }
-  return `${model} does not render at ${videoResolution}. It offers ${legal.join(', ')}. Pick one of those, or switch models.`
+  return `${label} does not render at ${videoResolution}. It offers ${legal.join(', ')}. Pick one of those, or switch models.`
+}
+
+/**
+ * THE verdict on a video request's shape parameters, in the order a caller can
+ * fix them: aspect ratio (only where it shapes the request, `aspectRatioApplies`),
+ * resolution, reference images at that resolution, then duration, whose window
+ * depends on the resolution. The agent op and the desktop's composition check
+ * (which the prompt bar, the agent route and the handlers run) both call this,
+ * so a ratio, resolution or length one refuses is refused by all. `field` names
+ * the parameter to change.
+ */
+export function checkVideoParams(
+  model: string,
+  req: {
+    aspectRatio?: string
+    videoResolution?: string
+    duration?: number
+    provider?: string
+    firstFrame?: boolean
+    lastFrame?: boolean
+    /** Free reference images (ingredients, characters, environments, styles). */
+    referenceImages?: number
+    label?: string
+  }
+): { field: 'aspectRatio' | 'videoResolution' | 'references' | 'duration'; message: string } | null {
+  const name = req.label ?? model
+  const refs = req.referenceImages ?? 0
+  const ratio = aspectRatioApplies(model, { firstFrame: req.firstFrame, referenceImages: refs })
+    ? checkAspectRatio(model, req.aspectRatio, req.provider, name)
+    : null
+  if (ratio) return { field: 'aspectRatio', message: ratio }
+  const resolution = checkVideoResolution(model, req.videoResolution, name)
+  if (resolution) return { field: 'videoResolution', message: resolution }
+  if (refs > 0 && maxIngredientImagesFor(model) > 0 && maxIngredientImagesFor(model, req.videoResolution) === 0) {
+    return { field: 'references', message: `${name} takes no reference images at ${req.videoResolution}. Pick a lower resolution, or remove the references.` }
+  }
+  const duration = checkDuration(model, req.duration, {
+    videoResolution: req.videoResolution,
+    promptMode: refs > 0 && !req.firstFrame && !req.lastFrame ? 'ingredients' : undefined,
+    label: name,
+  })
+  return duration ? { field: 'duration', message: duration } : null
 }
 
 export function checkDuration(
   model: string,
   duration: number | undefined,
-  opts: { videoResolution?: string; promptMode?: string } = {}
+  opts: { videoResolution?: string; promptMode?: string; label?: string } = {}
 ): string | null {
   if (duration == null) return null
   const d = durationsFor(model, opts)
@@ -1389,8 +1612,8 @@ export function checkDuration(
     why = ` at ${opts.videoResolution}`
     escape = `, or pick a resolution without that restriction (${fmtWindow(base)} at the unrestricted ones)`
   }
-  const allowed = legal.length === 1 ? `${legal[0]}s only` : d.mode === 'discrete' ? `${legal.join('s, ')}s` : `${d.min}-${d.max}s`
-  return `${model}${why} accepts ${allowed} — ${duration}s is not legal. Pick a duration in range${escape}.`
+  const allowed = legal.length === 1 ? `${legal[0]} seconds only` : d.mode === 'discrete' ? `${legal.join(', ')} seconds` : `${d.min} to ${d.max} seconds`
+  return `${opts.label ?? model}${why} makes clips of ${allowed}, and ${duration}s was asked. Pick a length in that range${escape}.`
 }
 
 // ── Generated prose ──────────────────────────────────────────────────────────

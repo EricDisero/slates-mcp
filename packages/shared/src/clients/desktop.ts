@@ -81,6 +81,13 @@ function fetchErrorCodes(err: unknown): string[] {
 // short enough that an app update mid-session is picked up. Keyed by port
 // (each desktop instance = one port).
 const HEALTH_CACHE_TTL_MS = 60_000
+/**
+ * The longest URL `get` sends. Node's HTTP server refuses a request whose
+ * headers pass 16,384 bytes (its default `--max-http-header-size`) with a bare
+ * 431, and the request line counts toward that; this leaves room for the rest.
+ */
+export const MAX_GET_URL_LENGTH = 12_000
+
 const healthCache = new Map<number, { health: DesktopHealth; fetchedAt: number }>()
 
 export class SlatesDesktopClient {
@@ -116,14 +123,7 @@ export class SlatesDesktopClient {
   // error — this check turns that into an actionable "update Slates"
   // message BEFORE the op's first real request.
   async requireCapability(cap: string, friendlyFeature: string): Promise<void> {
-    const cached = healthCache.get(this.port)
-    let health: DesktopHealth
-    if (cached && Date.now() - cached.fetchedAt < HEALTH_CACHE_TTL_MS) {
-      health = cached.health
-    } else {
-      health = await this.healthz()
-      healthCache.set(this.port, { health, fetchedAt: Date.now() })
-    }
+    const health = await this.cachedHealth()
     if (health.agentApiVersion === undefined || !health.capabilities?.includes(cap)) {
       throw new Error(
         `Your Slates desktop app doesn't support ${friendlyFeature} yet ` +
@@ -131,6 +131,29 @@ export class SlatesDesktopClient {
           `Update Slates (Settings → Check for Updates) and retry.`
       )
     }
+  }
+
+  /** Whether this desktop advertises `cap`: for an op that has an older route to fall back to. */
+  async hasCapability(cap: string): Promise<boolean> {
+    return (await this.cachedHealth()).capabilities?.includes(cap) ?? false
+  }
+
+  private async cachedHealth(): Promise<DesktopHealth> {
+    const cached = healthCache.get(this.port)
+    if (cached && Date.now() - cached.fetchedAt < HEALTH_CACHE_TTL_MS) return cached.health
+    const health = await this.healthz()
+    healthCache.set(this.port, { health, fetchedAt: Date.now() })
+    return health
+  }
+
+  /**
+   * A quote route: the request rides the JSON body as `{ [field]: request }`
+   * where the desktop advertises 'quote-post'. An older desktop reads it as a
+   * JSON string in the query, which `get` holds to a safe length.
+   */
+  async quote<T>(path: string, field: string, request: unknown): Promise<T> {
+    if (await this.hasCapability('quote-post')) return this.post<T>(path, { [field]: request })
+    return this.get<T>(path, { [field]: JSON.stringify(request) })
   }
 
   async get<T>(path: string, params?: Record<string, string | number | boolean | null | undefined>): Promise<T> {
@@ -141,7 +164,14 @@ export class SlatesDesktopClient {
         url.searchParams.set(k, String(v))
       }
     }
-    const res = await this.fetchOrFriendly(url.toString(), {
+    const href = url.toString()
+    if (href.length > MAX_GET_URL_LENGTH) {
+      throw new Error(
+        `This request is too long to send to this version of Slates (${href.length} characters, limit ${MAX_GET_URL_LENGTH}). ` +
+          'Update Slates (Settings → Check for Updates), or send fewer items at once.'
+      )
+    }
+    const res = await this.fetchOrFriendly(href, {
       headers: { Authorization: `Bearer ${this.token}`, ...sessionHeaders() },
     })
     return this.handle<T>(path, res)

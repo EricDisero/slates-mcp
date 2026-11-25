@@ -7,6 +7,7 @@ import { defaultModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 import { ALL_OPERATIONS, brainFiles, toolDefinitions, useBrainSource } from '../packages/shared/dist/index.js'
 import { imageCostKey, isGptImageModel } from '../packages/shared/dist/operations/index.js'
 import { brainOrSkip } from './brain-source.mjs'
+import { clientCalls } from './desktop-double.mjs'
 
 // The cinematic catalogue is the brain's (slates-api brain/), held as a member's server holds it.
 useBrainSource(brainOrSkip('prompt-control'))
@@ -22,7 +23,7 @@ const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)
   const posts = []
   const capabilities = []
   const ctx = { desktop: () => ({
-    requireCapability: async cap => { capabilities.push(cap) },
+    ...clientCalls, requireCapability: async cap => { capabilities.push(cap) },
     get: async () => ({ assets: [
       { id: referenceId, code: 'IMG-A1', label: 'Reference', type: 'image' },
       { id: assetId, code: 'IMG-A2', label: 'Result', type: 'image' },
@@ -56,7 +57,7 @@ const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)
   // slates_update_asset resolves a badge code, posts only what was passed, and answers a compact row.
   const renamePosts = []
   const renameCtx = { desktop: () => ({
-    requireCapability: async cap => { capabilities.push(cap) },
+    ...clientCalls, requireCapability: async cap => { capabilities.push(cap) },
     get: async () => ({ assets: [{ id: assetId, code: 'IMG-A2', label: 'Result', type: 'image' }] }),
     post: async (route, body) => { renamePosts.push({ route, body }); return { asset: { id: assetId, code: 'IMG-A2', label: 'Ref: shirt', type: 'image', prompt: 'The shirt front', filePath: 'secret.png' } } },
   }) }
@@ -140,7 +141,7 @@ const registry = { models: [
 ] }
 const ctx = {
   cloud: () => ({ get: async () => registry }),
-  desktop: () => ({ requireCapability: async () => {}, post: async (path, body) => {
+  desktop: () => ({ ...clientCalls, requireCapability: async () => {}, post: async (path, body) => {
     posts.push({ path, body }); return { success: true, background: true, generationId: 'mock-generation' }
   } }),
 }
@@ -202,8 +203,9 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   const desktopWithout = (missing) => {
     const sent = []
     return { sent, ctx: { cloud: () => ({ get: async () => registry }), desktop: () => ({
-      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
-      post: async (path, body) => { sent.push({ path, body }); return { success: true, background: true, generationId: 'mock-generation' } },
+      ...clientCalls, requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      // `sent` is what would spend; a quote route is asked, never sent to.
+      post: async (path, body) => { if (!path.endsWith('-quote')) sent.push({ path, body }); return { success: true, background: true, generationId: 'mock-generation' } },
     }) } }
   }
   const older = desktopWithout(['image-models-v5'])
@@ -264,7 +266,7 @@ assert.equal(posts.at(-1).body.resolution, '2k')
     const shot = { id: shotId, projectId, code: 'SHOT-A', name: 'A' }
     const quote = { fingerprint: 'fp', items: [{ shotId, name: 'A', code: 'SHOT-A', model: 'gpt-image-2-5-sunburst', prompt: 'Room', cost: 0.1, credits: 3, blocked: null }], total: 3, largest: 3, unpriced: 0 }
     return { sent, ctx: { cloud: () => ({ get: async () => registry }), desktop: () => ({
-      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      ...clientCalls, requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
       get: async (path, query) => {
         if (path === '/agent/shots/quote') { sent.push({ path, body: JSON.parse(query.input) }); return quote }
         if (path === '/agent/shots/get') return { shot }
@@ -316,9 +318,10 @@ assert.equal(posts.at(-1).body.resolution, '2k')
     const sent = []
     const shot = { id: shotId, projectId, code: 'SHOT-A', name: 'A' }
     return { sent, ctx: { cloud: () => ({ get: async () => omniRegistry }), desktop: () => ({
-      requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
+      ...clientCalls, requireCapability: async (cap) => { if (missing.includes(cap)) throw new Error(`Update Slates: ${cap} required`) },
       get: async (path) => {
-        if (path === '/agent/assets') return { assets: [{ id: sourceId, type: 'video', duration: clipSeconds }] }
+        // Every id a case names is an asset of this project: an id outside it is refused before any request.
+        if (path === '/agent/assets') return { assets: [{ id: sourceId, type: 'video', duration: clipSeconds }, ...[frameA, frameB, ...pics].map((id) => ({ id, type: 'image' })), ...clips.map((id) => ({ id, type: 'video', duration: 2 }))] }
         if (path === '/agent/shots/get') return { shot }
         return { storyboards: [], shots: [], variety: null }
       },
@@ -406,7 +409,7 @@ assert.equal(posts.at(-1).body.resolution, '2k')
   const fake = (refuse) => {
     const seen = { gates: [], posts: [] }
     const ctx = { desktop: () => ({
-      requireCapability: async (cap) => { seen.gates.push(cap); if (cap === refuse) throw new Error(`Update Slates: ${cap} required`) },
+      ...clientCalls, requireCapability: async (cap) => { seen.gates.push(cap); if (cap === refuse) throw new Error(`Update Slates: ${cap} required`) },
       get: async () => ({}),
       post: async (path) => { seen.posts.push(path); throw new Error(`posted ${path}`) },
     }) }
@@ -434,7 +437,7 @@ assert.equal(posts.at(-1).body.resolution, '2k')
 {
   const projectId = '11111111-1111-4111-8111-111111111111', assetId = '44444444-4444-4444-8444-444444444444'
   const clipId = '55555555-5555-4555-8555-555555555555'
-  const answering = (selection) => ({ desktop: () => ({ requireCapability: async () => {}, post: async () => ({ selection, notes: [] }) }) })
+  const answering = (selection) => ({ desktop: () => ({ ...clientCalls, requireCapability: async () => {}, post: async () => ({ selection, notes: [] }) }) })
   const media = await call('set_selection', { surface: 'media', mode: 'replace', ids: [assetId] },
     answering({ surface: 'media', projectId, ids: [assetId], items: [{ id: assetId, code: null, label: 'Shirt' }, { id: 'a2', code: 'IMG-A2', label: 'Hat' }] }))
   assert.equal(media.text, `2 selected on Media: ${assetId}, IMG-A2 — Hat.`)

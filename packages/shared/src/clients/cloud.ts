@@ -161,5 +161,6 @@ export interface ModelRegistryResponse {
     model: string
     cost_credits?: number         // CREDITS
     cost_cents?: number           // legacy alias = CREDITS
+    list_credits?: number         // the list price, sent only where the account's tier is debited something else
   }>
 }
