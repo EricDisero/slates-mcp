@@ -1525,7 +1525,7 @@ export const getAsset: Operation<{ projectId: string; assetId: string }> = {
   async run(input, ctx) {
     await ctx.desktop().requireCapability('asset-detail', 'reading one asset in full')
     const id = (await resolveAssetRefs(ctx, input.projectId, [input.assetId])).id(input.assetId)
-    return ok(await ctx.desktop().get('/agent/assets/get', { id }))
+    return ok(await ctx.desktop().get('/agent/assets/get', { id, projectId: input.projectId }))
   },
 }
 
@@ -2297,10 +2297,6 @@ const MINIMAX_FREE_REF_IMAGES_BY_MODEL: Record<string, number> = {
  */
 const LTX_MODELS = new Set<string>(['ltx-2-5', 'ltx-2-5-pro'])
 
-/** Max billed seconds on a Wan 3.0 take: 30s of output plus 15s of reference
- *  video, which fal bills "in addition to output duration". */
-const WAN_3_VREF_MAX_TOTAL = 45
-
 /** K for the `-ref{K}` suffix: images past the free five, capped by the model's
  *  own declared ceiling. 0 for h3-max (no reference transport) and for anything
  *  that is not a MiniMax row. Mirrors refImageSurchargeCount() in
@@ -2562,6 +2558,7 @@ export const estimateGenerationCost: Operation<{
         // a quote can never promise something generation then refuses.
         const capErr = assertVideoCapabilities({
           model: resolved.model,
+          aspectRatio: input.aspectRatio,
           videoResolution: input.videoResolution ?? resolved.videoResolution,
           duration,
         })
@@ -5295,9 +5292,9 @@ export function videoCostKey(input: {
     const res = input.videoResolution ?? defaultVideoResolutionFor(input.model)
     const vrefSecs = input.videoRefSeconds ?? 0
     if (vrefSecs > 0) {
-      // ceil(x - 0.05) matches the server's probe rounding, so quote = bill.
-      const total = Math.min(WAN_3_VREF_MAX_TOTAL, Math.ceil(vrefSecs - 0.05) + input.duration)
-      return `wan-3.0-vref-${res}-${total}s`
+      // ceil(x - 0.05) matches the server's probe rounding, so quote = bill. Never clamped: a clamp bills a
+      // longer clip at a shorter one's price.
+      return `wan-3.0-vref-${res}-${Math.ceil(vrefSecs - 0.05) + input.duration}s`
     }
     return `wan-3.0-${res}-${input.duration}s`
   }

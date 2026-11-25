@@ -74,8 +74,6 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'credit_boost_purchased', senders: API, kind: 'purchase', what: 'The credit boost upsell' },
   { name: 'credits_purchased', senders: API, kind: 'purchase', what: 'A credit pack bought on its own' },
   { name: 'vault_purchased', senders: API, kind: 'purchase', what: 'The legacy vault SKU (unrouted since 2026-07-09)' },
-  { name: 'thumbs_purchased', senders: API, kind: 'purchase', what: 'A Thumbs purchase' },
-  { name: 'thumbs_oto2_purchased', senders: API, kind: 'purchase', what: 'Thumbs as the /letsgo OTO2 (unrouted since 2026-07-09)' },
 
   // ── Funnel ──
   { name: '$pageview', senders: WEB, kind: 'funnel', what: 'A page view, sent by hand on each route change' },
@@ -83,7 +81,6 @@ export const ANALYTICS_EVENTS: readonly AnalyticsEvent[] = [
   { name: 'view_content', senders: WEB, kind: 'funnel', what: 'A sales page seen; browser pixel and PostHog with one id' },
   { name: 'initiate_checkout', senders: WEB, kind: 'funnel', what: 'The checkout opened; browser pixel and PostHog with one id' },
   { name: 'checkout_started', senders: API, kind: 'funnel', what: "A checkout first learns the buyer's email: the lead post (lead_source) or the PaymentIntent attach (payment_intent_id), whichever comes first, once per email an hour; carries utm_*, ft_utm_* and lp_*" },
-  { name: 'thumbs_checkout_started', senders: API, kind: 'funnel', what: 'A Thumbs checkout created' },
   { name: 'checkout_payment_intent_failed', senders: WEB, kind: 'funnel', what: 'The checkout could not create its PaymentIntent' },
   { name: 'headline_variant_shown', senders: WEB, kind: 'funnel', what: 'The sales page hero headline arm shown' },
   { name: 'funnel_step', senders: WEB, kind: 'funnel', what: 'An upsell or success page reached' },

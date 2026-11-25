@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { requireDesktop } from '../auth.js'
+import { DesktopUnreachableError, requireDesktop } from '../auth.js'
 
 // One agent session per process (an MCP server's connection, or one CLI run): the desktop counts
 // what it spends against the person's per-session spend limit (`slates_get_spend_limits`).
@@ -173,7 +173,7 @@ export class SlatesDesktopClient {
     } catch (err) {
       const codes = fetchErrorCodes(err)
       if (codes.some((c) => CONNECTION_ERROR_CODES.has(c))) {
-        throw new Error(DESKTOP_UNREACHABLE_MESSAGE)
+        throw new DesktopUnreachableError(DESKTOP_UNREACHABLE_MESSAGE)
       }
       const name = (err as { name?: unknown })?.name
       if (name === 'AbortError' || codes.some((c) => TIMEOUT_ERROR_CODES.has(c))) {

@@ -162,9 +162,7 @@ export class DesktopUnreachableError extends Error {
  */
 export function isDesktopDown(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code
-  if (code === 'DESKTOP_SERVER_MISSING' || code === 'DESKTOP_UNREACHABLE') return true
-  // Until clients/desktop.ts throws DesktopUnreachableError, its refused connection is a plain Error.
-  return err instanceof Error && err.message.startsWith('Slates desktop app is not reachable')
+  return code === 'DESKTOP_SERVER_MISSING' || code === 'DESKTOP_UNREACHABLE'
 }
 
 /** A short hash of a bearer token, so a file can name which login wrote it without holding the token. */

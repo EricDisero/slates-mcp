@@ -92,6 +92,26 @@ for (const model of IMAGE_MODELS) {
     cells += 3
   }
 }
+// A video estimate refuses the frame shapes generation refuses, from the same check: it used to quote any shape.
+for (const model of shared.VIDEO_MODELS) {
+  const ratios = aspectRatiosFor(model, AGENT_ROUTE_PROVIDER)
+  const duration = MODEL_CAPABILITIES[model].duration?.min ?? 5
+  for (const aspectRatio of aspectRatioUnion(shared.VIDEO_MODELS)) {
+    const est = await call('slates_estimate_generation_cost', { model, aspectRatio, duration }, ctx)
+    assert.equal(refused(est, 'aspectRatio'), !ratios.includes(aspectRatio), `estimate ${model} ${aspectRatio}: ${JSON.stringify(est.data)}`)
+    cells += 1
+  }
+}
+// slates_get_asset names its project, so the desktop refuses an asset id from another one.
+{
+  const seen = []
+  const d = { requireCapability: async () => {}, get: async (path, query) => {
+    seen.push([path, query])
+    return path === '/agent/assets' ? { assets: [{ id: assetId, code: 'IMG-A1' }] } : { asset: { id: assetId } }
+  } }
+  await call('slates_get_asset', { projectId, assetId: 'IMG-A1' }, { cloud: ctx.cloud, desktop: () => d })
+  assert.deepEqual(seen.find(([path]) => path === '/agent/assets/get')?.[1], { id: assetId, projectId }, 'slates_get_asset sends its projectId')
+}
 // The Kling edit window, and a known model whose parameters miss the price list.
 assert.ok(refused(await call('slates_estimate_generation_cost', { model: 'kling-v3.0-omni-edit', duration: 40 }, ctx), 'duration'))
 await assert.rejects(

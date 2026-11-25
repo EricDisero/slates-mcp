@@ -38,7 +38,7 @@ slates-mcp/
 - **Never duplicate operation logic.** Both surfaces register the same `ALL_OPERATIONS` array. Adding a new tool = one edit in `packages/shared/src/operations/index.ts`, then both surfaces ship it.
 - **No native deps.** Pure TS + `@modelcontextprotocol/sdk` + `commander` + `zod` + `zod-to-json-schema`. No FFmpeg, no sharp, no canvas. The desktop side handles binary work.
 - **Bearer tokens only flow to their intended hosts.** `slates_sk_` to `slates-api.fly.dev` or this machine; the desktop token to `127.0.0.1:PORT`. The clients enforce this — never bypass.
-- **Connection file is the single source of truth.** Don't add a second config or env-var path. The CLI's `slates login` writes it, the desktop app writes the desktop side, both surfaces read it.
+- **Connection file is the single source of truth.** Don't add a second config or env-var path. The CLI's `slates login` writes it, the desktop app writes the desktop side, both surfaces read it. The CLI's own `slates use` default lives in `~/.slates/cli.json` (`CLI_STATE_FILE`), since the desktop rewrites the connection file whole.
 - **Cost-key builders must byte-match the desktop's.** `videoCostKey()` in `operations/index.ts` mirrors `klingCreditKey`/`seedanceCreditKey` in `slate/src/shared/pricing.ts` — every key dimension (resolution incl 4K, face/realface, audio) must be reflected here or agent pre-flight quotes diverge from what's billed (the Kling-4K quote gap shipped exactly this way, caught 2026-07-02). Any key-shape change in either repo updates both in the same pass. Full contract: `slate/.claude/pricing.md`.
 - **Everything below `operations/index.ts` and `prompts/` is SSOT for something downstream.**
   Prompting tips, model facts and routing, model capabilities, the agent doctrine, banned tokens,
@@ -67,11 +67,11 @@ npm install
 npm run build       # shared → mcp → cli, then the agent-surface lockstep check
 npm run typecheck   # whole-monorepo type check
 npm run check:agent-surface   # just the lockstep check (needs a built dist)
+node scripts/mcp-hosts-check.mjs   # host contract: exit codes, flags, `slates use` (needs dist)
 ```
 
 `npm run build` runs `scripts/agent-surface-lockstep-check.mjs`, whose numbered checks
-**print their own numbers** — the op count, the doctrine size, the per-turn byte total —
-so nothing downstream has to restate them in prose (which is how they went stale):
+**print their own numbers** (op count, doctrine size, per-turn bytes), so no prose restates them:
 
 | # | Asserts |
 |---|---|
@@ -90,10 +90,8 @@ so nothing downstream has to restate them in prose (which is how they went stale
 | 13 | The asset label and note limits equal slate's `assetLabel.ts` |
 | 14 | Every tool renders an object schema; `toolDefinition()` refuses one that does not (a zod 4 schema renders as `{}`) |
 
-**Every one is mutation-tested** — break it, confirm red, restore, confirm green. A checker nobody has
-seen fail is not a checker. `scripts/mcp-instructions-smoke.mjs` then spawns the real stdio server and
-reads the doctrine, the annotations, a prompt, a resource, structured content and a flattened
-validation error back off a real client.
+**Every one is mutation-tested** (break, red, restore, green). `scripts/mcp-instructions-smoke.mjs` then reads the doctrine, annotations, a prompt, a resource,
+structured content and a validation error back off the real stdio server.
 
 ## Adding a new operation
 

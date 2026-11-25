@@ -14,7 +14,7 @@ Agent-side recipe markdown ("skills") lives in `packages/shared/skills/` and is 
 
 The MCP/CLI lets an AI agent control your Slates workspace end to end: create projects, build characters and boards, generate images and videos (blocking or in the background), surgically edit images, assemble clips on the editing timeline, export the result as an MP4 (or FCP7 XML for DaVinci Resolve), and watch the desktop app populate live as the agent works. <!-- gen:tool-count -->237<!-- /gen:tool-count --> tools total.
 
-Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`).
+Both surfaces share one operations layer (`@slatesvideo/shared`) and one config file (`~/.slates/agent-connection.json`). The CLI keeps its `slates use` default project in `~/.slates/cli.json`.
 
 > **Desktop version note:** the timeline, export, background-generation, edit-image, and image-reference tools need a Slates desktop on agent API v2. If a tool reports a version error, update Slates (Settings → Check for Updates) and retry. Everything else works on older desktops.
 
