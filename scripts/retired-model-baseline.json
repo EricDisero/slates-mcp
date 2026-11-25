@@ -3,7 +3,6 @@
     "slate": {
       ".claude/generation.md": 1,
       ".claude/rules/storyboard.md": 1,
-      "CLAUDE.md": 1,
       "docs/api-documentation/GOOGLE_API.md": 25,
       "docs/api-documentation/KLING_API.md": 9,
       "docs/generation-recovery.md": 1,
