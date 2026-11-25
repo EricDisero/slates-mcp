@@ -420,6 +420,8 @@ export function mergeShotParams(existing: ShotParams, patch: Record<string, unkn
   if (existing.seedanceDraft && patch.seedanceDraft === false && patch.videoResolution === undefined && next.videoResolution === '480p') {
     delete next.videoResolution
   }
+  // Switching the draft on with no resolution named: the stored one gives way, so the draft's 480p is filled.
+  if (patch.seedanceDraft === true && patch.videoResolution === undefined) delete next.videoResolution
   return readParams({ ...next, ...patch })
 }
 
