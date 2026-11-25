@@ -71,7 +71,10 @@ export async function runWithConsent(call: ConsentCall): Promise<OperationResult
     // A quote that carries a fingerprint (`slates_generate_from_shots`) is fired only with it: the
     // user approved THAT quote, and a changed recipe must still refuse.
     const fingerprint = typeof data.fingerprint === 'string' ? { fingerprint: data.fingerprint } : {}
-    return run({ ...fingerprint, confirm: true })
+    // A quote that minted a request id (`slates_upscale_image`) is paid under that id: the
+    // confirmed run and any retry of it are then one run to the desktop.
+    const requestId = typeof data.requestId === 'string' ? { requestId: data.requestId } : {}
+    return run({ ...fingerprint, ...requestId, confirm: true })
   }
   // null: no person answered, so this call stands as it would on a host with no elicitation. The
   // model's own confirm and fingerprint run, and without a confirm the quote goes back to the model.

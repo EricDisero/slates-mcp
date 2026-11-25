@@ -153,6 +153,25 @@ try {
       assert.equal('declined' in outcome, answer === false)
     }
   }
+  // An approved quote runs under the request id it was quoted with, so a retry cannot pay twice.
+  const patches = []
+  await runWithConsent({
+    opId: 'slates_upscale_image', gate: 'op-asks', args: {}, hostCanAsk: true,
+    run: async (patch) => { patches.push(patch); return patch?.confirm ? { text: 'ran' } : { text: 'quote', data: { requires_confirm: true, requestId: 'R1', message: 'Cost' } } },
+    ask: async () => true,
+  })
+  assert.deepEqual(patches, [undefined, { requestId: 'R1', confirm: true }], 'the confirmed run carries the quote’s request id')
+  // A failed upscale names the id its retry must reuse.
+  const upscaleCtx = { desktop: () => ({
+    requireCapability: async () => {},
+    get: async (path) => path === '/agent/generation/upscale-quote'
+      ? { credits: 1, factor: 2, width: 10, height: 10, outWidth: 20, outHeight: 20, code: 'IMG-A1' }
+      : { assets: [{ id: PROJECT, projectId: PROJECT, code: 'IMG-A1', type: 'image', label: 'Still' }] },
+    post: async () => { throw new Error('socket hang up') },
+  }) }
+  const retryId = '44444444-4444-4444-8444-444444444444'
+  await assert.rejects(op('slates_upscale_image').run({ projectId: PROJECT, assetId: PROJECT, factor: 2, confirm: true, requestId: retryId }, upscaleCtx),
+    new RegExp(`socket hang up.*requestId=${retryId}`), 'the error text carries the request id')
   let ranUnasked = 0
   await runWithConsent({ opId: 'x', gate: 'server-asks', args: { confirm: true }, hostCanAsk: false, run: async () => { ranUnasked++; return { text: 'ran' } }, ask: async () => assert.fail('a host that cannot ask is not asked') })
   assert.equal(ranUnasked, 1, 'on a host with no form the call stands as sent')

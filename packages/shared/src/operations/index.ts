@@ -8084,7 +8084,12 @@ export const upscaleImage: Operation<{ projectId: string; assetId: string; facto
       })
     }
     const r = await desktop.post<{ status?: string; generationId?: string; asset?: { id: string; code: string | null; filePath: string; width: number; height: number }; credits?: number; cost_credits?: number }>(
-      '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits, requestId })
+      '/agent/generation/upscale-image', { projectId: input.projectId, assetId: id, factor: input.factor, expectedCredits: quote.credits, requestId },
+    ).catch((error: unknown) => {
+      // The request may have reached the desktop before the connection failed: the retry reuses this id.
+      const said = error instanceof Error ? error.message : String(error)
+      throw new Error(`${said.replace(/[.\s]+$/, '')}. The upscale may still be running. Retry with requestId=${requestId}: the same id never pays twice.`, { cause: error })
+    })
     if (!r.asset) return ok({ ...r, requestId }, `The upscale of ${name} under this requestId is still running; check slates_get_generation_status with ${r.generationId ?? requestId}. Do not start it again with a new requestId.`)
     const spent = r.cost_credits ?? r.credits ?? quote.credits
     return ok({ ...r, cost_credits: spent, requestId }, `Upscaled ${name} ${quote.factor}x (${size}) into ${r.asset.code ?? r.asset.id} for ${fmtCredits(spent)}.`)
