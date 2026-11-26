@@ -44,6 +44,7 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadTypeScriptModule } from './load-typescript.mjs'
+import { guideCopyProblems } from './brain-prices.mjs'
 import { brainOrSkip, readAllSkills, readSkillDir } from './brain-source.mjs'
 
 const REPO = join(import.meta.dirname, '..')
@@ -183,6 +184,7 @@ export function lintBrain(skills, { shape = SHAPE, added = null } = {}) {
 
   for (const [name, text] of Object.entries(skills)) {
     try {
+      fail.push(...guideCopyProblems(name, text))
       parseGuideBans(name, text, true)
     } catch (error) { fail.push(error.message) }
   }
@@ -249,6 +251,9 @@ export function lintMyBrain(files, { shape = SHAPE, bundled = null } = {}) {
 function blocksOf(text) {
   const body = text.replace(FRONTMATTER_RE, (m) => '\n'.repeat(m.split('\n').length - 1)).replace(OPERATIVE_RE, (m) => '\n'.repeat(m.split('\n').length - 1))
   const lines = body.split(/\r?\n/)
+  for (const sample of ['A take costs 999 credits.', '<!-- internal: Kie -->', '<!-- quote: $0.01 -->', '999 credits <!-- src: price: kling-mc-std-5s, 2026-11-26 -->']) {
+    if (!guideCopyProblems('fixture', sample).length) throw new Error('Unanchored price or serving name passed: ' + sample)
+  }
   const fenced = fenceMap(lines)
   const blocks = []
   let current = null

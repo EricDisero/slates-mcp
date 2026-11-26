@@ -72,7 +72,7 @@ const thresholds = `<!-- GENERATED from @slatesvideo/shared — do not edit betw
 
 **The thresholds, from the code that enforces them:**
 
-- **Confirm gate:** above **${CONFIRM_CREDITS} credits** an op returns \`requires_confirm\` and will not
+- **Confirm gate:** above **${CONFIRM_CREDITS} credits** an op returns \`requires_confirm\` and will not <!-- src: price: CONFIRM_CREDITS, 2026-11-26 -->
   proceed until you re-call with \`confirm: true\`. This is a code gate, not permission to spend: every generation still needs the user-approved plan or quote.
 - **Deviation pause:** the desktop Slates Director stops and re-asks when projected generation spend
   exceeds the approved plan by more than **${deviationPct}%**. You do not trigger this; the app does.

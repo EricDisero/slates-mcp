@@ -8,16 +8,13 @@
 // fail the check if that ever stops being true (2026-11-10: `fal schema` sat in sixteen
 // source comments of the brain).
 import assert from 'node:assert/strict'
+import { servingWords } from './serving-words.mjs'
 import { readAllSkills } from './brain-source.mjs'
 
 // A provider's name ends where a letter would continue it (`fal_KEY` is fal, `false` is not).
 const banned = [
   [/\$\d+(?:\.\d+)?(?:\s*(?:\/|per)\s*(?:s|sec|second|image|M)\b)?/, 'a raw dollar rate (quote credits)'],
-  [/\bfal(?:\.ai)?(?![a-z])/i, 'the serving provider fal'],
-  [/\bpiapi(?![a-z])/i, 'the serving provider PiAPI'],
-  [/\bevolink(?![a-z])/i, 'the serving provider EvoLink'],
-  [/\bbyteplus(?![a-z])/i, 'the serving provider BytePlus'],
-  [/\b(?:kuaishou|google) direct\b/i, 'a serving route name'],
+  [servingWords, 'a serving provider'],
 ]
 
 /** Every line of `text` that breaks the rule, comments included. */
