@@ -1,29 +1,35 @@
 {
   "about": "The brain Eric last approved: its commit, the slates-api commit brain-approved.json pins with it (approvedApiCommit) and the brainHash (brain-hash.mjs) of what its build hands an agent. The plugins are built from this commit's skills (build-plugins.mjs), shared's publish refuses any other brain (brain-review.mjs --check), and the gate compares every candidate with a build of it in the same batch (gate.mjs). Only brain-review.mjs --approve moves them, with Eric's decisions exported from his review page; --pin-approved-hash records the hash once when it is missing. lastApproval is what that approval took: the page's head, what he approved and held, the reverts and the gate's report.",
-  "approvedCommit": "ca6b29f",
-  "approvedBrainHash": "3a86e750d5ec0e51",
-  "approvedApiCommit": "1e59d7b843580aaf4696f59b4f6a939c69c54d62",
-  "approvedOn": "2026-11-25",
+  "approvedCommit": "8c1db68",
+  "approvedBrainHash": "1a8350bd21c31bd0",
+  "approvedApiCommit": "93b38ad2941bc11a8c8e63207edf730ddd01f26c",
+  "approvedOn": "2026-11-26",
   "lastApproval": {
-    "from": "2f7d03a",
-    "page": "ca6b29f",
+    "from": "ca6b29f",
+    "page": "8c1db68",
     "approved": [
-      "3e0157c",
-      "9913a31",
-      "3db1564",
-      "44d529e",
-      "2693006",
-      "4ff5077",
-      "4db3105"
+      "2d45fd0",
+      "96a94b4",
+      "eeda0e7",
+      "b5fded0",
+      "9964264",
+      "bd846cd",
+      "6cf0b2a",
+      "93b38ad",
+      "7fb5753",
+      "3e6d285",
+      "5385ce7",
+      "365ed6a",
+      "cb53f67",
+      "54e7947",
+      "17afd57"
     ],
     "held": [],
     "reverts": [],
     "gate": [
-      "routing sonnet: candidate 101/102, baseline 100/102",
+      "routing sonnet: candidate 102/102, baseline 102/102",
       "routing sonnet: both arms held the same card and router (8b73f5fbc222d7d2), so the gap is the run's spread, not the brain",
-      "routing haiku: candidate 83/102, baseline 84/102",
-      "routing haiku: both arms held the same card and router (8b73f5fbc222d7d2), so the gap is the run's spread, not the brain",
-      "craft claude-opus-5-5: the candidate wins 9 cases, loses 8, ties 8 against the approved brain (an equal brain loses that many or more 69% of the time); craft 1.68 against 1.66 of 2, read before building 96% against 94%, playbook 94% against 92%, forbidden 0 against 0"
+      "craft claude-opus-5-5: the candidate wins 6 cases, loses 12, ties 7 against the approved brain (an equal brain loses that many or more 12% of the time); craft 1.59 against 1.66 of 2, read before building 96% against 96%, playbook 96% against 94%, forbidden 0 against 0"
     ]
   }
 }
