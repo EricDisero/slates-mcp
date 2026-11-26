@@ -13,7 +13,7 @@ const SKILLS = brainFiles()
 // slates-web may pin the docs to a slate commit that buyers have (scripts/llm-docs/desktop-docs-ref.json,
 // SLATES_DOCS_REF overrides). Pinned, this package ships that commit's manual, so the copy to match is the
 // generator's own output of it, slates-web's public/slates-reference.md, not slate's main.
-const web = resolve(dirname(fileURLToPath(import.meta.url)), '../../slates-web')
+const web = resolve(process.env.SLATES_WEB_DIR || resolve(dirname(fileURLToPath(import.meta.url)), '../../slates-web'))
 const pinFile = resolve(web, 'scripts/llm-docs/desktop-docs-ref.json')
 const docsRef = process.env.SLATES_DOCS_REF !== undefined
   ? process.env.SLATES_DOCS_REF || null
