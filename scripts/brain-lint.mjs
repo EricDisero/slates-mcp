@@ -375,6 +375,8 @@ function selfTest(skills) {
   const fenced = line => `<!-- @banned:start -->\n${line}\n<!-- @banned:end -->`
   const tokens = parseGuideBans('fixture', fenced('- Ban: `wrong` | Avoid `wrong`, prefer `static camera`.'), true)
   if (tokens.map(t => t.token).join() !== 'wrong') throw new Error('The @banned explanation became a literal')
+  const cached = parseGuideBans('fixture', fenced('- Avoid `wrong`, prefer `static camera`.'))
+  if (cached.map(t => t.token).join() !== 'wrong') throw new Error('Cached guide lost its leading ban or banned its explanation')
   const legacy = { ...skills, [ROUTER]: skills[ROUTER] + fenced('- Avoid `wrong`, prefer `static camera`.') }
   if (!lintBrain(legacy).some(f => f.includes('expected a structured @banned row'))) throw new Error('Legacy @banned advice passed lint')
 
