@@ -5925,7 +5925,7 @@ export const generateVideo: Operation<{
     audioReferenceSpokenText: z.array(z.string()).optional().describe(
       'The exact words in each reference clip — same order and length as audioReferenceAssetIds, "" for a clip with no speech. The model RE-TRANSCRIBES a take rather than using it verbatim, so audio decides voice/accent/timing and only this decides the WORDS. Omit it and the words are a guess.'
     ),
-    sound: z.boolean().optional().describe('Kling 3.0 (every tier) and Wan 3.0: sound on (default) or silent (false); Kling 3.0 bills audio as its own key. Seedance, Omni Flash, H3 and Kling 4.0 always generate audio.'),
+    sound: z.boolean().optional().describe(`Sound on by default. Pass false for a silent take on ${VIDEO_MODELS.filter(id => getModelCapability(id)?.soundCanBeDisabled).join(', ')}. Kling 3.0 bills audio separately.`),
     audioLanguage: z.enum(['EN', 'ZH', 'JA', 'KO', 'ES']).optional().describe('Any Kling 3.0 model with sound on — language for dialogue.'),
     generateMusic: z.boolean().optional().describe('Any Kling 3.0 model with sound on — auto-generate background music.'),
     seedanceDraft: z.boolean().optional().describe('Create a finishable Seedance 2.5 preview at 480p.'),

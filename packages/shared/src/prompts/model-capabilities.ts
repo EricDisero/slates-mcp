@@ -434,6 +434,7 @@ export const FLUX_3_RESOLUTIONS: Record<'1k' | '2k' | '4k', '1k' | '1.5k' | '2k'
 export const VIDEO_REFERENCE_UPLOAD_BYTES = 200 * 1024 * 1024
 
 export interface ModelCapability {
+  soundCanBeDisabled?: boolean
   maxPromptLength?: number
   promptOptionalWithFirstFrame?: boolean
   imageResolutions?: ImageResolution[]
@@ -662,6 +663,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // with reference images lands, takes the three-ratio enum (fal OpenAPI, read
   // 2026-11-24).
   'kling-v3.0-std': {
+    soundCanBeDisabled: true,
     maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
@@ -673,6 +675,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-pro': {
+    soundCanBeDisabled: true,
     maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
@@ -683,6 +686,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-omni': {
+    soundCanBeDisabled: true,
     maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
@@ -695,6 +699,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-omni-pro': {
+    soundCanBeDisabled: true,
     maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
@@ -815,6 +820,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // all-reference mode are mutually exclusive."
 
   'wan-3.0': {
+    soundCanBeDisabled: true,
     maxPromptLength: 20000,
     aspectRatios: WAN_3_ASPECT_RATIOS,
     // fal enum 480p / 720p / 1080p, schema default 1080p. Our default is 720p
@@ -846,6 +852,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // the image-to-video request has no ratio field.
 
   'magi-2': {
+    soundCanBeDisabled: true,
     promptOptionalWithFirstFrame: true,
     referenceSecondsTolerance: 0,
     maxPromptLength: 15000,
@@ -1422,6 +1429,10 @@ export function maxIngredientImagesFor(model: string, videoResolution?: string):
   const cap = MODEL_CAPABILITIES[model]
   if (videoResolution && cap?.noReferenceImagesAt?.includes(videoResolution as VideoResolution)) return 0
   return cap?.maxIngredientImages ?? 0
+}
+
+export function requestSoundFor(model: string, requested: boolean | undefined): boolean {
+  return !MODEL_CAPABILITIES[model]?.soundCanBeDisabled || requested !== false
 }
 
 export function promptLengthFor(_model: string, prompt: string): number {
