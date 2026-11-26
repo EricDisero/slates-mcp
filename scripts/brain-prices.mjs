@@ -30,8 +30,10 @@ function amount(expression) {
   return total
 }
 
-const numerals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
-const credit = new RegExp('(?<![\\w.])([\\d,]+(?:\\.\\d+)?|' + numerals.join('|') + ')(?:[*_`]*[ -]+|(?=cr\\b))(?:credits?|cr)\\b', 'gi')
+const numerals = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+  'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen', 'twenty']
+const numeral = '(?:[0-9][0-9,]*(?:\\.[0-9]+)?|' + numerals.join('|') + ')'
+const credit = new RegExp('(?<![\\w.])(' + numeral + ')(?:[ -]+|(?=cr\\b))(?:credits?|cr)\\b|\\bcredits?\\s*[:=]\\s*(' + numeral + ')\\b', 'gi')
 const anchors = /<!--\s*src: price:\s*([^<>]+?), \d{4}-\d{2}-\d{2}\s*-->/g
 
 export function guideCopyProblems(name, markdown) {
@@ -43,7 +45,16 @@ export function guideCopyProblems(name, markdown) {
     if (/\$\s*(?:\d|\.\d)/.test(raw)) fail('raw dollar figure: quote the billed credits')
     const refs = [...raw.matchAll(anchors)].flatMap(match => match[1].split(';'))
     const line = raw.replace(anchors, '')
-    const values = [...line.matchAll(credit)].map(m => numerals.includes(m[1].toLowerCase()) ? numerals.indexOf(m[1].toLowerCase()) : Number(m[1].replaceAll(',', '')))
+    const plain = line.replace(/[*_`~]/g, '')
+    // Each end of a price range needs its own billing fact.
+    const quantities = plain.replace(/(\d[\d,.]*)\s*(?:[–—-]|to)\s*(?=\d[\d,.]*\s*(?:credits?|cr)\b)/gi, '$1 credits, ')
+    if (/\b(?:hundred|thousand|million|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[ -]+(?:and|[a-z]+)){0,2}[ -]+credits?\b/i.test(quantities)) {
+      fail('write the credit count in digits and anchor it to its billing fact')
+    }
+    const values = [...quantities.matchAll(credit)].map(match => {
+      const token = (match[1] ?? match[2]).toLowerCase()
+      return numerals.includes(token) ? numerals.indexOf(token) : Number(token.replaceAll(',', ''))
+    })
     const cells = line.trim().split('|').slice(1, -1)
     const header = cells.findIndex(cell => /^\s*(?:cost(?: in credits)?|credits)\s*$/i.test(cell))
     if (!cells.length) creditColumn = -1

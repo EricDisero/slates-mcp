@@ -251,7 +251,7 @@ export function lintMyBrain(files, { shape = SHAPE, bundled = null } = {}) {
 function blocksOf(text) {
   const body = text.replace(FRONTMATTER_RE, (m) => '\n'.repeat(m.split('\n').length - 1)).replace(OPERATIVE_RE, (m) => '\n'.repeat(m.split('\n').length - 1))
   const lines = body.split(/\r?\n/)
-  for (const sample of ['A take costs 999 credits.', '<!-- internal: Kie -->', '<!-- quote: $0.01 -->', '999 credits <!-- src: price: kling-mc-std-5s, 2026-11-26 -->']) {
+  for (const sample of ['A take costs 999 credits.', '**999** **credits**', '<!-- Credits: 999 -->', 'one hundred credits', '3–42 credits <!-- src: price: kling-mc-pro-5s, 2026-11-26 -->', '<!-- internal: Kie -->', '<!-- quote: $0.01 -->', '999 credits <!-- src: price: kling-mc-std-5s, 2026-11-26 -->']) {
     if (!guideCopyProblems('fixture', sample).length) throw new Error('Unanchored price or serving name passed: ' + sample)
   }
   const fenced = fenceMap(lines)
