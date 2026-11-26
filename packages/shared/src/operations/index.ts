@@ -2398,10 +2398,10 @@ export const estimateGenerationCost: Operation<{
 }> = {
   id: 'slates_estimate_generation_cost',
   description:
-    'Quote credits before any generate_* op. For saved Shots, a board or a scene, quote with slates_get_board_quote instead. Accepts the generation model ids and parameters (edit seats other than Kling, lip-sync and motion-transfer engines need an exact registry cost key), or an exact registry cost key. Show the user the total and wait for their OK before the generate call; the result flags requires_confirm above the threshold and carries the model\'s prompting card.',
+    'Quote credits before generating. For saved Shots, boards and scenes use slates_get_board_quote. Pass a model id and settings or an exact cost key (required for non-Kling edits, lip sync and motion transfer). Show the total and wait for approval. Returns the model card and requires_confirm above the threshold.',
   input: z.object({
-    model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2-1") or an exact registry cost key ("nano-banana-2-1-2k", "seedance-2-1080p-8s")'),
-    prompt: z.string().optional().describe('Optional prompt to check against the selected model before quoting.'),
+    model: z.string().describe('Generation model id (e.g. "seedance-2") or exact cost key (e.g. "seedance-2-1080p-8s").'),
+    prompt: z.string().optional().describe('Check prompt length before quoting.'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
     // Video windows and resolutions GENERATED from MODEL_CAPABILITIES. The
     // hand-typed "Video 3-15" here was wrong the day seedance-2.5 (4-30s)
