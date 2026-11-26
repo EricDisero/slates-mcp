@@ -183,12 +183,7 @@ export function lintBrain(skills, { shape = SHAPE, added = null } = {}) {
 
   for (const [name, text] of Object.entries(skills)) {
     try {
-      for (const { token, note } of parseGuideBans(name, text)) {
-        // A replacement phrase after a directive cannot also be a ban.
-        const replacement = /(?:write|use|say|instead|replace with)\b[^":]*[,:]?\s*"([^"]+)"/gi
-        const offered = [...note.matchAll(replacement)].some(m => m[1] === token)
-        if (offered) fail.push(`${name}.md: the prompt guard bans "${token}" as a replacement phrase. Move the positive example outside @banned.`)
-      }
+      parseGuideBans(name, text, true)
     } catch (error) { fail.push(error.message) }
   }
 
@@ -372,6 +367,12 @@ function addedSinceBoth(skills) {
 }
 
 function selfTest(skills) {
+  const fenced = line => `<!-- @banned:start -->\n${line}\n<!-- @banned:end -->`
+  const tokens = parseGuideBans('fixture', fenced('- Ban: `wrong` | Avoid `wrong`, prefer `static camera`.'), true)
+  if (tokens.map(t => t.token).join() !== 'wrong') throw new Error('The @banned explanation became a literal')
+  const legacy = { ...skills, [ROUTER]: skills[ROUTER] + fenced('- Avoid `wrong`, prefer `static camera`.') }
+  if (!lintBrain(legacy).some(f => f.includes('expected a structured @banned row'))) throw new Error('Legacy @banned advice passed lint')
+
   const clean = lintBrain(skills)
   if (clean.length) throw new Error(`self-test needs a clean brain first:\n  ${clean.join('\n  ')}`)
   const anOperative = Object.keys(skills).find((n) => OPERATIVE_RE.test(skills[n]) && !n.startsWith('slates-prompting-'))

@@ -13,45 +13,30 @@ export interface BannedToken {
   when?: BannedTokenCondition
 }
 
-/** The right way, written next to the wrong one: never a token. */
-const POSITIVE_BEFORE = [/\(\s*say\s*$/i, /\bthan\s*$/i, /\bas in:?\s*$/i]
-const POSITIVE_AFTER = /^\)\s*passed\b/i
-/** A rule the call alone cannot settle. */
-const CONTEXTUAL = /after the first introduction/i
+// A ban row lists only literals before the pipe. The note after it is free prose.
+const ROW = /^- (Ban|Warn)(?: \((reference-video|edit)\))?: ((?:`[^`\n]+`)(?:, `[^`\n]+`)*)(?: \| (.+))?$/
 
-function conditionOf(heading: string): BannedTokenCondition | undefined {
-  if (/with a reference video/i.test(heading)) return 'reference-video'
-  if (/in an EDIT prompt/i.test(heading)) return 'edit'
-  return undefined
-}
-
-/** One fence → its tokens, positives dropped, each with its line and its limits. */
-function parseBannedBlock(body: string, skill: string, scope: BannedTokenScope): BannedToken[] {
-  const lines = body.replace(/<!--[\s\S]*?-->/g, '').split('\n').map((l) => l.trim()).filter(Boolean)
-  const heading = lines.find((l) => /never use|avoid/i.test(l)) ?? ''
-  const when = conditionOf(heading.replace(/`[^`\n]*`/g, ''))
-  const out: BannedToken[] = []
-  for (const line of lines) {
-    const note = line.replace(/^-\s*/, '').replace(/`([^`\n]+)`/g, '"$1"')
-    for (const m of line.matchAll(/`([^`\n]+)`/g)) {
-      const before = line.slice(0, m.index)
-      const after = line.slice((m.index ?? 0) + m[0].length)
-      if (POSITIVE_BEFORE.some((re) => re.test(before)) || POSITIVE_AFTER.test(after)) continue
-      const token = m[1].trim()
-      if (out.some((t) => t.token === token)) continue
-      out.push({ token, skill, scope, note, checkable: !CONTEXTUAL.test(line), ...(when ? { when } : {}) })
-    }
-  }
-  return out
-}
-
-export function parseGuideBans(skill: string, content: string): BannedToken[] {
+export function parseGuideBans(skill: string, content: string, strict = false): BannedToken[] {
   const scope = /nano-banana|gpt-image|flux|seedream/.test(skill) ? 'image' : 'video'
   const tokens: BannedToken[] = []
   for (const fence of content.matchAll(/<!--\s*@banned:start\s*-->([\s\S]*?)<!--\s*@banned:end\s*-->/g)) {
-    const block = parseBannedBlock(fence[1], skill, scope)
-    if (!block.length) throw new Error(`${skill}: @banned block contains no tokens`)
-    for (const token of block) if (!tokens.some(other => other.token === token.token)) tokens.push(token)
+    const lines = fence[1].replace(/<!--[\s\S]*?-->/g, '').split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+    let count = 0
+    for (const line of lines) {
+      if (line.startsWith('**') || line.startsWith('- Guidance: ')) continue
+      const row = ROW.exec(line)
+      if (!row) {
+        if (strict) throw new Error(`${skill}: expected a structured @banned row (- Ban: \`literal\` | explanation): ${line}`)
+        continue // A cached older brain still serves its human-readable advice.
+      }
+      const [, action, condition, literals, explanation] = row
+      for (const [, token] of literals.matchAll(/`([^`]+)`/g)) {
+        count++
+        tokens.push({ token, skill, scope, note: explanation || literals, checkable: action === 'Ban',
+          ...(condition ? { when: condition as BannedTokenCondition } : {}) })
+      }
+    }
+    if (strict && !count) throw new Error(`${skill}: @banned block contains no structured literals`)
   }
   return tokens
 }

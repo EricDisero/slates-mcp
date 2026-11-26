@@ -6,12 +6,7 @@
  * 2026-10-07): a word the user typed passes, and the identical call sent again
  * after the refusal runs. No model's list is universal.
  *
- * WHAT A BLOCK MAY CONTAIN. Every `backticked` string is a never-use token,
- * except the right way written beside it, which is never a token: `(say \`x\`)`,
- * `than \`x\``, `as in: \`x\`` and `(\`x\`) passed`. A heading that limits the
- * block to a call shape ("with a reference video", "in an EDIT prompt") limits
- * the refusal to calls of that shape. A line whose rule depends on context the
- * call cannot show ("after the first introduction") stays a warning only.
+ * Only explicit Ban and Warn rows declare literals. Conditions live on those rows.
  */
 import { brainFiles, servedBrain, type ServedBrain } from '../skills/served.js'
 
