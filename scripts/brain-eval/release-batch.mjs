@@ -5,7 +5,7 @@
 // with brain-review.mjs's own checks, then sets RELEASE_BATCH_ENV for the runs it starts.
 //
 //   node scripts/brain-eval/release-batch.mjs --spec <spec.json> --decisions <decisions.json> --root <build of the
-//     approved commit> --baseline-brain <slates-api brain/ at the approved pin> [--models sonnet,haiku]
+//     approved commit> --baseline-brain <slates-api brain/ at the approved pin> [--models sonnet]
 //     [--routing-runs 2] [--craft-runs 2] [--craft <craft.json from a batch on this brain hash>]
 //
 // --craft reuses a finished craft result instead of running the briefs again, when only routing must re-run (a routing
@@ -31,7 +31,8 @@ const specFile = resolve(need('spec'))
 const decisionsFile = resolve(need('decisions'))
 const baseline = resolve(need('root'))
 const baselineBrain = resolve(need('baseline-brain'))
-const models = arg('models', 'sonnet,haiku').split(',').map((m) => m.trim()).filter(Boolean)
+// Sonnet only by default: Haiku scored 79 and 81 of 102 on identical text (2026-11-26), so its arm adds noise and time, not signal.
+const models = arg('models', 'sonnet').split(',').map((m) => m.trim()).filter(Boolean)
 const routingRuns = countArg('routing-runs', '2')
 // Two runs a brief, as every release batch before this script ran (results/2026-10-25-craft-*/arms.json): at one,
 // a single judge swing on a case both arms read the same guides for decides its sign.
