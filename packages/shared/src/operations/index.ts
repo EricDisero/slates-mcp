@@ -2228,6 +2228,10 @@ export const VIDEO_MODELS = [
   // start and end frames OR references (10 images, 5 videos, 5 audio clips).
   // Reference video seconds bill on top of output seconds, so it has a vref key.
   'wan-3.0',
+  // MAGI-2 (added 2026-11-26): 4-30s at 1080p only, sound on or off, start and
+  // end frames OR references (10 images, 5 videos, 5 audio clips). One price per
+  // output second: references and sound do not move it.
+  'magi-2',
   // Kling 4.0 (added 2026-10-23 beside 3.0, which stays the default Kling):
   // one row with no Standard/Pro split, frames or text only, sound always on.
   // `kling-v4.0` never starts with `kling-v3.0`, so no 3.0 branch can take it.
@@ -5430,6 +5434,12 @@ export function videoCostKey(input: {
     }
     return `wan-3.0-${res}-${input.duration}s`
   }
+  if (input.model === 'magi-2') {
+    // Mirrors magiCreditKey() in slate/src/shared/pricing.ts. One resolution
+    // and one rate per output second on every endpoint: references, sound and
+    // frames do not move the price, so the key is the length alone.
+    return `magi-2-1080p-${input.duration}s`
+  }
   throw new Error(`Unknown video model: ${input.model}`)
 }
 
@@ -5692,6 +5702,9 @@ function resolveVideoModel(raw: string): {
     'hailuo-3': 'minimax-h3',
     'hailuo-3.0': 'minimax-h3',
     hailuo: 'minimax-h3',
+    magi: 'magi-2',
+    magi2: 'magi-2',
+    'magi-2.0': 'magi-2',
   }
   if (aliases[s]) {
     out!.model = aliases[s]
@@ -6042,14 +6055,16 @@ export const generateVideo: Operation<{
       }
     }
 
-    // Wan 3.0's SHAPE constraints. The same split as Omni Flash: image-to-video
-    // takes a start frame and an optional end frame, reference-to-video takes
-    // images, videos and audio, and Alibaba calls the two modes "mutually
-    // exclusive". The reference endpoint has no frame slot, so frames with
+    // Wan 3.0's and MAGI-2's SHAPE constraints. The same split as Omni Flash:
+    // image-to-video takes a start frame and an optional end frame,
+    // reference-to-video takes images, videos and audio, and the two never mix
+    // (Alibaba: "mutually exclusive"; MAGI-2: references "cannot be added to a
+    // frame request"). The reference endpoint has no frame slot, so frames with
     // references are refused, never dropped (the MiniMax H3 rule, slate
     // .claude/rules/models.md invariant 7). Caps are read from the SSOT.
-    if (input.model === 'wan-3.0') {
-      const cap = getModelCapability('wan-3.0')
+    if (input.model === 'wan-3.0' || input.model === 'magi-2') {
+      const label = input.model === 'wan-3.0' ? 'Wan 3.0' : 'MAGI-2'
+      const cap = getModelCapability(input.model)
       const imageRefs =
         (input.ingredientAssetIds?.length ?? 0) +
         (input.characterAssetIds?.length ?? 0) +
@@ -6069,11 +6084,11 @@ export const generateVideo: Operation<{
       ).find(([n, max]) => max !== undefined && n > max)
       const shapeError =
         refAll > 0 && (input.firstFrameAssetId || input.lastFrameAssetId)
-          ? 'Wan 3.0 takes first/last frames OR references, not both: Alibaba calls the two modes mutually exclusive. Drop one side.'
+          ? `${label} takes first/last frames OR references, not both: its reference endpoint has no frame slots. Drop one side.`
           : input.lastFrameAssetId && !input.firstFrameAssetId
-            ? 'Wan 3.0 needs a start frame (firstFrameAssetId) with a last frame.'
+            ? `${label} needs a start frame (firstFrameAssetId) with a last frame.`
             : overCap
-              ? `Wan 3.0 takes at most ${overCap[1]} ${overCap[2]} (you passed ${overCap[0]}).`
+              ? `${label} takes at most ${overCap[1]} ${overCap[2]} (you passed ${overCap[0]}).`
               : null
       if (shapeError) {
         return ok({ requires_clarification: true, missing: [], message: shapeError })
@@ -12625,6 +12640,7 @@ export function resolveGuideTopic(topic: string): string | null {
   if (t.startsWith('seedream')) return 'slates-prompting-seedream-5-5'
   if (t.startsWith('omni-flash') || t.startsWith('gemini-omni') || t === 'omni flash') return 'slates-prompting-omni-flash'
   if (t.startsWith('wan') || t === 'alibaba-wan-3.0') return 'slates-prompting-wan-3'
+  if (t.startsWith('magi')) return 'slates-prompting-magi-2'
   // MiniMax H3 — both seats share one skill. Placed BEFORE the seed/seedance
   // block for the same reason seed-audio is: no prefix collision exists today,
   // but a `minimax-*` id must never fall through to a Seedance guide.

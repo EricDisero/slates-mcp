@@ -108,6 +108,14 @@ const OMNI_FLASH_ASPECT_RATIOS: AspectRatio[] = ['16:9', '9:16']
  */
 const WAN_3_ASPECT_RATIOS: AspectRatio[] = ['16:9', '4:3', '1:1', '3:4', '9:16']
 
+/**
+ * MAGI-2: six, on the text-to-video and reference-to-video requests (Kie's
+ * `magi-2/*` schemas, ripped 2026-11-25 to second-brain
+ * business/projects/slates/provider-docs/kie-magi-2-docs.md). Image-to-video
+ * has no ratio field: the start frame decides the shape.
+ */
+const MAGI_2_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
+
 /** Seedance (both seats, and the edit row): six — notably NO `4:5`. */
 const SEEDANCE_ASPECT_RATIOS: AspectRatio[] = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16']
 
@@ -811,6 +819,33 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
     maxReferenceFilesTotal: 20,
     maxReferenceVideoSeconds: 15,
     maxReferenceAudioSeconds: 15,
+  },
+
+  // ── MAGI-2 (added 2026-11-26) ─────────────────────────────────────────────
+  //
+  // Every value READ OFF Kie's schemas for magi-2/{text,image,reference}-to-video,
+  // ripped 2026-11-25 (second-brain business/projects/slates/provider-docs/
+  // kie-magi-2-docs.md). Frames ride image-to-video and references ride
+  // reference-to-video; the two never travel together. No aspectRatioWithFirstFrame:
+  // the image-to-video request has no ratio field.
+
+  'magi-2': {
+    aspectRatios: MAGI_2_ASPECT_RATIOS,
+    // resolution enum is `1080p` alone on all three endpoints.
+    videoResolution: { options: ['1080p'], fixed: '1080p' },
+    // duration: integer 4-30 on all three endpoints.
+    duration: { min: 4, max: 30, mode: 'continuous' },
+    // reference_image_urls maxItems 10, reference_video_urls maxItems 5 and
+    // reference_audio_urls maxItems 5; each clip 2-30 s and 30 s per type.
+    // References are not billed, so the combined seconds count 'actual'.
+    maxIngredientImages: 10,
+    maxReferenceVideos: 5,
+    maxReferenceAudio: 5,
+    maxReferenceFilesTotal: 20,
+    referenceVideoDuration: { min: 2, max: 30 },
+    referenceAudioDuration: { min: 2, max: 30 },
+    maxReferenceVideoSeconds: 30,
+    maxReferenceAudioSeconds: 30,
   },
 
   // ── Seedance ───────────────────────────────────────────────────────────────

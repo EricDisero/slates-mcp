@@ -11,7 +11,7 @@ const noTransport = { desktop: () => { throw new Error('no desktop call expected
 
 // audioReferenceSpokenText pairs by position on EVERY model: one line for two clips
 // would send clip A with clip B's words. It was enforced only inside the MiniMax block.
-for (const model of ['seedance-2.5', 'wan-3.0', 'minimax-h3']) {
+for (const model of ['seedance-2.5', 'wan-3.0', 'magi-2', 'minimax-h3']) {
   const r = await generateVideo.run(generateVideo.input.parse({
     model, projectId, prompt: 'Two people talk.', aspectRatio: '16:9', duration: 5,
     ingredientAssetIds: ['IMG-A1'], audioReferenceAssetIds: ['AUD-S1', 'AUD-S2'], audioReferenceSpokenText: ['the words in clip two'],
@@ -19,6 +19,17 @@ for (const model of ['seedance-2.5', 'wan-3.0', 'minimax-h3']) {
   assert.equal(r.data?.requires_clarification, true, `${model}: a misaligned spoken-text array is refused`)
   assert.match(r.data.message, /pairs by position/)
 }
+// MAGI-2: frames and references never travel together, an end frame needs a start
+// frame, the caps come from the row, and the key is the length alone.
+{
+  const magi = (extra) => generateVideo.run(generateVideo.input.parse({ model: 'magi-2', projectId, prompt: 'A runner crosses the bridge.', aspectRatio: '16:9', duration: 8, ...extra }), noTransport)
+  assert.match((await magi({ firstFrameAssetId: 'IMG-F1', ingredientAssetIds: ['IMG-A1'] })).data?.message ?? '', /frames OR references/, 'magi-2: a start frame with references is refused')
+  assert.match((await magi({ lastFrameAssetId: 'IMG-F2' })).data?.message ?? '', /needs a start frame/, 'magi-2: an end frame alone is refused')
+  assert.match((await magi({ ingredientAssetIds: Array.from({ length: 11 }, (_, i) => `IMG-A${i}`) })).data?.message ?? '', /at most 10 reference images/, 'magi-2: the eleventh image is refused')
+  assert.equal(videoCostKey({ model: 'magi-2', duration: 8 }), 'magi-2-1080p-8s')
+  assert.equal(videoCostKey({ model: 'magi-2', duration: 8, videoReferenceSecondsEach: [10, 12] }), 'magi-2-1080p-8s', 'magi-2: reference video adds nothing to the key')
+}
+
 // The Shot path pairs through the same rule.
 const shot = await createShot.run(createShot.input.parse({
   projectId, prompt: 'Two people talk.', refs: { 'audio-reference': ['AUD-S1', 'AUD-S2'] }, audioRefSpokenText: ['one line'],

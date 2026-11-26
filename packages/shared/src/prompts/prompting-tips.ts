@@ -62,6 +62,7 @@ export type PromptingTipsKey =
   | 'omni-flash-edit'
   | 'minimax-h3'
   | 'wan-3'
+  | 'magi-2'
   | 'nano-banana'
   | 'gpt-image-2-6'
   | 'seed-audio'
@@ -813,6 +814,54 @@ const WAN_3: PromptingTipsEntry = {
   ],
 }
 
+const MAGI_2: PromptingTipsEntry = {
+  label: 'MAGI-2',
+  intro: [
+    'MAGI-2 makes 1080p video with its own soundtrack (dialogue, effects, ambience, music), sound on or off. Text-to-video, a start frame with an optional end frame, or references across images, video clips and audio clips. Frames and references never mix, and references add nothing to the price.',
+  ],
+  columns: [
+    [
+      {
+        heading: "Write the whole shot as a director's caption",
+        example: 'Subject and setting · the action beat by beat · camera · light · Sound: line',
+        note: 'It was trained on long, structured captions, so a one-line prompt underuses it. Plain, direct English, heavy on verbs and on how things change over time.',
+      },
+      {
+        heading: 'From a start frame, spend the words on motion',
+        example: 'Open on the frame as it is; she turns to the window, lifts the cup and sets it down while the camera eases closer',
+        note: 'The frame already fixes the look. Describe the start, the movement and where it ends, and how bodies and objects keep their shape through fast motion.',
+        critical: true,
+      },
+      {
+        heading: 'Name each reference by what it shows',
+        example: 'The woman in the first reference image, the red-haired runner, leads; keep her face, hair and outfit the same',
+        note: 'Say which reference and what it is, every time. Never a bare tag, never an @ sign, and give every image a role: character, product, wardrobe, location or style.',
+        critical: true,
+      },
+    ],
+    [
+      {
+        heading: 'Numbered shots for longer takes',
+        example: 'Shot 1: wide, rain over the harbour. Shot 2: close-up, her hands on the rope.',
+        note: 'One event per shot, starting just before the action and ending on its result. Repeat key appearance details in every shot.',
+      },
+      {
+        heading: 'A Sound: line, and dialogue in quotes',
+        example: 'Sound: gravel under the tyres, gulls, low wind, continuing to the very last frame · She says: "Not here."',
+        note: 'Name the sources you want to hear. Write dialogue yourself, in the language it should be spoken.',
+      },
+      {
+        heading: "Say what you want, never what you don't",
+        example: 'static camera · an empty street · clear daylight',
+        note: 'Turn every constraint into something visible. A readable sign or label: the exact words, facing the camera, held still for a second.',
+      },
+    ],
+  ],
+  footer: [
+    'Draft at a short length, then render the full take once the shot works; keep the seed to compare prompt changes. The provider may rewrite prompts on its side and offers no switch to turn that off on this model.',
+  ],
+}
+
 export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   seedance: SEEDANCE,
   'seedance-2-5': SEEDANCE_25,
@@ -823,6 +872,7 @@ export const PROMPTING_TIPS: Record<PromptingTipsKey, PromptingTipsEntry> = {
   'omni-flash-edit': OMNI_FLASH_EDIT,
   'minimax-h3': MINIMAX_H3,
   'wan-3': WAN_3,
+  'magi-2': MAGI_2,
   'nano-banana': NANO_BANANA,
   'gpt-image-2-6': GPT_IMAGE_26,
 

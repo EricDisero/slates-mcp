@@ -453,6 +453,17 @@ export const MODEL_FACTS: ModelFact[] = [
     notes: 'Alibaba\'s video model, added 2026-10-17: first on Artificial Analysis text-to-video that day, at about a third of Seedance 2.5\'s price per second at 1080p. Long single takes, multi-shot sequences with timestamps, sound on or off. Start frame with an optional last frame, or references across images, videos and audio cited as Image N / Video N / Audio N (audio-only allowed); frames and references never mix. Reference video seconds bill on top of the output. Route here for long takes, timed multi-shot scenes and reference-driven shots on a budget; Seedance 2.5 stays the default. VIDEO-ONLY.',
   },
   {
+    id: 'magi-2',
+    tipsKey: 'magi-2',
+    route: 'generate',
+    tier: 'specialist',
+    label: 'MAGI-2',
+    kind: 'video',
+    // 1080p only; 10 images + 5 videos + 5 audio, each clip 2-30s, 30s per type.
+    ...caps('magi-2'),
+    notes: "Sand AI's video model, added 2026-11-26: first on Artificial Analysis image-to-video that day, level with Seedance 2.5 inside the confidence interval, at a small fraction of its price per second. 1080p only, sound on or off. Start frame with an optional end frame, or references across images, videos and audio, each named in the prompt by what it shows; frames and references never mix, and references add nothing to the bill. Route here for image-to-video, long single takes and reference-driven shots on a budget; Seedance 2.5 stays the default. VIDEO-ONLY.",
+  },
+  {
     id: 'seed-audio',
     tipsKey: 'seed-audio',
     route: 'generate',
