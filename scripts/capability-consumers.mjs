@@ -13,7 +13,7 @@ const repos = [
 
 function checkFile(file, source) {
   const bound = /(?:max|limit|cap)\w*prompt|prompt\w*(?:max|limit|cap)|TTS_MAX_CHARACTERS/i
-  if (!/maxReferenceAudio|getMaxRefAudio/.test(source) && !(source.includes('.length') && bound.test(source))) return
+  if (!/maxReferenceAudio|getMaxRefAudio/.test(source) && !(source.includes('.length') && (bound.test(source) || /prompt/i.test(source)))) return
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const capacity = /\b(?:maxReferenceAudio|getMaxRefAudio)\b/
   const behavior = /soundCanBeDisabled|autoAttachCharacterVoice|(?:toggle|disable|set|enable)Sound|sound(?:Switch|Toggle)|characterVoice|attach(?:Character)?Voice|voiceVideoModels|no-character-voice/i
@@ -28,10 +28,20 @@ function checkFile(file, source) {
   }
   const isBound = node => ts.isIdentifier(node) && bound.test(node.text)
   const isLength = node => ts.isPropertyAccessExpression(node) && node.name.text === 'length'
+  const isPromptLength = node => isLength(node) &&
+    ((ts.isIdentifier(node.expression) && /prompt$/i.test(node.expression.text)) ||
+      (ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === 'prompt'))
   function visit(node) {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) initializers.set(node.name.text, node.initializer)
     if (ts.isBinaryExpression(node) && ['>', '<', '>=', '<=', '===', '!=='].includes(node.operatorToken.getText(ast))) {
-      if ([[node.left, node.right], [node.right, node.left]].some(([a, b]) => tracks(a, isBound) && tracks(b, isLength))) {
+      const comparesBound = ([a, b]) => {
+        if (tracks(a, isBound) && tracks(b, isLength)) return true
+        // A literal in a validation branch is a bound too. Display-only ellipses use the length of their sliced preview.
+        return ['<', '>', '<=', '>='].includes(node.operatorToken.getText(ast)) &&
+          ts.isNumericLiteral(a) && Number(a.text) > 0 && tracks(b, isPromptLength) &&
+          !(ts.isConditionalExpression(node.parent) && /^['"](?:\.\.\.|…)['"]$/.test(node.parent.whenTrue.getText(ast)))
+      }
+      if ([[node.left, node.right], [node.right, node.left]].some(comparesBound)) {
         const line = ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1
         console.error(`${file}:${line}: use promptLengthFor before comparing a prompt bound. String.length counts UTF-16 units.`)
         process.exitCode = 1
