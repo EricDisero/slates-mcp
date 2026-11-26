@@ -251,9 +251,6 @@ export function lintMyBrain(files, { shape = SHAPE, bundled = null } = {}) {
 function blocksOf(text) {
   const body = text.replace(FRONTMATTER_RE, (m) => '\n'.repeat(m.split('\n').length - 1)).replace(OPERATIVE_RE, (m) => '\n'.repeat(m.split('\n').length - 1))
   const lines = body.split(/\r?\n/)
-  for (const sample of ['A take costs 999 credits.', '**999** **credits**', '<!-- Credits: 999 -->', 'one hundred credits', '3–42 credits <!-- src: price: kling-mc-pro-5s, 2026-11-26 -->', '<!-- internal: Kie -->', '<!-- quote: $0.01 -->', '999 credits <!-- src: price: kling-mc-std-5s, 2026-11-26 -->']) {
-    if (!guideCopyProblems('fixture', sample).length) throw new Error('Unanchored price or serving name passed: ' + sample)
-  }
   const fenced = fenceMap(lines)
   const blocks = []
   let current = null
@@ -372,6 +369,26 @@ function addedSinceBoth(skills) {
 }
 
 function selfTest(skills) {
+  const rejectedCopy = [
+    '32 credits <!-- src: price: kling-mc-std-5s, 2026-11-26 -->',
+    '**42** **credits**', '32cr', 'a 32-credit draft', '3–42 credits',
+    'nine credits', 'one hundred credits', 'four dollars a can',
+    '<!-- Credits: 32 -->', '<!-- $0.01 -->', 'USD 1.25', '<!-- internal: Kie -->',
+    '| Tier | Credits |\n|---|---|\n| Pro | **1,234** |',
+    'Tier | Cost (credits)\n---|---\nPro | 32',
+    '| | Std | Pro |\n|---|---|---|\n| Price at 768p | 32 | 42 |',
+  ]
+  const allowedCopy = [
+    'Quote the returned credit total for a ten-second take.',
+    '| Tier | Duration |\n|---|---|\n| Pro | 10 |',
+  ]
+  for (const line of rejectedCopy) {
+    if (!guideCopyProblems('fixture', line).length) throw new Error('Literal guide price or serving name passed: ' + line)
+  }
+  for (const line of allowedCopy) {
+    if (guideCopyProblems('fixture', line).length) throw new Error('Non-price guide text was rejected: ' + line)
+  }
+
   const fenced = line => `<!-- @banned:start -->\n${line}\n<!-- @banned:end -->`
   const tokens = parseGuideBans('fixture', fenced('- Ban: `wrong` | Avoid `wrong`, prefer `static camera`.'), true)
   if (tokens.map(t => t.token).join() !== 'wrong') throw new Error('The @banned explanation became a literal')
@@ -474,7 +491,7 @@ function selfTest(skills) {
     if (warned.length !== 1 || !warned[0].includes(knownPair) || !warned[0].includes(`lower the pin to ${now} in brain-shape.json`)) throw new Error(`self-test: a loose pin was not named (got: ${warned.join(' | ') || 'nothing'})`)
   }
   const gitCases = sourceCheckInTempRepo()
-  console.log(`brain-lint self-test: ${mutations.length + 1 + myMutations.length + myClean.length} mutations and clean cases, each caught or kept${gitCases ? `; the source check on a real diff, ${gitCases} git settings` : '; no git, so the source check on a real diff was skipped'}`)
+  console.log(`brain-lint self-test: ${rejectedCopy.length + allowedCopy.length + mutations.length + 1 + myMutations.length + myClean.length} mutations and clean cases, each caught or kept${gitCases ? `; the source check on a real diff, ${gitCases} git settings` : '; no git, so the source check on a real diff was skipped'}`)
 }
 
 /**
