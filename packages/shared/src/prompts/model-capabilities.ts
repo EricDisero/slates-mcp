@@ -1066,6 +1066,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // — moving them here would split one clamp across two files.
 
   'seed-audio': {
+    maxPromptLength: 2048,
     aspectRatios: [],
     // ONE image XOR up to 3 audio clips; the XOR is enforced by
     // `validateComposition`, this is only the image arm.
@@ -1073,6 +1074,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'eleven-sfx': {
+    maxPromptLength: 450,
     aspectRatios: [],
   },
 
@@ -1426,13 +1428,21 @@ export function promptLengthFor(_model: string, prompt: string): number {
   return Array.from(prompt).length
 }
 
+const maxLivePromptLength = Math.max(...Object.values(MODEL_CAPABILITIES).map(cap => cap.maxPromptLength ?? cap.maxCharacters ?? 0))
+
+export function promptLengthError(model: string | null | undefined, prompt: string | undefined): string | undefined {
+  const cap = model ? MODEL_CAPABILITIES[model] : undefined
+  const limit = cap?.maxPromptLength ?? cap?.maxCharacters ?? (cap?.imageResolutions ? 4000 : maxLivePromptLength)
+  if (prompt && promptLengthFor(model ?? '', prompt) > limit) {
+    return `${model || 'A Shot'} takes at most ${limit} prompt characters.`
+  }
+}
+
 export function videoPromptError(model: string, prompt: unknown, firstFrame: boolean, hasCuts = false): string | undefined {
   const cap = MODEL_CAPABILITIES[model]
   if (prompt != null && typeof prompt !== 'string') return 'The prompt must be text.'
   if (!prompt?.trim() && !hasCuts && !(firstFrame && cap?.promptOptionalWithFirstFrame)) return 'A prompt is required.'
-  if (prompt && cap?.maxPromptLength && promptLengthFor(model, prompt) > cap.maxPromptLength) {
-    return `${model} takes at most ${cap.maxPromptLength} prompt characters.`
-  }
+  return promptLengthError(model, prompt ?? undefined)
 }
 
 /** Whether the aspect ratio shapes this request. With a start frame the frame

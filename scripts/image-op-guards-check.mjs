@@ -42,6 +42,24 @@ if (bang.length) {
 const shared = await import(new URL('../packages/shared/dist/index.js', import.meta.url))
 const { ALL_OPERATIONS, IMAGE_MODELS, MODEL_CAPABILITIES, AGENT_ROUTE_PROVIDER, aspectRatiosFor, aspectRatioUnion, CONFIRM_CREDITS } = shared
 const op = (id) => ALL_OPERATIONS.find((o) => o.id === id)
+// The schema must preserve authored text before the operation sees the chosen/stored model.
+for (const name of ['create_shot', 'update_shot', 'duplicate_shot']) {
+  const input = { projectId: '00000000-0000-4000-8000-000000000000', shotId: 'SHOT-A', model: 'magi-2' }
+  for (const prompt of ['a'.repeat(4900), '🎬'.repeat(2001)]) {
+    const result = op('slates_' + name).input.safeParse({ ...input, prompt })
+    assert.ok(result.success, name + ' refused a valid MAGI-2 prompt')
+    assert.equal(result.data.prompt, prompt)
+  }
+}
+const { promptLengthError } = await import('../packages/shared/dist/prompts/model-capabilities.js')
+for (const [model, cap] of Object.entries(MODEL_CAPABILITIES)) {
+  if (!cap.maxPromptLength) continue
+  assert.equal(promptLengthError(model, '🎬'.repeat(cap.maxPromptLength)), undefined, model + ' counts UTF-16 units')
+  assert.ok(promptLengthError(model, 'a'.repeat(cap.maxPromptLength + 1)), model + ' exceeds its declared limit')
+}
+const largest = Math.max(...Object.values(MODEL_CAPABILITIES).map(cap => cap.maxPromptLength || 0))
+assert.equal(promptLengthError(undefined, 'a'.repeat(largest)), undefined)
+assert.ok(promptLengthError(undefined, 'a'.repeat(largest + 1)))
 const call = (id, input, ctx) => op(id).run(op(id).input.parse(input), ctx)
 const projectId = '11111111-1111-4111-8111-111111111111'
 const assetId = '22222222-2222-4222-8222-222222222222'

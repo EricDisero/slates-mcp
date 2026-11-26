@@ -55,7 +55,7 @@ import {
 import {
   AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
-  aspectRatioApplies, promptLengthFor, videoPromptError, aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
+  aspectRatioApplies, promptLengthError, promptLengthFor, videoPromptError, aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
   maxIngredientImagesFor, maxReferenceVideosFor,
   checkAspectRatio, checkVideoResolution,
   describeAspectRatios, describeVideoResolutions, describeDurations,
@@ -2375,6 +2375,7 @@ const EDIT_VIDEO_RESOLUTIONS = videoResolutionUnion(['seedance-2.5-edit', 'omni-
 
 export const estimateGenerationCost: Operation<{
   model: string
+  prompt?: string
   quantity?: number
   duration?: number
   /** inworld-tts-2 only — the character count of the text, which is what it
@@ -2400,6 +2401,7 @@ export const estimateGenerationCost: Operation<{
     'Quote credits before any generate_* op. For saved Shots, a board or a scene, quote with slates_get_board_quote instead. Accepts the generation model ids and parameters (edit seats other than Kling, lip-sync and motion-transfer engines need an exact registry cost key), or an exact registry cost key. Show the user the total and wait for their OK before the generate call; the result flags requires_confirm above the threshold and carries the model\'s prompting card.',
   input: z.object({
     model: z.string().describe('Base model id as passed to the generate op (e.g. "seedance-2", "kling-v3.0-std", "nano-banana-2-1") or an exact registry cost key ("nano-banana-2-1-2k", "seedance-2-1080p-8s")'),
+    prompt: z.string().optional().describe('Optional prompt to check against the selected model before quoting.'),
     quantity: z.number().int().min(1).max(10).optional().describe('Number of generations (default 1)'),
     // Video windows and resolutions GENERATED from MODEL_CAPABILITIES. The
     // hand-typed "Video 3-15" here was wrong the day seedance-2.5 (4-30s)
@@ -2434,6 +2436,8 @@ export const estimateGenerationCost: Operation<{
     ),
   }),
   async run(input, ctx) {
+    const lengthError = promptLengthError(resolveVideoModel(input.model)?.model ?? input.model, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     // A retired seat is never quoted: its keys still bill older desktops, and `nano-banana-2-1k` (the
     // retired Nano Banana 2 at 1K) would otherwise answer an agent that meant Nano Banana 2.1.
     const retired = retiredModelOfKey(input.model)
@@ -4342,7 +4346,7 @@ export const generateImage: Operation<{
     // demonstrably skipped the call that would have taught it.
     describeBannedTokens('image'),
   input: z.object({
-    prompt: z.string().min(1).max(4000),
+    prompt: z.string().min(1),
     // Routing GENERATED from MODEL_FACTS.
     model: zEnum(IMAGE_MODELS).optional().describe(
       `Image model. Omitted: ${DEFAULT_IMAGE_MODEL} with projectId, ${HEADLESS_IMAGE_MODEL} (the only headless seat) without.\n` +
@@ -4381,6 +4385,8 @@ export const generateImage: Operation<{
       ? await defaultImageSeatFor(() => ctx.desktop(), input.model, `${input.model ?? DEFAULT_IMAGE_MODEL} generation`)
       : { model: input.model ?? HEADLESS_IMAGE_MODEL, note: '' }
     const imageModel: ImageModelId = seat.model
+    const lengthError = promptLengthError(imageModel, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     const dropped = droppedImageParams(imageModel, input)
     if (dropped) return ok(dropped)
     // A desktop before the folder rule ignores folderId and files at the root.
@@ -4911,7 +4917,7 @@ export const editImage: Operation<{
   input: z.object({
     projectId: z.string().uuid(),
     sourceAssetId: z.string().uuid().describe('Image asset to edit. Must exist in the project. ' + ASSET_UUID_ONLY),
-    prompt: z.string().min(1).max(4000).describe('The change, not the whole image. @name and #look words attach nothing here: pass those pictures in referenceAssetIds.'),
+    prompt: z.string().min(1).describe('The change, not the whole image. @name and #look words attach nothing here: pass those pictures in referenceAssetIds.'),
     editModel: zEnum(IMAGE_MODELS).optional(),
     referenceAssetIds: z.array(z.string().uuid().describe(ASSET_UUID_ONLY)).max(Math.max(...IMAGE_MODELS.map(editReferenceCap))).optional().describe(`Images beside the source, which is image 1. Each model's own cap: ${IMAGE_MODELS.map((m) => `${m} ${editReferenceCap(m)}`).join(', ')}.`),
     resolution: z.enum(['1k', '2k', '3k', '4k']).optional().describe(`Omit for the model's default. Per model: ${IMAGE_MODELS.map((m) => `${m} ${(MODEL_CAPABILITIES[m]?.imageResolutions ?? []).join('/')}`).join(', ')}.`),
@@ -4935,6 +4941,8 @@ export const editImage: Operation<{
         ? await defaultImageSeatFor(() => desktop, undefined, 'image editing')
         : { model: toolModelFor('image-edit') as ImageModelId, note: '' }
     const editModel = seat.model
+    const lengthError = promptLengthError(editModel, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     const resolution = input.resolution ?? defaultImageResolutionFor(editModel)
     // The same gates as slates_generate_image, from the same functions.
     const refusal = droppedImageParams(editModel, input) ??
@@ -6765,6 +6773,8 @@ export const generateAudio: Operation<{
   }),
   run: async (input, ctx) => {
     requireGuideRead(ctx, input.model)
+    const lengthError = promptLengthError(input.model, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     // A desktop before the folder rule ignores folderId and files at the root.
     if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
     // ── Per-surface clarification + constraint gates ──
@@ -7415,7 +7425,7 @@ export const editVideo: Operation<{
   input: z.object({
     projectId: z.string().uuid().describe('Project the source clip lives in.'),
     sourceVideoAssetId: z.string().describe('The VIDEO asset to edit — UUID or badge code ("VID-V3", bare "V3"); codes resolve against the project at call time. Clip-length windows per engine are on `model`.'),
-    prompt: z.string().min(1).max(2500).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-1-2-edit keep it simple and add "Keep everything else the same."'),
+    prompt: z.string().min(1).describe('The change, not the whole scene — e.g. "replace the man with @marcus", "make it a rainy night", "turn the street into a neon Tokyo alley". Mention subjects with @name; the transport compiles them to Kling\'s @ElementN notation (Kling models). For omni-flash-1-2-edit keep it simple and add "Keep everything else the same."'),
     // Clip windows and resolutions GENERATED from MODEL_CAPABILITIES.
     model: zEnum(EDIT_VIDEO_MODELS).optional().describe(
       // Routing GENERATED from MODEL_FACTS; the paragraph that stood here was
@@ -7445,6 +7455,8 @@ export const editVideo: Operation<{
       await desktop.requireCapability('background-generation', 'background generation')
     }
     const model = input.model ?? EDIT_VIDEO_DEFAULT
+    const lengthError = promptLengthError(model, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     requireGuideRead(ctx, model)
     const isOmniFlashEdit = model === 'omni-flash-1-2-edit'
     const isSeedanceEdit = model === 'seedance-2.5-edit'
@@ -11303,8 +11315,13 @@ const MODEL_BOUND_SHOT_PARAMS = ['aspectRatio', 'videoResolution', 'imageResolut
 async function assertStoredShotCapabilities(
   model: string | undefined,
   params: ShotOpParams | undefined,
-  read: () => Promise<ShotDetail>
+  read: () => Promise<ShotDetail>,
+  prompt: string | undefined
 ): Promise<OperationResult | null> {
+  if (prompt !== undefined || model !== undefined) {
+    const error = promptLengthError(model ?? (await read()).model, prompt ?? (await read()).rawPrompt)
+    if (error) throw new Error(error)
+  }
   if (model !== undefined || !MODEL_BOUND_SHOT_PARAMS.some((k) => params?.[k] !== undefined)) return null
   return assertShotCapabilities((await read()).model ?? undefined, params)
 }
@@ -11434,7 +11451,7 @@ export const createShot: Operation<
   input: z.object({
     projectId: z.string().uuid(),
     name: z.string().max(120).optional().describe('What to call it. Shown on the card; the prompt supplies one if you omit it.'),
-    prompt: z.string().min(1).max(4000).optional().describe('The RAW prompt, @mentions intact. Never write "image 1" yourself — the composer numbers references, and a hand-written number is wrong the moment one moves. Required unless fromAssetId supplies the recipe.'),
+    prompt: z.string().min(1).optional().describe('The RAW prompt, @mentions intact. Never write "image 1" yourself — the composer numbers references, and a hand-written number is wrong the moment one moves. Required unless fromAssetId supplies the recipe.'),
     fromAssetId: z.string().optional().describe("Save as shot: start from this asset's RECORDED recipe (UUID or badge code) — its prompt, model, settings and references — as Media's Save as shot does. That result becomes the Shot's first take unless another Shot already holds it. Anything else you pass overrides the recipe."),
     model: z.string().optional().describe('Model id — the same ids slates_generate_image / slates_generate_video / slates_generate_audio take, and their descriptions carry the routing. Optional: a Shot can be planned before the model is decided.'),
     params: shotParamsSchema,
@@ -11453,6 +11470,8 @@ export const createShot: Operation<
   }),
   async run(input, ctx) {
     if (!input.prompt && !input.fromAssetId) throw new Error('Pass a prompt, or fromAssetId to save a result\'s recorded recipe as the Shot.')
+    const lengthError = promptLengthError(input.model, input.prompt)
+    if (lengthError) throw new Error(lengthError)
     const capErr = assertShotCapabilities(input.model, input.params)
     if (capErr) return capErr
     const alignErr = checkSpokenTextAlignment(input)
@@ -11553,7 +11572,7 @@ export const updateShot: Operation<
     shotId: z.string().describe('The Shot id, or its SHOT-A code as shown on the row.'),
     projectId: z.string().uuid().describe('The Shot\'s project — badge codes and entity ids resolve against it.'),
     name: z.string().max(120).optional(),
-    prompt: z.string().max(4000).optional(),
+    prompt: z.string().optional(),
     model: z.string().optional(),
     params: shotParamsSchemaTerse,
     refs: shotRefsSchemaTerse,
@@ -11576,7 +11595,7 @@ export const updateShot: Operation<
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
     const read = shotReader(desktop, input.shotId, input.projectId)
-    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read)
+    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read, input.prompt)
     if (storedErr) return storedErr
     await requireDraftShotDesktop(desktop, input.model, input.params, read)
     const { spec, seatNote, posterAssetId } = await buildShotSpecInput(ctx, input.projectId, input)
@@ -11616,7 +11635,7 @@ export const duplicateShot: Operation<{
     shotId: z.string().describe('The Shot id, or its SHOT-A code.'),
     projectId: z.string().uuid().optional().describe(SHOT_PROJECT_DESCRIBE),
     name: z.string().max(120).optional().describe('Name for the copy (default: the original plus "copy").'),
-    prompt: z.string().max(4000).optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
+    prompt: z.string().optional().describe('Replace the prompt on the copy. Omit to keep the original\'s.'),
     model: z.string().optional().describe('Point the copy at a different model — the A/B lever. The prompt is NOT rewritten, and the copy records which model it was written for.'),
     params: shotParamsSchemaTerse,
     frameId: z.string().uuid().nullable().optional().describe('Attach the copy to this frame. Omit to keep the original\'s frame; pass null to leave it unattached.'),
@@ -11627,7 +11646,7 @@ export const duplicateShot: Operation<{
     const desktop = ctx.desktop()
     await desktop.requireCapability('shots', 'saved Shots')
     const read = shotReader(desktop, input.shotId, input.projectId)
-    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read)
+    const storedErr = await assertStoredShotCapabilities(input.model, input.params, read, input.prompt)
     if (storedErr) return storedErr
     await requireDraftShotDesktop(desktop, input.model, input.params, read)
     // Only the halves actually named. The route merges two levels deep, so an
