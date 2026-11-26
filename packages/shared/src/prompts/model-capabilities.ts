@@ -433,7 +433,6 @@ export const FLUX_3_RESOLUTIONS: Record<'1k' | '2k' | '4k', '1k' | '1.5k' | '2k'
 export interface ModelCapability {
   maxPromptLength?: number
   promptOptionalWithFirstFrame?: boolean
-  promptUsesCodePoints?: boolean
   imageResolutions?: ImageResolution[]
   /** Product default shared by estimates and generation. */
   defaultImageResolution?: ImageResolution
@@ -845,7 +844,6 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
 
   'magi-2': {
     promptOptionalWithFirstFrame: true,
-    promptUsesCodePoints: true,
     referenceSecondsTolerance: 0,
     maxPromptLength: 15000,
     aspectRatios: MAGI_2_ASPECT_RATIOS,
@@ -1421,8 +1419,8 @@ export function maxIngredientImagesFor(model: string, videoResolution?: string):
   return cap?.maxIngredientImages ?? 0
 }
 
-export function promptLengthFor(model: string, prompt: string): number {
-  return MODEL_CAPABILITIES[model]?.promptUsesCodePoints ? Array.from(prompt).length : prompt.length
+export function promptLengthFor(_model: string, prompt: string): number {
+  return Array.from(prompt).length
 }
 
 export function videoPromptError(model: string, prompt: unknown, firstFrame: boolean, hasCuts = false): string | undefined {

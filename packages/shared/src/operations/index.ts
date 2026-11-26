@@ -55,7 +55,7 @@ import {
 import {
   AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
-  aspectRatioApplies, videoPromptError, aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
+  aspectRatioApplies, promptLengthFor, videoPromptError, aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
   maxIngredientImagesFor, maxReferenceVideosFor,
   checkAspectRatio, checkVideoResolution,
   describeAspectRatios, describeVideoResolutions, describeDurations,
@@ -1289,7 +1289,7 @@ function describeComposer(r: ComposerReport): string {
       ? `a draft from ${r.draftFrom.code ?? r.draftFrom.assetId}`
       : 'an unsaved draft'
   lines.push(`Prompt box (${r.open ? 'showing' : 'hidden'}), ${r.lane} lane, ${r.model.label}${r.destination === 'chatgpt' ? ' (ChatGPT)' : ''}; ${where}.`)
-  lines.push(`Words (${r.prompt.length}${r.promptMax ? `/${r.promptMax}` : ''}): ${r.prompt ? JSON.stringify(r.prompt) : 'none'}`)
+  lines.push(`Words (${promptLengthFor(r.model.id, r.prompt)}${r.promptMax ? `/${r.promptMax}` : ''}): ${r.prompt ? JSON.stringify(r.prompt) : 'none'}`)
   if (r.params.length) lines.push(`Settings: ${r.params.map((p) => `${p.label} ${p.value || '(none)'}`).join(' · ')}`)
   if (r.tiles.length) {
     const tiles = r.tiles.map(
@@ -6786,9 +6786,10 @@ export const generateAudio: Operation<{
       // because "the words that get spoken" and "what you asked for" are the
       // same thing here. That also means the character count is knowable
       // client-side, which is what makes the quote below exact.
-      if (input.prompt.length > TTS_MAX_CHARACTERS) {
+      const characters = promptLengthFor(input.model, input.prompt)
+      if (characters > TTS_MAX_CHARACTERS) {
         throw new Error(
-          `${TTS_MODEL} accepts up to ${TTS_MAX_CHARACTERS} characters in one take — this text is ${input.prompt.length}. Split it into separate lines and generate each one.`
+          `${TTS_MODEL} accepts up to ${TTS_MAX_CHARACTERS} characters in one take — this text is ${characters}. Split it into separate lines and generate each one.`
         )
       }
       if (input.durationSeconds != null) {
@@ -6839,8 +6840,9 @@ export const generateAudio: Operation<{
           message: `Sound Effects needs a durationSeconds of ${ELEVEN_SFX_MIN_SECONDS}-${ELEVEN_SFX_MAX_SECONDS}. It is billed per second and is never left for the model to pick (that would make the charge non-deterministic). Roughly: ${ELEVEN_SFX_MIN_SECONDS}s for an impact, 2-4s for a whoosh, 8-${ELEVEN_SFX_MAX_SECONDS}s for a loopable bed.`,
         })
       }
-      if (input.prompt.length > 450) {
-        throw new Error(`Sound Effects accepts up to 450 characters — this prompt is ${input.prompt.length}.`)
+      const characters = promptLengthFor(input.model, input.prompt)
+      if (characters > 450) {
+        throw new Error(`Sound Effects accepts up to 450 characters — this prompt is ${characters}.`)
       }
     }
 
@@ -6867,7 +6869,7 @@ export const generateAudio: Operation<{
     const costKey = audioCostKey({
       model: input.model,
       durationSeconds: seconds,
-      characters: input.model === TTS_MODEL ? input.prompt.length : undefined,
+      characters: input.model === TTS_MODEL ? promptLengthFor(input.model, input.prompt) : undefined,
     })
     const entry = registry.models.find((m) => m.model === costKey) ??
       (await cloud.get<ModelRegistryResponse>(`/api/agent/models?costKey=${encodeURIComponent(costKey)}`)).models[0]

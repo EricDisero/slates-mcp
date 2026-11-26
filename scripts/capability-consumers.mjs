@@ -5,18 +5,38 @@ import { join, resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
 const repos = [
-  [root, ['packages']],
-  [resolve(process.env.SLATES_DESKTOP_DIR || join(root, '../slate')), ['src']],
-  [resolve(process.env.SLATES_API_DIR || join(root, '../slates-api')), ['src']],
+  [root, ['.']],
+  [resolve(process.env.SLATES_DESKTOP_DIR || join(root, '../slate')), ['.']],
+  [resolve(process.env.SLATES_API_DIR || join(root, '../slates-api')), ['.']],
   [resolve(process.env.SLATES_WEB_DIR || join(root, '../slates-web')), ['scripts/llm-docs']],
 ]
 
 function checkFile(file, source) {
-  if (!/maxReferenceAudio|getMaxRefAudio/.test(source)) return
+  const bound = /(?:max|limit|cap)\w*prompt|prompt\w*(?:max|limit|cap)|TTS_MAX_CHARACTERS/i
+  if (!/maxReferenceAudio|getMaxRefAudio/.test(source) && !(source.includes('.length') && bound.test(source))) return
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const capacity = /\b(?:maxReferenceAudio|getMaxRefAudio)\b/
   const behavior = /soundCanBeDisabled|autoAttachCharacterVoice|(?:toggle|disable|set|enable)Sound|sound(?:Switch|Toggle)|characterVoice|voiceVideoModels|no-character-voice/i
+  const initializers = new Map()
+  function tracks(node, predicate, seen = new Set()) {
+    if (predicate(node)) return true
+    if (ts.isFunctionLike(node) || ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node) || seen.size >= 3) return false
+    if (ts.isIdentifier(node) && initializers.has(node.text) && !seen.has(node.text)) {
+      return tracks(initializers.get(node.text), predicate, new Set([...seen, node.text]))
+    }
+    return !!ts.forEachChild(node, child => tracks(child, predicate, seen) || undefined)
+  }
+  const isBound = node => ts.isIdentifier(node) && bound.test(node.text)
+  const isLength = node => ts.isPropertyAccessExpression(node) && node.name.text === 'length'
   function visit(node) {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) initializers.set(node.name.text, node.initializer)
+    if (ts.isBinaryExpression(node) && ['>', '<', '>=', '<=', '===', '!=='].includes(node.operatorToken.getText(ast))) {
+      if ([[node.left, node.right], [node.right, node.left]].some(([a, b]) => tracks(a, isBound) && tracks(b, isLength))) {
+        const line = ast.getLineAndCharacterOfPosition(node.getStart(ast)).line + 1
+        console.error(`${file}:${line}: use promptLengthFor before comparing a prompt bound. String.length counts UTF-16 units.`)
+        process.exitCode = 1
+      }
+    }
     const value = ts.isIfStatement(node) || ts.isConditionalExpression(node) ? node.expression :
       ts.isVariableDeclaration(node) || ts.isPropertyAssignment(node) ? node.initializer :
       ts.isReturnStatement(node) ? node.expression : undefined
@@ -43,7 +63,7 @@ for (const [repo, paths] of repos) {
   if (!existsSync(repo) && process.env.CI) continue
   const files = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', ...paths], { cwd: repo, encoding: 'utf8', maxBuffer: 20_000_000 })
   for (const path of files.split('\0')) {
-    if (!/\.[cm]?[jt]sx?$/.test(path) || path.includes('/vendor/')) continue
+    if (!/\.[cm]?[jt]sx?$/.test(path) || /(?:^|\/)(?:vendor|dist|node_modules)\//.test(path)) continue
     const file = join(repo, path)
     if (existsSync(file)) checkFile(file, readFileSync(file, 'utf8'))
   }
