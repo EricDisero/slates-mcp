@@ -16,7 +16,7 @@ function checkFile(file, source) {
   if (!/maxReferenceAudio|getMaxRefAudio/.test(source) && !(source.includes('.length') && bound.test(source))) return
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const capacity = /\b(?:maxReferenceAudio|getMaxRefAudio)\b/
-  const behavior = /soundCanBeDisabled|autoAttachCharacterVoice|(?:toggle|disable|set|enable)Sound|sound(?:Switch|Toggle)|characterVoice|voiceVideoModels|no-character-voice/i
+  const behavior = /soundCanBeDisabled|autoAttachCharacterVoice|(?:toggle|disable|set|enable)Sound|sound(?:Switch|Toggle)|characterVoice|attach(?:Character)?Voice|voiceVideoModels|no-character-voice/i
   const initializers = new Map()
   function tracks(node, predicate, seen = new Set()) {
     if (predicate(node)) return true
@@ -42,7 +42,8 @@ function checkFile(file, source) {
       ts.isReturnStatement(node) ? node.expression : undefined
     if (value && !ts.isObjectLiteralExpression(value) && !ts.isFunctionLike(value) &&
         !(ts.isCallExpression(value) && value.arguments.some(ts.isFunctionLike) && !node.name?.getText(ast).match(behavior)) &&
-        capacity.test(value.getText(ast))) {
+        (capacity.test(value.getText(ast)) || (ts.isIdentifier(value) || ts.isPrefixUnaryExpression(value) || ts.isBinaryExpression(value)) &&
+          tracks(value, part => ts.isIdentifier(part) && capacity.test(part.text)))) {
       let context = node.getText(ast)
       if (ts.isReturnStatement(node)) {
         const fn = ts.findAncestor(node, ts.isFunctionLike)
