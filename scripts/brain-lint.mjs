@@ -54,6 +54,8 @@ export const CAPS = { directorWords: 300, routerWords: SHAPE.caps.fileWords.rout
 // from source so the lint needs no build).
 const BRAIN_CHECK = loadTypeScriptModule(join(REPO, 'packages', 'shared', 'src', 'skills', 'brain-check.ts'))
 
+const { parseGuideBans } = loadTypeScriptModule(join(REPO, 'packages/shared/src/prompts/guide-bans.ts'))
+
 const OPERATIVE_RE = /<!--\s*@operative:start\s*-->([\s\S]*?)<!--\s*@operative:end\s*-->/
 const CARD_START_RE = /<!--\s*@card:start\s*-->/
 const CARD_RE = /<!--\s*@card:start\s*-->([\s\S]*?)<!--\s*@card:end\s*-->/
@@ -178,6 +180,17 @@ export function lintBrain(skills, { shape = SHAPE, added = null } = {}) {
 
   // 4. An operative summary leads every other file.
   for (const [name, text] of Object.entries(skills)) if (name !== ROUTER) fail.push(...summaryFailures(name, text))
+
+  for (const [name, text] of Object.entries(skills)) {
+    try {
+      for (const { token, note } of parseGuideBans(name, text)) {
+        // A replacement phrase after a directive cannot also be a ban.
+        const replacement = /(?:write|use|say|instead|replace with)\b[^":]*[,:]?\s*"([^"]+)"/gi
+        const offered = [...note.matchAll(replacement)].some(m => m[1] === token)
+        if (offered) fail.push(`${name}.md: the prompt guard bans "${token}" as a replacement phrase. Move the positive example outside @banned.`)
+      }
+    } catch (error) { fail.push(error.message) }
+  }
 
   // 5. The fixed shape.
   for (const name of Object.keys(skills)) {
