@@ -31,7 +31,6 @@
       "src/types/index.ts": 19
     },
     "slates-web": {
-      "docs/copy.md": 4,
       "next.config.ts": 2,
       "scripts/build-llm-docs.mjs": 2,
       "scripts/check-copy-facts.ts": 1,
@@ -61,7 +60,6 @@
       "src/types/index.ts": 24
     },
     "slates-web": {
-      "docs/copy.md": 1,
       "src/app/copy/changelog.ts": 2
     }
   }

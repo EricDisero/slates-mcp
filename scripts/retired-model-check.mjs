@@ -64,7 +64,11 @@ function countHits(text, terms) {
 }
 
 function scan(repo, name) {
-  const listed = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', '-z'], { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const list = (...args) => execFileSync('git', ['ls-files', '-z', ...args], { cwd: repo, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const listed = list('--cached') + list('--others', '--exclude-standard', '--', '.', ':(exclude,glob).next*/**')
+  // The web copy inventory mirrors release notes that we already check in their source file.
+  const changelogPath = resolve(repo, 'src/app/copy/changelog.ts')
+  const changelog = name === 'slates-web' && existsSync(changelogPath) ? readFileSync(changelogPath, 'utf8') : ''
   const hits = Object.fromEntries([...families.keys()].map(key => [key, {}]))
   for (const path of listed.split('\0')) {
     if (!path || SKIP.test(path) || HISTORY.test(path)) continue
@@ -75,7 +79,10 @@ function scan(repo, name) {
     if (!stat.isFile() || stat.size > MAX_BYTES) continue
     const buffer = readFileSync(file)
     if (buffer.includes(0)) continue
-    const text = buffer.toString('utf8')
+    let text = buffer.toString('utf8')
+    if (name === 'slates-web' && path === 'docs/copy.md') {
+      text = text.replace(/^- `RELEASES\[\d+\]\.changes\[\d+\]\.text`: (.+)$/gm, (line, words) => changelog.includes(words.trimEnd()) ? '' : line)
+    }
     for (const family of families.values()) {
       if (NOT_OURS[family.name]?.test(path) || keptServerFiles(family).has(`${name}/${path}`)) continue
       const n = countHits(text, family.terms)
@@ -103,7 +110,8 @@ for (const [key, files] of Object.entries(own)) {
 }
 
 const parent = siblingRoot()
-const present = parent ? SIBLINGS.filter(name => existsSync(resolve(parent, name, '.git'))) : []
+const siblingDir = name => name === 'slates-web' && process.env.SLATES_WEB_DIR ? resolve(process.env.SLATES_WEB_DIR) : resolve(parent, name)
+const present = parent ? SIBLINGS.filter(name => existsSync(resolve(siblingDir(name), '.git'))) : []
 if (present.length < SIBLINGS.length) {
   const missing = SIBLINGS.filter(name => !present.includes(name))
   const message = `sibling repos not found (${missing.join(', ')})${parent ? ` next to ${parent}` : '; set SLATES_DESKTOP_DIR in a worktree'}`
@@ -111,7 +119,7 @@ if (present.length < SIBLINGS.length) {
   else failures.push(`${message}. A local check cannot skip.`)
 }
 
-const current = Object.fromEntries(present.map(name => [name, scan(resolve(parent, name), name)]))
+const current = Object.fromEntries(present.map(name => [name, scan(siblingDir(name), name)]))
 const sortedFiles = files => Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)))
 
 if (process.argv.includes('--write')) {
