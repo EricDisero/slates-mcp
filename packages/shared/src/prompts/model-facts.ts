@@ -461,7 +461,7 @@ export const MODEL_FACTS: ModelFact[] = [
     kind: 'video',
     // 1080p only; 10 images + 5 videos + 5 audio, each clip 2-30s, 30s per type.
     ...caps('magi-2'),
-    notes: "Sand AI's video model, added 2026-11-26: first on Artificial Analysis image-to-video that day, level with Seedance 2.5 inside the confidence interval, at a small fraction of its price per second. 1080p only, sound on or off. Start frame with an optional end frame, or references across images, videos and audio, each named in the prompt by what it shows; frames and references never mix, and references add nothing to the bill. Route here for small, cheap image-to-video jobs. Seedance 2.5 stays the default and runs the main workflow (draft, edit, upscale), and a Blender previs blocking always goes to Seedance 2.5 (MAGI-2 ignored one in our 2026-11-26 test). VIDEO-ONLY.",
+    notes: "First on Artificial Analysis image-to-video that day, level with Seedance 2.5 inside the confidence interval, at a small fraction of its price per second. 1080p only, sound on or off. Start frame with an optional end frame, or references across images, videos and audio, each named in the prompt by what it shows; frames and references never mix, and references add nothing to the bill. Route here for small, cheap image-to-video jobs. Seedance 2.5 stays the default and runs the main workflow (draft, edit, upscale), and a Blender previs blocking always goes to Seedance 2.5 (MAGI-2 ignored one in our 2026-11-26 test). VIDEO-ONLY.",
   },
   {
     id: 'seed-audio',

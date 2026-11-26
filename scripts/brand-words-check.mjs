@@ -14,6 +14,7 @@
 //   node scripts/brand-words-check.mjs [--self-test]     (part of npm run build)
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+import { servingSourceHits } from './serving-words.mjs'
 import { readAllSkills } from './brain-source.mjs'
 
 const REPO = join(import.meta.dirname, '..')
@@ -116,6 +117,9 @@ for (const pkg of readdirSync(PACKAGES)) {
   const src = join(PACKAGES, pkg, 'src')
   try { statSync(src) } catch { continue }
   for (const file of files(src, (n) => /\.(ts|tsx|js|mjs)$/.test(n) && !n.startsWith('hyperframes-content'))) {
+    if (rel(file).startsWith('packages/shared/src/prompts/')) {
+      for (const hit of servingSourceHits(readFileSync(file, 'utf8'), file)) problems.push(`${rel(file)}:${hit.line}  ${hit.text}`)
+    }
     for (const hit of sourceHits(readFileSync(file, 'utf8'))) problems.push(`${rel(file)}:${hit.line}  ${hit.text.slice(0, 160)}`)
   }
 }
