@@ -35,6 +35,7 @@ import {
   APP_MANUAL,
   defaultContext,
   prepareOperation,
+  operations,
   runOperation,
   toolDefinitions,
   cachedLatestVersion,
@@ -194,7 +195,7 @@ const OUTPUT_SCHEMAS: Record<string, Record<string, unknown>> = {
   slates_get_generation_status: {
     type: 'object',
     properties: {
-      status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed', 'cancelled', 'unknown'] },
+      status: { type: 'string', enum: ['pending', 'processing', 'completed', 'failed', 'rejected', 'cancelled', 'unknown'] },
       error: { type: ['string', 'null'] },
       asset: { type: ['object', 'null'] },
       cost_credits: { type: ['number', 'null'] },
@@ -304,6 +305,7 @@ async function elicitConfirm(message: string): Promise<boolean | null> {
 // (stdio), so a generation is refused until its model's guide was served here:
 // as a guide tool result, a prompt or a skill resource.
 const guidesRead = new Set<string>()
+const guideEvidence = { cards: new Set<string>(), full: new Set<string>(), rejected: new Set<string>() }
 
 server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
   const op = opsById.get(request.params.name)
@@ -313,9 +315,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       isError: true,
     }
   }
+  // MCP exposes request boundaries, but no assistant message ID. An overlapping call
+  // keeps the cards available when it arrived, even if consent or a quote waits.
+  const evidenceAtArrival = { ...guideEvidence, cards: new Set(guideEvidence.cards) }
+  const topics = new Set<string>()
+  const rejectGeneration = (): void => {
+    if (op.billable) operations.recordGenerationRejection({ guideEvidence }, op.id, request.params.arguments?.model, topics)
+  }
   try {
     const prepared = prepareOperation(op, request.params.arguments)
-    if (!prepared.ok) return { content: [{ type: 'text', text: prepared.message }], isError: true }
+    if (!prepared.ok) {
+      rejectGeneration()
+      return { content: [{ type: 'text', text: prepared.message }], isError: true }
+    }
     const { call } = prepared
     const args = call.input
 
@@ -350,15 +362,25 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         gate: CONFIRM_GATES.get(op.id) ?? 'none',
         args: args as Record<string, unknown>,
         hostCanAsk: clientSupportsElicitation() && !elicitationFailed,
-        run: (patch) => call.run({ ...defaultContext(), signal: extra?.signal, guidesRead }, patch as never),
+        run: (patch) => call.run({
+          ...defaultContext(), signal: extra?.signal, guidesRead, guideEvidence: evidenceAtArrival,
+          onGenerationGuide: (topic) => topics.add(topic),
+        }, patch as never),
         ask: elicitConfirm,
       })
     } finally {
       if (ticker) clearInterval(ticker)
     }
-    if ('declined' in outcome) return { content: [{ type: 'text', text: DECLINED_TEXT }] }
+    if ('declined' in outcome) {
+      rejectGeneration()
+      return { content: [{ type: 'text', text: DECLINED_TEXT }] }
+    }
     const result = outcome
     let data = result.data as Record<string, unknown> | undefined
+
+    if (data?.requires_clarification === true) rejectGeneration()
+    if (op.id === 'slates_estimate_generation_cost' && typeof data?.craft_card === 'string' && data.craft_card &&
+        typeof data.craft_card_skill === 'string') guideEvidence.cards.add(data.craft_card_skill)
 
     if (typeof data?.prompt_warning === 'string' && data.prompt_warning) {
       warn(data.prompt_warning)
@@ -395,6 +417,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
         : {}),
     }
   } catch (err) {
+    rejectGeneration()
     const message = err instanceof Error ? err.message : String(err)
     if (isDesktopDown(err)) warn(message)
     return {
@@ -444,6 +467,7 @@ server.setRequestHandler(GetPromptRequestSchema, async (request) => {
     throw new Error(`Unknown prompt: ${name}. Available: ${Object.keys(skills).sort().join(', ')}`)
   }
   guidesRead.add(name)
+  guideEvidence.full.add(name)
   // Served is used: a My brain file read this way keeps its date, so archiveUnused never takes a file in use.
   if (brain.mine.has(name)) noteUsed(name)
   return {
@@ -554,6 +578,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const content = Object.hasOwn(brain.skills, name) ? brain.skills[name] : undefined
       if (content === undefined) throw new Error(`Unknown skill: ${skill[1]}`)
       guidesRead.add(name)
+      guideEvidence.full.add(name)
       if (brain.mine.has(name)) noteUsed(name)
       return content
     }

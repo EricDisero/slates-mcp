@@ -1,4 +1,7 @@
-import { CONFIRM_CREDITS } from '../packages/shared/dist/index.js'
+import { loadTypeScriptModule } from './load-typescript.mjs'
+import { WHITE_LABEL_WORDS } from './white-label-words.mjs'
+
+const { CONFIRM_CREDITS } = loadTypeScriptModule(new URL('../packages/shared/src/operations/confirm-threshold.ts', import.meta.url))
 import { servingWords } from './serving-words.mjs'
 
 const numberWord = 'zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million'
@@ -21,7 +24,9 @@ export function guideCopyProblems(name, markdown) {
   let previousCells = []
   for (const [index, raw] of markdown.split(/\r?\n/).entries()) {
     const fail = reason => problems.push(`${name}:${index + 1}: ${reason}`)
-    if (servingWords.test(raw)) fail('names a serving provider: ' + raw.trim().slice(0, 120))
+    if (servingWords.test(raw) || WHITE_LABEL_WORDS.test(raw)) {
+      fail('names a serving provider or white-label engine: use the model or Slates feature name in place of ' + raw.trim().slice(0, 120))
+    }
     // This generated threshold describes the confirmation response. Its value must still match the code.
     const plain = raw.replace(
       `**Confirm gate:** above **${CONFIRM_CREDITS} credits** an op returns \`requires_confirm\``,

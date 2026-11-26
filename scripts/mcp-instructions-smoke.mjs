@@ -191,7 +191,7 @@ else {
   const guide = /topic "([^"]+)"/.exec(text)?.[1]
   check('a generation before its guide is read is refused, with the guide named', refused.isError === true && /^Error: Refused: this session has not read/.test(text) && !!guide, text.slice(0, 200))
   // Read it, as an agent must, so the checks below reach the op itself.
-  await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: guide } })
+  await client.callTool({ name: 'slates_get_prompting_guide', arguments: { topic: guide, depth: 'full' } })
   // A guide served as a prompt or a resource is read too.
   const gated = async (model) => (((await client.callTool({ name: 'slates_generate_video', arguments: { prompt: 'a quiet room', model } })).content ?? [])[0]?.text ?? '')
   const viaPrompt = 'slates-prompting-kling-v3'
@@ -436,6 +436,47 @@ else {
 
 await client.close()
 await fixture.close()
+
+// Hold a generation after it arrives and let the overlapping estimate return its card first.
+const overlap = await mcpFixture()
+const sharedUrl = new URL('../packages/shared/dist/index.js', import.meta.url).href
+const model = 'nano-banana-2-1'
+const preload = `
+  import { operations } from ${JSON.stringify(sharedUrl)};
+  const entered = Promise.withResolvers();
+  const release = Promise.withResolvers();
+  const generate = operations.generateImage.run;
+  operations.generateImage.run = async (input, ctx) => {
+    entered.resolve();
+    await release.promise;
+    return generate(input, ctx);
+  };
+  operations.estimateGenerationCost.run = async () => {
+    await entered.promise;
+    setImmediate(release.resolve);
+    return { text: 'Craft card', data: {
+      craft_card: 'Craft card', craft_card_skill: operations.resolveGuideTopic(${JSON.stringify(model)}),
+    } };
+  };
+`
+const overlapClient = new Client({ name: 'slates-card-overlap-smoke', version: '1.0.0' })
+try {
+  await overlapClient.connect(new StdioClientTransport({
+    command: process.execPath,
+    args: [...overlap.args.slice(0, -1), '--import', 'data:text/javascript,' + encodeURIComponent(preload), overlap.args.at(-1)],
+    env: overlap.env,
+    stderr: 'pipe',
+  }))
+  const [estimate, generate] = await Promise.all([
+    overlapClient.callTool({ name: 'slates_estimate_generation_cost', arguments: { model } }, undefined, { timeout: 5000 }),
+    overlapClient.callTool({ name: 'slates_generate_image', arguments: { model, prompt: 'A quiet room' } }, undefined, { timeout: 5000 }),
+  ])
+  check('an overlapping MCP generation cannot use the estimate card', estimate.structuredContent?.craft_card === 'Craft card' &&
+    generate.isError === true && /this session has not read/.test(generate.content?.[0]?.text ?? ''), generate.content?.[0]?.text)
+} finally {
+  await overlapClient.close()
+  await overlap.close()
+}
 
 if (failures > 0) {
   console.error(`\nmcp-instructions-smoke FAILED (${failures} assertion(s))`)

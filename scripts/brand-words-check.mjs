@@ -23,7 +23,7 @@ const OWN_SKILLS = join(PACKAGES, 'shared', 'skills')
 const CORPUS = join(OWN_SKILLS, 'hyperframes')
 
 /** The names no agent may read: the engine and the company behind it. */
-const WORDS = /hyper\s*-?\s*frames?|heygen/i
+import { WHITE_LABEL_WORDS as WORDS } from './white-label-words.mjs'
 /** The brand as prose, or the company in any form; the white-labelled corpus may keep only the engine's code forms (`__hyperframes`, `@hyperframes/core`, `npx hyperframes`). */
 const PROSE = /\bHyper[Ff]rames?\b|[Hh][Ee][Yy][Gg][Ee][Nn]/
 

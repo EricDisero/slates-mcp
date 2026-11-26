@@ -45,6 +45,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { loadTypeScriptModule } from './load-typescript.mjs'
 import { guideCopyProblems } from './brain-prices.mjs'
+import { selfTestServedGuides, servedGuideProblems } from './served-guide-lint.mjs'
 import { brainOrSkip, readAllSkills, readSkillDir } from './brain-source.mjs'
 
 const REPO = join(import.meta.dirname, '..')
@@ -182,12 +183,7 @@ export function lintBrain(skills, { shape = SHAPE, added = null } = {}) {
   // 4. An operative summary leads every other file.
   for (const [name, text] of Object.entries(skills)) if (name !== ROUTER) fail.push(...summaryFailures(name, text))
 
-  for (const [name, text] of Object.entries(skills)) {
-    try {
-      fail.push(...guideCopyProblems(name, text))
-      parseGuideBans(name, text, true)
-    } catch (error) { fail.push(error.message) }
-  }
+  fail.push(...servedGuideProblems(skills))
 
   // 5. The fixed shape.
   for (const name of Object.keys(skills)) {
@@ -565,7 +561,10 @@ function main() {
     console.error(`brain lint: ${failures.length} problem(s):\n  ${failures.join('\n  ')}`)
     process.exit(1)
   }
-  if (process.argv.includes('--self-test')) selfTest(skills)
+  if (process.argv.includes('--self-test')) {
+    selfTestServedGuides()
+    selfTest(skills)
+  }
   const ops = Object.values(skills).filter((t) => OPERATIVE_RE.test(t)).length
   const cards = Object.values(skills).filter((t) => CARD_START_RE.test(t)).length
   const known = Object.keys(SHAPE.duplicates.known).length

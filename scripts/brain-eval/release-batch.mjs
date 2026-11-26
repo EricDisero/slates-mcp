@@ -22,6 +22,8 @@ import { readFileSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { arg, countArg } from '../behaviour-ab/lib.mjs'
 import { buildRefusals, reviewAnswered } from '../brain-review.mjs'
+import { readSkills } from '../brain-lint.mjs'
+import { servedGuideProblems } from '../served-guide-lint.mjs'
 import { RELEASE_BATCH_ENV } from './release-guard.mjs'
 
 const here = import.meta.dirname
@@ -41,7 +43,7 @@ const reuseCraft = arg('craft') ? resolve(arg('craft')) : null
 
 const { refuse, page, after } = reviewAnswered(JSON.parse(readFileSync(specFile, 'utf8')), JSON.parse(readFileSync(decisionsFile, 'utf8')))
 const built = await buildRefusals(page, after)
-refuse.push(...built.refuse)
+refuse.push(...built.refuse, ...servedGuideProblems(readSkills()))
 if (built.current.unbuilt?.length) refuse.push(`the build is older than the skills on disk (${built.current.unbuilt.join(', ')}); npm run build first`)
 if (refuse.length) {
   console.error(`✗ release batch: not started\n  ${refuse.join('\n  ')}`)

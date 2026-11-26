@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, wri
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
+import { generateFromShots, getGenerationStatus, generateVideo, generateImage, generateCharacterIdentity, generateEnvironmentPlate, extractGridCells, generateChatGptImage, getPromptingGuide, GuideNotReadError, resolveGuideTopic } from '../packages/shared/dist/operations/index.js'
 import { toolModelFor } from '../packages/shared/dist/prompts/model-facts.js'
 import { refreshServedBrain, useBrainSource } from '../packages/shared/dist/skills/served.js'
 import { buildAgentDoctrine } from '../packages/shared/dist/prompts/agent-doctrine.js'
@@ -144,7 +144,43 @@ const byName = session()
 await getPromptingGuide.run({ topic: klingGuide }, byName)
 assert.ok(byName.guidesRead.has(klingGuide), `${klingGuide} by its exact name is read`)
 
-// 7. A machine with no brain or with a locked guide, in an empty home folder (below, in a child process).
+const cardSession = () => ({
+  ...session(),
+  guideEvidence: { cards: new Set([seedanceGuide]), full: new Set(), rejected: new Set() },
+})
+const fullGuideRequired = (err) => err instanceof GuideNotReadError && err.guide === seedanceGuide && /depth "full"/.test(err.message)
+for (const prompt of ['@marcus and @jenna at the counter', 'A scene in #noir']) {
+  await assert.rejects(generateVideo.run({ ...video, prompt }, cardSession()), fullGuideRequired)
+}
+
+const shotId = 'SHOT-A'
+const board = cardSession()
+board.spend = { approved: () => true }
+board.desktop = () => ({
+  requireCapability: async () => {},
+  get: async () => ({ shot: { id: shotId, projectId: video.projectId, cuts: 1, referenceCount: 0, references: [] } }),
+  quote: async () => ({ fingerprint: 'fp', items: [{ shotId, model: video.model, credits: 1 }] }),
+  post: async () => ({ results: [{ shotId, status: 'failed' }] }),
+})
+const rejected = await generateFromShots.run({ shotIds: [shotId], confirm: true, fingerprint: 'fp' }, board)
+assert.equal(rejected.data.results[0].status, 'failed')
+await assert.rejects(generateVideo.run({ ...video }, { ...board, desktop: () => desktop }), fullGuideRequired)
+console.log('guide-gate: a failed saved Shot requires the full guide when retried via generate_video')
+
+for (const status of ['failed', 'rejected']) {
+  const polled = cardSession()
+  await getGenerationStatus.run({ generationId: id, waitSeconds: 45 }, {
+    ...polled,
+    desktop: () => ({
+      requireCapability: async () => {},
+      get: async () => ({ generation: { model: video.model, status } }),
+    }),
+  })
+  await assert.rejects(generateVideo.run({ ...video }, polled), fullGuideRequired)
+}
+console.log('guide-gate: failed and rejected generation status require the full guide on retry')
+
+// 7. A machine with no brain or with a locked guide, in an empty home folder.
 const home = mkdtempSync(join(tmpdir(), 'slates-guide-gate-home-'))
 const child = spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--empty-home'], {
   env: { ...process.env, HOME: home, USERPROFILE: home, SLATES_BRAIN_DIR: '' },

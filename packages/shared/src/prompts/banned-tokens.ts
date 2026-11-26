@@ -10,7 +10,7 @@
  */
 import { brainFiles, servedBrain, type ServedBrain } from '../skills/served.js'
 
-import { parseGuideBans, type BannedToken, type BannedTokenScope } from './guide-bans.js'
+import { matcherFor, parseGuideBans, type BannedToken, type BannedTokenScope } from './guide-bans.js'
 export type { BannedToken, BannedTokenCondition, BannedTokenScope } from './guide-bans.js'
 
 // Read from the brain this process holds (skills/served.ts) and rebuilt when it changes: the model guides that
@@ -33,17 +33,6 @@ export const BANNED_PROMPT_TOKENS: readonly BannedToken[] = Object.freeze([])
 export function bannedTokensFor(_scope: BannedTokenScope): readonly BannedToken[] { return BANNED_PROMPT_TOKENS }
 export function describeBannedTokens(_scope: BannedTokenScope): string { return '' }
 export function bannedTokensForSkill(skill: string): readonly BannedToken[] { return bannedBySkill().get(skill) ?? [] }
-
-const matchers = new Map<string, RegExp>()
-function matcherFor(token: string): RegExp {
-  let matcher = matchers.get(token)
-  if (!matcher) {
-    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    matcher = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i')
-    matchers.set(token, matcher)
-  }
-  return matcher
-}
 
 export function findBannedTokens(prompt: string, _scope: BannedTokenScope, skill?: string): BannedToken[] {
   return skill ? bannedTokensForSkill(skill).filter((b) => matcherFor(b.token).test(prompt)) : []

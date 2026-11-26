@@ -195,6 +195,10 @@ function joinNums(nums: number[]): string {
  */
 const TOKEN_RE = /(?<![\w.@#])([@#])([\w-]+(?:\.[\w-]+)*)/g
 
+export function hasReferenceMention(prompt: string): boolean {
+  return prompt.search(TOKEN_RE) !== -1
+}
+
 /**
  * 🚨 A HEX COLOUR IS NOT A TAG. `#000000` is to `#` what `eric@gmail.com` is to
  * `@`: an everyday literal that happens to open with our sigil, written by

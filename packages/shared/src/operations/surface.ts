@@ -263,7 +263,6 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
   ],
   // Rename, delete, reorder. The 63-op CRUD tail the review measured at 39.5 KB.
   admin: [
-    'slates_get_client_ad_report',
     'slates_update_project',
     'slates_update_asset',
     'slates_delete_project',
@@ -288,6 +287,17 @@ export const OPERATION_GROUPS: Record<OperationGroup, readonly string[]> = {
     'slates_get_spend_limits',
     'slates_set_spend_limits',
   ],
+  ads: [
+    'slates_get_client_ad_report',
+    'slates_get_ad_winners',
+    'slates_set_recipe_verdict',
+    'slates_more_like_this',
+    'slates_plan_split_test',
+    'slates_evaluate_split_test_winner',
+    'slates_find_winning_ads',
+    'slates_list_winning_ad_niches',
+    'slates_break_down_winning_ad',
+  ],
   // A third transport nobody without Blender installed can reach.
   blender: [
     'slates_blender_status',
@@ -310,8 +320,7 @@ export function groupFor(id: string): OperationGroup | undefined {
   return GROUP_BY_OP.get(id)
 }
 
-/** `extended` iff the op names a group. Absent from every group ⇒ `core`, so a
- *  new op is visible until someone deliberately defers it. */
+/** Only the explicit startup set appears in every Slates Basic prompt. */
 export const STARTUP_TOOL_IDS = new Set([
   'slates_load_tools', 'slates_get_prompting_guide', 'slates_get_workspace_state',
   'slates_list_projects', 'slates_create_project', 'slates_list_assets',
@@ -327,6 +336,7 @@ export const GROUP_SUMMARY: Record<OperationGroup, string> = {
   library: 'folders, favorites, pins, the Library (user-named categories of saved references: characters, locations, products, looks) and styles, templates (list, export, import), exporting original asset files, moving and copying assets and Library items between projects, moving a project into the current projects folder, revealing files on disk',
   script: 'rich script documents, anchored sections and their saved versions, reusable passages, variations and take input history',
   timeline: 'named cuts and exporting several at once, what made an exported ad (its recipe ID); the timeline (tracks, clips, markers, settings), text, picture and HTML motion layers, captions, video export and FCP7 XML export for DaVinci Resolve or Premiere, clip trimming',
+  ads: 'ad accounts, split tests and winning ads',
   admin: 'rename / delete / reorder for projects, characters, locations, looks, boards, scenes and frames; shot duplicate, split and merge; spend limits',
   blender: 'the Blender previs bridge — scene inspection, bpy execution, API docs, grey-box render',
 }

@@ -1,3 +1,4 @@
+import { CONFIRM_CREDITS } from './confirm-threshold.js'
 import { randomUUID } from 'node:crypto'
 import { MAX_IMAGE_VARIATIONS, SHEET_TOOL_ASPECT_RATIO, SHEET_TOOL_GPT_QUALITY } from '../prompts/generation-policy.js'
 import { STYLE_LIBRARY, DEFAULT_STYLE_ID } from '../prompts/style-library.js'
@@ -72,6 +73,7 @@ import {
 // that make a shot good rather than merely un-bad — and it rides the estimate
 // RESULT, which the doctrine already makes the agent call before generating.
 // Zero prefix bytes, present at the moment the model has just been named.
+import { hasReferenceMention } from '../prompts/reference-composer.js'
 import { describeCraftCard, craftCard } from '../prompts/craft-cards.js'
 // ONE captioning rule for a generated asset, shared with the desktop gallery.
 import { assetCaption } from '../prompts/asset-label.js'
@@ -118,13 +120,16 @@ export interface OperationContext {
    */
   signal?: AbortSignal
   /**
-   * The guides this session has read through `slates_get_prompting_guide`, by
-   * guide name. Present, it gates every generation: a model whose guide is not
-   * in it is refused, with the guide's card, before anything is spent
-   * (`requireGuideRead`). The MCP server keeps one per connection and the
-   * desktop one per chat. Absent (the CLI, one call per process), no gate.
+   * Guides or cards opened by name. MCP keeps them per connection and the desktop
+   * per chat. Hosts also supply guide evidence for the estimate and full-guide paths.
+   * CLI calls carry no session ledger.
    */
   guidesRead?: Set<string>
+  /** Guide evidence from tool results that reached this session. A rejection requires the full guide. */
+  guideEvidence?: { cards: Set<string>; full: Set<string>; rejected: Set<string> }
+  // The transport records the actual guide when a recipe or default supplies the model.
+  onGenerationGuide?: (topic: string) => void
+  onGenerationRejected?: () => void
   /**
    * The host's own spending decision for this one call, where the host has one (the desktop Studio Agent's loop):
    * the credits the user approved beyond the call's own quote, the quote they approved (its `fingerprint`), and
@@ -164,7 +169,8 @@ export const CONNECT_FOR_BRAIN = 'Have the user open the Slates app signed in on
 
 export class GuideNotReadError extends Error {
   code = 'GUIDE_NOT_READ'
-  constructor(readonly model: string, readonly guide: string) {
+  constructor(readonly model: string, readonly guide: string, full = false) {
+    const request = `topic "${guide}"${full ? ' and depth "full"' : ''}`
     const head = `Refused: this session has not read ${guide}, the guide for ${model}. Nothing was generated or charged. `
     const body = brainSkills().skills[guide]
     const served = servedBrain()
@@ -172,28 +178,59 @@ export class GuideNotReadError extends Error {
     super(
       body !== undefined
         ? head +
-            `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against it, then call this again. Its card:\n\n` +
+            `Call slates_get_prompting_guide with ${request}, rewrite the prompt against it, then call this again. Its card:\n\n` +
             // The card this user's brain serves, so a model guide from their My brain is the one in the refusal.
             describeCraftCard(guide, body)
         : locked
         ? // Past this account's tier: no body here, so the server's notice (its card included) is what it reads.
           head +
-            `Call slates_get_prompting_guide with topic "${guide}", rewrite the prompt against what it says, then call this again. What it says:\n\n` +
+            `Call slates_get_prompting_guide with ${request}, rewrite the prompt against what it says, then call this again. What it says:\n\n` +
             (locked.notice ?? `${guide} is not open to this account. Run the job on the general rules.`)
         : // No copy here and none locked: the brain never arrived, so asking for the guide again cannot help.
           head +
             `The guide comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ` +
-            `${CONNECT_FOR_BRAIN}; then call slates_get_prompting_guide with topic "${guide}" and call this again.`
+            `${CONNECT_FOR_BRAIN}; then call slates_get_prompting_guide with ${request} and call this again.`
     )
   }
 }
 
-/** Refuse the generation when the session keeps a ledger and `model`'s guide is not in it. A seat with no model id names its guide. */
-function requireGuideRead(ctx: OperationContext, model: string | null | undefined, guide = model ? resolveGuideTopic(model) : null): void {
-  if (!ctx?.guidesRead || !model) return
-  if (guide && !ctx.guidesRead.has(guide)) throw new GuideNotReadError(model, guide)
+/**
+ * Routine calls can use a delivered estimate card. Other calls and retries need the full guide.
+ * A locked guide's returned notice counts as the most this account can read.
+ */
+export function recordGenerationRejection(
+  ctx: Pick<OperationContext, 'guideEvidence'>,
+  fallbackOp: string,
+  model: unknown,
+  topics: ReadonlySet<string> = new Set(),
+): void {
+  const rejected = ctx.guideEvidence?.rejected
+  if (!rejected) return
+  if (topics.size) {
+    for (const topic of topics) rejected.add(topic)
+  } else {
+    rejected.add((typeof model === 'string' && resolveGuideTopic(model)) || fallbackOp)
+  }
 }
 
+function requireGuideRead(
+  ctx: OperationContext,
+  model: string | null | undefined,
+  guide = model ? resolveGuideTopic(model) : null,
+  routineOp?: string,
+): void {
+  if (!ctx || !model || !guide) return
+  ctx.onGenerationGuide?.(guide)
+  if (!ctx.guidesRead) return
+  const evidence = ctx.guideEvidence
+  if (!evidence) {
+    if (!ctx.guidesRead.has(guide)) throw new GuideNotReadError(model, guide)
+    return
+  }
+  const full = !routineOp || evidence.rejected.has(guide) || evidence.rejected.has(routineOp)
+  if (evidence.full.has(guide) || (!full && (evidence.cards.has(guide) || ctx.guidesRead.has(guide)))) return
+  throw new GuideNotReadError(model, guide, full)
+}
 /** Throw if the caller has cancelled. Call between billable items, never inside one. */
 function throwIfCancelled(ctx: OperationContext, detail?: string): void {
   if (ctx.signal?.aborted) throw new OperationCancelledError(detail)
@@ -277,7 +314,7 @@ export interface OperationAnnotations {
 }
 
 export type OperationTier = 'core' | 'extended'
-export type OperationGroup = 'script' | 'library' | 'timeline' | 'admin' | 'blender'
+export type OperationGroup = 'script' | 'library' | 'timeline' | 'admin' | 'blender' | 'ads'
 
 // ── Helpers ─────────────────────────────────────────────────────
 
@@ -323,7 +360,7 @@ function ok(data: unknown, text?: string): OperationResult {
 // the same credit value); balances the same. Read via creditCost(); display
 // via fmtCredits(). The confirm gate fires above CONFIRM_CREDITS (≈ the old
 // $0.50 gate at the 3¢/credit peg).
-export const CONFIRM_CREDITS = 17
+export { CONFIRM_CREDITS } from './confirm-threshold.js'
 const CENTS_PER_CREDIT = 3 // peg: 1 credit = 3¢ billed = 2¢ COGS (mirror of slates-api)
 
 /**
@@ -4391,7 +4428,8 @@ export const generateImage: Operation<{
     if (dropped) return ok(dropped)
     // A desktop before the folder rule ignores folderId and files at the root.
     if (input.folderId !== undefined) await ctx.desktop().requireCapability('media-folder', 'choosing the folder a result lands in')
-    requireGuideRead(ctx, imageModel)
+    const multiReference = (input.referenceAssetIds?.length ?? 0) + (input.referenceImageUrls?.length ?? 0) > 1
+    requireGuideRead(ctx, imageModel, undefined, !multiReference && !hasReferenceMention(input.prompt) && (input.count ?? 1) === 1 ? generateImage.id : undefined)
     const promptWarning = bannedTokenWarning(input.prompt, 'image', promptingSkillFor(imageModel))
     input = { ...input, resolution: input.resolution ?? defaultImageResolutionFor(imageModel) }
     if (!input.aspectRatio || !input.resolution) {
@@ -5958,7 +5996,12 @@ export const generateVideo: Operation<{
       await ctx.desktop().requireCapability('seedance-drafts', 'Seedance 2.5 drafts and 4K output')
     }
     if (input.seedanceDraft) input.videoResolution = draftResolution(input.model, input.videoResolution ?? resolved.videoResolution)
-    requireGuideRead(ctx, input.model)
+    const imageRefs = (input.firstFrameAssetId ? 1 : 0) + (input.lastFrameAssetId ? 1 : 0) +
+      (input.ingredientAssetIds?.length ?? 0) + (input.characterAssetIds?.length ?? 0) +
+      (input.environmentAssetIds?.length ?? 0) + (input.styleAssetIds?.length ?? 0)
+    const sceneReference = input.videoReferenceAssetId || input.videoReferenceAssetIds?.length ||
+      input.audioReferenceAssetId || input.audioReferenceAssetIds?.length
+    requireGuideRead(ctx, input.model, undefined, imageRefs <= 1 && !input.lastFrameAssetId && !sceneReference && !hasReferenceMention(input.prompt ?? '') ? generateVideo.id : undefined)
     if (input.duration == null && resolved.duration != null) input.duration = resolved.duration
     if (input.videoResolution == null && resolved.videoResolution != null)
       input.videoResolution = resolved.videoResolution
@@ -6772,7 +6815,8 @@ export const generateAudio: Operation<{
     folderId: folderIdField,
   }),
   run: async (input, ctx) => {
-    requireGuideRead(ctx, input.model)
+    const multiReference = (input.audioReferenceAssetIds?.length ?? 0) + (input.imageReferenceAssetId ? 1 : 0) > 1
+    requireGuideRead(ctx, input.model, undefined, multiReference ? undefined : generateAudio.id)
     const lengthError = promptLengthError(input.model, input.prompt)
     if (lengthError) throw new Error(lengthError)
     // A desktop before the folder rule ignores folderId and files at the root.
@@ -7723,7 +7767,9 @@ export const getGenerationStatus: Operation<{ generationId: string; waitSeconds?
       }>('/agent/generation/status', { id: input.generationId })
       const g = r.generation
       const status = (g?.status as string | undefined) ?? r.status
-      const terminal = status === 'completed' || status === 'failed' || status === 'cancelled'
+      const failed = status === 'failed' || status === 'rejected'
+      if (failed) recordGenerationRejection(ctx, getGenerationStatus.id, g?.model)
+      const terminal = status === 'completed' || failed || status === 'cancelled'
       if (terminal || Date.now() >= deadline) {
         if (!g) return ok(r)
         // Slim the payload: the raw generation row (full prompt/settings)
@@ -12349,7 +12395,12 @@ export const generateFromShots: Operation<{
     const quote = await desktop.quote<DesktopShotQuote>('/agent/shots/quote', 'input', {
       projectId: details[0].projectId, shotIds: details.map((d) => d.id), draft,
     })
-    for (const model of new Set(quote.items.map((i) => i.model))) requireGuideRead(ctx, model)
+    const shot = details.length === 1 ? details[0] : undefined
+    const routine = shot?.cuts === 1 && shot.referenceCount <= 1 && Array.isArray(shot.references) &&
+      shot.references.length <= 1 && shot.references.every((ref) => ref.kind === 'image')
+    for (const model of new Set(quote.items.map((i) => i.model))) {
+      requireGuideRead(ctx, model, undefined, routine ? generateFromShots.id : undefined)
+    }
     const total = quote.items.reduce((n, i) => n + (i.credits ?? 0), 0)
     const largest = Math.max(0, ...quote.items.map((i) => i.credits ?? 0))
     // ONE approval for the set, on the STATED total; a stale fingerprint is a
@@ -12369,11 +12420,16 @@ export const generateFromShots: Operation<{
       )
     }
     approvedSpend(ctx)
-    const ran = await desktop.post('/agent/shots/batch-generate', {
+    const ran = await desktop.post<{ results?: Array<{ shotId: string; status: string }> }>('/agent/shots/batch-generate', {
       shotIds: quote.items.map((i) => i.shotId),
       fingerprint: quote.fingerprint,
       draft,
     })
+    for (const item of ran.results ?? []) {
+      if (item.status === 'failed' || item.status === 'rejected') {
+        recordGenerationRejection(ctx, generateFromShots.id, quote.items.find((shot) => shot.shotId === item.shotId)?.model)
+      }
+    }
     return seatNote ? ok(ran, `${JSON.stringify(ran)}\n${seatNote}`) : ok(ran)
   },
 }
@@ -12904,6 +12960,7 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const guide = locked.notice ?? `${locked.name} is not open to this account. Run the job on the general rules.`
       // The guide gate makes an agent read what this account holds; a guide it cannot open never blocks a generation.
       ctx?.guidesRead?.add(locked.name)
+      ctx?.guideEvidence?.full.add(locked.name)
       return { text: guide, data: { topic: locked.name, tier: locked.tier, locked: true, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     // The shared brain with the user's My brain laid over it; theirs wins on a conflict (skills/my-brain.ts).
@@ -12939,7 +12996,10 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       const guide = lockedAlias?.notice ?? `The guide ${resolved} comes from the connected Slates account and is not on this machine (${served.problem ?? 'no brain received yet'}). ${CONNECT_FOR_BRAIN}, then ask again.`
       // A locked guide's notice carries its craft card (slates-api lib/brain.ts lockedNotice), so it counts as read; a
       // guide that never arrived does not, so no generation runs without the card (Eric, 2026-10-23: a hard blocker).
-      if (lockedAlias) ctx?.guidesRead?.add(resolved)
+      if (lockedAlias) {
+        ctx?.guidesRead?.add(resolved)
+        ctx?.guideEvidence?.full.add(resolved)
+      }
       return { text: guide, data: { topic: resolved, ...(lockedAlias ? { tier: lockedAlias.tier, locked: true } : { unavailable: true }), bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     if (resolved) {
@@ -12952,8 +13012,10 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       // router with the preload only to a connection that has not opened it, so this answer is the agent's one copy.
       const preload = resolved === BRAIN_ROUTER ? myBrainPreload() : ''
       const guide = `${preload ? `${preload}\n\n` : ''}${own}${retrieveGuide(resolved, brain.skills[resolved], depth, input.query)}`
-      ctx?.guidesRead?.add(resolved)
-      return { text: guide, data: { topic: resolved, tier: 'free', ...(mine ? { source: 'my-brain' } : {}), depth: servedDepth(resolved, depth, input.query), bytes: Buffer.byteLength(guide, 'utf8'), guide } }
+      const deliveredDepth = servedDepth(resolved, depth, input.query)
+      if (deliveredDepth === 'full' || (deliveredDepth === 'card' && !input.query?.trim())) ctx?.guidesRead?.add(resolved)
+      if (deliveredDepth === 'full') ctx?.guideEvidence?.full.add(resolved)
+      return { text: guide, data: { topic: resolved, tier: 'free', ...(mine ? { source: 'my-brain' } : {}), depth: deliveredDepth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     const member = await memberGuideCatalog(ctx)
     const privateEntry = member.entries.find(entry => entry.name === topic)
@@ -12967,7 +13029,8 @@ export const getPromptingGuide: Operation<{ topic?: string; depth?: GuideDepth; 
       if (typeof result?.markdown !== 'string') throw new Error('Invalid member guide body')
       const depth = input.depth ?? 'card'
       const guide = retrieveGuide(privateEntry.name, result.markdown, depth, input.query)
-      ctx?.guidesRead?.add(privateEntry.name)
+      if (depth === 'full' || (depth === 'card' && !input.query)) ctx?.guidesRead?.add(privateEntry.name)
+      if (depth === 'full') ctx?.guideEvidence?.full.add(privateEntry.name)
       return { text: guide, data: { topic: privateEntry.name, tier: 'paid', depth, bytes: Buffer.byteLength(guide, 'utf8'), guide } }
     }
     // Slates' guides first, then HyperFrames' (they carry the craft for HTML layers and editing).
@@ -13019,9 +13082,9 @@ export const loadTools: Operation<{ group?: OperationGroup; query?: string; name
   // Worded to be true on both surfaces: the desktop agent must load an
   // extended tool before calling it, while the MCP server lists every tool, so
   // "missing from your list" never happens there by default.
-  description: 'Find Slates tools by task. query searches tool names and descriptions and returns a compact list. names returns up to five exact tools with their schemas; group returns a whole task group. Call the tools by their own names. If a tool you need is missing from your tool list, a names or group load adds it; a load replaces the previous optional selection, and query alone does not change it. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
+  description: 'Find Slates tools by task. query searches names and descriptions. names loads up to five exact schemas; group loads a task group. Each load replaces the previous optional selection. Search alone leaves it in place. Groups: ' + Object.entries(GROUP_SUMMARY).map(([g, s]) => `${g}: ${s}`).join('; '),
   input: z.object({
-    group: z.enum(['script', 'library', 'timeline', 'admin', 'blender']).optional(),
+    group: z.enum(Object.keys(GROUP_SUMMARY) as [OperationGroup, ...OperationGroup[]]).optional(),
     query: z.string().min(1).max(160).optional().describe('Search for a task such as generate image, create shot, or edit video.'),
     names: z.array(z.string()).min(1).max(5).optional().describe('Exact operation names to load after discovery. Their permission annotations remain separate.'),
   }).refine((v) => [v.group, v.query, v.names].filter(Boolean).length === 1, 'Pass exactly one of query, names, or group.'),

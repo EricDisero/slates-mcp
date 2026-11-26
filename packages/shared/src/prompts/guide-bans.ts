@@ -50,3 +50,14 @@ export function parseGuideBans(skill: string, content: string, strict = false): 
   }
   return tokens
 }
+
+const matchers = new Map<string, RegExp>()
+export function matcherFor(token: string): RegExp {
+  let matcher = matchers.get(token)
+  if (!matcher) {
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    matcher = new RegExp(`(?<!\\w)${escaped}(?!\\w)`, 'i')
+    matchers.set(token, matcher)
+  }
+  return matcher
+}
