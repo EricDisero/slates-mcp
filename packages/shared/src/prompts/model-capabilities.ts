@@ -430,6 +430,9 @@ export const FLUX_3_RESOLUTIONS: Record<'1k' | '2k' | '4k', '1k' | '1.5k' | '2k'
   '4k': '2k',
 }
 
+/** Largest conditioned video the direct reference upload must carry. */
+export const VIDEO_REFERENCE_UPLOAD_BYTES = 200 * 1024 * 1024
+
 export interface ModelCapability {
   maxPromptLength?: number
   promptOptionalWithFirstFrame?: boolean
