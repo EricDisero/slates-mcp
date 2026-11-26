@@ -824,7 +824,7 @@ const MAGI_2: PromptingTipsEntry = {
       {
         heading: "Write the whole shot as a director's caption",
         example: 'Subject and setting · the action beat by beat · camera · light · Sound: line',
-        note: 'It was trained on long, structured captions, so a one-line prompt underuses it. Plain, direct English, heavy on verbs and on how things change over time.',
+        note: 'The Preview model trained on structured captions. Try that format for a shot with several beats. Plain, direct English, heavy on verbs and on how things change over time.',
       },
       {
         heading: 'From a start frame, spend the words on motion',
@@ -851,14 +851,14 @@ const MAGI_2: PromptingTipsEntry = {
         note: 'Name the sources you want to hear. Write dialogue yourself, in the language it should be spoken.',
       },
       {
-        heading: "Say what you want, never what you don't",
+        heading: 'Describe visible targets',
         example: 'static camera · an empty street · clear daylight',
-        note: 'Turn every constraint into something visible. A readable sign or label: the exact words, facing the camera, held still for a second.',
+        note: 'Try naming what should appear in the frame. A readable sign or label: the exact words, facing the camera, held still for a second.',
       },
     ],
   ],
   footer: [
-    'Draft at a short length, then render the full take once the shot works; keep the seed to compare prompt changes. The provider may rewrite prompts on its side and offers no switch to turn that off on this model.',
+    'Draft at a short length, then render the full take once the shot works. The provider may rewrite prompts on its side and offers no switch to turn that off on this model.',
   ],
 }
 
