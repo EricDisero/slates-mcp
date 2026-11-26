@@ -431,6 +431,9 @@ export const FLUX_3_RESOLUTIONS: Record<'1k' | '2k' | '4k', '1k' | '1.5k' | '2k'
 }
 
 export interface ModelCapability {
+  maxPromptLength?: number
+  promptOptionalWithFirstFrame?: boolean
+  promptUsesCodePoints?: boolean
   imageResolutions?: ImageResolution[]
   /** Product default shared by estimates and generation. */
   defaultImageResolution?: ImageResolution
@@ -446,6 +449,7 @@ export interface ModelCapability {
    */
   maxBatchImages?: number
   /** Per-file reference-audio bounds, independently of the combined cap. */
+  referenceSecondsTolerance?: number
   referenceVideoDuration?: { min: number; max: number }
   referenceAudioDuration?: { min: number; max: number }
   aspectRatios: AspectRatio[]
@@ -656,6 +660,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // with reference images lands, takes the three-ratio enum (fal OpenAPI, read
   // 2026-11-24).
   'kling-v3.0-std': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
     videoResolution: { options: ['720p', '4k'] },
@@ -666,6 +671,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-pro': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
     videoResolution: { options: ['1080p', '4k'] },
@@ -675,6 +681,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-omni': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
     // O3 Standard: 720p, as Standard above. Omni Pro is the 1080p tier.
@@ -686,6 +693,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-omni-pro': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_DIRECT_ASPECT_RATIOS,
     providerAspectRatios: { fal: KLING_FAL_ASPECT_RATIOS },
     videoResolution: { options: ['1080p', '4k'] },
@@ -698,6 +706,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // Kling O3 video-to-video edit (fal-only; the source clip is the canvas, so
   // aspect/resolution/duration all follow it).
   'kling-v3.0-omni-edit': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_FAL_ASPECT_RATIOS,
     videoResolution: { options: ['1080p'], fixed: '1080p' },
     duration: { min: 3, max: 15, mode: 'continuous' },
@@ -705,6 +714,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'kling-v3.0-omni-pro-edit': {
+    maxPromptLength: 2500,
     aspectRatios: KLING_FAL_ASPECT_RATIOS,
     videoResolution: { options: ['1080p'], fixed: '1080p' },
     duration: { min: 3, max: 15, mode: 'continuous' },
@@ -720,6 +730,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // (Kling O3, Seedance 2.5 and Omni Flash hold the reference seat), so there is
   // no transport for an ingredient. Frames are frame slots, not references.
   'kling-v4.0': {
+    maxPromptLength: 26000,
     aspectRatios: KLING_V4_ASPECT_RATIOS,
     videoResolution: { options: ['720p', '1080p'], default: '720p' },
     duration: { min: 3, max: 30, mode: 'continuous' },
@@ -742,6 +753,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // a new resolution token in every exhaustive map.
 
   'omni-flash-1-2': {
+    maxPromptLength: 5000,
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
     videoResolution: { options: ['720p', '1080p', '4k'], default: '720p' },
     // fal: `duration` integer, minimum 3, maximum 15. Google: "any whole second
@@ -777,6 +789,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'omni-flash-1-2-edit': {
+    maxPromptLength: 5000,
     aspectRatios: OMNI_FLASH_ASPECT_RATIOS,
     // fal's v1.2 edit takes `resolution`, same enum and default; no duration
     // parameter, so the output follows the source clip.
@@ -800,6 +813,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // all-reference mode are mutually exclusive."
 
   'wan-3.0': {
+    maxPromptLength: 20000,
     aspectRatios: WAN_3_ASPECT_RATIOS,
     // fal enum 480p / 720p / 1080p, schema default 1080p. Our default is 720p
     // for the Seedance 2.5 reason: a 30s take at 1080p is 300 credits, and
@@ -830,6 +844,10 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // the image-to-video request has no ratio field.
 
   'magi-2': {
+    promptOptionalWithFirstFrame: true,
+    promptUsesCodePoints: true,
+    referenceSecondsTolerance: 0,
+    maxPromptLength: 15000,
     aspectRatios: MAGI_2_ASPECT_RATIOS,
     // resolution enum is `1080p` alone on all three endpoints.
     videoResolution: { options: ['1080p'], fixed: '1080p' },
@@ -851,6 +869,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // ── Seedance ───────────────────────────────────────────────────────────────
 
   'seedance-2': {
+    maxPromptLength: 4000,
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
     videoResolution: { options: ['480p', '720p', '1080p', '4k'], default: '1080p' },
     duration: { min: 4, max: 15, mode: 'continuous' },
@@ -896,6 +915,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'seedance-2.5': {
+    maxPromptLength: 4000,
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
     // Keep 720p as the default: a 30s take at 1080p is ~853 credits.
     videoResolution: { options: ['480p', '720p', '1080p', '4k'], default: '720p' },
@@ -912,6 +932,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'seedance-2.5-edit': {
+    maxPromptLength: 4000,
     aspectRatios: SEEDANCE_ASPECT_RATIOS,
     videoResolution: { options: ['480p', '720p', '1080p', '4k'], default: '720p' },
     duration: { min: 4, max: 30, mode: 'continuous' },
@@ -945,6 +966,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   // exact-id map, not a prefix.
 
   'minimax-h3': {
+    maxPromptLength: 7000,
     // fal reference-to-video schema, 2026-09-09: each audio clip is 2-15s.
     referenceAudioDuration: { min: 2, max: 15 },
     referenceVideoDuration: { min: 2, max: 15 },
@@ -980,6 +1002,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'minimax-h3-max': {
+    maxPromptLength: 7000,
     // fal reference-to-video schema, 2026-09-09: each audio clip is 2-15s.
     referenceAudioDuration: { min: 2, max: 15 },
     referenceVideoDuration: { min: 2, max: 15 },
@@ -1017,6 +1040,7 @@ export const MODEL_CAPABILITIES: Record<string, ModelCapability> = {
   },
 
   'minimax-h3-max-turbo': {
+    maxPromptLength: 7000,
     aspectRatios: MINIMAX_H3_ASPECT_RATIOS,
     // fal schema for both Turbo endpoints, 2026-09-29: enum
     // ["480P","768P","1080P"], default "768P", the same 1080P "latent
@@ -1336,7 +1360,8 @@ export function referenceSecondsBounds(model: string, kind: 'video' | 'audio'): 
 export function referenceClipInBounds(model: string, kind: 'video' | 'audio', seconds: number): boolean {
   if (!Number.isFinite(seconds) || seconds <= 0) return false
   const { clip } = referenceSecondsBounds(model, kind)
-  return !clip || (seconds >= clip.min && seconds <= clip.max + REFERENCE_SECONDS_TOLERANCE)
+  const tolerance = MODEL_CAPABILITIES[model]?.referenceSecondsTolerance ?? REFERENCE_SECONDS_TOLERANCE
+  return !clip || (seconds >= clip.min && seconds <= clip.max + tolerance)
 }
 
 export interface ReferenceSecondsVerdict {
@@ -1377,7 +1402,8 @@ export function checkReferenceSeconds(
   if (known.length === 0) return verdict(null)
   const total = basis === 'billed' ? billed : actual
   const shown = basis === 'billed' ? `${billed}s, each clip rounded up to a whole second` : `${actual.toFixed(1)}s`
-  if (max > 0 && total > max + (basis === 'billed' ? 0 : REFERENCE_SECONDS_TOLERANCE)) {
+  const tolerance = MODEL_CAPABILITIES[model]?.referenceSecondsTolerance ?? REFERENCE_SECONDS_TOLERANCE
+  if (max > 0 && total > max + (basis === 'billed' ? 0 : tolerance)) {
     return verdict(`${name} takes at most ${max}s of reference ${kind} in total, and this has ${shown}. Trim a clip first.`)
   }
   if (total < min) {
@@ -1393,6 +1419,19 @@ export function maxIngredientImagesFor(model: string, videoResolution?: string):
   const cap = MODEL_CAPABILITIES[model]
   if (videoResolution && cap?.noReferenceImagesAt?.includes(videoResolution as VideoResolution)) return 0
   return cap?.maxIngredientImages ?? 0
+}
+
+export function promptLengthFor(model: string, prompt: string): number {
+  return MODEL_CAPABILITIES[model]?.promptUsesCodePoints ? Array.from(prompt).length : prompt.length
+}
+
+export function videoPromptError(model: string, prompt: unknown, firstFrame: boolean, hasCuts = false): string | undefined {
+  const cap = MODEL_CAPABILITIES[model]
+  if (prompt != null && typeof prompt !== 'string') return 'The prompt must be text.'
+  if (!prompt?.trim() && !hasCuts && !(firstFrame && cap?.promptOptionalWithFirstFrame)) return 'A prompt is required.'
+  if (prompt && cap?.maxPromptLength && promptLengthFor(model, prompt) > cap.maxPromptLength) {
+    return `${model} takes at most ${cap.maxPromptLength} prompt characters.`
+  }
 }
 
 /** Whether the aspect ratio shapes this request. With a start frame the frame

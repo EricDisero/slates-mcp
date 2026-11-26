@@ -211,6 +211,20 @@ try {
     assert.deepEqual([h3.data.variant, h3.data.cost_credits], ['minimax-h3-768p-5s-ref2', 44], 'H3 bills the key the desktop composed, mentions included')
     assert.equal(d.sent('POST /agent/generation/video').at(-1).maxCredits, 44)
 
+    quote = { costKey: 'magi-2-1080p-5s', credits: 22 }
+    const magi = { projectId, model: 'magi2', duration: 5 }
+    for (const shape of [{ firstFrameAssetId: 'IMG-A1' }, { aspectRatio: '16:9', prompt: '😀'.repeat(15000) }]) {
+      const parsed = generateVideo.input.parse({ ...magi, ...shape })
+      const result = await generateVideo.run(parsed, ctxFor(d, cloud({ [quote.costKey]: 22 })))
+      assert.equal(result.data.requires_confirm, true, result.text)
+      const sent = d.sent('POST /agent/generation/video-quote').at(-1).request
+      assert.equal(sent.model, 'magi-2')
+      assert.equal(sent.aspectRatio, shape.aspectRatio)
+      assert.equal(sent.prompt, shape.prompt ?? '')
+    }
+    for (const shape of [{}, { prompt: '😀'.repeat(15001) }]) {
+      assert.deepEqual((await generateVideo.run({ ...magi, ...shape }, ctx)).data.missing, ['prompt'])
+    }
     // A desktop before 'video-quote': the op builds the key, so it needs each clip's length, and sends no ceiling.
     const older = await desktop({ ...assetRoutes, 'POST /agent/generation/video': () => made }, { without: ['video-quote', 'quote-post'] })
     const asked = await generateVideo.run({ ...call, confirm: true, background: true }, ctxFor(older))

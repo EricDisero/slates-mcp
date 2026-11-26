@@ -55,7 +55,7 @@ import {
 import {
   AGENT_ROUTE_PROVIDER, defaultImageResolutionFor,
   aspectRatioUnion, videoResolutionUnion, durationBounds,
-  aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
+  aspectRatioApplies, videoPromptError, aspectRatiosFor, videoResolutionsFor, getModelCapability, defaultVideoResolutionFor,
   maxIngredientImagesFor, maxReferenceVideosFor,
   checkAspectRatio, checkVideoResolution,
   describeAspectRatios, describeVideoResolutions, describeDurations,
@@ -5803,7 +5803,7 @@ function draftResolution(model: string | undefined, resolution?: string): '480p'
 }
 
 export const generateVideo: Operation<{
-  prompt: string
+  prompt?: string
   // Accepts base ids AND registry cost-key spellings — normalized by
   // resolveVideoModel() at the top of run() before any use.
   model: string
@@ -5842,14 +5842,14 @@ export const generateVideo: Operation<{
   description:
     'Generate video via Slates credits. Choose the model with slates-model-selection. Video models prompt very differently: the estimate returns the chosen model\'s prompting card, and its full guide (' +
     VIDEO_MODEL_GUIDES +
-    ') covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId, aspectRatio, and duration are required (requires_clarification otherwise). ' +
+    ') covers modes the card leaves out, via slates_get_prompting_guide. Read slates-content-policy when the scene involves conflict, creatures, crowds, destruction, weapons, or young characters. projectId and duration are required, plus aspectRatio when the endpoint takes it (requires_clarification otherwise). ' +
     confirmGateSentence('any image reference (frame, ingredient, character, environment or style)') +
     ' Image-to-video via firstFrameAssetId; a last frame via lastFrameAssetId and ingredients via ingredientAssetIds, each param stating which models take it. Asset params take UUIDs or badge codes ("IMG-A8"). ' +
     // GENERATED from the skill's own slop-token list. Always in context on both
     // surfaces, so it survives an agent that skips slates_get_prompting_guide.
     describeBannedTokens('video'),
   input: z.object({
-    prompt: z.string().min(1).max(4000),
+    prompt: z.string().optional().describe("Optional when the selected model can animate a start frame on its own."),
     // ROUTING doctrine only. Every capability number was stripped on 2026-08-16
     // and now lives in the aspectRatio / duration / videoResolution descriptions
     // below, generated from MODEL_CAPABILITIES. "16:9 only" for a model and
@@ -5965,6 +5965,14 @@ export const generateVideo: Operation<{
     // not reasonable for video given the cost.
     // Non-blocking prompt hygiene, computed once. Reported on the gates that
     // fire BEFORE any spend, where a rewrite is still free.
+    const promptError = videoPromptError(input.model, input.prompt, !!input.firstFrameAssetId)
+    if (promptError) return ok({ requires_clarification: true, missing: ['prompt'], message: promptError })
+    input.prompt ??= ''
+    const needsRatio = aspectRatioApplies(input.model, {
+      firstFrame: !!input.firstFrameAssetId,
+      referenceImages: [input.ingredientAssetIds, input.characterAssetIds, input.environmentAssetIds, input.styleAssetIds]
+        .reduce((n, ids) => n + (ids?.length ?? 0), 0),
+    })
     const promptWarning = bannedTokenWarning(input.prompt, 'video', promptingSkillFor(resolved.model))
     if (!input.projectId) {
       return ok({
@@ -5976,9 +5984,9 @@ export const generateVideo: Operation<{
           'projectId is required for video generation. Use slates_list_projects to find one or slates_create_project to make a new one. Video gens cost tens to a few hundred credits per call — they need to land in a project so the user sees the progress card and the result.',
       })
     }
-    if (!input.aspectRatio || !input.duration) {
+    if ((needsRatio && !input.aspectRatio) || !input.duration) {
       const missing: string[] = []
-      if (!input.aspectRatio) missing.push('aspectRatio')
+      if (needsRatio && !input.aspectRatio) missing.push('aspectRatio')
       if (!input.duration) missing.push('duration')
       return ok({
         requires_clarification: true,
@@ -5992,7 +6000,7 @@ export const generateVideo: Operation<{
           // a model locked to 16:9, "Kling/Seedance support 1:1 16:9 9:16 4:3 3:4
           // 21:9" and "Kling 5-15s" — three wrong claims in one sentence.
           `or ask the user. ` +
-          `Aspect ratio for ${input.model}: ${aspectRatiosFor(input.model, AGENT_ROUTE_PROVIDER).join(', ')}. ` +
+          (needsRatio ? `Aspect ratio for ${input.model}: ${aspectRatiosFor(input.model, AGENT_ROUTE_PROVIDER).join(', ')}. ` : '') +
           `Duration: ${describeDurations([input.model])}. ` +
           `Cost scales linearly with duration.`,
       })

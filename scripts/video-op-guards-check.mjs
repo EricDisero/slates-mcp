@@ -89,9 +89,10 @@ for (const model of VIDEO_MODELS) {
     if (rowBasis === 'actual' && max > 0 && clipsFit && verdict.actual <= max) assert.equal(verdict.error, null, `${model} [${clips.join(', ')}]s is ${verdict.actual.toFixed(1)}s measured, inside its ${max}s cap`)
     if (rowBasis === 'billed' && max > 0 && verdict.billed > max) assert.ok(verdict.error, `${model} [${clips.join(', ')}]s bills ${verdict.billed}s, past its ${max}s cap`)
   }
-  // A probe reads a clip a few hundredths long: that much over a per-clip ceiling is still the ceiling.
+  // kie-magi-2-docs.md sets a strict 30s maximum. Other rails allow small probe rounding errors.
   if (clip) {
-    assert.ok(!/long\. Trim/.test(checkReferenceSeconds(model, 'video', [clip.max + 0.03]).error ?? ''), `${model}: a ${clip.max + 0.03}s clip is inside its ${clip.max}s ceiling`)
+    const justOver = checkReferenceSeconds(model, 'video', [clip.max + 0.03]).error ?? ''
+    assert.equal(/long\. Trim/.test(justOver), model === 'magi-2', `${model}: unexpected per-clip allowance at ${clip.max + 0.03}s`)
     assert.match(checkReferenceSeconds(model, 'video', [clip.max + 0.2]).error ?? '', /long\. Trim/, `${model}: a ${clip.max + 0.2}s clip is over its ${clip.max}s ceiling`)
   }
 }
